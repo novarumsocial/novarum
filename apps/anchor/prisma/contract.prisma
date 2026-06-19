@@ -1,0 +1,7 @@
+model Session {
+  id         String   @id
+  secretHash Bytes
+  createdAt  DateTime
+
+  @@map("session")
+}

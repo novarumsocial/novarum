@@ -1,0 +1,17 @@
+{
+  "name": "novarum",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prettier": "^3.8.4",
+    "prettier-plugin-svelte": "^4.1.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "workspaces": [
+    "apps/*"
+  ]
+}

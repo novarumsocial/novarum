@@ -1,0 +1,36 @@
+{
+  "name": "anchor",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "bun@1.3.9",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts",
+    "contract:emit": "bun prisma-next contract emit",
+    "db:init": "bun prisma-next db init",
+    "db:update": "bun prisma-next db update",
+    "db:verify": "bun prisma-next db verify",
+    "migration:plan": "bun prisma-next migration plan",
+    "migrate": "bun prisma-next migrate",
+    "migration:status": "bun prisma-next migration status",
+    "migration:show": "bun prisma-next migration show"
+  },
+  "dependencies": {
+    "@prisma-next/postgres": "latest",
+    "dotenv": "^17.4.2",
+    "elysia": "latest"
+  },
+  "devDependencies": {
+    "@prisma-next/adapter-postgres": "latest",
+    "@prisma-next/cli": "latest",
+    "@prisma-next/contract": "latest",
+    "@prisma-next/sql-contract": "latest",
+    "@prisma-next/sql-orm-client": "latest",
+    "@prisma-next/target-postgres": "latest",
+    "@types/node": "^25.6.2",
+    "bun-types": "latest",
+    "prisma-next": "latest"
+  },
+  "module": "src/index.js"
+}
