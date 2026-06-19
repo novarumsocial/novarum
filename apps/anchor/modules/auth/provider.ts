@@ -3,9 +3,11 @@ import { randomString } from '../../utils/randomString';
 import type { Contract } from '../../prisma/contract.d';
 import { db } from '../../prisma/db';
 
-const sessionExpiresInSeconds = 60 * 60 * 24 * 30;
+export const sessionCookieName = 'session_token';
+export const sessionExpiresInSeconds = 60 * 60 * 24 * 30;
+export const sessionExpiresInMilliseconds = sessionExpiresInSeconds * 1000;
 
-export async function createSession(): Promise<SessionWithToken> {
+export async function createSession(userId: string): Promise<SessionWithToken> {
   const now = new Date();
 
   const id = randomString();
@@ -16,26 +18,24 @@ export async function createSession(): Promise<SessionWithToken> {
 
   const session: SessionWithToken = {
     id,
+    userId,
     secretHash,
     createdAt: now,
     token,
   };
 
-  await db.orm.public.Session.create({ id, secretHash, createdAt: now });
+  await db.orm.public.Session.create({ id, userId, secretHash, createdAt: now });
 
   return session;
 }
 
 export async function validateSessionToken(token: string): Promise<Session | null> {
-  const tokenParts = token.split('.');
-  if (tokenParts.length !== 2) {
+  const tokenParts = parseSessionToken(token);
+  if (!tokenParts) {
     return null;
   }
 
-  const [sessionId, sessionSecret] = tokenParts;
-  if (!sessionId || !sessionSecret) {
-    return null;
-  }
+  const { sessionId, sessionSecret } = tokenParts;
 
   const session = await getSession(sessionId);
   if (!session) {
@@ -51,7 +51,16 @@ export async function validateSessionToken(token: string): Promise<Session | nul
   return session;
 }
 
-async function getSession(sessionId: string): Promise<Session | null> {
+export async function deleteSessionToken(token: string): Promise<void> {
+  const tokenParts = parseSessionToken(token);
+  if (!tokenParts) {
+    return;
+  }
+
+  await deleteSession(tokenParts.sessionId);
+}
+
+export async function getSession(sessionId: string): Promise<Session | null> {
   const now = new Date();
 
   const session = await db.orm.public.Session.where({ id: sessionId }).first();
@@ -59,7 +68,7 @@ async function getSession(sessionId: string): Promise<Session | null> {
     return null;
   }
 
-  if (now.getTime() - session.createdAt.getTime() >= sessionExpiresInSeconds * 1000) {
+  if (isSessionExpired(session, now)) {
     await deleteSession(sessionId);
     return null;
   }
@@ -67,14 +76,55 @@ async function getSession(sessionId: string): Promise<Session | null> {
   return session;
 }
 
-async function deleteSession(sessionId: string): Promise<void> {
+export async function deleteSession(sessionId: string): Promise<void> {
   await db.orm.public.Session.where({ id: sessionId }).delete();
 }
 
-async function hashSecret(secret: string): Promise<Uint8Array> {
+export function createSessionCookie(token: string): SessionCookie {
+  return {
+    name: sessionCookieName,
+    value: token,
+    attributes: {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: sessionExpiresInSeconds,
+    },
+  };
+}
+
+export function createBlankSessionCookie(): SessionCookie {
+  return {
+    name: sessionCookieName,
+    value: '',
+    attributes: {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    },
+  };
+}
+
+export async function hashSecret(secret: string): Promise<Uint8Array> {
   const secretBytes = new TextEncoder().encode(secret);
   const secretHashBuffer = await crypto.subtle.digest('SHA-256', secretBytes);
   return new Uint8Array(secretHashBuffer);
+}
+
+function parseSessionToken(token: string): SessionTokenParts | null {
+  const [sessionId, sessionSecret, ...extraParts] = token.split('.');
+  if (!sessionId || !sessionSecret || extraParts.length > 0) {
+    return null;
+  }
+
+  return { sessionId, sessionSecret };
+}
+
+function isSessionExpired(session: Session, now = new Date()): boolean {
+  return now.getTime() - session.createdAt.getTime() >= sessionExpiresInMilliseconds;
 }
 
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -91,7 +141,25 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export type Session = DefaultModelRow<Contract, 'Session'>;
+export type User = DefaultModelRow<Contract, 'User'>;
 
 export interface SessionWithToken extends Session {
   token: string;
+}
+
+interface SessionTokenParts {
+  sessionId: string;
+  sessionSecret: string;
+}
+
+export interface SessionCookie {
+  name: typeof sessionCookieName;
+  value: string;
+  attributes: {
+    httpOnly: true;
+    secure: boolean;
+    sameSite: 'lax';
+    path: '/';
+    maxAge: number;
+  };
 }

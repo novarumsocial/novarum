@@ -1,7 +1,20 @@
+model User {
+  id           String @id
+  email        String @unique
+  passwordHash String
+
+  sessions Session[]
+
+  @@map("user")
+}
+
 model Session {
   id         String   @id
+  userId     String
   secretHash Bytes
   createdAt  DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
