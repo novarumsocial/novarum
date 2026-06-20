@@ -80,31 +80,36 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await db.orm.public.Session.where({ id: sessionId }).delete();
 }
 
-export function createSessionCookie(token: string): SessionCookie {
+export function createSessionCookie(token: string, request?: Request): SessionCookie {
   return {
     name: sessionCookieName,
     value: token,
-    attributes: {
-      httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: sessionExpiresInSeconds,
-    },
+    attributes: sessionCookieAttributes(sessionExpiresInSeconds, request),
   };
 }
 
-export function createBlankSessionCookie(): SessionCookie {
+export function createBlankSessionCookie(request?: Request): SessionCookie {
   return {
     name: sessionCookieName,
     value: '',
-    attributes: {
-      httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    },
+    attributes: sessionCookieAttributes(0, request),
+  };
+}
+
+function sessionCookieAttributes(maxAge: number, request?: Request): SessionCookie['attributes'] {
+  const forwardedHost = request?.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const requestHost = request ? new URL(request.url).host : 'localhost';
+  const host = forwardedHost ?? request?.headers.get('host') ?? requestHost;
+  const hostname = host.replace(/^\[/, '').replace(/\](:\d+)?$/, '').replace(/:\d+$/, '');
+  const local = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  const secure = !local;
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'none' : 'lax',
+    path: '/',
+    maxAge,
   };
 }
 
@@ -158,7 +163,7 @@ export interface SessionCookie {
   attributes: {
     httpOnly: true;
     secure: boolean;
-    sameSite: 'lax';
+    sameSite: 'lax' | 'none';
     path: '/';
     maxAge: number;
   };

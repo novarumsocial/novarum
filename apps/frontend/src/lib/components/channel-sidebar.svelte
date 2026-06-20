@@ -6,6 +6,7 @@
     HeadphoneOff,
   } from "@lucide/svelte";
   import type { Server, ChannelCategory, Channel } from "$lib/data/mock";
+  import UserArea from "./user-area.svelte";
 
   let {
     server,
@@ -96,26 +97,6 @@
       {/if}
     {/each}
   </div>
-
-  <!-- user area -->
-  <div class="flex h-14 shrink-0 items-center gap-2.5 border-t border-border bg-sidebar-accent/30 px-3">
-    <div class="flex size-8 shrink-0 items-center justify-center bg-primary/20 text-xs font-bold text-primary">
-      A
-    </div>
-    <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">Alice Chen</p>
-      <p class="truncate text-[11px] text-muted-foreground">@alice@novarum.social</p>
-    </div>
-    <div class="flex items-center gap-0.5">
-      <button class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground" aria-label="Mute">
-        <Mic class="size-4" />
-      </button>
-      <button class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground" aria-label="Deafen">
-        <Headphones class="size-4" />
-      </button>
-      <button class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground" aria-label="User settings">
-        <Settings class="size-4" />
-      </button>
-    </div>
-  </div>
+  
+  <UserArea />
 </aside>

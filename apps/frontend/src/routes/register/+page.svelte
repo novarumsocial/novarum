@@ -2,6 +2,8 @@
 	import { z } from "zod";
 	import { defaults, superForm } from "sveltekit-superforms";
 	import { zod4, zod4Client } from "sveltekit-superforms/adapters";
+	import { goto } from "$app/navigation";
+	import { anchor } from "$lib/anchor.svelte";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Form from "$lib/components/ui/form/index.js";
@@ -31,11 +33,14 @@
 				.max(32, "At most 32 characters.")
 				.regex(/^[a-zA-Z0-9._]+$/, "Letters, numbers, dots, underscores only.")
 				.default(""),
-			homeServer: z
+			homeserver: z
 				.string()
 				.trim()
 				.min(1, "Pick a home server.")
-				.regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Enter a valid server domain.")
+				.regex(
+					/^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(:\d{1,5})?$/,
+					"Enter a valid server address."
+				)
 				.default("novarum.social"),
 			displayName: z.string().trim().max(64, "At most 64 characters.").default(""),
 			email: z.email("Enter a valid email.").default(""),
@@ -49,6 +54,15 @@
 
 	let loading = $state(false);
 	let showPassword = $state(false);
+	let submitError = $state("");
+
+	function getErrorMessage(error: unknown) {
+		if (error && typeof error === "object" && "error" in error) {
+			return String(error.error);
+		}
+
+		return "Could not create your account.";
+	}
 
 	const form = superForm(defaults(zod4(registerSchema)), {
 		SPA: true,
@@ -57,21 +71,35 @@
 		multipleSubmits: "prevent",
 		onSubmit() {
 			loading = true;
+			submitError = "";
 		},
-		onUpdate({ form: updatedForm }) {
+		async onUpdate({ form: updatedForm }) {
 			if (!updatedForm.valid) {
 				loading = false;
 				return;
 			}
 
-			setTimeout(() => {
+			anchor.setHomeServer(updatedForm.data.homeserver);
+			const { error } = await anchor.client.auth.signup.post({
+				username: updatedForm.data.username,
+				displayName: updatedForm.data.displayName,
+				email: updatedForm.data.email,
+				password: updatedForm.data.password,
+				homeserver: updatedForm.data.homeserver
+			});
+
+			if (error) {
+				submitError = getErrorMessage(error.value);
 				loading = false;
-			}, 1000);
+				return;
+			}
+
+			await goto("/app");
 		}
 	});
 
 	const { form: formData, enhance } = form;
-	let handle = $derived(`@${$formData.username || "username"}@${$formData.homeServer || "server"}`);
+	let handle = $derived(`@${$formData.username || "username"}@${$formData.homeserver || "server"}`);
 </script>
 
 <svelte:head>
@@ -136,7 +164,7 @@
 							<Form.FieldErrors class="text-xs" />
 						</Form.Field>
 
-						<Form.Field {form} name="homeServer" class="space-y-1.5">
+						<Form.Field {form} name="homeserver" class="space-y-1.5">
 							<Form.Control>
 								{#snippet children({ props })}
 									<Form.Label>Home server</Form.Label>
@@ -146,7 +174,7 @@
 										/>
 										<Input
 											{...props}
-											bind:value={$formData.homeServer}
+											bind:value={$formData.homeserver}
 											placeholder="novarum.social"
 											class="pl-8"
 											autocomplete="url"
@@ -287,6 +315,10 @@
 							<ArrowRight class="size-4" />
 						{/if}
 					</Form.Button>
+
+					{#if submitError}
+						<p class="text-sm text-destructive">{submitError}</p>
+					{/if}
 				</form>
 
 				<!--<div class="my-5 flex items-center gap-3">
