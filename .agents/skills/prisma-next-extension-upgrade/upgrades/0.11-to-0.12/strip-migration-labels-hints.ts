@@ -4,7 +4,7 @@
  * `migrationHash` over the surviving metadata envelope + sibling `ops.json`.
  *
  * Background: starting at the 0.12 release the migration manifest schema is
- * closed (`'+': 'reject'`) — `labels` and `hints` are no longer part of the
+ * closed (`'+': 'reject'`) - `labels` and `hints` are no longer part of the
  * model, so any manifest still carrying either key fails to load with
  * `INVALID_MANIFEST` naming the offending key. The two fields also no longer
  * participate in the content-addressed migration identity: `migrationHash` is
@@ -36,7 +36,7 @@
  *
  * Format-preserving edit: rather than reparse-and-reserialise (which would
  * reflow every value to a single canonical style and bloat the diff), this
- * codemod performs a surgical text edit — it removes only the `labels` and
+ * codemod performs a surgical text edit - it removes only the `labels` and
  * `hints` top-level key lines and swaps the `migrationHash` value in place.
  * Every other byte (key order, indentation, and whether arrays like
  * `providedInvariants` are written inline or expanded) is left exactly as the
@@ -52,7 +52,7 @@
  *
  * The hash algorithm is replicated inline (canonicalisation rules from
  * `@prisma-next/framework-components` `canonicalizeJson` + the migration-tools
- * `computeMigrationHash`) so this script stays self-contained — consumers run
+ * `computeMigrationHash`) so this script stays self-contained - consumers run
  * it via `pnpm exec tsx` from their project root with no dependency on any
  * `@prisma-next/*` package being resolvable from that root.
  *
@@ -76,7 +76,7 @@ const projectRoot = process.cwd();
 // --- Inline canonicalisation + hash --------------------------------------
 // Replicated from `@prisma-next/framework-components` `canonicalizeJson`
 // (sortKeys + JSON.stringify) and the migration-tools `computeMigrationHash`.
-// Kept inline so the script has no `@prisma-next/*` import — pnpm's strict
+// Kept inline so the script has no `@prisma-next/*` import - pnpm's strict
 // node_modules layout won't resolve transitive framework deps from a
 // consumer's project root.
 
@@ -163,7 +163,7 @@ function scanValueEnd(text: string, start: number): number {
     throw new Error('unterminated container while scanning JSON value');
   }
 
-  // Primitive (number / true / false / null) — run to the next structural
+  // Primitive (number / true / false / null) - run to the next structural
   // terminator.
   let i = start;
   while (i < text.length && !',}]\r\n \t'.includes(text[i]!)) i += 1;
@@ -219,7 +219,7 @@ async function findMigrationManifests(root: string): Promise<string[]> {
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      // Unreadable directory — skip silently. The consumer's project root may
+      // Unreadable directory - skip silently. The consumer's project root may
       // legitimately contain restricted directories.
       return;
     }
@@ -295,7 +295,7 @@ async function processFile(path: string): Promise<Result> {
     out = replaceMigrationHash(out, oldHash, newHash);
   } else if (out !== raw) {
     // labels/hints were present but there is no string migrationHash to update
-    // — a malformed manifest we refuse to guess at.
+    // - a malformed manifest we refuse to guess at.
     throw new Error(`${path}: manifest is missing a string \`migrationHash\` field`);
   }
 
@@ -324,7 +324,7 @@ for (const path of manifests) {
     alreadyClean += 1;
   } else if (result.status === 'skipped-no-ops') {
     skipped += 1;
-    console.log(`SKIP  ${rel}  (no sibling ops.json — not a migration package)`);
+    console.log(`SKIP  ${rel}  (no sibling ops.json - not a migration package)`);
   } else {
     changed += 1;
     const verb = dryRun ? 'WOULD FIX' : 'FIXED';

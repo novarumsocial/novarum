@@ -4,7 +4,7 @@ to: "0.12"
 changes:
   - id: expr-visitor-add-window-func-method
     summary: |
-      The `ExprVisitor<R>` interface in `@prisma-next/sql-relational-core/ast` gained a required `windowFunc(expr: WindowFuncExpr): R` method (added to support `ROW_NUMBER() OVER (…)` lowering for `.distinct(cols)`). Every `ExprVisitor<R>` implementation in your extension — typically the object literal you pass to `expr.accept({ … })` — must add the new method or TypeScript will refuse the literal. The right body depends on what the visitor does: binding/encoding/transforming visitors usually treat `WindowFuncExpr` similarly to `AggregateExpr`; visitors that reject unsupported kinds in restricted contexts (e.g. grouped `HAVING`) should reject window functions there too. No automated codemod — author the body per visitor by hand.
+      The `ExprVisitor<R>` interface in `@prisma-next/sql-relational-core/ast` gained a required `windowFunc(expr: WindowFuncExpr): R` method (added to support `ROW_NUMBER() OVER (…)` lowering for `.distinct(cols)`). Every `ExprVisitor<R>` implementation in your extension - typically the object literal you pass to `expr.accept({ … })` - must add the new method or TypeScript will refuse the literal. The right body depends on what the visitor does: binding/encoding/transforming visitors usually treat `WindowFuncExpr` similarly to `AggregateExpr`; visitors that reject unsupported kinds in restricted contexts (e.g. grouped `HAVING`) should reject window functions there too. No automated codemod - author the body per visitor by hand.
     detection:
       glob: "**/*.ts"
       contains:
@@ -13,7 +13,7 @@ changes:
       anyMatch: false
   - id: any-expression-exhaustive-switch-add-window-func-case
     summary: |
-      The `AnyExpression` discriminated union in `@prisma-next/sql-relational-core/ast` gained a `WindowFuncExpr` variant (`kind: 'window-func'`). Exhaustive switches over `expr.kind` that use the `satisfies never` exhaustiveness pattern — typically in SQL renderers, AST walkers, and analysis passes — will fail to compile until they add a `case 'window-func':` arm. The arm's body depends on the switch's purpose; the most common shape is "render the window function as `fn() OVER (…)`" (matching Postgres/SQLite syntax) or "reject as unsupported in this context".
+      The `AnyExpression` discriminated union in `@prisma-next/sql-relational-core/ast` gained a `WindowFuncExpr` variant (`kind: 'window-func'`). Exhaustive switches over `expr.kind` that use the `satisfies never` exhaustiveness pattern - typically in SQL renderers, AST walkers, and analysis passes - will fail to compile until they add a `case 'window-func':` arm. The arm's body depends on the switch's purpose; the most common shape is "render the window function as `fn() OVER (…)`" (matching Postgres/SQLite syntax) or "reject as unsupported in this context".
     detection:
       glob: "**/*.ts"
       contains:
@@ -22,7 +22,7 @@ changes:
       anyMatch: false
   - id: distinct-cols-now-collapses-by-specified-columns
     summary: |
-      `.distinct(cols)` on `@prisma-next/sql-orm-client` `Collection` (and on nested `.include(…, c => c.distinct(cols)…)`) now keeps **one representative row per `(cols)` group**, matching Prisma semantics. Prior to 0.12, `.distinct(cols)` did not actually collapse rows on the specified columns — when the projection contained any other distinguishing column (typically `id`), rows that differed only in those other columns were all returned. No code change is required for consumer call sites, but any extension tests or fixtures that asserted the pre-0.12 no-collapse output will fail and need updating to reflect the new collapsed shape. The representative within each partition is picked by the user's `.orderBy(…)` (if any); when the orderBy doesn't fully order rows in a partition the pick is implementation-defined, matching Prisma's documented behaviour.
+      `.distinct(cols)` on `@prisma-next/sql-orm-client` `Collection` (and on nested `.include(…, c => c.distinct(cols)…)`) now keeps **one representative row per `(cols)` group**, matching Prisma semantics. Prior to 0.12, `.distinct(cols)` did not actually collapse rows on the specified columns - when the projection contained any other distinguishing column (typically `id`), rows that differed only in those other columns were all returned. No code change is required for consumer call sites, but any extension tests or fixtures that asserted the pre-0.12 no-collapse output will fail and need updating to reflect the new collapsed shape. The representative within each partition is picked by the user's `.orderBy(…)` (if any); when the orderBy doesn't fully order rows in a partition the pick is implementation-defined, matching Prisma's documented behaviour.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -30,7 +30,7 @@ changes:
       anyMatch: true
   - id: replace-runtime-verify-options-with-verify-marker
     summary: |
-      The `@prisma-next/sql-runtime` export `RuntimeVerifyOptions` is removed; replaced by `VerifyMarkerOption = 'onFirstUse' | false`. Extension convenience wrappers that expose a `*OptionsBase` interface must rename `verify?: RuntimeVerifyOptions` to `verifyMarker?: VerifyMarkerOption`, drop the hard-coded `verify: { mode: 'onFirstUse', requireMarker: false }` default in the wrapper's `createRuntime(...)` call, and thread the caller's value through via `...ifDefined('verifyMarker', options.verifyMarker)` so the runtime's own default (`'onFirstUse'`) applies when the option is omitted. The runtime no longer throws `CONTRACT.MARKER_MISMATCH` / `CONTRACT.MARKER_MISSING` on drift — it emits a structured `warn`-level log line once per runtime instance (single-flighted under concurrent first queries) and proceeds.
+      The `@prisma-next/sql-runtime` export `RuntimeVerifyOptions` is removed; replaced by `VerifyMarkerOption = 'onFirstUse' | false`. Extension convenience wrappers that expose a `*OptionsBase` interface must rename `verify?: RuntimeVerifyOptions` to `verifyMarker?: VerifyMarkerOption`, drop the hard-coded `verify: { mode: 'onFirstUse', requireMarker: false }` default in the wrapper's `createRuntime(...)` call, and thread the caller's value through via `...ifDefined('verifyMarker', options.verifyMarker)` so the runtime's own default (`'onFirstUse'`) applies when the option is omitted. The runtime no longer throws `CONTRACT.MARKER_MISMATCH` / `CONTRACT.MARKER_MISSING` on drift - it emits a structured `warn`-level log line once per runtime instance (single-flighted under concurrent first queries) and proceeds.
     detection:
       glob: "**/*.ts"
       contains:
@@ -39,7 +39,7 @@ changes:
       anyMatch: true
   - id: define-contract-drop-capabilities-generic
     summary: |
-      The `Capabilities` type parameter is removed from the framework `baseDefineContract` factory and from `ContractInput` in `@prisma-next/contract`. Extension authors who ship their own target-facade-style `defineContract` (a thin wrapper that re-exports `baseDefineContract` with `family` / `target` pre-bound) must drop the `Capabilities` generic from every facade type alias (`*Result`, `*BaseScaffold`, `*Definition`, `*Scaffold`) and from every overload signature; the corresponding `ContractInput<…, Capabilities>` and `baseDefineContract<…, Capabilities>` instantiations lose their trailing argument. Extensions that don't ship a facade have no source change — their emitted `contract.json` / `contract.d.ts` will pick up two new auto-contributed capabilities (`postgres.distinctOn`, `sql.lateral`) on re-emit; re-run `pnpm fixtures:emit` (or the equivalent for your extension) to refresh fixtures.
+      The `Capabilities` type parameter is removed from the framework `baseDefineContract` factory and from `ContractInput` in `@prisma-next/contract`. Extension authors who ship their own target-facade-style `defineContract` (a thin wrapper that re-exports `baseDefineContract` with `family` / `target` pre-bound) must drop the `Capabilities` generic from every facade type alias (`*Result`, `*BaseScaffold`, `*Definition`, `*Scaffold`) and from every overload signature; the corresponding `ContractInput<…, Capabilities>` and `baseDefineContract<…, Capabilities>` instantiations lose their trailing argument. Extensions that don't ship a facade have no source change - their emitted `contract.json` / `contract.d.ts` will pick up two new auto-contributed capabilities (`postgres.distinctOn`, `sql.lateral`) on re-emit; re-run `pnpm fixtures:emit` (or the equivalent for your extension) to refresh fixtures.
     detection:
       glob: "**/*.ts"
       contains:
@@ -67,7 +67,7 @@ changes:
     script: ./regenerate-extension-public-baseline.ts
   - id: domain-plane-spi-and-testing-subpath
     summary: |
-      Contract SPI is namespaced: read models/value objects through `contract.domain.namespaces.<ns>` (helpers: `domainModelsAtDefaultNamespace(contract.domain)`, `ContractModelDefinitions`) instead of flat `contract.models`. The `@prisma-next/contract/testing` subpath export was removed — test factories (`createContract`, `createSqlContract`, `DUMMY_HASH`, `applicationDomainOf`) now live in `@prisma-next/test-utils`. Run the colocated import codemod and update SPI consumption to the namespaced contract shape.
+      Contract SPI is namespaced: read models/value objects through `contract.domain.namespaces.<ns>` (helpers: `domainModelsAtDefaultNamespace(contract.domain)`, `ContractModelDefinitions`) instead of flat `contract.models`. The `@prisma-next/contract/testing` subpath export was removed - test factories (`createContract`, `createSqlContract`, `DUMMY_HASH`, `applicationDomainOf`) now live in `@prisma-next/test-utils`. Run the colocated import codemod and update SPI consumption to the namespaced contract shape.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -84,7 +84,7 @@ changes:
       anyMatch: true
 ---
 
-# 0.11 → 0.12 — Extension-author upgrade instructions
+# 0.11 → 0.12 - Extension-author upgrade instructions
 
 ## `expr-visitor-add-window-func-method`
 
@@ -94,12 +94,12 @@ Starting at the 0.12 release, the framework `ExprVisitor<R>` interface in `@pris
 windowFunc(expr: WindowFuncExpr): R;
 ```
 
-This method was added to support `WindowFuncExpr` — the new AST node for window functions, currently lowering `ROW_NUMBER() OVER (PARTITION BY … ORDER BY …)` used by `.distinct(cols)` (and reserved for `RANK` / `DENSE_RANK` as future additions).
+This method was added to support `WindowFuncExpr` - the new AST node for window functions, currently lowering `ROW_NUMBER() OVER (PARTITION BY … ORDER BY …)` used by `.distinct(cols)` (and reserved for `RANK` / `DENSE_RANK` as future additions).
 
 Every `ExprVisitor<R>` implementation needs to add the new method. The natural body depends on what the visitor does:
 
-- **Binding / encoding / transforming visitors** — usually treat `WindowFuncExpr` the same way they treat `AggregateExpr` (recurse into `args`, `partitionBy`, and `orderBy`).
-- **Validating visitors** that restrict which expression kinds are allowed in a given context (e.g. grouped `HAVING` clauses) — typically reject window functions just like they reject aggregates in unrelated contexts.
+- **Binding / encoding / transforming visitors** - usually treat `WindowFuncExpr` the same way they treat `AggregateExpr` (recurse into `args`, `partitionBy`, and `orderBy`).
+- **Validating visitors** that restrict which expression kinds are allowed in a given context (e.g. grouped `HAVING` clauses) - typically reject window functions just like they reject aggregates in unrelated contexts.
 
 ### Before 0.12
 
@@ -139,13 +139,13 @@ expr.accept<AnyExpression>({
 });
 ```
 
-TypeScript will report missing-property errors on every visitor literal after the bump; that's a reliable compile-time signal for every affected site. No automated codemod — the right body depends on what your visitor does, so author each one by hand.
+TypeScript will report missing-property errors on every visitor literal after the bump; that's a reliable compile-time signal for every affected site. No automated codemod - the right body depends on what your visitor does, so author each one by hand.
 
 ## `any-expression-exhaustive-switch-add-window-func-case`
 
 Starting at the 0.12 release, the `AnyExpression` discriminated union in `@prisma-next/sql-relational-core/ast` gained `WindowFuncExpr` (`kind: 'window-func'`). Exhaustive switches over `expr.kind` that use the `satisfies never` exhaustiveness pattern will fail to compile until they add a matching arm.
 
-The most common case is in SQL renderers — Postgres and SQLite both render `WindowFuncExpr` as `fn() OVER (PARTITION BY … ORDER BY …)` (the syntax is identical across the two targets we ship).
+The most common case is in SQL renderers - Postgres and SQLite both render `WindowFuncExpr` as `fn() OVER (PARTITION BY … ORDER BY …)` (the syntax is identical across the two targets we ship).
 
 ### Before 0.12
 
@@ -201,20 +201,20 @@ function renderWindowFunc(expr: WindowFuncExpr): string {
 }
 ```
 
-If your switch builds an `isAtomicExpressionKind` predicate or anything similar (used to decide whether the rendered expression needs surrounding parentheses), treat `'window-func'` as atomic — `fn() OVER (…)` is self-delimited by its own parentheses.
+If your switch builds an `isAtomicExpressionKind` predicate or anything similar (used to decide whether the rendered expression needs surrounding parentheses), treat `'window-func'` as atomic - `fn() OVER (…)` is self-delimited by its own parentheses.
 
-No automated codemod — the body of the new arm depends on what the switch does. TypeScript pinpoints every site at compile time.
+No automated codemod - the body of the new arm depends on what the switch does. TypeScript pinpoints every site at compile time.
 
 ## `distinct-cols-now-collapses-by-specified-columns`
 
-Starting at the 0.12 release, `.distinct(cols)` on the `@prisma-next/sql-orm-client` `Collection` API — at the top level (`db.Post.distinct('title')`), on leaf includes (`include('posts', p => p.distinct('title'))`), and on non-leaf includes (`include('posts', p => p.distinct('title').include('comments'))`) — keeps one representative row per `(cols)` group, matching Prisma's documented semantics.
+Starting at the 0.12 release, `.distinct(cols)` on the `@prisma-next/sql-orm-client` `Collection` API - at the top level (`db.Post.distinct('title')`), on leaf includes (`include('posts', p => p.distinct('title'))`), and on non-leaf includes (`include('posts', p => p.distinct('title').include('comments'))`) - keeps one representative row per `(cols)` group, matching Prisma's documented semantics.
 
 Prior to 0.12, `.distinct(cols)` did not actually collapse rows on the specified columns: when the projection contained any other distinguishing column (typically `id`), rows that differed only in those other columns were all returned. From 0.12 onwards, `.distinct(cols)` keeps one representative row per `(cols)` group, matching the way Prisma documents `distinct`.
 
 ### No code change for consumer call sites
 
 ```ts
-// Both 0.11 and 0.12 — same call site, different runtime behaviour:
+// Both 0.11 and 0.12 - same call site, different runtime behaviour:
 const posts = await db.Post
   .orderBy([(p) => p.title.asc(), (p) => p.id.asc()])
   .distinct('title')
@@ -222,7 +222,7 @@ const posts = await db.Post
 
 // 0.11: returns every post (if seed has 3 posts including two sharing title='A',
 // you get 3 back).
-// 0.12: returns one post per title (you get 2 back — title='A' picks the
+// 0.12: returns one post per title (you get 2 back - title='A' picks the
 // lower-id row per the orderBy; title='B' is unaffected).
 ```
 
@@ -233,31 +233,31 @@ The API surface is unchanged. Type-level signatures are unchanged. Only the SQL 
 Any extension test that exercises `.distinct(cols)` and asserts the result set will fail under 0.12. Updates needed:
 
 - **Seed data with duplicates** on every column passed to `.distinct(...)` so the test actually exercises dedup (a test with no duplicates is a no-op assertion in either era).
-- **Pair `.distinct(...)` with an `.orderBy(...)`** that fully orders rows within each partition (e.g. `[distinctCol.asc(), id.asc()]`) so the picked representative is deterministic. When the orderBy doesn't fully order a partition the choice is implementation-defined — matches Prisma's behaviour, but makes assertions flaky.
+- **Pair `.distinct(...)` with an `.orderBy(...)`** that fully orders rows within each partition (e.g. `[distinctCol.asc(), id.asc()]`) so the picked representative is deterministic. When the orderBy doesn't fully order a partition the choice is implementation-defined - matches Prisma's behaviour, but makes assertions flaky.
 - **Update `expect(rows).toEqual([…])` shapes** to match the post-collapse output. The dropped row's grandchildren (where `.distinct(cols).include(grandchild)` is in play) do not appear in the output either.
 
 ### Representative-selection behaviour
 
-The user's `.orderBy(…)` drives the OVER ORDER BY of the underlying `ROW_NUMBER()` — the row with rank 1 in each partition wins. When the orderBy doesn't fully order rows within a partition, the choice between tied rows is implementation-defined (Postgres and SQLite are each entitled to pick any row in the tie). This matches Prisma's documented behaviour; if your extension needs deterministic picks across partition ties, add a primary-key tiebreaker to the orderBy.
+The user's `.orderBy(…)` drives the OVER ORDER BY of the underlying `ROW_NUMBER()` - the row with rank 1 in each partition wins. When the orderBy doesn't fully order rows within a partition, the choice between tied rows is implementation-defined (Postgres and SQLite are each entitled to pick any row in the tie). This matches Prisma's documented behaviour; if your extension needs deterministic picks across partition ties, add a primary-key tiebreaker to the orderBy.
 
 ### Validation
 
-After updating fixture / test data, run your extension's standard `pnpm test` (or `pnpm test:integration` for tests that exercise live SQL). No type-level changes — TypeScript will not pinpoint sites; runtime assertions are the signal.
+After updating fixture / test data, run your extension's standard `pnpm test` (or `pnpm test:integration` for tests that exercise live SQL). No type-level changes - TypeScript will not pinpoint sites; runtime assertions are the signal.
 
 ## `replace-runtime-verify-options-with-verify-marker`
 
 Starting at the 0.12 release, `@prisma-next/sql-runtime` simplifies marker verification. The previous `RuntimeVerifyOptions` type and the `verify: { mode; requireMarker }` field on `RuntimeOptions` are removed; replaced by a single optional field `verifyMarker?: VerifyMarkerOption` where `VerifyMarkerOption = 'onFirstUse' | false` and `'onFirstUse'` is the runtime default.
 
-If your extension ships a convenience wrapper around `createRuntime(...)` — the pattern used by `@prisma-next/sqlite`, `@prisma-next/postgres`, and `@prisma-next/postgres/serverless` — you need four mechanical edits in the wrapper source:
+If your extension ships a convenience wrapper around `createRuntime(...)` - the pattern used by `@prisma-next/sqlite`, `@prisma-next/postgres`, and `@prisma-next/postgres/serverless` - you need four mechanical edits in the wrapper source:
 
 1. Rename the type import from `RuntimeVerifyOptions` to `VerifyMarkerOption`.
 2. Rename the option on your `*OptionsBase` interface from `verify?` to `verifyMarker?`.
 3. Drop the hard-coded default literal in the `createRuntime(...)` call.
 4. Thread the caller's value through with `ifDefined` so omitted options defer to the runtime default.
 
-The runtime's read-side behaviour also changes: it no longer throws `CONTRACT.MARKER_MISMATCH` or `CONTRACT.MARKER_MISSING` when the database marker is absent or drifted. Instead, on the first `execute()` call per runtime instance, it emits one structured `warn`-level log line (payload includes `code`, `scope`, `expected`, `actual`, `message`) and proceeds with the query. Extension authors do not need to implement this behaviour — it lives inside `@prisma-next/sql-runtime` — but tests that previously asserted thrown errors need retargeting (see *Tests and fixtures* below).
+The runtime's read-side behaviour also changes: it no longer throws `CONTRACT.MARKER_MISMATCH` or `CONTRACT.MARKER_MISSING` when the database marker is absent or drifted. Instead, on the first `execute()` call per runtime instance, it emits one structured `warn`-level log line (payload includes `code`, `scope`, `expected`, `actual`, `message`) and proceeds with the query. Extension authors do not need to implement this behaviour - it lives inside `@prisma-next/sql-runtime` - but tests that previously asserted thrown errors need retargeting (see *Tests and fixtures* below).
 
-### Before 0.12 — type import and options interface
+### Before 0.12 - type import and options interface
 
 ```ts
 import type {
@@ -276,7 +276,7 @@ export interface MyTargetOptionsBase {
 }
 ```
 
-### Starting at 0.12 — type import and options interface
+### Starting at 0.12 - type import and options interface
 
 ```ts
 import type {
@@ -298,7 +298,7 @@ export interface MyTargetOptionsBase {
 
 Import `ifDefined` from `@prisma-next/utils/defined` if your wrapper does not already use it for other optional fields.
 
-### Before 0.12 — `createRuntime(...)` call inside the wrapper
+### Before 0.12 - `createRuntime(...)` call inside the wrapper
 
 ```ts
 const runtime = createRuntime({
@@ -310,9 +310,9 @@ const runtime = createRuntime({
 });
 ```
 
-The hard-coded `{ mode: 'onFirstUse', requireMarker: false }` default duplicated what the runtime already applied when `verify` was omitted. From 0.12 the wrapper should not inject a default — let the runtime's `'onFirstUse'` default stand.
+The hard-coded `{ mode: 'onFirstUse', requireMarker: false }` default duplicated what the runtime already applied when `verify` was omitted. From 0.12 the wrapper should not inject a default - let the runtime's `'onFirstUse'` default stand.
 
-### Starting at 0.12 — `createRuntime(...)` call inside the wrapper
+### Starting at 0.12 - `createRuntime(...)` call inside the wrapper
 
 ```ts
 const runtime = createRuntime({
@@ -330,17 +330,17 @@ When the caller omits `verifyMarker`, the spread adds nothing and the runtime de
 
 | Before 0.12 (`verify`) | Starting at 0.12 (`verifyMarker`) |
 | --- | --- |
-| `{ mode: 'onFirstUse', requireMarker: false }` (or omitted — your wrapper defaulted to this) | omit `verifyMarker` (runtime default `'onFirstUse'`) |
-| `{ mode: 'onFirstUse', requireMarker: true }` | `verifyMarker: 'onFirstUse'` — but the throw-on-missing-marker semantics are removed; use the `db-verify` CLI for fail-fast deploy checks |
-| `{ mode: 'always', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` — `'always'` mode is dropped; verification is once-per-runtime |
-| `{ mode: 'startup', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` — `'startup'` mode is dropped for the same reason |
+| `{ mode: 'onFirstUse', requireMarker: false }` (or omitted - your wrapper defaulted to this) | omit `verifyMarker` (runtime default `'onFirstUse'`) |
+| `{ mode: 'onFirstUse', requireMarker: true }` | `verifyMarker: 'onFirstUse'` - but the throw-on-missing-marker semantics are removed; use the `db-verify` CLI for fail-fast deploy checks |
+| `{ mode: 'always', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` - `'always'` mode is dropped; verification is once-per-runtime |
+| `{ mode: 'startup', requireMarker: ... }` | `verifyMarker: 'onFirstUse'` - `'startup'` mode is dropped for the same reason |
 | Explicit skip | `verifyMarker: false` |
 
 ### Tests and fixtures
 
 Extension wrapper tests that exercised the old surface need two kinds of updates:
 
-**Option-forwarding tests** — rename the option and adjust assertions about defaults:
+**Option-forwarding tests** - rename the option and adjust assertions about defaults:
 
 ```ts
 // Before 0.12
@@ -377,7 +377,7 @@ it('omits verifyMarker from createRuntime when not provided (runtime default app
 });
 ```
 
-**Drift / missing-marker integration tests** — grep for `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISSING' })` or `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' })`. These patterns no longer apply: the runtime logs instead of throwing. Retarget to assert on the `Log.warn` sink:
+**Drift / missing-marker integration tests** - grep for `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISSING' })` or `rejects.toMatchObject({ code: 'CONTRACT.MARKER_MISMATCH' })`. These patterns no longer apply: the runtime logs instead of throwing. Retarget to assert on the `Log.warn` sink:
 
 ```ts
 // Before 0.12
@@ -390,7 +390,7 @@ const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } satisfies Log;
 const runtime = createRuntime({ stackInstance, context, driver, log });
 
 const rows = await runtime.execute(plan).toArray();
-expect(rows).toEqual(/* expected rows — query proceeds */);
+expect(rows).toEqual(/* expected rows - query proceeds */);
 expect(log.warn).toHaveBeenCalledOnce();
 expect(log.warn).toHaveBeenCalledWith({
   code: 'CONTRACT.MARKER_MISSING',
@@ -405,18 +405,18 @@ Pass a `log` object into `createRuntime(...)` (or through your wrapper if you ex
 
 ### Validation
 
-After applying the edits above, run `pnpm typecheck` on your extension package. TypeScript flags every remaining `RuntimeVerifyOptions` import and every `verify?:` field on your options interface. Then run your extension's test suite — option-forwarding unit tests and any marker-drift integration tests are the sites most likely to need the retargeting described above.
+After applying the edits above, run `pnpm typecheck` on your extension package. TypeScript flags every remaining `RuntimeVerifyOptions` import and every `verify?:` field on your options interface. Then run your extension's test suite - option-forwarding unit tests and any marker-drift integration tests are the sites most likely to need the retargeting described above.
 
 ## `define-contract-drop-capabilities-generic`
 
-Starting at the 0.12 release, the framework `baseDefineContract` factory in `@prisma-next/contract` drops its `Capabilities` type parameter, and the `ContractInput<Family, Target, Types, Models, ExtensionPacks, Capabilities>` shape loses its trailing argument. Capabilities are no longer declared at authoring time — they are contributed automatically by target components and extension packs, and flow into the emitted `contract.json` / `contract.d.ts` from there.
+Starting at the 0.12 release, the framework `baseDefineContract` factory in `@prisma-next/contract` drops its `Capabilities` type parameter, and the `ContractInput<Family, Target, Types, Models, ExtensionPacks, Capabilities>` shape loses its trailing argument. Capabilities are no longer declared at authoring time - they are contributed automatically by target components and extension packs, and flow into the emitted `contract.json` / `contract.d.ts` from there.
 
 There are two kinds of impact on an extension, depending on what your extension ships:
 
 - **Extensions that ship their own target-facade `defineContract`** (the pattern used by `@prisma-next/postgres`, `@prisma-next/sqlite`, and any third-party adapter that pre-binds `family` + `target` for its consumers): you need to drop the `Capabilities` generic from every facade type alias and overload signature. TypeScript will pinpoint every site once you bump.
-- **Extensions that only contribute pack metadata + emit fixtures** (the more common shape — `@prisma-next/pgvector`, `@prisma-next/paradedb`, etc.): no source change. Re-emit your contract fixtures (`pnpm fixtures:emit` or the equivalent script for your package) so the regenerated `contract.json` / `contract.d.ts` picks up the new auto-contributed capability keys — in the 0.12 line, `postgres.distinctOn: true` and `sql.lateral: true` appear in every SQL-target fixture that loads the relevant adapter.
+- **Extensions that only contribute pack metadata + emit fixtures** (the more common shape - `@prisma-next/pgvector`, `@prisma-next/paradedb`, etc.): no source change. Re-emit your contract fixtures (`pnpm fixtures:emit` or the equivalent script for your package) so the regenerated `contract.json` / `contract.d.ts` picks up the new auto-contributed capability keys - in the 0.12 line, `postgres.distinctOn: true` and `sql.lateral: true` appear in every SQL-target fixture that loads the relevant adapter.
 
-### Facade-style extensions — drop the generic
+### Facade-style extensions - drop the generic
 
 If your extension ships a `defineContract` that wraps `baseDefineContract` with `family` / `target` pre-bound, walk every type alias and every overload signature in your facade and remove the `Capabilities` parameter.
 
@@ -523,15 +523,15 @@ Drop the same parameter from every other overload signature (the factory-form ov
 
 ### Type tests that asserted authoring-time capability literals
 
-If your facade ships a `define-contract.test-d.ts` (or similar) that asserts a `capabilities` literal is acceptable as an input to your `defineContract` — flip the assertion. The literal is now refused at the type level:
+If your facade ships a `define-contract.test-d.ts` (or similar) that asserts a `capabilities` literal is acceptable as an input to your `defineContract` - flip the assertion. The literal is now refused at the type level:
 
 ```ts
 // Starting at 0.12
-// @ts-expect-error — capabilities are contributed by components, not authoring input
+// @ts-expect-error - capabilities are contributed by components, not authoring input
 defineContract({ capabilities: { sql: { lateral: true } } });
 ```
 
-### Extensions that only emit fixtures — re-emit
+### Extensions that only emit fixtures - re-emit
 
 If your extension does not ship a facade, you have no source change. The contract fixtures your extension emits as part of its test suite will, however, gain new capability keys after the bump. Re-run your fixture-emit script (commonly `pnpm fixtures:emit` or `pnpm test:fixtures:emit`) and commit the regenerated `contract.json` / `contract.d.ts`. Expect to see:
 
@@ -542,11 +542,11 @@ No fixture-shape changes other than capability additions; if your re-emit produc
 
 ### Validation
 
-After applying the edits, run `pnpm typecheck` and the matching test suite for your extension package. For facade-style extensions, the typecheck pinpoints every remaining occurrence of the `Capabilities` generic at compile time. For fixture-only extensions, the regenerated `contract.json` / `contract.d.ts` diff is the signal — review it to confirm the new capability keys landed where you expect.
+After applying the edits, run `pnpm typecheck` and the matching test suite for your extension package. For facade-style extensions, the typecheck pinpoints every remaining occurrence of the `Capabilities` generic at compile time. For fixture-only extensions, the regenerated `contract.json` / `contract.d.ts` diff is the signal - review it to confirm the new capability keys landed where you expect.
 
 ## `strip-migration-labels-hints`
 
-Starting at the 0.12 release, the migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`. If your extension ships on-disk migration packages — for example an install-extension migration (`migrations/<timestamp>_install_…/migration.json`) that provisions your extension's database objects — any manifest that still holds either key fails to load: the loader rejects it with `INVALID_MANIFEST`, naming the first offending key (`labels` or `hints`). The two fields are also removed from the content-addressed migration identity — `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json` — so every migrated manifest additionally needs its hash recomputed over the slimmed envelope, or it fails hash verification on the next load.
+Starting at the 0.12 release, the migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`. If your extension ships on-disk migration packages - for example an install-extension migration (`migrations/<timestamp>_install_…/migration.json`) that provisions your extension's database objects - any manifest that still holds either key fails to load: the loader rejects it with `INVALID_MANIFEST`, naming the first offending key (`labels` or `hints`). The two fields are also removed from the content-addressed migration identity - `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json` - so every migrated manifest additionally needs its hash recomputed over the slimmed envelope, or it fails hash verification on the next load.
 
 Run the colocated codemod from your extension's package root:
 
@@ -554,7 +554,7 @@ Run the colocated codemod from your extension's package root:
 pnpm exec tsx ./strip-migration-labels-hints.ts
 ```
 
-It walks every `migration.json` that has a sibling `ops.json` (a complete on-disk migration package), removes the `labels` and `hints` keys, and recomputes `migrationHash` over the slimmed metadata plus the operations. The edit is format-preserving — only the two key lines are removed and the hash value is swapped in place, so the rest of each manifest (key order, indentation, inline-vs-expanded arrays) is left untouched and the diff stays minimal. The codemod is idempotent: re-running it over already-migrated manifests makes no further changes.
+It walks every `migration.json` that has a sibling `ops.json` (a complete on-disk migration package), removes the `labels` and `hints` keys, and recomputes `migrationHash` over the slimmed metadata plus the operations. The edit is format-preserving - only the two key lines are removed and the hash value is swapped in place, so the rest of each manifest (key order, indentation, inline-vs-expanded arrays) is left untouched and the diff stays minimal. The codemod is idempotent: re-running it over already-migrated manifests makes no further changes.
 
 ### Confirm every manifest is migrated
 
@@ -572,13 +572,13 @@ After running the codemod, run your extension's migration-loading tests (the int
 
 ## `extension-public-default-baseline`
 
-Starting at the 0.12 release, Postgres extension packs whose contract-space declares only storage types (no tables) emit their empty default namespace under `public` / `postgres-schema` instead of `__unbound__` / `postgres-unbound-schema`. The on-disk migration ops (`CREATE EXTENSION …`, invariant registration, etc.) are unchanged — only the contract hash envelope moves. Expect diffs in:
+Starting at the 0.12 release, Postgres extension packs whose contract-space declares only storage types (no tables) emit their empty default namespace under `public` / `postgres-schema` instead of `__unbound__` / `postgres-unbound-schema`. The on-disk migration ops (`CREATE EXTENSION …`, invariant registration, etc.) are unchanged - only the contract hash envelope moves. Expect diffs in:
 
-- `src/contract.json` / `src/contract.d.ts` — new `storageHash` and namespace keys
-- `migrations/<baseline>/migration.json` — updated `to` and `migrationHash`
-- `migrations/<baseline>/end-contract.json` / `end-contract.d.ts` — regenerated snapshots
-- `migrations/<baseline>/migration.ts` — updated `describe().to` storage hash literal
-- `migrations/refs/head.json` — updated `hash`
+- `src/contract.json` / `src/contract.d.ts` - new `storageHash` and namespace keys
+- `migrations/<baseline>/migration.json` - updated `to` and `migrationHash`
+- `migrations/<baseline>/end-contract.json` / `end-contract.d.ts` - regenerated snapshots
+- `migrations/<baseline>/migration.ts` - updated `describe().to` storage hash literal
+- `migrations/refs/head.json` - updated `hash`
 
 ### Regenerate contract-space and baseline
 
@@ -606,9 +606,9 @@ Run your extension's test suite and any migration-loading integration tests. Con
 
 Starting at the 0.12 release, two SPI changes affect extension authors:
 
-1. **Namespaced domain plane** — stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `domainModelsAtDefaultNamespace(contract.domain)` (reads the contract's sole namespace; throws on a multi-namespace contract — select explicitly per TML-2550) and `ContractModelDefinitions<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
+1. **Namespaced domain plane** - stop reading flat `contract.models` / `contract.valueObjects`. Models and value objects live under `contract.domain.namespaces.<ns>`. Use `domainModelsAtDefaultNamespace(contract.domain)` (reads the contract's sole namespace; throws on a multi-namespace contract - select explicitly per TML-2550) and `ContractModelDefinitions<C>` from `@prisma-next/contract/types` for typed access. Storage remains under `contract.storage.namespaces.<ns>` (unchanged shape).
 
-2. **Removed `@prisma-next/contract/testing` subpath** — test factories moved to `@prisma-next/test-utils`. Add `@prisma-next/test-utils` to your extension's `devDependencies` at the same version pin as your other `@prisma-next/*` packages if it is not already present.
+2. **Removed `@prisma-next/contract/testing` subpath** - test factories moved to `@prisma-next/test-utils`. Add `@prisma-next/test-utils` to your extension's `devDependencies` at the same version pin as your other `@prisma-next/*` packages if it is not already present.
 
 ### Migrate test imports
 
@@ -624,7 +624,7 @@ It rewrites every `@prisma-next/contract/testing` import to `@prisma-next/test-u
 pnpm exec tsx ./migrate-contract-testing-imports.ts --check
 ```
 
-Exports are unchanged — only the package path moves:
+Exports are unchanged - only the package path moves:
 
 ```diff
 -import { createContract, createSqlContract } from '@prisma-next/contract/testing';
@@ -637,7 +637,7 @@ Subpath imports such as `@prisma-next/test-utils/typed-expectations` were alread
 
 Walk extension source that constructs or reads contracts directly (tests, control adapters, planners). TypeScript will flag most stale reads after the bump; the mechanical rewrites are:
 
-**Reading models** — resolve through the target's default domain namespace:
+**Reading models** - resolve through the target's default domain namespace:
 
 ```diff
 -const models = contract.models;
@@ -646,7 +646,7 @@ Walk extension source that constructs or reads contracts directly (tests, contro
 +const models = domainModelsAtDefaultNamespace(contract.domain);
 ```
 
-**Patching models in tests** — nest under the domain namespace:
+**Patching models in tests** - nest under the domain namespace:
 
 ```diff
  return {
@@ -664,7 +664,7 @@ Walk extension source that constructs or reads contracts directly (tests, contro
  };
 ```
 
-**Hard-coded `__unbound__` namespace lookups for table resolution** — scan all storage namespaces (a table name is unique within the contract's default resolution path):
+**Hard-coded `__unbound__` namespace lookups for table resolution** - scan all storage namespaces (a table name is unique within the contract's default resolution path):
 
 ```diff
 -const table = contract.storage.namespaces['__unbound__']?.tables[tableName];
@@ -683,7 +683,7 @@ Run `pnpm typecheck && pnpm test` on your extension package. The import codemod 
 
 Starting at the 0.12 release (runtime qualification, [ADR 223](../../../../../docs/architecture%20docs/adrs/ADR%20223%20-%20Target-owned%20default%20namespace.md)), the foundation `contract` package retires the transitional projection helpers introduced during the symmetric domain-plane migration. Extension code that still calls them will fail to compile after the bump.
 
-The default namespace a bare name resolves through is **inferred** from the contract (sole namespace, else insertion order) — there are no `…ForSqlTarget` / `…ForMongo` helpers to import. A target's default namespace is declared on its descriptor (`defaultNamespaceId`) and consumed only by authoring; runtime code resolves target-agnostically.
+The default namespace a bare name resolves through is **inferred** from the contract (sole namespace, else insertion order) - there are no `…ForSqlTarget` / `…ForMongo` helpers to import. A target's default namespace is declared on its descriptor (`defaultNamespaceId`) and consumed only by authoring; runtime code resolves target-agnostically.
 
 ### Removed exports (old → new)
 
@@ -703,7 +703,7 @@ Storage namespace envelopes in SQL-family contracts must carry a `qualifyTable(t
 
 ### Hydrating contracts in tests
 
-Do not `structuredClone` hydrated contracts — it strips functions such as `qualifyTable`. Round-trip through the target serializer instead:
+Do not `structuredClone` hydrated contracts - it strips functions such as `qualifyTable`. Round-trip through the target serializer instead:
 
 ```ts
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -735,4 +735,4 @@ Apart from `strip-migration-labels-hints` (which ships the colocated codemod des
 - The `RuntimeVerifyOptions` → `VerifyMarkerOption` import rename, `verify?` → `verifyMarker?` on `*OptionsBase`, and `...ifDefined('verifyMarker', options.verifyMarker)` thread-through in `packages/3-extensions/sqlite/src/runtime/sqlite.ts`, `packages/3-extensions/postgres/src/runtime/postgres.ts`, and `packages/3-extensions/postgres/src/runtime/postgres-serverless.ts`.
 - Retargeted option-forwarding and marker-drift tests in `packages/3-extensions/postgres/test/postgres-serverless.test.ts`.
 
-There is no scriptable transform — the right body for the `ExprVisitor` method and the right arm for the exhaustive switch depend on what the consumer's visitor / switch does; the right test retargeting for marker drift depends on whether the test asserted throws or option forwarding. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.
+There is no scriptable transform - the right body for the `ExprVisitor` method and the right arm for the exhaustive switch depend on what the consumer's visitor / switch does; the right test retargeting for marker drift depends on whether the test asserted throws or option forwarding. The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry; the substantive verification of the consumer-facing translation lives in the published extension-upgrade skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.

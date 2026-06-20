@@ -6,7 +6,7 @@
  * carries `fromContract` / `toContract` (the schema rejects them as
  * unknown keys). The destination contract continues to live next door
  * as `end-contract.json` (and the source as `start-contract.json`); the
- * manifest copy was redundant. `migrationHash` is unaffected — it was
+ * manifest copy was redundant. `migrationHash` is unaffected - it was
  * already computed without those two fields, so stripping them does
  * not change the stored hash.
  *
@@ -58,7 +58,7 @@ async function findManifests(root: string): Promise<string[]> {
           const parsed: unknown = JSON.parse(await readFile(path, 'utf-8'));
           if (looksLikeMigrationManifest(parsed)) out.push(path);
         } catch {
-          // Not valid JSON, or not the manifest shape — skip silently.
+          // Not valid JSON, or not the manifest shape - skip silently.
         }
       }
     }

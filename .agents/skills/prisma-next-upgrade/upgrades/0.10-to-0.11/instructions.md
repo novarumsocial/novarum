@@ -3,7 +3,7 @@ from: "0.10"
 to: "0.11"
 changes:
   - id: insert-single-row-wrap-in-array
-    summary: Wrap single-row `.insert({...})` call sites in an array — `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
+    summary: Wrap single-row `.insert({...})` call sites in an array - `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -11,7 +11,7 @@ changes:
       anyMatch: true
 ---
 
-# 0.10 → 0.11 — User upgrade instructions
+# 0.10 → 0.11 - User upgrade instructions
 
 ## `insert-single-row-wrap-in-array`
 
@@ -47,10 +47,10 @@ for (const item of items) {
 }
 ```
 
-If a call site already passes an array (`.insert([row1, row2])`), it is already correct — leave it unchanged.
+If a call site already passes an array (`.insert([row1, row2])`), it is already correct - leave it unchanged.
 
 TypeScript will flag bare-object call sites as type errors after the bump, providing a reliable compile-time signal for every affected site.
 
 ### Validation
 
-After applying the rule above, run `pnpm typecheck && pnpm test` (or your application's equivalent). The change is mechanical — every affected call site is flagged at compile time.
+After applying the rule above, run `pnpm typecheck && pnpm test` (or your application's equivalent). The change is mechanical - every affected call site is flagged at compile time.

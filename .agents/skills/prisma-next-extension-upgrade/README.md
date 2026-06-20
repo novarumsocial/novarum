@@ -2,11 +2,11 @@
 
 An agent skill that upgrades a Prisma Next **extension** package from one minor version to the next. The skill carries the per-step bump-install-instructions-check-pins-validate-commit flow plus the cumulative set of per-transition *upgrade instructions* (one directory per `(from-minor, to-minor)` pair).
 
-The companion CLI `prisma-next-check-pins` ships separately from [`@prisma-next/extension-author-tools`](../../../packages/0-shared/extension-author-tools/) — extension authors install that as a normal `devDependency` and wire it into CI.
+The companion CLI `prisma-next-check-pins` ships separately from [`@prisma-next/extension-author-tools`](../../../packages/0-shared/extension-author-tools/) - extension authors install that as a normal `devDependency` and wire it into CI.
 
 ## Audience
 
-This skill is for **authors of Prisma Next extensions** — packages that consume the framework SPI and expose contract / middleware / codec / migration surfaces to downstream apps.
+This skill is for **authors of Prisma Next extensions** - packages that consume the framework SPI and expose contract / middleware / codec / migration surfaces to downstream apps.
 
 If you are a user of Prisma Next (your project imports `@prisma-next/postgres`, `@prisma-next/mongo`, etc. from your application code), install the [`prisma-next-upgrade`](../../upgrade/prisma-next-upgrade/SKILL.md) skill instead. If your repo contains both an app and an extension, install both.
 

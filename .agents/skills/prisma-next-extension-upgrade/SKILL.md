@@ -14,11 +14,11 @@ description: >-
 
 # Upgrade Prisma Next (extension)
 
-This skill upgrades a project that **is** a Prisma Next extension — a package that consumes the framework SPI (`@prisma-next/contract`, `@prisma-next/framework-components`, `@prisma-next/migration-tools`, etc.) and exposes contract / middleware / codec / migration surfaces that downstream apps install via `prisma-next.config.ts`.
+This skill upgrades a project that **is** a Prisma Next extension - a package that consumes the framework SPI (`@prisma-next/contract`, `@prisma-next/framework-components`, `@prisma-next/migration-tools`, etc.) and exposes contract / middleware / codec / migration surfaces that downstream apps install via `prisma-next.config.ts`.
 
-If the project you are upgrading is a consumer **app** (it imports `@prisma-next/postgres` or `@prisma-next/mongo` from its application code), use the `prisma-next-upgrade` skill instead — or both, if the repo contains both a consumer app and an extension package, in which case run the user flow first then the extension flow in the same session.
+If the project you are upgrading is a consumer **app** (it imports `@prisma-next/postgres` or `@prisma-next/mongo` from its application code), use the `prisma-next-upgrade` skill instead - or both, if the repo contains both a consumer app and an extension package, in which case run the user flow first then the extension flow in the same session.
 
-## Step 0 — Ensure the skill is up to date
+## Step 0 - Ensure the skill is up to date
 
 Before doing anything else, ensure this skill is installed at `@latest` and reload it. Bug fixes to *old* per-transition upgrade instructions ship in the latest skill release as part of its cumulative set; running against a stale skill can apply a known-broken translation.
 
@@ -28,7 +28,7 @@ Concretely: if the agent runtime supports an in-session refresh, perform it now.
 pnpm dlx skills add prisma/prisma-next/skills/extension-author --all
 ```
 
-The extension-author skill subpath is intentionally unpinned (always `main`) — the cumulative instruction set is the source of truth and the latest release fixes apply to every prior transition.
+The extension-author skill subpath is intentionally unpinned (always `main`) - the cumulative instruction set is the source of truth and the latest release fixes apply to every prior transition.
 
 Then re-invoke this skill before proceeding.
 
@@ -59,19 +59,19 @@ If the from-to delta spans multiple minor versions (e.g. `0.6 → 0.8`), build t
 0.6 → 0.7 → 0.8
 ```
 
-Apply each step in order, fully: bump, install, run instructions, check pins, validate, commit — before moving to the next. Halt the chain on the first failed step.
+Apply each step in order, fully: bump, install, run instructions, check pins, validate, commit - before moving to the next. Halt the chain on the first failed step.
 
 ## Per-step flow
 
-This flow assumes you are an **external extension author** — your extension lives in its own repo and consumes `@prisma-next/*` from npm. (Extensions inside the `prisma/prisma-next` monorepo itself are bumped via `pnpm bump-minor` / `scripts/set-version.ts`, which rewrites every `workspace:<X.Y.Z>` spec in lockstep with the root version; they do not run this skill.)
+This flow assumes you are an **external extension author** - your extension lives in its own repo and consumes `@prisma-next/*` from npm. (Extensions inside the `prisma/prisma-next` monorepo itself are bumped via `pnpm bump-minor` / `scripts/set-version.ts`, which rewrites every `workspace:<X.Y.Z>` spec in lockstep with the root version; they do not run this skill.)
 
 For each `(from, to)` step in the chain:
 
-1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (e.g. `"0.8.0"` — no caret, no tilde, no range, no `workspace:` specifier; the exact-pin rule below details why). All entries advance to the same version. Cover whichever dep field(s) the extension uses today — `dependencies` and/or `peerDependencies` — and any `optionalDependencies`. The extension-upgrade skill itself ships via `pnpm dlx skills add` (see Step 0); there is no `@prisma-next/extension-upgrade-skill` npm entry to bump. The companion CLI tool is `@prisma-next/extension-author-tools` — leave its pin at the version the extension's CI is currently using; bumping it is independent of the framework upgrade and is normally a no-op.
+1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the extension's `package.json` to the exact `<to>` version (e.g. `"0.8.0"` - no caret, no tilde, no range, no `workspace:` specifier; the exact-pin rule below details why). All entries advance to the same version. Cover whichever dep field(s) the extension uses today - `dependencies` and/or `peerDependencies` - and any `optionalDependencies`. The extension-upgrade skill itself ships via `pnpm dlx skills add` (see Step 0); there is no `@prisma-next/extension-upgrade-skill` npm entry to bump. The companion CLI tool is `@prisma-next/extension-author-tools` - leave its pin at the version the extension's CI is currently using; bumping it is independent of the framework upgrade and is normally a no-op.
 
-2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The extension's source is now broken against the new SPI — the upgrade instructions for `<from> → <to>` exist to fix it.
+2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The extension's source is now broken against the new SPI - the upgrade instructions for `<from> → <to>` exist to fix it.
 
-3. **Check pins.** Run `pnpm exec prisma-next-check-pins` (shipped by `@prisma-next/extension-author-tools`). This sanity check asserts that every `@prisma-next/*` entry across `dependencies`, `peerDependencies`, and `optionalDependencies` is a single exact-version string and that all entries share the same version. If the check fails, the bump step did not rewrite every spec — fix the offending entries and re-run before proceeding.
+3. **Check pins.** Run `pnpm exec prisma-next-check-pins` (shipped by `@prisma-next/extension-author-tools`). This sanity check asserts that every `@prisma-next/*` entry across `dependencies`, `peerDependencies`, and `optionalDependencies` is a single exact-version string and that all entries share the same version. If the check fails, the bump step did not rewrite every spec - fix the offending entries and re-run before proceeding.
 
 4. **Read the upgrade instructions.** Load `upgrades/<from>-to-<to>/instructions.md` from this skill package. Parse the YAML frontmatter and pay particular attention to its `changes[]` array.
 
@@ -84,9 +84,9 @@ For each `(from, to)` step in the chain:
      - codemods → invoke per the script's own `instructions.md` prose.
    - If the entry has no `script`, follow the prose body in `instructions.md` directly.
 
-   If `changes[]` is empty (the placeholder shape for transitions with no extension-side breaking changes), this sub-step is a no-op — proceed to validation.
+   If `changes[]` is empty (the placeholder shape for transitions with no extension-side breaking changes), this sub-step is a no-op - proceed to validation.
 
-6. **Validate.** Run `pnpm build && pnpm test` (or the project's equivalent — the `scripts` field of the extension's `package.json` is the discovery surface). If anything is red, halt the chain. Do **not** auto-roll-back; surface the failure to the user with the failing change's `id` (from the frontmatter), the file paths the change operated on, and the inferred remediation.
+6. **Validate.** Run `pnpm build && pnpm test` (or the project's equivalent - the `scripts` field of the extension's `package.json` is the discovery surface). If anything is red, halt the chain. Do **not** auto-roll-back; surface the failure to the user with the failing change's `id` (from the frontmatter), the file paths the change operated on, and the inferred remediation.
 
 7. **Commit.** Create one commit containing this step's changes: the `package.json` bump, the lockfile churn from `pnpm install`, and any source-file rewrites from the applied changes. Use the message:
 
@@ -94,7 +94,7 @@ For each `(from, to)` step in the chain:
    chore: upgrade @prisma-next/* to <to-version>
    ```
 
-   (Or the extension's own commit-message convention, if it has one.) One commit per step — never squash steps.
+   (Or the extension's own commit-message convention, if it has one.) One commit per step - never squash steps.
 
 Move on to the next step. Repeat.
 
@@ -102,7 +102,7 @@ Move on to the next step. Repeat.
 
 Prisma Next extensions pin every `@prisma-next/*` dependency to a single **exact** version (no `^`, no `~`, no range, no wildcard, no `workspace:` specifier in the published `package.json`). All `@prisma-next/*` entries share the same version. The pin advances only after a successful upgrade run against the new minor.
 
-`prisma-next-check-pins` (shipped by `@prisma-next/extension-author-tools` — install with `pnpm add -D @prisma-next/extension-author-tools`) enforces the rule. Run it locally with:
+`prisma-next-check-pins` (shipped by `@prisma-next/extension-author-tools` - install with `pnpm add -D @prisma-next/extension-author-tools`) enforces the rule. Run it locally with:
 
 ```bash
 pnpm exec prisma-next-check-pins

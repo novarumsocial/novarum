@@ -159,7 +159,7 @@ export const messagesByChannel: Record<string, Message[]> = {
 		{
 			id: "m1",
 			author: authors.relay,
-			content: "**Federation relay online** — 12 servers reachable. Average latency: 84ms.",
+			content: "**Federation relay online** - 12 servers reachable. Average latency: 84ms.",
 			timestamp: ago(120),
 			edited: false,
 			fromFederated: false,
@@ -186,7 +186,7 @@ export const messagesByChannel: Record<string, Message[]> = {
 		{
 			id: "m4",
 			author: authors.carol,
-			content: "can confirm from fedi.space — federation traffic is noticeably snappier today. nice work on the relay optimization!",
+			content: "can confirm from fedi.space - federation traffic is noticeably snappier today. nice work on the relay optimization!",
 			timestamp: ago(72),
 			edited: false,
 			fromFederated: true,
@@ -222,7 +222,7 @@ export const messagesByChannel: Record<string, Message[]> = {
 		{
 			id: "m8",
 			author: authors.alice,
-			content: "@frank — any update on the homeserver discovery spec? the WG was asking about it",
+			content: "@frank - any update on the homeserver discovery spec? the WG was asking about it",
 			timestamp: ago(25),
 			edited: false,
 			fromFederated: false,
@@ -240,7 +240,7 @@ export const messagesByChannel: Record<string, Message[]> = {
 		{
 			id: "m10",
 			author: authors.bob,
-			content: "nice. would love to see the SRV format early — we're planning matrix.org's novarum bridge and need to align on discovery",
+			content: "nice. would love to see the SRV format early - we're planning matrix.org's novarum bridge and need to align on discovery",
 			timestamp: ago(12),
 			edited: false,
 			fromFederated: true,
@@ -260,7 +260,7 @@ export const messagesByChannel: Record<string, Message[]> = {
 		{
 			id: "wm1",
 			author: authors.relay,
-			content: "Welcome to **novarum** — your federated chat network. This is a global channel, reachable from any connected server. Introduce yourself and say hello!",
+			content: "Welcome to **novarum** - your federated chat network. This is a global channel, reachable from any connected server. Introduce yourself and say hello!",
 			timestamp: ago(9999),
 			edited: false,
 			fromFederated: false,
