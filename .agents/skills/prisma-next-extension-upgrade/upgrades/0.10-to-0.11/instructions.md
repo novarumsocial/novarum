@@ -12,7 +12,7 @@ changes:
       anyMatch: true
   - id: facade-add-close-and-async-dispose
     summary: |
-      The official Prisma Next facades (`@prisma-next/postgres`, `@prisma-next/sqlite`, `@prisma-next/mongo`) now expose `close()` and `[Symbol.asyncDispose]` so short-lived scripts can release facade-owned resources cleanly and exit instead of hanging on a live connection. Extensions that expose a facade in the same shape should add the same surface for parity, honouring the ownership rule (only close resources the facade itself constructed) and managing a terminal closed state (subsequent operations reject with a clear error). No script — manual code authoring per extension.
+      The official Prisma Next facades (`@prisma-next/postgres`, `@prisma-next/sqlite`, `@prisma-next/mongo`) now expose `close()` and `[Symbol.asyncDispose]` so short-lived scripts can release facade-owned resources cleanly and exit instead of hanging on a live connection. Extensions that expose a facade in the same shape should add the same surface for parity, honouring the ownership rule (only close resources the facade itself constructed) and managing a terminal closed state (subsequent operations reject with a clear error). No script - manual code authoring per extension.
     detection:
       glob: "**/src/runtime/*.ts"
       contains:
@@ -28,7 +28,7 @@ changes:
         - "@prisma-next/mongo"
       anyMatch: true
   - id: insert-single-row-wrap-in-array
-    summary: Wrap single-row `.insert({...})` call sites in an array — `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
+    summary: Wrap single-row `.insert({...})` call sites in an array - `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
     detection:
       glob: "**/*.{ts,tsx}"
       contains:
@@ -42,11 +42,11 @@ changes:
         - ".withValues("
 ---
 
-# 0.10 → 0.11 — Extension-author upgrade instructions
+# 0.10 → 0.11 - Extension-author upgrade instructions
 
 ## `namespace-kind-required-on-handcrafted-contract-literals`
 
-Starting at the 0.11 release, the framework `Namespace` interface tightens `kind` from optional (inherited from `IRNode`) to required. Any **handcrafted** `Contract<{ namespaces: { ... } }>` type literal — typically used in extension test-d files and inline-typed fixtures — must add `kind: 'sql-namespace'` (or `'mongo-namespace'`) to each namespace literal or TypeScript will reject the literal as not structurally assignable to `Namespace`.
+Starting at the 0.11 release, the framework `Namespace` interface tightens `kind` from optional (inherited from `IRNode`) to required. Any **handcrafted** `Contract<{ namespaces: { ... } }>` type literal - typically used in extension test-d files and inline-typed fixtures - must add `kind: 'sql-namespace'` (or `'mongo-namespace'`) to each namespace literal or TypeScript will reject the literal as not structurally assignable to `Namespace`.
 
 This **does not** affect:
 
@@ -124,13 +124,13 @@ For each match, open the file and add the `kind` literal to every namespace entr
 
 The framework needs every namespace IR node to carry its family discriminator at the type level so that cross-family namespace walks (the new `elementCoordinates(storage)` surface in `@prisma-next/framework-components/ir`) can dispatch on a known-present `kind`, not an optional one.
 
-The runtime invariant has always held — every concrete namespace class sets `kind` non-enumerably via `Object.defineProperty(this, 'kind', { value, enumerable: false })` in its constructor. The type tightening makes the invariant honest at the consumer surface.
+The runtime invariant has always held - every concrete namespace class sets `kind` non-enumerably via `Object.defineProperty(this, 'kind', { value, enumerable: false })` in its constructor. The type tightening makes the invariant honest at the consumer surface.
 
 ### What you do **not** need to change
 
 - No `.d.ts` regeneration is needed. Run `prisma-next contract emit` only as part of your normal authoring flow; the emitter handles the `kind` field for you.
 - No `contract.json` snapshot changes. The hash inputs are unchanged because `kind` is non-enumerable on namespace class instances.
-- No runtime API changes. Extension factories that construct namespaces via `new SqlStorage(...)`, `new PostgresSchema(...)`, etc. are unchanged — the constructors continue to materialise `kind` non-enumerably.
+- No runtime API changes. Extension factories that construct namespaces via `new SqlStorage(...)`, `new PostgresSchema(...)`, etc. are unchanged - the constructors continue to materialise `kind` non-enumerably.
 
 ## `facade-add-close-and-async-dispose`
 
@@ -148,7 +148,7 @@ This is the surface that lets a short-lived script (`tsx my-script.ts`) release 
 
 If your extension exposes a facade in the same shape (e.g. you publish your own `postgresServerless()` or `someDriver()` factory that returns the same client object), add the equivalent surface. Three load-bearing properties:
 
-1. **Ownership rule.** `close()` releases only the resources the facade *itself* constructed. A `{ url }` (or similar opaque-string) binding means the facade opened the connection — facade owns it, `close()` disposes it. A `{ pool }` / `{ client }` / `{ mongoClient }` (caller-supplied opaque-handle) binding means the caller owns it — `close()` leaves it untouched. The facade must capture this ownership decision at construction time and remember it.
+1. **Ownership rule.** `close()` releases only the resources the facade *itself* constructed. A `{ url }` (or similar opaque-string) binding means the facade opened the connection - facade owns it, `close()` disposes it. A `{ pool }` / `{ client }` / `{ mongoClient }` (caller-supplied opaque-handle) binding means the caller owns it - `close()` leaves it untouched. The facade must capture this ownership decision at construction time and remember it.
 
 2. **Idempotence.** `close()` can be called multiple times in a row without throwing. The second and later calls are no-ops.
 
@@ -160,7 +160,7 @@ Reference implementations in this repo:
 - `packages/3-extensions/sqlite/src/runtime/sqlite.ts` (only-`{ path }` shape; the facade always owns)
 - `packages/3-extensions/mongo/src/runtime/mongo.ts` (`{ url }` vs `{ mongoClient }`)
 
-The `[Symbol.asyncDispose]` alias is one line — delegate to `close()` — and enables the TS 5.2+ `await using db = yourFacade(...)` syntax. There is no good reason not to add both methods together.
+The `[Symbol.asyncDispose]` alias is one line - delegate to `close()` - and enables the TS 5.2+ `await using db = yourFacade(...)` syntax. There is no good reason not to add both methods together.
 
 ## `mongo-close-ownership-rule`
 
@@ -170,7 +170,7 @@ Before 0.11, `@prisma-next/mongo`'s `db.close()` looked like this:
 async close() {
   try {
     await runtimePromise;
-    await runtime.close();  // unconditional — closed any MongoClient, owned or not
+    await runtime.close();  // unconditional - closed any MongoClient, owned or not
   } catch { /* swallow */ }
   closed = true;
 }
@@ -195,10 +195,10 @@ async close() {
 
 **If your extension uses `mongo({ mongoClient: someClient })`** and previously called `db.close()` expecting `someClient` to be closed, your test suite will now show the `MongoClient` outliving the facade. Two ways to migrate:
 
-- **Switch to a `{ url }` binding.** If your extension constructs the `MongoClient` purely to hand it to `mongo()`, drop the manual construction — pass the connection string in `{ url }` and let the facade own the client.
+- **Switch to a `{ url }` binding.** If your extension constructs the `MongoClient` purely to hand it to `mongo()`, drop the manual construction - pass the connection string in `{ url }` and let the facade own the client.
 - **Close the `MongoClient` explicitly.** If your extension genuinely needs to share a `MongoClient` across multiple consumers (e.g. one client backs several `mongo()` facades, or the client is held in a higher-level connection-management seam), keep the `{ mongoClient }` binding and add `await someClient.close()` after your last facade is disposed.
 
-No script — the right migration depends on why your extension was sharing the client in the first place. Walk the call sites by hand.
+No script - the right migration depends on why your extension was sharing the client in the first place. Walk the call sites by hand.
 
 ## `insert-single-row-wrap-in-array`
 
@@ -236,7 +236,7 @@ await runtime.execute(db.sql.table.insert(row).build());
 await runtime.execute(db.sql.table.insert([row]).build());
 ```
 
-If a call site already passes an array (`.insert([row1, row2])`), it is already correct — leave it unchanged.
+If a call site already passes an array (`.insert([row1, row2])`), it is already correct - leave it unchanged.
 
 TypeScript will report bare-object call sites as type errors after the bump, which is a reliable compile-time signal for every affected site.
 
@@ -261,16 +261,16 @@ const ast = InsertAst.into(TableSource.named(tableName))
 ```
 
 The change is:
-- Replace `.withValues(expr)` with `.withRows([expr])` — the single-row overload is removed; `withRows` accepts an array of assignment maps.
+- Replace `.withValues(expr)` with `.withRows([expr])` - the single-row overload is removed; `withRows` accepts an array of assignment maps.
 
 Walk every `.ts` / `.tsx` file matched by the `detection.glob` above. For each call site matching `.withValues(`, apply the replacement. The argument remains a single expression; it just needs to be wrapped in an array.
 
 ### Validation
 
-After applying the rules above, run `pnpm typecheck && pnpm test` (or your extension's equivalent). `prisma-next-check-pins` should also pass — the pin set is unchanged for this transition; the breaking change is in the `InsertAst` builder method surface, not the dependency contract.
+After applying the rules above, run `pnpm typecheck && pnpm test` (or your extension's equivalent). `prisma-next-check-pins` should also pass - the pin set is unchanged for this transition; the breaking change is in the `InsertAst` builder method surface, not the dependency contract.
 
 ## Validation by execution
 
-These entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades) plus the Mongo behaviour change documented above; the `namespace-kind-required-on-handcrafted-contract-literals` entry covers a type-only tightening with no runtime substrate transform. There is no codemod to apply against a reverted substrate — the framework changes *are* the new surfaces, and these instructions describe the consumer-side translation, not a substrate transform.
+These entries are prose-only (no scripts). The substrate diff on `packages/3-extensions/` is additive (new methods on the three official facades) plus the Mongo behaviour change documented above; the `namespace-kind-required-on-handcrafted-contract-literals` entry covers a type-only tightening with no runtime substrate transform. There is no codemod to apply against a reverted substrate - the framework changes *are* the new surfaces, and these instructions describe the consumer-side translation, not a substrate transform.
 
 The release-pipeline gate (`pnpm check:upgrade-coverage`) is satisfied by this directory existing with at least one entry. The substantive verification of the consumer-facing translation lives in the published skill's per-step bump-install-instructions-validate-commit loop, which runs in extension authors' own CI.

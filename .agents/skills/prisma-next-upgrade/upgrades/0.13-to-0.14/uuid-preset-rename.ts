@@ -40,4 +40,4 @@ for (const file of files) {
     changed++;
   }
 }
-console.log(`done — ${changed} file(s) updated`);
+console.log(`done - ${changed} file(s) updated`);

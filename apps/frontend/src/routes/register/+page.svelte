@@ -103,7 +103,7 @@
 </script>
 
 <svelte:head>
-	<title>novarum — register</title>
+	<title>novarum - register</title>
 	<meta name="description" content="Create your novarum account" />
 </svelte:head>
 
@@ -133,7 +133,7 @@
 				<div class="space-y-1">
 					<Card.Title class="text-xl">Create your account</Card.Title>
 					<Card.Description>
-						Pick a home server and username — your handle works across the federation.
+						Pick a home server and username - your handle works across the federation.
 					</Card.Description>
 				</div>
 			</Card.Header>

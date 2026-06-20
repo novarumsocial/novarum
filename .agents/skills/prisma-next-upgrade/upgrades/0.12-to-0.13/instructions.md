@@ -13,7 +13,7 @@ changes:
       anyMatch: false
   - id: re-emit-mti-variant-link-columns
     summary: |
-      MTI variant models — PSL `@@base(Parent, "tag")` models that carry their own `@@map` and are therefore stored in their own table — now materialise base-PK link columns in storage. On re-emit, each such variant table gains a copy of the base table's full primary-key column set (same names and types), a primary key over those columns, and a cascading foreign key referencing the base table's primary key; the contract's `storageHash` changes accordingly. Re-emit your contract artefacts (`pnpm emit`), then advance your database with the corresponding migration (`prisma-next migration plan` → `prisma-next migrate`) so the variant tables gain the link column, PK, and cascading FK. Contracts whose variants share the base table (single-table inheritance, no own `@@map`) are unaffected.
+      MTI variant models - PSL `@@base(Parent, "tag")` models that carry their own `@@map` and are therefore stored in their own table - now materialise base-PK link columns in storage. On re-emit, each such variant table gains a copy of the base table's full primary-key column set (same names and types), a primary key over those columns, and a cascading foreign key referencing the base table's primary key; the contract's `storageHash` changes accordingly. Re-emit your contract artefacts (`pnpm emit`), then advance your database with the corresponding migration (`prisma-next migration plan` → `prisma-next migrate`) so the variant tables gain the link column, PK, and cascading FK. Contracts whose variants share the base table (single-table inheritance, no own `@@map`) are unaffected.
     detection:
       glob: "**/contract.json"
       contains:
@@ -34,7 +34,7 @@ changes:
       SQL and Mongo contract. Re-emit your contract artefacts (`prisma-next contract
       emit`), then plan and apply the corresponding migration (`prisma-next migration
       plan` → `prisma-next migrate`) so your database schema is reconciled with the new
-      contract shape. No source change is required — re-emitting is sufficient.
+      contract shape. No source change is required - re-emitting is sufficient.
     detection:
       glob: "**/contract.json"
       anyMatch: true
@@ -50,13 +50,13 @@ changes:
 TML-2500(M3b): advances the `examples/supabase` walking skeleton to wire a
 cross-space FK from `public.Profile.userId` to `supabase:auth.AuthUser.id` with
 a cascading delete. The diff is new sample code that exercises a capability
-shipped in M2/M3a — no existing consumer has cross-space FKs to migrate. This
+shipped in M2/M3a - no existing consumer has cross-space FKs to migrate. This
 entry serves as the canonical first-use reference for the PSL authoring pattern.
 
 dependabot/runtime-deps: bumped pg 8.20→8.21, pg-cursor 2.19→2.20, vitest 4.1.6→4.1.7,
 vite 8.0.13→8.0.15, tsdown 0.22.0→0.22.1, tsx 4.22.3→4.22.4, next 16.2.4→16.2.6,
 postcss 8.5.14→8.5.15, evlog 2.16.0→2.18.1, @prisma/dev 0.24.7→0.24.8,
-@types/node 25.6.0→25.9.1 — all incidental to examples; no user-side action required.
+@types/node 25.6.0→25.9.1 - all incidental to examples; no user-side action required.
 
 TML-2808: the SQL/Mongo contract storage IR moved to a namespace
 envelope (`namespaces.<ns>.entries.<kind>`) and lifted cross-references
@@ -71,7 +71,7 @@ enabling framework changes ride along: (a) the emitter now emits
 multi-namespace contracts (single-namespace output is byte-identical),
 and (b) `db init` / `db verify` introspect all declared namespaces
 across a composed contract aggregate instead of only `public`. Both
-are forward-compatible — single-namespace contracts emit byte-identical
+are forward-compatible - single-namespace contracts emit byte-identical
 output and introspect through the same path as before. The new
 extension package is purely additive (consumers opt in by adding
 `extensionPacks: [supabasePack]`). No codemod or user-side action
@@ -80,7 +80,7 @@ required.
 TML-2754: points stale migration tests at the post-#751
 `SqlControlAdapter` API (`createPlanner(controlAdapter)` and the
 `adapter` option on `executeDbInit`/`executeDbUpdate`). Touches
-`examples/multi-extension-monorepo/test/` only — a test-only diff with
+`examples/multi-extension-monorepo/test/` only - a test-only diff with
 no runtime, contract, or public-API change; incidental to examples, no
 user-side action required.
 
@@ -105,15 +105,15 @@ substrate diff.
 Release bump 0.13.0 (#789): version-number changes across all workspace
 `package.json` files and `pnpm-lock.yaml` specifiers; the
 `examples/supabase/src/contract.json` and `contract.d.ts` `version`
-field updated to `0.13.0`. Incidental substrate diff — no user-side
+field updated to `0.13.0`. Incidental substrate diff - no user-side
 action required.
 -->
 
-# 0.12 → 0.13 — User upgrade instructions
+# 0.12 → 0.13 - User upgrade instructions
 
 ## `sqlite-create-table-method`
 
-Starting at this release, `createTable` is no longer a free function exported from `@prisma-next/sqlite/migration`. It is now a protected method on the `Migration` base class — call it as `this.createTable({...})` inside `get operations()`.
+Starting at this release, `createTable` is no longer a free function exported from `@prisma-next/sqlite/migration`. It is now a protected method on the `Migration` base class - call it as `this.createTable({...})` inside `get operations()`.
 
 The column builder helpers `col()`, `lit()`, `fn()`, `primaryKey()`, `foreignKey()`, and `unique()` are now exported from `@prisma-next/sqlite/migration` directly, so you do not need an additional import.
 
@@ -168,7 +168,7 @@ MigrationCLI.run(import.meta.url, M);
 2. In `get operations()`, replace each `createTable(tableName, columns, constraints?)` call with `this.createTable({ table: tableName, columns, constraints? })`.
 3. Run `pnpm typecheck && pnpm test` to confirm the migration compiled and all tests pass.
 
-TypeScript flags the removed `createTable` import as an error after the bump, so every affected call site is pinpointed at compile time. No contract re-emit is required — this is an authoring-surface change only.
+TypeScript flags the removed `createTable` import as an error after the bump, so every affected call site is pinpointed at compile time. No contract re-emit is required - this is an authoring-surface change only.
 
 ## `re-emit-mti-variant-link-columns`
 
@@ -192,13 +192,13 @@ model Bug {
 
 Before this release, the `bug` table held only the variant-specific columns (`severity`, …) with **no primary key** and no relationship to `task`. From this release on, re-emitting the contract materialises the base-PK link in the variant's storage table:
 
-- a copy of the base table's full primary-key column set — the same column names and types (one column for a single-column PK like `id`, or every component for a composite PK),
+- a copy of the base table's full primary-key column set - the same column names and types (one column for a single-column PK like `id`, or every component for a composite PK),
 - a primary key over those link columns,
 - a cascading foreign key (`ON DELETE CASCADE`) from those columns to the base table's matching primary-key columns.
 
-The variant row's link columns mirror its parent base row's primary key — the same identity links a `task` row to its `bug`/`feature` detail row. This is the storage shape the runtime already assumed when writing base + variant rows together; the change makes it explicit and enforced at the database level.
+The variant row's link columns mirror its parent base row's primary key - the same identity links a `task` row to its `bug`/`feature` detail row. This is the storage shape the runtime already assumed when writing base + variant rows together; the change makes it explicit and enforced at the database level.
 
-Single-table inheritance variants — `@@base(...)` models **without** their own `@@map`, which share the base table — are unaffected: there is no separate table to link.
+Single-table inheritance variants - `@@base(...)` models **without** their own `@@map`, which share the base table - are unaffected: there is no separate table to link.
 
 ### Re-emit your contracts
 
@@ -229,11 +229,11 @@ prisma-next migrate
 
 The plan adds the variant's link columns, sets them `NOT NULL`, adds the primary key over them, and adds the cascading foreign key to the base table.
 
-A variant row's link columns **must equal its parent base row's primary key** — that shared identity is what links a `task` row to its `bug`/`feature` detail row, and the cascading foreign key to the base table enforces it. There is therefore no correct backfill, and you must **never fabricate** the link values (for example with `gen_random_uuid()`): fabricated values have no matching base row, so the validating foreign key in this same migration would immediately reject them.
+A variant row's link columns **must equal its parent base row's primary key** - that shared identity is what links a `task` row to its `bug`/`feature` detail row, and the cascading foreign key to the base table enforces it. There is therefore no correct backfill, and you must **never fabricate** the link values (for example with `gen_random_uuid()`): fabricated values have no matching base row, so the validating foreign key in this same migration would immediately reject them.
 
-The runtime always wrote each variant row together with its base row, sharing the same primary-key values. On a database provisioned that way there are no rows missing the link columns, so the `SET NOT NULL` step is a no-op and the migration applies cleanly with no backfill. Author the migration with no `dataTransform` — just `addColumn` (nullable) → `setNotNull` → primary key → foreign key — then run `node <migration>.ts` (or `pnpm exec tsx <migration>.ts`) to self-emit `ops.json` and attest the package before `prisma-next migrate`.
+The runtime always wrote each variant row together with its base row, sharing the same primary-key values. On a database provisioned that way there are no rows missing the link columns, so the `SET NOT NULL` step is a no-op and the migration applies cleanly with no backfill. Author the migration with no `dataTransform` - just `addColumn` (nullable) → `setNotNull` → primary key → foreign key - then run `node <migration>.ts` (or `pnpm exec tsx <migration>.ts`) to self-emit `ops.json` and attest the package before `prisma-next migrate`.
 
-If your database does hold variant rows that predate the link columns, they are unlinkable orphans — nothing in those rows maps them back to their base row. The `SET NOT NULL` precheck ("ensure no NULL values") halts the migration before any destructive step. Resolve those rows by hand — map each to the correct base primary key, or delete it — and re-run. Do not paper over the halt with fabricated link values.
+If your database does hold variant rows that predate the link columns, they are unlinkable orphans - nothing in those rows maps them back to their base row. The `SET NOT NULL` precheck ("ensure no NULL values") halts the migration before any destructive step. Resolve those rows by hand - map each to the correct base primary key, or delete it - and re-run. Do not paper over the halt with fabricated link values.
 
 ### Validation
 
@@ -243,7 +243,7 @@ After re-emitting and migrating, run `pnpm typecheck && pnpm test` (or your appl
 
 This release ships PSL support for referencing a model from an extension contract space (e.g. `supabase:auth.AuthUser`) in a relation field, together with named-type aliases for database-native column types.
 
-**This entry is informational.** No existing consumer has cross-space foreign keys to change — this is a new opt-in capability. Adopt it when you want a field in your model to reference a row owned by an extension (such as Supabase's `auth.users` table).
+**This entry is informational.** No existing consumer has cross-space foreign keys to change - this is a new opt-in capability. Adopt it when you want a field in your model to reference a row owned by an extension (such as Supabase's `auth.users` table).
 
 ### Named-type aliases
 
@@ -300,7 +300,7 @@ The storage IR inside `contract.json` moved to a namespace envelope in 0.13. Eve
 table and type entry that was previously at the top level of `storage` now lives under
 `storage.namespaces.<ns>.entries.<kind>`. Cross-references that were bare strings are
 now `{ namespace, model }` objects in `domain`. The emitter handles this automatically
-— no schema source change is needed.
+- no schema source change is needed.
 
 Because the shape change affects `storageHash`, every SQL and Mongo contract must be
 re-emitted, and the database must be migrated to match.
@@ -318,12 +318,12 @@ prisma-next migration plan --name storage-namespace-envelope
 prisma-next migrate
 ```
 
-The migration records the hash transition; no column or table is added or removed — this
+The migration records the hash transition; no column or table is added or removed - this
 is a metadata-only change. Confirm with `prisma-next migration check` once done.
 
 ## `telemetry-now-opt-out`
 
-**Informational — no code change required.**
+**Informational - no code change required.**
 
 Starting at 0.13, the CLI collects anonymised usage telemetry by default (previously
 opt-in). If you want to disable it, set either of the following environment variables:
@@ -334,6 +334,6 @@ PRISMA_NEXT_DISABLE_TELEMETRY=1
 DO_NOT_TRACK=1
 ```
 
-Either variable takes effect immediately — no config file change needed. See
+Either variable takes effect immediately - no config file change needed. See
 [Telemetry](https://github.com/prisma/prisma-next/blob/main/docs/Telemetry.md) for
 what is collected and how to opt out permanently.

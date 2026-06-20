@@ -13,15 +13,15 @@ description: >-
 
 # Upgrade Prisma Next (user app)
 
-This skill upgrades a project that **consumes** Prisma Next via the public package API (`@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, etc.). If the project is itself a Prisma Next *extension*, use the `prisma-next-extension-upgrade` skill instead — or both, if the repo contains both an app and an extension package.
+This skill upgrades a project that **consumes** Prisma Next via the public package API (`@prisma-next/postgres`, `@prisma-next/mongo`, the contract files in `prisma/`, etc.). If the project is itself a Prisma Next *extension*, use the `prisma-next-extension-upgrade` skill instead - or both, if the repo contains both an app and an extension package.
 
-## Step 0 — Ensure the skill is up to date
+## Step 0 - Ensure the skill is up to date
 
 Before anything else, ensure this skill is installed at `@latest` and reload it. Bug fixes to *old* per-transition upgrade instructions ship in the latest skill release as part of its cumulative set; running against a stale skill can apply a known-broken translation.
 
-If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`pnpm dlx skills add prisma/prisma-next/skills/upgrade --all`), then re-invoke. The upgrade-skill subpath is intentionally unpinned (always `main`) — the cumulative instruction set is the source of truth, and the latest release fixes apply to every prior transition.
+If the agent runtime supports an in-session refresh, perform it now. Otherwise, exit and ask the user to re-install (`pnpm dlx skills add prisma/prisma-next/skills/upgrade --all`), then re-invoke. The upgrade-skill subpath is intentionally unpinned (always `main`) - the cumulative instruction set is the source of truth, and the latest release fixes apply to every prior transition.
 
-## Pre-flight — extension compatibility
+## Pre-flight - extension compatibility
 
 Before changing any code, refuse to upgrade past any installed extension's pinned Prisma Next version. Extensions in Prisma Next pin every `@prisma-next/*` dependency to a single exact version (no carets, no ranges); that pin is the highest version the extension has been validated against. Upgrading the user app past that pin would silently desynchronise the extension's type identity from the app's.
 
@@ -62,7 +62,7 @@ If the from-to delta spans multiple minor versions (e.g. `0.6 → 0.8`), build t
 0.6 → 0.7 → 0.8
 ```
 
-Apply each step in order, fully: bump, install, run instructions, validate, commit — before moving to the next. Halt the chain on the first failed step; do not skip ahead.
+Apply each step in order, fully: bump, install, run instructions, validate, commit - before moving to the next. Halt the chain on the first failed step; do not skip ahead.
 
 The chain order does not depend on which extensions are installed; the pre-flight has already established the target is reachable.
 
@@ -70,9 +70,9 @@ The chain order does not depend on which extensions are installed; the pre-fligh
 
 For each `(from, to)` step in the chain:
 
-1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the project's `package.json` to the exact `<to>` version (no caret, no tilde). All entries advance to the same version. Cover `dependencies` and `devDependencies`. The upgrade skill itself is delivered through `pnpm dlx skills add` and lives under `.agents/skills/prisma-next-upgrade/` (or the equivalent CLI-managed directory) — there is no `@prisma-next/upgrade-skill` npm entry to bump.
+1. **Bump `@prisma-next/*` deps.** Rewrite every `@prisma-next/*` entry in the project's `package.json` to the exact `<to>` version (no caret, no tilde). All entries advance to the same version. Cover `dependencies` and `devDependencies`. The upgrade skill itself is delivered through `pnpm dlx skills add` and lives under `.agents/skills/prisma-next-upgrade/` (or the equivalent CLI-managed directory) - there is no `@prisma-next/upgrade-skill` npm entry to bump.
 
-2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The project's code is now broken against the new types — the upgrade instructions for `<from> → <to>` exist to fix it.
+2. **Install.** Run `pnpm install` (or the project's lockfile-managing command). The project's code is now broken against the new types - the upgrade instructions for `<from> → <to>` exist to fix it.
 
 3. **Read the upgrade instructions.** Load `upgrades/<from>-to-<to>/instructions.md` from this skill package. Parse the YAML frontmatter and pay particular attention to its `changes[]` array.
 
@@ -80,9 +80,9 @@ For each `(from, to)` step in the chain:
    - If the entry has a `detection` block (glob + content predicate), run it; skip the change if no files match. No `detection` → apply unconditionally.
    - If the entry names a `script:` (relative path next to `instructions.md`), invoke it from the project root: `*.ts` via `pnpm exec tsx <path>`, `*.sh` via `bash <path>`, codemods per the script's own prose. No `script` → follow the prose body directly.
 
-   Empty `changes[]` (placeholder shape for transitions with no user-side breaking changes) is a no-op — proceed to validation.
+   Empty `changes[]` (placeholder shape for transitions with no user-side breaking changes) is a no-op - proceed to validation.
 
-5. **Validate.** Run `pnpm typecheck && pnpm test` (or the project's equivalent — the `scripts` field of the project's `package.json` is the discovery surface). If anything is red, halt the chain. Do **not** auto-roll-back; surface the failure to the user with the failing change's `id` (from the frontmatter), the file paths the change operated on, and the inferred remediation.
+5. **Validate.** Run `pnpm typecheck && pnpm test` (or the project's equivalent - the `scripts` field of the project's `package.json` is the discovery surface). If anything is red, halt the chain. Do **not** auto-roll-back; surface the failure to the user with the failing change's `id` (from the frontmatter), the file paths the change operated on, and the inferred remediation.
 
 6. **Commit.** One commit per step containing the `package.json` bump, lockfile churn, and any source rewrites:
 

@@ -52,7 +52,7 @@
 
     <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
       <Users class="size-3.5" />
-      Online — {online.length}
+      Online - {online.length}
     </div>
     <div class="space-y-0.5">
       {#each online as member}
@@ -75,7 +75,7 @@
     </div>
 
     {#if offline.length > 0}
-      <div class="mt-4 text-xs font-semibold text-muted-foreground">Offline — {offline.length}</div>
+      <div class="mt-4 text-xs font-semibold text-muted-foreground">Offline - {offline.length}</div>
       <div class="space-y-0.5 opacity-50">
         {#each offline as member}
           <div class="flex items-center gap-2 px-1 py-1">

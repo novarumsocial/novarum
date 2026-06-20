@@ -3,7 +3,7 @@
  * install migration baseline after the 0.12 public-by-default flip
  * (`__unbound__`/`postgres-unbound-schema` → `public`/`postgres-schema`).
  *
- * The migration ops are unchanged — only the contract hash envelope moves.
+ * The migration ops are unchanged - only the contract hash envelope moves.
  * This script:
  *   1. Finds extension package roots (nearest `package.json` with a
  *      `build:contract-space` script) whose `src/contract.json` still

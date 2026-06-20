@@ -9,7 +9,7 @@
  * preserves `additionalProperties` through emission, so re-emitting is
  * the consumer-facing migration for on-disk contract artefacts. A
  * non-variant Mongo model must resolve to an `objectId` `_id`; otherwise
- * interpret fails with `PSL_MONGO_ID_REQUIRED` — fix the PSL/TS source
+ * interpret fails with `PSL_MONGO_ID_REQUIRED` - fix the PSL/TS source
  * before re-emitting.
  *
  * After re-emitting, apply the resulting open→closed validator migration
@@ -97,7 +97,7 @@ async function isMongoContract(contractPath: string): Promise<boolean> {
  * A contract is in the closed-validator (post-0.12) format when every object
  * schema that declares a `properties` map also carries `additionalProperties:
  * false`. That covers collection validators, nested value objects, and each
- * polymorphic `oneOf` branch — all of which expose `properties`.
+ * polymorphic `oneOf` branch - all of which expose `properties`.
  *
  * The one exception is a polymorphic schema's top-level node: it carries both
  * base `properties` and a `oneOf`, and is deliberately left open because

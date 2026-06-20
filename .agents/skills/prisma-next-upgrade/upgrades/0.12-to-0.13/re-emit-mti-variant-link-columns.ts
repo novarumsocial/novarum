@@ -10,7 +10,7 @@
  *
  * Detection: a contract is a candidate when its domain carries a model with a
  * `base` reference (an MTI variant) whose matching storage table has no
- * `primaryKey` — the pre-change shape. After re-emit the table gains its
+ * `primaryKey` - the pre-change shape. After re-emit the table gains its
  * `id` PK + cascading FK and the contract's `storageHash` changes.
  *
  * Dispatch: walks the project root for `prisma-next.config.ts` directories,
@@ -91,7 +91,7 @@ async function resolveContractJson(configDir: string): Promise<string | null> {
 /**
  * A contract needs the MTI link-column migration when any of its domain models
  * is an MTI variant (carries a `base` reference) whose matching storage table
- * has no `primaryKey` — the pre-change shape that lacks the link column.
+ * has no `primaryKey` - the pre-change shape that lacks the link column.
  */
 function contractNeedsMtiLinkColumns(raw: string): boolean {
   let parsed: unknown;

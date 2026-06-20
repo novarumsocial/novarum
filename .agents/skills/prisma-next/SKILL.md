@@ -1,9 +1,9 @@
 ---
 name: prisma-next
-description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do with Prisma Next", "what can I do next with Prisma", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill — adoption / quickstart / first-touch orientation / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migrate), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request — load that sibling skill directly.
+description: Route a vague Prisma Next prompt to the right specific skill. Use for "help me with Prisma Next", "what is Prisma Next", "explain Prisma Next", "I'm new to PN", "where do I start", "what can I do with Prisma Next", "what can I do next with Prisma", "just ran createprisma", "tour of Prisma Next", "Prisma Next overview", and comparison questions like "Prisma Next vs Prisma 7", "PN vs Drizzle", "PN vs Kysely", "PN vs TypeORM". Do NOT use when the prompt clearly matches a workflow skill - adoption / quickstart / first-touch orientation / brownfield introspection, schema / contract editing, migration authoring (db update / migration plan / migrate), migration review on deploy / concurrent migrations, queries / db.orm / db.sql / TypedSQL, runtime / db.ts / middleware wiring, build / Vite plugin / Next.js plugin, debug / structured error envelopes / PN-* error codes, or feedback / bug report / feature request - load that sibling skill directly.
 ---
 
-# Prisma Next — Router
+# Prisma Next - Router
 
 > **Edit your data contract. Prisma handles the rest.**
 
@@ -17,7 +17,7 @@ This skill exists to disambiguate vague Prisma Next prompts. When the user hasn'
 
 ## When Not to Use
 
-- The user named a workflow — use the matching skill directly:
+- The user named a workflow - use the matching skill directly:
   - Setting up a new project or adopting an existing DB → `prisma-next-quickstart`.
   - Editing the schema, adding a model, changing a field → `prisma-next-contract`.
   - Authoring a migration, fixing a planner error → `prisma-next-migrations`.
@@ -46,7 +46,7 @@ If you still can't tell which skill applies, ask the user what they want to do. 
 
 ## The canonical model (one paragraph)
 
-Prisma Next is a contract-first data layer. You author a **data contract** (a `contract.prisma` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces on SQL targets: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw(...)`). On MongoDB targets only the ORM lane exists, and its keys are collection storage names (`db.orm.users`) rather than PSL model names — `prisma-next-queries` § *MongoDB ORM addressing* covers the rule. Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
+Prisma Next is a contract-first data layer. You author a **data contract** (a `contract.prisma` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces on SQL targets: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw(...)`). On MongoDB targets only the ORM lane exists, and its keys are collection storage names (`db.orm.users`) rather than PSL model names - `prisma-next-queries` § *MongoDB ORM addressing* covers the rule. Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
 
 Three steps the user does:
 
@@ -54,11 +54,11 @@ Three steps the user does:
 2. **The system plans the migrations for you.** (`prisma-next-migrations`)
 3. **If you need data migrations, you edit `migration.ts` and execute it.** (`prisma-next-migrations`)
 
-Everything else — queries, runtime wiring, build integration, debugging, feedback — sits on top of those three.
+Everything else - queries, runtime wiring, build integration, debugging, feedback - sits on top of those three.
 
 ## Checklist
 
 - [ ] If the prompt matches a specific workflow skill, route there without asking.
 - [ ] If the prompt is vague, ask one disambiguating question.
-- [ ] Do not attempt to answer the user's question from this skill — load the right specific skill first.
+- [ ] Do not attempt to answer the user's question from this skill - load the right specific skill first.
 - [ ] If the user describes a missing feature or a misbehaviour they want fixed, route to `prisma-next-feedback`.

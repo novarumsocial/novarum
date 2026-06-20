@@ -186,7 +186,7 @@ const rewrites: Rewrite[] = [
       return `this.createIndex({ schema: ${s.value}, table: ${t.value}, index: ${idx.value}, columns: ${c.value} })`;
     },
   },
-  // addForeignKey(schema, table, { ... }) — wraps opts in `foreignKey:`
+  // addForeignKey(schema, table, { ... }) - wraps opts in `foreignKey:`
   {
     pattern: /\baddForeignKey\(/g,
     rewrite(m) {
@@ -203,7 +203,7 @@ const rewrites: Rewrite[] = [
 ];
 
 function applyRewrites(src: string): string {
-  // installExtension already takes an object — just prepend `this.`
+  // installExtension already takes an object - just prepend `this.`
   let out = src.replace(/(?<!this\.)(?<!\.)\binstallExtension\(/g, 'this.installExtension(');
 
   for (const { pattern, rewrite } of rewrites) {
@@ -287,4 +287,4 @@ for (const file of files) {
     changed++;
   }
 }
-console.log(`done — ${changed} file(s) updated`);
+console.log(`done - ${changed} file(s) updated`);

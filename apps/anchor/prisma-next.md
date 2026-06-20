@@ -1,6 +1,6 @@
 # Welcome to Prisma Next!
 
-Prisma Next lets you query your database in simple, easy-to-read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every table, column, and relation.
+Prisma Next lets you query your database in simple, easy-to-read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client - with autocomplete for every table, column, and relation.
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
 
@@ -37,8 +37,8 @@ const user = await db.orm.User
 
 Your contract has two companion files in the same directory:
 
-- **`contract.json`** — this tells your application what models exist, just like `package-lock.json` tells your package manager what dependencies your project has
-- **`contract.d.ts`** — this powers autocomplete and type checking in your editor
+- **`contract.json`** - this tells your application what models exist, just like `package-lock.json` tells your package manager what dependencies your project has
+- **`contract.d.ts`** - this powers autocomplete and type checking in your editor
 
 Commit both files to git. When you change your contract, run `bun prisma-next contract emit` to update them.
 
@@ -82,9 +82,9 @@ bun prisma-next migration status    # Show migration status
 
 | File | Purpose |
 |---|---|
-| [`src/prisma/contract.prisma`](src/prisma/contract.prisma) | Your data contract — define your models here |
+| [`src/prisma/contract.prisma`](src/prisma/contract.prisma) | Your data contract - define your models here |
 | [`prisma-next.config.ts`](prisma-next.config.ts) | CLI configuration |
-| [`src/prisma/db.ts`](src/prisma/db.ts) | Database client — `import { db } from './src/prisma/db'` |
+| [`src/prisma/db.ts`](src/prisma/db.ts) | Database client - `import { db } from './src/prisma/db'` |
 | `src/prisma/contract.json` | Compiled contract (generated) |
 | `src/prisma/contract.d.ts` | Contract types (generated) |
 
@@ -92,12 +92,12 @@ bun prisma-next migration status    # Show migration status
 
 1. Edit [`src/prisma/contract.prisma`](src/prisma/contract.prisma) to add or change models.
 2. Run `bun prisma-next contract emit` to regenerate the contract.
-3. Query your models — your IDE will autocomplete everything.
+3. Query your models - your IDE will autocomplete everything.
 
 ## Monorepo notes (pnpm workspaces)
 
 If this project lives inside a pnpm workspace, a few things are worth knowing:
 
-- **Catalogs.** When the workspace's `pnpm-workspace.yaml` defines a `catalogs` entry for `prisma-next` or `@prisma-next/postgres`, pnpm uses the catalog version everywhere — `init` does too. If you wanted the published `latest` instead, update or remove the catalog entry, then re-run `pnpm install`.
+- **Catalogs.** When the workspace's `pnpm-workspace.yaml` defines a `catalogs` entry for `prisma-next` or `@prisma-next/postgres`, pnpm uses the catalog version everywhere - `init` does too. If you wanted the published `latest` instead, update or remove the catalog entry, then re-run `pnpm install`.
 - **`pnpm dlx`.** `pnpm dlx prisma-next@latest init …` works in any directory. Inside a workspace, pnpm still resolves dependencies through the workspace's catalog/overrides rather than the registry; expect the installed Prisma Next packages to reflect the workspace's catalog rather than `latest`.
 - **`pnpm` → `npm` fallback.** If `pnpm` ever fails to install Prisma Next with a `workspace:*` or `catalog:` resolution error (a leak in a published artefact), `init` falls back to `npm install` and surfaces a warning. Once the offending package republishes a clean version you can switch back with `pnpm install`.

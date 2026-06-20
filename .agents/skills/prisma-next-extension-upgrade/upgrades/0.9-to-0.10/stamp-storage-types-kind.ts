@@ -9,7 +9,7 @@
  * enumerable `kind` discriminator (`'codec-instance'` for codec
  * triples; `'postgres-enum'` for Postgres enums). The family
  * `ContractSerializer` rejects untagged entries with a diagnostic
- * naming the offending entry — the previous silent fallthrough in
+ * naming the offending entry - the previous silent fallthrough in
  * `normaliseTypeEntry` is gone. See TML-2536.
  *
  * Before 0.10, the on-disk shape was:
@@ -62,7 +62,7 @@
  *   future extension-contributed codecs).
  *
  * The transformation re-serialises each affected file via
- * `JSON.stringify(value, null, 2) + '\n'` — the same formatting the
+ * `JSON.stringify(value, null, 2) + '\n'` - the same formatting the
  * CLI uses when authoring snapshots originally, so the diff outside
  * `storage.types` is zero on files the CLI generated. Hand-edited
  * contract snapshots may experience cosmetic whitespace shifts; this
@@ -106,7 +106,7 @@ async function findContractSnapshots(root: string): Promise<string[]> {
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      // Unreadable directory — skip silently. Mirrors the predecessor
+      // Unreadable directory - skip silently. Mirrors the predecessor
       // 0.8→0.9 codemod's failure-tolerant walk; the user's project
       // root may legitimately contain restricted directories.
       return;
@@ -169,7 +169,7 @@ function looksLikeUntaggedCodecTriple(value: unknown): value is UntaggedCodecTri
   // `typeParams.values` is already a string[]. Without this guard a
   // malformed enum entry would slip through the classifier and surface
   // a different (more specific) diagnostic from `stampEntry` than the
-  // outer "neither stamped nor untagged-triple — hand-edit required"
+  // outer "neither stamped nor untagged-triple - hand-edit required"
   // throw. Folding that case into the predicate gives every malformed
   // entry the same single diagnostic shape.
   if (obj['codecId'] === POSTGRES_ENUM_CODEC_ID) {
@@ -184,7 +184,7 @@ function looksLikeUntaggedCodecTriple(value: unknown): value is UntaggedCodecTri
 function stampEntry(name: string, raw: UntaggedCodecTriple): StampedEntry {
   if (raw.codecId === POSTGRES_ENUM_CODEC_ID) {
     const values = (raw.typeParams as { values?: unknown })['values'];
-    // Invariant: `looksLikeUntaggedCodecTriple` already gated this — a
+    // Invariant: `looksLikeUntaggedCodecTriple` already gated this - a
     // `pg/enum@1` entry that reaches `stampEntry` has a string[]
     // `typeParams.values`. The runtime check stays as a defensive
     // marker so a future loosening of the predicate doesn't silently
@@ -240,7 +240,7 @@ function processContract(parsed: unknown, filePath: string): ProcessOutcome {
     }
     if (!looksLikeUntaggedCodecTriple(entry)) {
       throw new Error(
-        `${filePath}: storage.types[${JSON.stringify(name)}] is neither a stamped entry nor an untagged codec triple — refusing to guess. Hand-edit required.`,
+        `${filePath}: storage.types[${JSON.stringify(name)}] is neither a stamped entry nor an untagged codec triple - refusing to guess. Hand-edit required.`,
       );
     }
     newTypes[name] = stampEntry(name, entry);
@@ -261,12 +261,12 @@ function processContract(parsed: unknown, filePath: string): ProcessOutcome {
  * (strings, numbers, booleans, null) whose serialised length fits
  * within `INLINE_ARRAY_THRESHOLD`. This matches the on-disk shape the
  * CLI's contract-snapshot writer produces (e.g. `"columns": ["id"]`,
- * `"values": ["admin", "user"]`) — the alternative (Node's default
+ * `"values": ["admin", "user"]`) - the alternative (Node's default
  * `JSON.stringify(null, 2)`) reflows every such array onto multiple
  * lines and bloats the diff with hundreds of lines of cosmetic noise.
  *
  * The non-array, non-object surfaces match `JSON.stringify(null, 2)`
- * byte-for-byte (same key ordering — insertion order — and same
+ * byte-for-byte (same key ordering - insertion order - and same
  * quoting/escaping). The only divergence is inline-primitive-arrays.
  */
 const INLINE_ARRAY_THRESHOLD = 80;

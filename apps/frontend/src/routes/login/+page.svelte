@@ -86,7 +86,7 @@
 </script>
 
 <svelte:head>
-	<title>novarum — sign in</title>
+	<title>novarum - sign in</title>
 	<meta name="description" content="Sign in to your novarum account" />
 </svelte:head>
 
