@@ -176,7 +176,7 @@
 					</Form.Button>
 				</form>
 
-				<div class="my-5 flex items-center gap-3">
+				<!--<div class="my-5 flex items-center gap-3">
 					<Separator class="flex-1" />
 					<span class="text-xs text-muted-foreground">or</span>
 					<Separator class="flex-1" />
@@ -184,7 +184,7 @@
 
 				<Button type="button" variant="outline" class="w-full" size="lg">
 					Continue with SSO
-				</Button>
+				</Button>-->
 			</Card.Content>
 
 			<Card.Footer class="justify-center text-xs text-muted-foreground">

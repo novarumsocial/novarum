@@ -1,10 +1,18 @@
 model User {
-  id           String @id
-  email        String @unique
-  passwordHash String
+  id             String @id
+  username       String
+  homeserverName String
+  displayName    String?
+  email          String? @unique
+  passwordHash   String?
+  avatarUrl      String?
+  isBot          Boolean
+  createdAt      DateTime
+  updatedAt      DateTime
 
   sessions Session[]
 
+  @@unique([username, homeserverName])
   @@map("user")
 }
 

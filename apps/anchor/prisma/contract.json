@@ -86,7 +86,35 @@
           },
           "User": {
             "fields": {
+              "avatarUrl": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "displayName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "email": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeserverName": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -100,7 +128,28 @@
                   "kind": "scalar"
                 }
               },
+              "isBot": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "passwordHash": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "username": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -127,14 +176,35 @@
             },
             "storage": {
               "fields": {
+                "avatarUrl": {
+                  "column": "avatarUrl"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "displayName": {
+                  "column": "displayName"
+                },
                 "email": {
                   "column": "email"
+                },
+                "homeserverName": {
+                  "column": "homeserverName"
                 },
                 "id": {
                   "column": "id"
                 },
+                "isBot": {
+                  "column": "isBot"
+                },
                 "passwordHash": {
                   "column": "passwordHash"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "username": {
+                  "column": "username"
                 }
               },
               "namespaceId": "public",
@@ -204,7 +274,27 @@
             },
             "user": {
               "columns": {
+                "avatarUrl": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "displayName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "homeserverName": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -214,7 +304,22 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "isBot": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "passwordHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "username": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -232,6 +337,12 @@
                   "columns": [
                     "email"
                   ]
+                },
+                {
+                  "columns": [
+                    "username",
+                    "homeserverName"
+                  ]
                 }
               ]
             }
@@ -241,7 +352,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:91be4996d337c5ed937c132ceba29e2c09b7a0052b0f7597d4710b18a0b5a5b1"
+    "storageHash": "sha256:4ae4071a2a7f43c36893716580fe62279f34c80750ebb66727d5852e9a32aa65"
   },
   "capabilities": {
     "postgres": {

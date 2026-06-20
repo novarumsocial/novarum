@@ -1,4 +1,4 @@
-import Elysia, { Cookie, t } from 'elysia';
+import Elysia, { t } from 'elysia';
 import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import {
@@ -7,14 +7,38 @@ import {
   createSessionCookie,
   deleteSessionToken,
   sessionCookieName,
-	validateSessionToken,
+  validateSessionToken,
 } from './provider';
+
+const homeserverName = process.env['HOMESERVER_NAME'] ?? 'novarum.social';
+
+function userResponse(user: {
+  id: string;
+  username: string;
+  homeserverName: string;
+  displayName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  isBot: boolean;
+}) {
+  return {
+    id: user.id,
+    username: user.username,
+    homeserverName: user.homeserverName,
+    handle: `@${user.username}:${user.homeserverName}`,
+    displayName: user.displayName,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    isBot: user.isBot,
+  };
+}
 
 export const auth = new Elysia({ prefix: '/auth' })
   .post(
     '/signup',
     async ({ body, cookie, status }) => {
-      const { email, password } = body;
+      const { username, displayName, email, password } = body;
+      const now = new Date();
 
       const existingUser = await db.orm.public.User.where({ email }).first();
       if (existingUser) {
@@ -22,10 +46,23 @@ export const auth = new Elysia({ prefix: '/auth' })
         return { error: 'User already exists' };
       }
 
+      const existingUsername = await db.orm.public.User.where({ username, homeserverName }).first();
+      if (existingUsername) {
+        status(409);
+        return { error: 'Username is already taken' };
+      }
+
       const user = await db.orm.public.User.create({
         id: randomString(),
+        username,
+        homeserverName,
+        displayName: displayName || null,
         email,
         passwordHash: await Bun.password.hash(password),
+        avatarUrl: null,
+        isBot: false,
+        createdAt: now,
+        updatedAt: now,
       });
 
       const session = await createSession(user.id);
@@ -37,14 +74,13 @@ export const auth = new Elysia({ prefix: '/auth' })
       });
 
       return {
-        user: {
-          id: user.id,
-          email: user.email,
-        },
+        user: userResponse(user),
       };
     },
     {
       body: t.Object({
+        username: t.String({ minLength: 2, maxLength: 32, pattern: '^[a-zA-Z0-9._]+$' }),
+        displayName: t.Optional(t.String({ maxLength: 64 })),
         email: t.String({ type: 'email' }),
         password: t.String({ minLength: 8 }),
       }),
@@ -57,6 +93,11 @@ export const auth = new Elysia({ prefix: '/auth' })
 
       const user = await db.orm.public.User.where({ email }).first();
       if (!user) {
+        status(401);
+        return { error: 'Invalid email or password' };
+      }
+
+      if (!user.passwordHash) {
         status(401);
         return { error: 'Invalid email or password' };
       }
@@ -76,10 +117,7 @@ export const auth = new Elysia({ prefix: '/auth' })
       });
 
       return {
-        user: {
-          id: user.id,
-          email: user.email,
-        },
+        user: userResponse(user),
       };
     },
     {
@@ -127,9 +165,6 @@ export const auth = new Elysia({ prefix: '/auth' })
     }
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-      },
+      user: userResponse(user),
     };
   });
