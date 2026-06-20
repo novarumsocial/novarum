@@ -3,8 +3,6 @@ model User {
   username       String
   homeserverName String
   displayName    String?
-  email          String? @unique
-  passwordHash   String?
   avatarUrl      String?
   isBot          Boolean
   createdAt      DateTime
@@ -14,6 +12,17 @@ model User {
 
   @@unique([username, homeserverName])
   @@map("user")
+  LocalCredential LocalCredential[]
+}
+
+model LocalCredential {
+  userId       String @id
+  email        String @unique
+  passwordHash String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("local_credential")
 }
 
 model Session {

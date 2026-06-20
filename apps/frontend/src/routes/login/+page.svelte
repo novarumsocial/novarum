@@ -2,6 +2,8 @@
 	import { z } from "zod";
 	import { defaults, superForm } from "sveltekit-superforms";
 	import { zod4, zod4Client } from "sveltekit-superforms/adapters";
+	import { goto } from "$app/navigation";
+	import { anchor } from "$lib/anchor.svelte";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Form from "$lib/components/ui/form/index.js";
@@ -10,7 +12,7 @@
 	import {
 		MessagesSquare,
 		Server,
-		Mail,
+		AtSign,
 		Lock,
 		ArrowRight,
 		LoaderCircle
@@ -22,13 +24,31 @@
 			.string()
 			.trim()
 			.min(1, "Pick a home server.")
-			.regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Enter a valid server domain.")
+			.regex(
+				/^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(:\d{1,5})?$/,
+				"Enter a valid server address."
+			)
 			.default("novarum.social"),
-		email: z.string().email("Enter a valid email.").default(""),
+		username: z
+			.string()
+			.trim()
+			.min(2, "At least 2 characters.")
+			.max(32, "At most 32 characters.")
+			.regex(/^[a-zA-Z0-9._]+$/, "Letters, numbers, dots, underscores only.")
+			.default(""),
 		password: z.string().min(1, "Enter your password.").default("")
 	});
 
 	let loading = $state(false);
+	let submitError = $state("");
+
+	function getErrorMessage(error: unknown) {
+		if (error && typeof error === "object" && "error" in error) {
+			return String(error.error);
+		}
+
+		return "Could not sign you in.";
+	}
 
 	const form = superForm(defaults(zod4(loginSchema)), {
 		SPA: true,
@@ -37,16 +57,28 @@
 		multipleSubmits: "prevent",
 		onSubmit() {
 			loading = true;
+			submitError = "";
 		},
-		onUpdate({ form: updatedForm }) {
+		async onUpdate({ form: updatedForm }) {
 			if (!updatedForm.valid) {
 				loading = false;
 				return;
 			}
 
-			setTimeout(() => {
+			anchor.setHomeServer(updatedForm.data.homeServer);
+			const { error } = await anchor.client.auth.login.post({
+				username: updatedForm.data.username,
+				homeserver: updatedForm.data.homeServer,
+				password: updatedForm.data.password
+			});
+
+			if (error) {
+				submitError = getErrorMessage(error.value);
 				loading = false;
-			}, 900);
+				return;
+			}
+
+			await goto("/app");
 		}
 	});
 
@@ -113,21 +145,22 @@
 						<Form.FieldErrors class="text-xs" />
 					</Form.Field>
 
-					<Form.Field {form} name="email" class="space-y-1.5">
+					<Form.Field {form} name="username" class="space-y-1.5">
 						<Form.Control>
 							{#snippet children({ props })}
-								<Form.Label>Email</Form.Label>
+								<Form.Label>Username</Form.Label>
 								<div class="relative">
-									<Mail
+									<AtSign
 										class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
 									/>
 									<Input
 										{...props}
-										type="email"
-										bind:value={$formData.email}
-										placeholder="you@example.com"
+										bind:value={$formData.username}
+										placeholder="alice"
 										class="pl-8"
-										autocomplete="email"
+										autocomplete="username"
+										spellcheck="false"
+										autocapitalize="none"
 									/>
 								</div>
 							{/snippet}
@@ -142,6 +175,7 @@
 									<Form.Label>Password</Form.Label>
 									<button
 										type="button"
+										tabindex="-1"
 										class="text-xs text-muted-foreground transition-colors hover:text-foreground"
 									>
 										Forgot password?
@@ -174,6 +208,10 @@
 							<ArrowRight class="size-4" />
 						{/if}
 					</Form.Button>
+
+					{#if submitError}
+						<p class="text-sm text-destructive">{submitError}</p>
+					{/if}
 				</form>
 
 				<!--<div class="my-5 flex items-center gap-3">
