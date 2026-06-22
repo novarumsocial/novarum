@@ -2,7 +2,7 @@ export interface Server {
 	id: string;
 	name: string;
 	initials: string;
-	color: string;
+	color?: string;
 }
 
 export interface ChannelCategory {

@@ -29,7 +29,11 @@ export async function createSession(userId: string): Promise<SessionWithToken> {
   return session;
 }
 
-export async function validateSessionToken(token: string): Promise<Session | null> {
+export async function validateSessionToken(token: string | undefined): Promise<SessionWithUser | null> {
+  if (!token) {
+    return null;
+  }
+
   const tokenParts = parseSessionToken(token);
   if (!tokenParts) {
     return null;
@@ -60,10 +64,10 @@ export async function deleteSessionToken(token: string): Promise<void> {
   await deleteSession(tokenParts.sessionId);
 }
 
-export async function getSession(sessionId: string): Promise<Session | null> {
+export async function getSession(sessionId: string): Promise<SessionWithUser | null> {
   const now = new Date();
 
-  const session = await db.orm.public.Session.where({ id: sessionId }).first();
+  const session = (await db.orm.public.Session.where({ id: sessionId }).include('user').first()) as SessionWithUser | null;
   if (!session) {
     return null;
   }
@@ -147,6 +151,7 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 export type Session = DefaultModelRow<Contract, 'Session'>;
 export type User = DefaultModelRow<Contract, 'User'>;
+export type SessionWithUser = Session & { user: User };
 
 export interface SessionWithToken extends Session {
   token: string;

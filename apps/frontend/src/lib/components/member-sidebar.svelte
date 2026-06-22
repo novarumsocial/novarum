@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Globe, Volume2, Users, Mic, MicOff } from "@lucide/svelte";
-  import type { Author, VoiceUser } from "$lib/data/mock";
+  import type { Author, VoiceUser } from "$lib/types/chat";
 
   let {
     members,
@@ -89,4 +89,3 @@
     {/if}
   </div>
 </aside>
-

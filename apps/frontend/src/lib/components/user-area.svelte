@@ -39,7 +39,7 @@
         {data?.user.displayName || data?.user.username}
       </p>
       <p class="truncate text-[11px] text-muted-foreground">
-        @{data?.user.username}@{data?.user.homeserverName}
+        @{data?.user.username}@{data?.user.homeserver}
       </p>
     {/if}
   </div>
