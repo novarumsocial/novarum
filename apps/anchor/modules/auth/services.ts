@@ -13,7 +13,7 @@ import {
 function userResponse(user: {
   id: string;
   username: string;
-  homeserverName: string;
+  homeserver: string;
   displayName: string | null;
   avatarUrl: string | null;
   isBot: boolean;
@@ -21,8 +21,8 @@ function userResponse(user: {
   return {
     id: user.id,
     username: user.username,
-    homeserverName: user.homeserverName,
-    handle: `@${user.username}:${user.homeserverName}`,
+    homeserver: user.homeserver,
+    handle: `@${user.username}:${user.homeserver}`,
     displayName: user.displayName,
     email,
     avatarUrl: user.avatarUrl,
@@ -43,7 +43,7 @@ export const auth = new Elysia({ prefix: '/auth' })
         return { error: 'User already exists' };
       }
 
-      const existingUsername = await db.orm.public.User.where({ username, homeserverName: homeserver }).first();
+      const existingUsername = await db.orm.public.User.where({ username, homeserver: homeserver }).first();
       if (existingUsername) {
         status(409);
         return { error: 'Username is already taken' };
@@ -52,7 +52,7 @@ export const auth = new Elysia({ prefix: '/auth' })
       const user = await db.orm.public.User.create({
         id: randomString(),
         username,
-        homeserverName: homeserver,
+        homeserver: homeserver,
         displayName: displayName || null,
         avatarUrl: null,
         isBot: false,
@@ -93,7 +93,7 @@ export const auth = new Elysia({ prefix: '/auth' })
     async ({ body, cookie, request, status }) => {
       const { username, homeserver, password } = body;
 
-      const user = await db.orm.public.User.where({ username, homeserverName: homeserver }).first();
+      const user = await db.orm.public.User.where({ username, homeserver: homeserver }).first();
       if (!user) {
         status(401);
         return { error: 'Invalid username or password' };

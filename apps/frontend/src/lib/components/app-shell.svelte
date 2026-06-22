@@ -1,65 +1,51 @@
 <script lang="ts">
-  import {
-    servers, channelsByServer, messagesByChannel,
-    members, voiceUsers,
-  } from "$lib/data/mock";
-  import ServerSidebar from "./server-sidebar.svelte";
-  import ChannelSidebar from "./channel-sidebar.svelte";
-  import ChatArea from "./chat-area.svelte";
-  import MemberSidebar from "./member-sidebar.svelte";
+  import { onMount } from 'svelte';
+  import { chat } from '$lib/chat-state.svelte';
+  import { realtime } from '$lib/realtime.svelte';
+  import ServerSidebar from './guild-sidebar.svelte';
+  import ChannelSidebar from './channel-sidebar.svelte';
+  import ChatArea from './chat-area.svelte';
+  import MemberSidebar from './member-sidebar.svelte';
+  import type { Channel } from '$lib/types/chat';
 
-  let activeServer = $state("home");
-  let activeChannel = $state("ch-general");
+  const currentServer = $derived(chat.currentServer);
+  const currentCategories = $derived(chat.currentCategories);
+  const currentChannel = $derived(chat.currentChannel);
+  const currentMessages = $derived(chat.currentMessages);
 
-  const currentServer = $derived(
-    servers.find((s) => s.id === activeServer)!
-  );
-  const currentCategories = $derived(
-    channelsByServer[activeServer] || []
-  );
-  const currentChannel = $derived(
-    (() => {
-      for (const cat of currentCategories) {
-        const found = cat.channels.find((ch) => ch.id === activeChannel);
-        if (found) return found;
-      }
-      return currentCategories[0]?.channels[0] ?? null;
-    })()
-  );
-  const currentMessages = $derived(
-    currentChannel ? (messagesByChannel[currentChannel.id] || []) : []
-  );
+  onMount(() => {
+    const disconnect = realtime.connect();
+    chat.loadGuilds();
 
-  function selectServer(id: string) {
-    activeServer = id;
-    const cats = channelsByServer[id];
-    if (cats && cats.length > 0 && cats[0].channels.length > 0) {
-      activeChannel = cats[0].channels[0].id;
-    }
-  }
-
-  function selectChannel(id: string) {
-    activeChannel = id;
-  }
+    return disconnect;
+  });
 </script>
 
 <div class="dark flex h-svh overflow-hidden bg-background">
   <ServerSidebar
-    {servers}
-    activeId={activeServer}
-    onSelect={selectServer}
+    servers={chat.servers}
+    activeId={chat.activeServer}
+    onSelect={(id) => chat.selectServer(id)}
+    onCreateServer={(server) => chat.createServer(server)}
   />
-  <ChannelSidebar
-    server={currentServer}
-    categories={currentCategories}
-    activeChannel={activeChannel}
-    onSelectChannel={selectChannel}
-  />
-  {#if currentChannel}
-    <ChatArea
-      channel={currentChannel}
-      messages={currentMessages}
+  {#if currentServer}
+    <ChannelSidebar
+      server={currentServer}
+      categories={currentCategories}
+      activeChannel={chat.activeChannel}
+      onSelectChannel={(id: string) => chat.selectChannel(id)}
+      onCreateChannel={async (categoryId: string, channel: Channel) => await chat.createChannel(currentServer.id, channel, channel.type)}
     />
   {/if}
-  <MemberSidebar {members} {voiceUsers} />
+  {#if currentChannel}
+    <ChatArea channel={currentChannel} messages={currentMessages} />
+  {:else}
+    <main class="flex flex-1 items-center justify-center bg-background px-6">
+      <div class="max-w-sm text-center">
+        <p class="text-sm font-medium text-foreground">No channel selected</p>
+        <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
+      </div>
+    </main>
+  {/if}
+  <MemberSidebar members={chat.members} voiceUsers={chat.voiceUsers} />
 </div>

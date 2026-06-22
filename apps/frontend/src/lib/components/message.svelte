@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Message } from '$lib/data/mock';
+  import type { Message } from '$lib/types/chat';
 
   let {
     message,

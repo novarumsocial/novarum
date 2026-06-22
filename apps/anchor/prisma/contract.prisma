@@ -1,18 +1,19 @@
 model User {
   id             String @id
   username       String
-  homeserverName String
+  homeserver     String @map("homeserverName")
   displayName    String?
   avatarUrl      String?
   isBot          Boolean
   createdAt      DateTime
   updatedAt      DateTime
 
-  sessions Session[]
-
-  @@unique([username, homeserverName])
+  @@unique([username, homeserver])
   @@map("user")
-  LocalCredential LocalCredential[]
+  sessions         Session[]
+  memberships GuildMember[]
+  ownedGuilds Guild[]      @relation("GuildOwner")
+  messages         Message[]
 }
 
 model LocalCredential {
@@ -34,4 +35,70 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("session")
+}
+
+model Guild {
+  id          String   @id
+  name        String
+  description String?
+  avatarUrl   String?
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   temporal.updatedAt()
+
+  owner    User          @relation("GuildOwner", fields: [ownerId], references: [id])
+  members  GuildMember[]
+  channels Channel[]
+
+  @@index([ownerId])
+  @@map("guild")
+}
+
+model GuildMember {
+  guildId  String
+  userId   String
+  role     String    @default("MEMBER")
+  joinedAt DateTime  @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([guildId, userId])
+  @@index([userId])
+  @@map("guild_member")
+}
+
+model Channel {
+  id          String      @id
+  guildId     String
+  name        String
+  type        String      @default("TEXT")
+  position    Int
+  createdAt   DateTime    @default(now())
+  updatedAt   temporal.updatedAt()
+
+  guild    Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([guildId, name])
+  @@index([guildId, position])
+  @@map("channel")
+}
+
+model Message {
+  id        String    @id
+  channelId String
+  authorId  String
+  content   String
+  nonce     String
+  createdAt DateTime  @default(now())
+  updatedAt temporal.updatedAt()
+  deletedAt DateTime?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@unique([authorId, nonce])
+  @@index([channelId, createdAt, id])
+  @@map("message")
 }

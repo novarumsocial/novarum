@@ -1,26 +1,39 @@
 <script lang="ts">
-  import { cn } from "$lib/utils";
+  import { cn } from '$lib/utils';
   import {
-    Hash, Volume2, Globe, ChevronDown, ChevronRight,
-    Plus, User, Settings, Headphones, Mic, MicOff,
-    HeadphoneOff,
-  } from "@lucide/svelte";
-  import type { Server, ChannelCategory, Channel } from "$lib/data/mock";
-  import UserArea from "./user-area.svelte";
+    ChevronDown,
+    ChevronRight,
+    Globe,
+    Hash,
+    Plus,
+    Volume2,
+  } from '@lucide/svelte';
+  import type { Channel, ChannelCategory, Server } from '$lib/types/chat';
+  import UserArea from './user-area.svelte';
+  import CreateChannelDialog from './create-channel-dialog.svelte';
 
   let {
     server,
     categories,
     activeChannel,
     onSelectChannel,
+    onCreateChannel,
   }: {
     server: Server;
     categories: ChannelCategory[];
-    activeChannel: string;
+    activeChannel: string | null;
     onSelectChannel: (id: string) => void;
+    onCreateChannel?: (categoryId: string, channel: Channel) => Promise<Channel | void>;
   } = $props();
 
   let collapsed = $state<Record<string, boolean>>({});
+  let createOpen = $state(false);
+  let createCategory = $state<ChannelCategory | null>(null);
+
+  function openCreateChannel(category: ChannelCategory) {
+    createCategory = category;
+    createOpen = true;
+  }
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
@@ -51,11 +64,19 @@
         {/if}
         {cat.label}
         <span
-          onclick={(e) => { e.stopPropagation(); }}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+          onkeydown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            e.stopPropagation();
+            openCreateChannel(cat);
+          }}
+          onclick={(e) => {
+            e.stopPropagation();
+            openCreateChannel(cat);
+          }}
           class="ml-auto cursor-pointer opacity-0 transition-opacity hover:opacity-100"
           role="button"
-          tabindex="-1"
+          tabindex="0"
           aria-label="Add channel"
         >
           <Plus class="size-3" />
@@ -72,10 +93,8 @@
               activeChannel !== ch.id && "text-muted-foreground hover:text-sidebar-foreground",
             )}
           >
-            {#if ch.type === "voice"}
+            {#if ch.type === "VOICE"}
               <Volume2 class="size-4 shrink-0" />
-            {:else if ch.type === "federated"}
-              <Globe class="size-4 shrink-0 text-primary/70" />
             {:else}
               <Hash class="size-4 shrink-0" />
             {/if}
@@ -100,3 +119,13 @@
   
   <UserArea />
 </aside>
+
+<CreateChannelDialog
+  bind:open={createOpen}
+  categoryLabel={createCategory?.label}
+  onCreate={async (channel) => {
+    if (!createCategory) return;
+    const createdChannel = await onCreateChannel?.(createCategory.id, channel);
+    if (createdChannel) onSelectChannel(createdChannel.id);
+  }}
+/>

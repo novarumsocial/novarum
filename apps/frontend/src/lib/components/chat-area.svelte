@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Hash, Globe, Volume2 } from '@lucide/svelte';
-  import type { Channel, Message } from '$lib/data/mock';
+  import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
 
@@ -17,10 +17,8 @@
 
 <div class="flex flex-1 flex-col bg-background">
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-    {#if channel.type === 'voice'}
+    {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />
-    {:else if channel.type === 'federated'}
-      <Globe class="size-5 text-primary/70" />
     {:else}
       <Hash class="size-5 text-muted-foreground" />
     {/if}
