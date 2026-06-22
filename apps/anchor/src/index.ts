@@ -4,6 +4,8 @@ import { wellKnown } from '../modules/well-known/services';
 import { auth } from '../modules/auth/services';
 import { guilds } from '../modules/guilds/services';
 import { realtime } from '../modules/realtime/services';
+import { channel } from '../modules/channel/services';
+import { message } from '../modules/message/services';
 
 const app = new Elysia()
   .use(cors({ credentials: true }))
@@ -11,6 +13,8 @@ const app = new Elysia()
   .use(auth)
   .use(guilds)
   .use(realtime)
+  .use(channel)
+  .use(message)
   .get('/', () => 'this is anchor')
   .listen(5049);
 

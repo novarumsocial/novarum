@@ -36,18 +36,18 @@ export const channel = new Elysia({ prefix: '/channel' })
         guildId,
       });
 
-			if (server) {
-				publishRealtime(server, `channelEvents:${session.userId}`, {
-					type: 'channel.created',
-					data: {
-						id: channel.id,
-						name: channel.name,
-						position: channel.position,
-						type: channel.type as 'TEXT' | 'VOICE',
-						guildId: channel.guildId,
-					},
-				});
-			}
+      if (server) {
+        publishRealtime(server, `guildEvents:${guildId}`, {
+          type: 'channel.created',
+          data: {
+            id: channel.id,
+            name: channel.name,
+            position: channel.position,
+            type: channel.type as 'TEXT' | 'VOICE',
+            guildId: channel.guildId,
+          },
+        });
+      }
 
       return channel;
     },

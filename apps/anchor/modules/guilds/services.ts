@@ -46,7 +46,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       const { guild, channel } = transaction;
 
       if (server) {
-        publishRealtime(server, `guildEvents:${session.userId}`, {
+        publishRealtime(server, `userEvents:${session.userId}`, {
           type: 'guild.created',
           data: {
             id: guild.id,

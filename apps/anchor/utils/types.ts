@@ -1,6 +1,6 @@
 export type RealtimeEvent =
   | {
-      type: "guild.created";
+      type: 'guild.created';
       data: {
         id: string;
         name: string;
@@ -15,12 +15,28 @@ export type RealtimeEvent =
       };
     }
   | {
-      type: "channel.created";
+      type: 'channel.created';
       data: {
         id: string;
         name: string;
         position: number;
         type: 'TEXT' | 'VOICE';
         guildId: string;
+      };
+    }
+  | {
+      type: 'message.created';
+      data: {
+        id: string;
+        channelId: string;
+        guildId: string;
+        content: string;
+        nonce: string;
+        createdAt: string;
+        author: {
+          id: string;
+          username: string;
+          avatar: string | null;
+        };
       };
     };

@@ -1,12 +1,5 @@
 import { anchor } from '$lib/anchor.svelte';
-import type {
-  Author,
-  Channel,
-  ChannelCategory,
-  Message,
-  Server,
-  VoiceUser,
-} from '$lib/types/chat';
+import type { Author, Channel, ChannelCategory, Message, Server, VoiceUser } from '$lib/types/chat';
 
 function initialsFor(name: string) {
   const initials = name
@@ -27,6 +20,16 @@ type AddChannelInput = {
   topic?: string;
 };
 
+type AddMessageInput = {
+  id: string;
+  channelId: string;
+  content: string;
+  createdAt: string | Date;
+  author: {
+    username: string;
+  };
+};
+
 function channelTypeFor(type: string | undefined): Channel['type'] {
   if (type === 'VOICE') return 'VOICE';
 
@@ -37,6 +40,7 @@ class ChatState {
   servers = $state<Server[]>([]);
   channelsByServer = $state<Record<string, ChannelCategory[]>>({});
   messagesByChannel = $state<Record<string, Message[]>>({});
+  messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
   voiceUsers = $state<VoiceUser[]>([]);
   guildsLoaded = $state(false);
@@ -69,6 +73,12 @@ class ChatState {
     return this.currentChannel ? (this.messagesByChannel[this.currentChannel.id] ?? []) : [];
   }
 
+  get currentMessagesLoading() {
+    return this.currentChannel
+      ? (this.messagesLoadingByChannel[this.currentChannel.id] ?? false)
+      : false;
+  }
+
   selectServer(id: string | null) {
     this.activeServer = id;
 
@@ -78,11 +88,17 @@ class ChatState {
     }
 
     const firstChannel = this.channelsByServer[id]?.[0]?.channels[0];
-    this.activeChannel = firstChannel?.id ?? null;
+    if (firstChannel) {
+      this.selectChannel(firstChannel.id);
+    } else {
+      this.activeChannel = null;
+    }
   }
 
   selectChannel(id: string) {
     this.activeChannel = id;
+    this.setChannelUnread(id, false);
+    void this.loadMessages(id);
   }
 
   addGuild(guild: { id: string; name: string }) {
@@ -143,10 +159,129 @@ class ChatState {
     this.setGuildCategories(channel.guildId, categories);
 
     if (this.activeServer === channel.guildId && !this.activeChannel) {
-      this.activeChannel = channel.id;
+      this.selectChannel(channel.id);
     }
 
     return nextChannel;
+  }
+
+  setMessages(channelId: string, messages: AddMessageInput[]) {
+    this.messagesByChannel = {
+      ...this.messagesByChannel,
+      [channelId]: messages.map((message) => ({
+        id: message.id,
+        author: {
+          username: message.author.username,
+          displayName: message.author.username,
+          server: '',
+          avatarColor: 'bg-primary',
+          isBot: false,
+        },
+        content: message.content,
+        timestamp: new Date(message.createdAt),
+        edited: false,
+        fromFederated: false,
+        replies: 0,
+      })),
+    };
+  }
+
+  addMessage(message: AddMessageInput) {
+    const messages = this.messagesByChannel[message.channelId] ?? [];
+    if (messages.some((item) => item.id === message.id)) return;
+
+    this.messagesByChannel = {
+      ...this.messagesByChannel,
+      [message.channelId]: [
+        ...messages,
+        {
+          id: message.id,
+          author: {
+            username: message.author.username,
+            displayName: message.author.username,
+            server: '',
+            avatarColor: 'bg-primary',
+            isBot: false,
+          },
+          content: message.content,
+          timestamp: new Date(message.createdAt),
+          edited: false,
+          fromFederated: false,
+          replies: 0,
+        },
+      ],
+    };
+
+    if (this.activeChannel !== message.channelId) {
+      this.setChannelUnread(message.channelId, true);
+    }
+  }
+
+  async sendMessage(channelId: string, content: string) {
+    const nonce = messageNonce();
+
+    const result = await anchor.client.message.send.post({
+      channelId,
+      content,
+      nonce,
+    });
+
+    if (result.error || !result.data || 'error' in result.data) {
+      console.error('Failed to send message', result.error ?? result.data);
+      return;
+    }
+  }
+
+  async loadMessages(channelId: string) {
+    this.messagesLoadingByChannel = {
+      ...this.messagesLoadingByChannel,
+      [channelId]: true,
+    };
+
+    try {
+      const result = await anchor.client.message.list.get({
+        query: { channelId },
+      });
+
+      if (result.error || !result.data || 'error' in result.data) {
+        console.error('Failed to load messages', result.error ?? result.data);
+        return;
+      }
+
+      this.setMessages(
+        channelId,
+        result.data.messages.map((message) => ({
+          ...message,
+          author: { username: String(message.author.username) },
+        }))
+      );
+    } finally {
+      this.messagesLoadingByChannel = {
+        ...this.messagesLoadingByChannel,
+        [channelId]: false,
+      };
+    }
+  }
+
+  private setChannelUnread(channelId: string, unread: boolean) {
+    let changed = false;
+    const nextChannelsByServer: Record<string, ChannelCategory[]> = {};
+
+    for (const [guildId, categories] of Object.entries(this.channelsByServer)) {
+      nextChannelsByServer[guildId] = categories.map((category) => ({
+        ...category,
+        channels: category.channels.map((channel) => {
+          if (channel.id !== channelId || channel.unread === unread) return channel;
+
+          changed = true;
+          return { ...channel, unread };
+        }),
+      }));
+    }
+
+    if (changed) {
+      this.channelsByServer = nextChannelsByServer;
+    }
   }
 
   async createServer(server: Server) {
@@ -205,3 +340,11 @@ class ChatState {
 }
 
 export const chat = new ChatState();
+
+function messageNonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+}
