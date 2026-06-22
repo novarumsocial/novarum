@@ -7,12 +7,28 @@
   let {
     channel,
     messages,
-    onSend = () => {},
+    loading = false,
+    onSend,
   }: {
     channel: Channel;
     messages: Message[];
+    loading?: boolean;
     onSend?: (content: string) => void;
   } = $props();
+
+  let scrollContainer = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    channel.id;
+    loading;
+    messages.length;
+
+    if (!scrollContainer || loading) return;
+
+    requestAnimationFrame(() => {
+      scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight });
+    });
+  });
 </script>
 
 <div class="flex flex-1 flex-col bg-background">
@@ -29,9 +45,25 @@
     {/if}
   </div>
 
-  <div class="flex-1 overflow-y-auto">
+  <div bind:this={scrollContainer} class="flex-1 overflow-y-auto">
     <div class="flex min-h-full flex-col justify-end px-4 py-4">
-      {#if messages.length === 0}
+      {#if loading}
+        <div class="space-y-5">
+          {#each Array.from({ length: 5 }) as _, i}
+            <div class="flex gap-3" class:opacity-60={i > 2}>
+              <div class="mt-0.5 size-9 shrink-0 animate-pulse bg-muted"></div>
+              <div class="min-w-0 flex-1 space-y-2">
+                <div class="flex items-center gap-2">
+                  <div class="h-3 w-24 animate-pulse bg-muted"></div>
+                  <div class="h-2 w-10 animate-pulse bg-muted/70"></div>
+                </div>
+                <div class="h-3 w-3/4 animate-pulse bg-muted"></div>
+                <div class="h-3 w-1/2 animate-pulse bg-muted/70"></div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {:else if messages.length === 0}
         <div class="mb-4 max-w-md border border-dashed border-border p-4">
           <p class="text-sm font-medium text-foreground">No messages yet</p>
           <p class="mt-1 text-sm text-muted-foreground">

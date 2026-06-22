@@ -12,6 +12,7 @@
   const currentCategories = $derived(chat.currentCategories);
   const currentChannel = $derived(chat.currentChannel);
   const currentMessages = $derived(chat.currentMessages);
+  const currentMessagesLoading = $derived(chat.currentMessagesLoading);
 
   onMount(() => {
     const disconnect = realtime.connect();
@@ -34,11 +35,17 @@
       categories={currentCategories}
       activeChannel={chat.activeChannel}
       onSelectChannel={(id: string) => chat.selectChannel(id)}
-      onCreateChannel={async (categoryId: string, channel: Channel) => await chat.createChannel(currentServer.id, channel, channel.type)}
+      onCreateChannel={async (categoryId: string, channel: Channel) =>
+        await chat.createChannel(currentServer.id, channel, channel.type)}
     />
   {/if}
   {#if currentChannel}
-    <ChatArea channel={currentChannel} messages={currentMessages} />
+    <ChatArea
+      channel={currentChannel}
+      messages={currentMessages}
+      loading={currentMessagesLoading}
+      onSend={(content) => chat.sendMessage(currentChannel.id, content)}
+    />
   {:else}
     <main class="flex flex-1 items-center justify-center bg-background px-6">
       <div class="max-w-sm text-center">
