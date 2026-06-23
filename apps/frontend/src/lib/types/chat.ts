@@ -47,3 +47,8 @@ export interface VoiceUser {
   deafened: boolean;
   speaking: boolean;
 }
+
+export type ChatRoute =
+  | { kind: 'home' }
+  | { kind: 'dms'; userId: string | null }
+  | { kind: 'guild'; serverId: string | null; channelId: string | null };

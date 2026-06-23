@@ -78,7 +78,7 @@
 				return;
 			}
 
-			await goto("/app");
+			await goto("/guilds");
 		}
 	});
 

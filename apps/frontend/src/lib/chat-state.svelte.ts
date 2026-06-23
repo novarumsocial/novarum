@@ -1,5 +1,7 @@
+import { page } from '$app/state';
+import { goto } from '$app/navigation';
 import { anchor } from '$lib/anchor.svelte';
-import type { Author, Channel, ChannelCategory, Message, Server, VoiceUser } from '$lib/types/chat';
+import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server, VoiceUser } from '$lib/types/chat';
 
 function initialsFor(name: string) {
   const initials = name
@@ -54,6 +56,36 @@ function channelTypeFor(type: string | undefined): Channel['type'] {
   return 'TEXT';
 }
 
+function guildPath(serverId?: string, channelId?: string) {
+  if (!serverId) return '/guilds';
+
+  const path = [serverId, channelId]
+    .filter((part): part is string => Boolean(part))
+    .map(encodeURIComponent)
+    .join('/');
+
+  return `/guilds/${path}`;
+}
+function dmPath(userId: string) {
+  // pretty sure theres no need to uri encode but thanks copilot i guess
+  return `/guilds/dms/${encodeURIComponent(userId)}`;
+}
+
+
+function currentRoute(): ChatRoute {
+  const [first, second] = (page.params.path ?? '').split('/').filter(Boolean);
+
+  // will eventually be replaced by dms
+  if (!first) return { kind: 'home' };
+  if (first === 'dms') return { kind: 'dms', userId: second ?? null };
+
+  return {
+    kind: 'guild',
+    serverId: first ?? null,
+    channelId: second ?? null,
+  };
+}
+
 class ChatState {
   servers = $state<Server[]>([]);
   channelsByServer = $state<Record<string, ChannelCategory[]>>({});
@@ -62,9 +94,12 @@ class ChatState {
   members = $state<Author[]>([]);
   voiceUsers = $state<VoiceUser[]>([]);
   guildsLoaded = $state(false);
+  private loadedChannel: string | null = null;
 
-  activeServer = $state<string | null>(null);
-  activeChannel = $state<string | null>(null);
+  route = $derived(currentRoute());
+  activeServer = $derived(this.route.kind === 'guild' ? this.route.serverId : null);
+  activeChannel = $derived(this.route.kind === 'guild' ? this.route.channelId : null);
+  activeDMUser = $derived(this.route.kind === 'dms' ? this.route.userId : null);
 
   get currentServer() {
     return this.activeServer
@@ -97,26 +132,27 @@ class ChatState {
       : false;
   }
 
-  selectServer(id: string | null) {
-    this.activeServer = id;
-
-    if (!id) {
-      this.activeChannel = null;
-      return;
-    }
-
-    const firstChannel = this.channelsByServer[id]?.[0]?.channels[0];
-    if (firstChannel) {
-      this.selectChannel(firstChannel.id);
-    } else {
-      this.activeChannel = null;
-    }
+  selectServer(id?: string) {
+    return goto(guildPath(id, this.firstChannelForServer(id)?.id));
   }
 
   selectChannel(id: string) {
-    this.activeChannel = id;
-    this.setChannelUnread(id, false);
-    void this.loadMessages(id);
+    if (this.activeServer) return goto(guildPath(this.activeServer, id));
+  }
+
+  selectDm(userId: string) {
+    return goto(dmPath(userId));
+  }
+
+  syncActiveChannel() {
+    const channelId = this.currentChannel?.id ?? null;
+    if (channelId === this.loadedChannel) return;
+
+    this.loadedChannel = channelId;
+    if (!channelId) return;
+
+    this.setChannelUnread(channelId, false);
+    void this.loadMessages(channelId);
   }
 
   addGuild(guild: { id: string; name: string }) {
@@ -130,8 +166,6 @@ class ChatState {
         initials: initialsFor(guild.name),
       },
     ];
-
-    this.selectServer(guild.id);
   }
 
   setGuildCategories(guildId: string, categories: ChannelCategory[]) {
@@ -291,7 +325,7 @@ class ChatState {
     };
 
     this.setGuildCategories(this.activeServer, categories);
-    this.activeChannel = channel.id;
+    this.selectChannel(channel.id);
   }
 
   async createChannel(guildId: string, channel: Channel, type: 'TEXT' | 'VOICE') {
@@ -324,6 +358,22 @@ class ChatState {
     }
 
     this.guildsLoaded = true;
+    this.selectInitialChannel();
+  }
+
+  private firstChannelForServer(serverId?: string) {
+    return serverId ? this.channelsByServer[serverId]?.[0]?.channels[0] : null;
+  }
+
+  private selectInitialChannel() {
+    if (!this.activeServer) return;
+
+    const serverId = this.currentServer?.id;
+    const channelId = this.currentChannel?.id ?? this.firstChannelForServer(serverId)?.id ?? null;
+
+    if (serverId !== this.activeServer || channelId !== this.activeChannel) {
+      void goto(guildPath(serverId, channelId ?? undefined), { replaceState: true });
+    }
   }
 }
 

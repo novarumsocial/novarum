@@ -11,7 +11,7 @@
   }: {
     servers: Server[];
     activeId: string | null;
-    onSelect: (id: string | null) => void;
+    onSelect: (id?: string) => void;
     onCreateServer?: (server: Server) => void;
   } = $props();
 
@@ -22,7 +22,7 @@
   class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3"
 >
   <button
-    onclick={() => onSelect(null)}
+    onclick={() => onSelect(undefined)}
     class="flex size-10 items-center justify-center text-base font-bold text-primary-foreground transition-opacity hover:opacity-80"
     class:opacity-70={activeId !== null}
     class:ring-2={activeId === null}

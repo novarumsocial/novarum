@@ -14,6 +14,8 @@
   const currentMessages = $derived(chat.currentMessages);
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
 
+  $effect(() => chat.syncActiveChannel());
+
   onMount(() => {
     const disconnect = realtime.connect();
     chat.loadGuilds();
