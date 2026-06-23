@@ -85,6 +85,7 @@ class RealtimeState {
         event.data.channels.forEach((channel) => {
           chat.addChannel(channel);
         });
+        chat.selectServer(event.data.id);
       }
       if (event.type === 'channel.created') {
         chat.addChannel(event.data);
