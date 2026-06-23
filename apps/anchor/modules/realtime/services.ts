@@ -18,6 +18,7 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
 
     ws.subscribe(`userEvents:${session.userId}`);
     for (const membership of memberships) {
+      console.log(`Subscribing ${session.user.username} to guildEvents:${membership.guildId}`);
       ws.subscribe(`guildEvents:${membership.guildId}`);
     }
   },

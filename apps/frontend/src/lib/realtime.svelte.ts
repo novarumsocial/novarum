@@ -35,7 +35,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string(),
       content: z.string(),
       nonce: z.string(),
-      createdAt: z.string(),
+      createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
       author: z.object({
         id: z.string(),
         username: z.string(),
@@ -46,6 +46,8 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 function parseRealtimeData(data: unknown) {
+  if (data instanceof MessageEvent) return parseRealtimeData(data.data);
+
   if (typeof data !== 'string') return data;
 
   try {
