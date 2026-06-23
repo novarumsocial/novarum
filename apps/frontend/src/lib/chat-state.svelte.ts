@@ -30,6 +30,24 @@ type AddMessageInput = {
   };
 };
 
+function messageFromInput(message: AddMessageInput): Message {
+  return {
+    id: message.id,
+    author: {
+      username: message.author.username,
+      displayName: message.author.username,
+      server: '',
+      avatarColor: 'bg-primary',
+      isBot: false,
+    },
+    content: message.content,
+    timestamp: new Date(message.createdAt),
+    edited: false,
+    fromFederated: false,
+    replies: 0,
+  };
+}
+
 function channelTypeFor(type: string | undefined): Channel['type'] {
   if (type === 'VOICE') return 'VOICE';
 
@@ -166,55 +184,25 @@ class ChatState {
   }
 
   setMessages(channelId: string, messages: AddMessageInput[]) {
-    this.messagesByChannel = {
-      ...this.messagesByChannel,
-      [channelId]: messages.map((message) => ({
-        id: message.id,
-        author: {
-          username: message.author.username,
-          displayName: message.author.username,
-          server: '',
-          avatarColor: 'bg-primary',
-          isBot: false,
-        },
-        content: message.content,
-        timestamp: new Date(message.createdAt),
-        edited: false,
-        fromFederated: false,
-        replies: 0,
-      })),
-    };
+    this.setChannelMessages(channelId, messages.map(messageFromInput));
   }
 
   addMessage(message: AddMessageInput) {
-    const messages = this.messagesByChannel[message.channelId] ?? [];
-    if (messages.some((item) => item.id === message.id)) return;
+    const channelMessages = this.messagesByChannel[message.channelId] ?? [];
+    if (channelMessages.some((item) => item.id === message.id)) return;
 
-    this.messagesByChannel = {
-      ...this.messagesByChannel,
-      [message.channelId]: [
-        ...messages,
-        {
-          id: message.id,
-          author: {
-            username: message.author.username,
-            displayName: message.author.username,
-            server: '',
-            avatarColor: 'bg-primary',
-            isBot: false,
-          },
-          content: message.content,
-          timestamp: new Date(message.createdAt),
-          edited: false,
-          fromFederated: false,
-          replies: 0,
-        },
-      ],
-    };
+    this.setChannelMessages(message.channelId, [...channelMessages, messageFromInput(message)]);
 
     if (this.activeChannel !== message.channelId) {
       this.setChannelUnread(message.channelId, true);
     }
+  }
+
+  private setChannelMessages(channelId: string, messages: Message[]) {
+    this.messagesByChannel = {
+      ...this.messagesByChannel,
+      [channelId]: messages,
+    };
   }
 
   async sendMessage(channelId: string, content: string) {

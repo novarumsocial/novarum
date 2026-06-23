@@ -19,5 +19,6 @@ const app = new Elysia()
   .listen(5049);
 
 export type App = typeof app;
+export type { RealtimeEvent } from '../utils/types';
 
 console.log(`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
