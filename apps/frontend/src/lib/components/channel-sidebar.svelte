@@ -9,7 +9,6 @@
     Volume2,
   } from '@lucide/svelte';
   import type { Channel, ChannelCategory, Server } from '$lib/types/chat';
-  import UserArea from './user-area.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
 
   let {
@@ -23,7 +22,7 @@
     categories: ChannelCategory[];
     activeChannel: string | null;
     onSelectChannel: (id: string) => void;
-    onCreateChannel?: (categoryId: string, channel: Channel) => Promise<Channel | void>;
+    onCreateChannel?: (channel: Channel) => Promise<Channel | void>;
   } = $props();
 
   let collapsed = $state<Record<string, boolean>>({});
@@ -116,8 +115,6 @@
       {/if}
     {/each}
   </div>
-  
-  <UserArea />
 </aside>
 
 <CreateChannelDialog
@@ -125,7 +122,7 @@
   categoryLabel={createCategory?.label}
   onCreate={async (channel) => {
     if (!createCategory) return;
-    const createdChannel = await onCreateChannel?.(createCategory.id, channel);
+    const createdChannel = await onCreateChannel?.(channel);
     if (createdChannel) onSelectChannel(createdChannel.id);
   }}
 />

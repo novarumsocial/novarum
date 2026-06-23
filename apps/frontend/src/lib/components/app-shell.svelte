@@ -7,6 +7,7 @@
   import ChatArea from './chat-area.svelte';
   import MemberSidebar from './member-sidebar.svelte';
   import type { Channel } from '$lib/types/chat';
+  import UserArea from './user-area.svelte';
 
   const currentServer = $derived(chat.currentServer);
   const currentCategories = $derived(chat.currentCategories);
@@ -25,22 +26,28 @@
 </script>
 
 <div class="dark flex h-svh overflow-hidden bg-background">
-  <ServerSidebar
-    servers={chat.servers}
-    activeId={chat.activeServer}
-    onSelect={(id) => chat.selectServer(id)}
-    onCreateServer={(server) => chat.createServer(server)}
-  />
-  {#if currentServer}
-    <ChannelSidebar
-      server={currentServer}
-      categories={currentCategories}
-      activeChannel={chat.activeChannel}
-      onSelectChannel={(id: string) => chat.selectChannel(id)}
-      onCreateChannel={async (categoryId: string, channel: Channel) =>
-        await chat.createChannel(currentServer.id, channel, channel.type)}
-    />
-  {/if}
+  <div class="flex shrink-0 flex-col">
+    <div class="flex min-h-0 flex-1">
+      <ServerSidebar
+        servers={chat.servers}
+        activeId={chat.activeServer}
+        onSelect={(id) => chat.selectServer(id)}
+        onCreateServer={(server) => chat.createServer(server)}
+      />
+      {#if currentServer}
+        <ChannelSidebar
+          server={currentServer}
+          categories={currentCategories}
+          activeChannel={chat.activeChannel}
+          onSelectChannel={(id: string) => chat.selectChannel(id)}
+          onCreateChannel={async (channel: Channel) =>
+            await chat.createChannel(currentServer.id, channel, channel.type)}
+        />
+      {/if}
+    </div>
+    <UserArea />
+  </div>
+
   {#if currentChannel}
     <ChatArea
       channel={currentChannel}
