@@ -39,4 +39,11 @@ export type RealtimeEvent =
           avatar: string | null;
         };
       };
+    }
+  | {
+      type: 'user.status.changed';
+      data: {
+        userId: string;
+        status: 'ONLINE' | 'OFFLINE';
+      };
     };

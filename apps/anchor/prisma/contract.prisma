@@ -7,6 +7,7 @@ model User {
   isBot          Boolean
   createdAt      DateTime
   updatedAt      DateTime
+  status         String @default("OFFLINE")
 
   @@unique([username, homeserver])
   @@map("user")

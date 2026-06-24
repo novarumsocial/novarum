@@ -3,6 +3,8 @@ import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
+import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
+import type { Contract } from '../../prisma/contract';
 
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status }) => {
@@ -58,4 +60,69 @@ export const channel = new Elysia({ prefix: '/channel' })
         guildId: t.String(),
       }),
     }
+  )
+  .get(
+    '/:id/users',
+    async ({ params, session, status }) => {
+      const channel = await db.orm.public.Channel.where({ id: params.id })
+        .include('guild', (guild) => guild.include('members'))
+        .first();
+      if (!channel) {
+        return status(404, { error: 'Channel not found' });
+      }
+
+      const isMember = channel.guild.members.some((member) => member.userId === session.userId);
+      if (!isMember) {
+        return status(401, { error: 'Unauthorized' });
+      }
+
+      const members = (await db.orm.public.GuildMember.where({ guildId: channel.guildId })
+        .include('user')
+        .all()) as ActuallyTypedMembers[];
+
+      console.log(members)
+
+      const users = members.map((member) => ({
+        userId: member.user.id as string,
+        username: member.user.username as string,
+        displayName: member.user.displayName as string,
+        homeserver: member.user.homeserver as string,
+        avatarUrl: (member.user.avatarUrl as string | null) ?? undefined,
+        isBot: member.user.isBot as boolean,
+        status: member.user.status as 'ONLINE' | 'OFFLINE',
+        role: member.role as 'OWNER' | 'ADMIN' | 'MEMBER',
+        joinedAt: member.joinedAt as Date,
+      }));
+
+      return { users };
+    },
+    {
+      response: {
+        200: t.Object({
+          users: t.Array(
+            t.Object({
+              userId: t.String(),
+              username: t.String(),
+              displayName: t.String(),
+              homeserver: t.String(),
+              avatarUrl: t.Optional(t.String()),
+              isBot: t.Boolean(),
+              status: t.Enum({ ONLINE: 'ONLINE', OFFLINE: 'OFFLINE' }),
+              role: t.Enum({ OWNER: 'OWNER', ADMIN: 'ADMIN', MEMBER: 'MEMBER' }),
+              joinedAt: t.Date(),
+            })
+          ),
+        }),
+        404: t.Object({
+          error: t.String(),
+        }),
+        401: t.Object({
+          error: t.String(),
+        }),
+      },
+    }
   );
+
+type ActuallyTypedMembers = DefaultModelRow<Contract, 'GuildMember'> & {
+  user: DefaultModelRow<Contract, 'Users'>;
+};

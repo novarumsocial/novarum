@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:1612a29b53175a017c8d8fbf5592ec54a1a666f92a68dfb64ce7c48bcbfb58cb'>;
+  StorageHashBase<'sha256:9b34b7517c2a55f3c61678235d3a4af65218f6a37addca57027d494cf708b64a'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:475ff2bcd228e9f64f1c02fbbc5214698c648e53b469e454461a77b5a53e1006'>;
 export type ProfileHash =
@@ -99,6 +99,7 @@ export type FieldOutputTypes = {
       readonly isBot: CodecTypes['pg/bool@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly status: CodecTypes['pg/text@1']['output'];
     };
   };
 };
@@ -158,6 +159,7 @@ export type FieldInputTypes = {
       readonly isBot: CodecTypes['pg/bool@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly status: CodecTypes['pg/text@1']['input'];
     };
   };
 };
@@ -560,6 +562,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz@1';
                   readonly nullable: false;
+                };
+                readonly status: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'OFFLINE'>;
+                  };
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -973,6 +984,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
               };
+              readonly status: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
             };
             readonly relations: {
               readonly memberships: {
@@ -1032,6 +1047,7 @@ type ContractBase = Omit<
                 readonly isBot: { readonly column: 'isBot' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
+                readonly status: { readonly column: 'status' };
               };
             };
           };

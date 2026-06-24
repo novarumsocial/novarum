@@ -32,6 +32,15 @@ type AddMessageInput = {
   };
 };
 
+type ChannelMemberInput = {
+  userId: string;
+  username: string;
+  displayName: string;
+  homeserver: string;
+  isBot: boolean;
+  status: 'ONLINE' | 'OFFLINE';
+};
+
 function messageFromInput(message: AddMessageInput): Message {
   return {
     id: message.id,
@@ -45,8 +54,19 @@ function messageFromInput(message: AddMessageInput): Message {
     content: message.content,
     timestamp: new Date(message.createdAt),
     edited: false,
-    fromFederated: false,
     replies: 0,
+  };
+}
+
+function memberFromInput(member: ChannelMemberInput): Author {
+  return {
+    userId: member.userId,
+    username: member.username,
+    displayName: member.displayName,
+    server: member.homeserver,
+    avatarColor: 'bg-primary',
+    isBot: member.isBot,
+    status: member.status,
   };
 }
 
@@ -149,10 +169,14 @@ class ChatState {
     if (channelId === this.loadedChannel) return;
 
     this.loadedChannel = channelId;
-    if (!channelId) return;
+    if (!channelId) {
+      this.members = [];
+      return;
+    }
 
     this.setChannelUnread(channelId, false);
     void this.loadMessages(channelId);
+    void this.loadMembers(channelId);
   }
 
   addGuild(guild: { id: string; name: string }) {
@@ -232,6 +256,12 @@ class ChatState {
     }
   }
 
+  updateMemberStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {
+    this.members = this.members.map((member) =>
+      member.userId === userId ? { ...member, status } : member
+    );
+  }
+
   private setChannelMessages(channelId: string, messages: Message[]) {
     this.messagesByChannel = {
       ...this.messagesByChannel,
@@ -283,6 +313,18 @@ class ChatState {
         [channelId]: false,
       };
     }
+  }
+
+  async loadMembers(channelId: string) {
+    const result = await anchor.client.channel({ id: channelId }).users.get();
+
+    if (result.error || !result.data || 'error' in result.data) {
+      console.error('Failed to load members', result.error ?? result.data);
+      this.members = [];
+      return;
+    }
+
+    this.members = result.data.users.map(memberFromInput);
   }
 
   private setChannelUnread(channelId: string, unread: boolean) {

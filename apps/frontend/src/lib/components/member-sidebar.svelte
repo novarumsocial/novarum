@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Globe, Volume2, Users, Mic, MicOff } from "@lucide/svelte";
+  import { Volume2, Users, Mic, MicOff } from "@lucide/svelte";
   import type { Author, VoiceUser } from "$lib/types/chat";
 
   let {
@@ -10,8 +10,8 @@
     voiceUsers: VoiceUser[];
   } = $props();
 
-  const online = $derived(members);
-  const offline: Author[] = [];
+  const online = $derived(members.filter((member) => member.status !== 'OFFLINE'));
+  const offline = $derived(members.filter((member) => member.status === 'OFFLINE'));
 </script>
 
 <aside class="flex w-56 flex-col bg-sidebar">
@@ -64,12 +64,10 @@
           <div class="min-w-0 flex-1">
             <span class="block truncate text-sm text-foreground">{member.displayName}</span>
             <span class="block truncate text-[10px] text-muted-foreground">
+              <!-- TODO: show member server on hover -->
               @{member.username}@{member.server}
             </span>
           </div>
-          {#if member.server !== "novarum.social"}
-            <Globe class="size-3 shrink-0 text-primary/50" title={member.server} />
-          {/if}
         </div>
       {/each}
     </div>

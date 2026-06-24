@@ -3,7 +3,7 @@
 
   let content = $state('');
   let {
-    placeholder = 'Message #general',
+    placeholder = 'Send a message',
     onSend = () => {},
   }: {
     placeholder?: string;

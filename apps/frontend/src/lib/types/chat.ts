@@ -22,11 +22,13 @@ export interface Channel {
 }
 
 export interface Author {
+  userId?: string;
   username: string;
   server: string;
   displayName: string;
   avatarColor: string;
   isBot: boolean;
+  status?: 'ONLINE' | 'OFFLINE';
 }
 
 export interface Message {
@@ -35,7 +37,6 @@ export interface Message {
   content: string;
   timestamp: Date;
   edited: boolean;
-  fromFederated: boolean;
   replies: number;
 }
 

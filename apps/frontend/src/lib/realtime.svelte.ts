@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { RealtimeEvent } from 'anchor';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
+const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
 
 const channelSchema = z.object({
   id: z.string(),
@@ -41,6 +42,13 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
         username: z.string(),
         avatar: z.string().nullable(),
       }),
+    }),
+  }),
+  z.object({
+    type: z.literal('user.status.changed'),
+    data: z.object({
+      userId: z.string(),
+      status: userStatusSchema,
     }),
   }),
 ]) satisfies z.ZodType<RealtimeEvent>;
@@ -92,6 +100,9 @@ class RealtimeState {
       }
       if (event.type === 'message.created') {
         chat.addMessage(event.data);
+      }
+      if (event.type === 'user.status.changed') {
+        chat.updateMemberStatus(event.data.userId, event.data.status);
       }
     });
 
