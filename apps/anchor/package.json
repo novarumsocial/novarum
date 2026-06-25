@@ -26,7 +26,8 @@
     "@elysiajs/cors": "^1.4.2",
     "@prisma-next/postgres": "latest",
     "dotenv": "^17.4.2",
-    "elysia": "latest"
+    "elysia": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@prisma-next/adapter-postgres": "latest",
