@@ -100,4 +100,45 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     }
 
     return { guilds };
-  });
+  })
+  .post(
+    '/:id/invite',
+    async ({ params, body, session }) => {
+      const { id: guildId } = params;
+
+      const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+      if (!guild) {
+        return { error: 'Guild not found' };
+      }
+      if (guild.ownerId !== session.userId) {
+        return { error: 'Unauthorized' };
+      }
+
+      const invite = await db.orm.public.GuildInvite.create({
+        id: randomString(),
+        code: randomAlphanumericString(8),
+        guildId,
+        creatorId: session.userId,
+        expiresAt: body?.expiresAt ? new Date(body.expiresAt) : null,
+      });
+
+      return { invite };
+    },
+    {
+      body: t.Optional(
+        t.Object({
+          expiresAt: t.Optional(t.String()),
+        })
+      ),
+    }
+  );
+
+function randomAlphanumericString(length: number) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    result += characters.charAt(randomIndex);
+  }
+  return result;
+}

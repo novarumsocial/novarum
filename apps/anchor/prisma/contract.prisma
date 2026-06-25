@@ -50,6 +50,7 @@ model Guild {
   owner    User          @relation("GuildOwner", fields: [ownerId], references: [id])
   members  GuildMember[]
   channels Channel[]
+  invites  GuildInvite[]
 
   @@index([ownerId])
   @@map("guild")
@@ -102,4 +103,20 @@ model Message {
   @@unique([authorId, nonce])
   @@index([channelId, createdAt, id])
   @@map("message")
+}
+
+model GuildInvite {
+  id        String   @id
+  guildId   String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  creator User  @relation(fields: [creatorId], references: [id])
+  creatorId String
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+  @@map("guild_invite")
 }
