@@ -9,6 +9,7 @@ import {
   sessionCookieName,
   validateSessionToken,
 } from './provider';
+import { getConfig } from '../../utils/config';
 
 function userResponse(user: {
   id: string;
@@ -34,7 +35,8 @@ export const auth = new Elysia({ prefix: '/auth' })
   .post(
     '/signup',
     async ({ body, cookie, request, status }) => {
-      const { username, displayName, email, password, homeserver } = body;
+      const { username, displayName, email, password } = body;
+      const homeserver = getConfig().server.homeserver;
       const now = new Date();
 
       const existingCredential = await db.orm.public.LocalCredential.where({ email }).first();
@@ -43,7 +45,7 @@ export const auth = new Elysia({ prefix: '/auth' })
         return { error: 'User already exists' };
       }
 
-      const existingUsername = await db.orm.public.User.where({ username, homeserver: homeserver }).first();
+      const existingUsername = await db.orm.public.User.where({ username, homeserver }).first();
       if (existingUsername) {
         status(409);
         return { error: 'Username is already taken' };
@@ -52,7 +54,7 @@ export const auth = new Elysia({ prefix: '/auth' })
       const user = await db.orm.public.User.create({
         id: randomString(),
         username,
-        homeserver: homeserver,
+        homeserver,
         displayName: displayName || null,
         avatarUrl: null,
         isBot: false,

@@ -67,7 +67,14 @@ function parseRealtimeData(data: unknown) {
 
 function parseRealtimeEvent(data: unknown) {
   const event = realtimeEventSchema.safeParse(parseRealtimeData(data));
-  return event.success ? event.data : null;
+  if (event.success) return event.data;
+
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrappedEvent = realtimeEventSchema.safeParse(parseRealtimeData(data.data));
+    if (wrappedEvent.success) return wrappedEvent.data;
+  }
+
+  return null;
 }
 
 class RealtimeState {
@@ -84,8 +91,8 @@ class RealtimeState {
       this.connected = false;
     });
 
-    socket.subscribe(({ data }) => {
-      const event = parseRealtimeEvent(data);
+    socket.subscribe((message) => {
+      const event = parseRealtimeEvent(message);
       if (!event) return;
 
       if (event.type === 'guild.created') {
