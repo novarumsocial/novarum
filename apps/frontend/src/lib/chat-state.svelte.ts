@@ -386,6 +386,14 @@ class ChatState {
     return createdChannel;
   }
 
+  async createInvite(guildId: string) {
+    const result = await anchor.client.guilds({ id: guildId }).invite.post();
+
+    if (result.error || !result.data || 'error' in result.data) return;
+
+    return result.data;
+  }
+
   async loadGuilds() {
     const result = await anchor.client.guilds.list.get();
 

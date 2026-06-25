@@ -12,6 +12,10 @@
       "model": "Guild",
       "namespace": "public"
     },
+    "guild_invite": {
+      "model": "GuildInvite",
+      "namespace": "public"
+    },
     "guild_member": {
       "model": "GuildMember",
       "namespace": "public"
@@ -217,6 +221,21 @@
                   "namespace": "public"
                 }
               },
+              "invites": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "guildId"
+                  ]
+                },
+                "to": {
+                  "model": "GuildInvite",
+                  "namespace": "public"
+                }
+              },
               "members": {
                 "cardinality": "1:N",
                 "on": {
@@ -274,6 +293,108 @@
               },
               "namespaceId": "public",
               "table": "guild"
+            }
+          },
+          "GuildInvite": {
+            "fields": {
+              "code": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "creatorId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "guildId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "creator": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "creatorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "guild": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "guildId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Guild",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "code": {
+                  "column": "code"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "creatorId": {
+                  "column": "creatorId"
+                },
+                "expiresAt": {
+                  "column": "expiresAt"
+                },
+                "guildId": {
+                  "column": "guildId"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "guild_invite"
             }
           },
           "GuildMember": {
@@ -940,6 +1061,102 @@
               },
               "uniques": []
             },
+            "guild_invite": {
+              "columns": {
+                "code": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "creatorId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "expiresAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "guildId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": [
+                      "creatorId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "guild_invite"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "guildId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "guild_invite"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "guild"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "guildId"
+                  ]
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "code"
+                  ]
+                }
+              ]
+            },
             "guild_member": {
               "columns": {
                 "guildId": {
@@ -1314,7 +1531,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:9b34b7517c2a55f3c61678235d3a4af65218f6a37addca57027d494cf708b64a"
+    "storageHash": "sha256:bb86b75b43feec2242a9edb927cbe84c9f15613b9c7dda378fd3c6c039482c0a"
   },
   "execution": {
     "executionHash": "sha256:475ff2bcd228e9f64f1c02fbbc5214698c648e53b469e454461a77b5a53e1006",

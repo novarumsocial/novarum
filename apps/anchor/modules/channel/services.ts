@@ -80,8 +80,6 @@ export const channel = new Elysia({ prefix: '/channel' })
         .include('user')
         .all()) as ActuallyTypedMembers[];
 
-      console.log(members)
-
       const users = members.map((member) => ({
         userId: member.user.id as string,
         username: member.user.username as string,
