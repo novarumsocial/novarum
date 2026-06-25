@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
-  import { ChevronDown, ChevronRight, Globe, Hash, Plus, Settings, UserRoundPlus, Volume2 } from '@lucide/svelte';
+  import { ChevronDown, ChevronRight, Hash, Plus, Settings, SquareArrowRightExit, UserRoundPlus, Volume2 } from '@lucide/svelte';
   import type { Channel, ChannelCategory, Server } from '$lib/types/chat';
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
@@ -62,7 +62,7 @@
       <DropdownMenu.Separator />
       <DropdownMenu.Item>
         Leave guild
-        <DropdownMenu.Shortcut>⇧⌘Q</DropdownMenu.Shortcut>
+        <DropdownMenu.Shortcut><SquareArrowRightExit class="size-3" /></DropdownMenu.Shortcut>
       </DropdownMenu.Item>
     </DropdownMenu.Content>
   </DropdownMenu.Root>

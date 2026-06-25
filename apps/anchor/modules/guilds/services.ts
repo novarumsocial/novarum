@@ -101,6 +101,32 @@ export const guilds = new Elysia({ prefix: '/guilds' })
 
     return { guilds };
   })
+  // right now, invites work as follows:
+  // - a user can create only one invite per guild
+  // - when regenerating it, the old invite is deleted and a new one is created
+  // this should probably be changed in the future but it should be fine for now
+  .get('/:id/invite', async ({ params, session, status }) => {
+    const { id: guildId } = params;
+
+    const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+    if (!guild) {
+      return status(404, { error: 'Guild not found' });
+    }
+    if (guild.ownerId !== session.userId) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const invite = await db.orm.public.GuildInvite.where({ guildId })
+      .where({ creatorId: session.userId })
+      // there should only be one but okay
+      .first();
+
+    if (!invite) {
+      return status(404, { error: 'No invite found for this guild' });
+    }
+
+    return { invite };
+  })
   .post(
     '/:id/invite',
     async ({ params, body, session }) => {
@@ -113,13 +139,18 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       if (guild.ownerId !== session.userId) {
         return { error: 'Unauthorized' };
       }
+      
+      // deletes prior invite (if any)
+      await db.orm.public.GuildInvite.where({ guildId })
+        .where({ creatorId: session.userId })
+        .delete();
 
       const invite = await db.orm.public.GuildInvite.create({
         id: randomString(),
         code: randomAlphanumericString(8),
         guildId,
         creatorId: session.userId,
-        expiresAt: body?.expiresAt ? new Date(body.expiresAt) : null,
+        // expiresAt: body?.expiresAt ? new Date(body.expiresAt) : null,
       });
 
       return { invite };

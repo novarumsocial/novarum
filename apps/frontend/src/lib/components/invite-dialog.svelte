@@ -16,6 +16,7 @@
 
   let code = $state('');
   let copied = $state(false);
+  let loading = $state(false);
 
   const inviteUrl = $derived(
     `${window.location.origin}/i/$${code.toLowerCase()}@${anchor.homeServer}`
@@ -35,15 +36,28 @@
   }
 
   async function fetchInvite() {
-    const invite = await chat.createInvite(guildId);
+    loading = true;
+    const invite = await chat.getGuildInvite(guildId)
+    if (invite) {
+      code = invite.invite.code;
+      // loading false here because createinvite will also do so
+      loading = false;
+    } else {
+      await createInvite();
+    }
+  }
+  async function createInvite() {
+    loading = true;
+    const invite = await chat.createGuildInvite(guildId)
     if (invite) {
       code = invite.invite.code;
     }
+    loading = false;
   }
 
   async function regenerateInvite() {
     copied = false;
-    await fetchInvite();
+    await createInvite();
   }
 
   function handleOpenChange() {
@@ -58,8 +72,7 @@
     <Dialog.Header>
       <Dialog.Title>Invite People</Dialog.Title>
       <Dialog.Description>
-        Share this link to let people join the server. It expires after 24 hours or when
-        regenerated.
+        Share this link to let people join the server. It's active indefinitely until regenerated.
       </Dialog.Description>
     </Dialog.Header>
 
@@ -74,6 +87,7 @@
             size="icon"
             aria-label="Copy invite link"
             onclick={copyInvite}
+            disabled={loading}
           >
             {#if copied}
               <Check class="size-4" />
@@ -86,11 +100,11 @@
 
       <Dialog.Footer class="border-t border-border pt-3">
         <div class="flex gap-2">
-          <Button type="button" variant="outline" onclick={regenerateInvite}>
+          <Button type="button" variant="outline" onclick={regenerateInvite} disabled={loading}>
             <RefreshCw class="size-4" />
             <span>Regenerate</span>
           </Button>
-          <Button type="button" onclick={copyInvite}>
+          <Button type="button" onclick={copyInvite} disabled={loading}>
             {#if copied}
               <Check class="size-4" />
               <span>Copied</span>
