@@ -15,6 +15,7 @@ model User {
   memberships GuildMember[]
   ownedGuilds Guild[]      @relation("GuildOwner")
   messages         Message[]
+  invites          GuildInvite[] @relation("GuildInviteCreator")
 }
 
 model LocalCredential {
@@ -112,7 +113,7 @@ model GuildInvite {
   createdAt DateTime @default(now())
   expiresAt DateTime?
 
-  creator User  @relation(fields: [creatorId], references: [id])
+  creator User  @relation("GuildInviteCreator", fields: [creatorId], references: [id])
   creatorId String
 
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)

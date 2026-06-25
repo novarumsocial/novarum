@@ -387,7 +387,7 @@ class ChatState {
   }
 
   async createGuildInvite(guildId: string) {
-    const result = await anchor.client.guilds({ id: guildId }).invite.post();
+    const result = await anchor.client.guilds({ id: guildId }).invites.post();
 
     if (result.error || !result.data || 'error' in result.data) return;
 
@@ -395,7 +395,7 @@ class ChatState {
   }
 
   async getGuildInvite(inviteCode: string) {
-    const result = await anchor.client.guilds({ id: inviteCode }).invite.get();
+    const result = await anchor.client.guilds({ id: inviteCode }).invites.get();
     
     if (result.error || !result.data || 'error' in result.data) return;
 

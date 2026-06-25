@@ -6,6 +6,7 @@ import { guilds } from '../modules/guilds/services';
 import { realtime } from '../modules/realtime/services';
 import { channel } from '../modules/channel/services';
 import { message } from '../modules/message/services';
+import { invite } from '../modules/invite/services';
 
 const app = new Elysia()
   .use(cors({ credentials: true }))
@@ -15,6 +16,7 @@ const app = new Elysia()
   .use(realtime)
   .use(channel)
   .use(message)
+  .use(invite)
   .get('/', () => 'this is anchor')
   .listen(5049);
 

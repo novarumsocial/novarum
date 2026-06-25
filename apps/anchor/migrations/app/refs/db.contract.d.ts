@@ -1150,6 +1150,17 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly invites: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'GuildInvite';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['creatorId'];
+                };
+              };
               readonly memberships: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;

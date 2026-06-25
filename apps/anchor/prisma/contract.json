@@ -792,6 +792,21 @@
               }
             },
             "relations": {
+              "invites": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "creatorId"
+                  ]
+                },
+                "to": {
+                  "model": "GuildInvite",
+                  "namespace": "public"
+                }
+              },
               "memberships": {
                 "cardinality": "1:N",
                 "on": {

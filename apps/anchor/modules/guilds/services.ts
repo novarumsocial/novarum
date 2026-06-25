@@ -105,7 +105,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
   // - a user can create only one invite per guild
   // - when regenerating it, the old invite is deleted and a new one is created
   // this should probably be changed in the future but it should be fine for now
-  .get('/:id/invite', async ({ params, session, status }) => {
+  .get('/:id/invites', async ({ params, session, status }) => {
     const { id: guildId } = params;
 
     const guild = await db.orm.public.Guild.where({ id: guildId }).first();
@@ -128,7 +128,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     return { invite };
   })
   .post(
-    '/:id/invite',
+    '/:id/invites',
     async ({ params, body, session }) => {
       const { id: guildId } = params;
 
@@ -165,7 +165,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
   );
 
 function randomAlphanumericString(length: number) {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * characters.length);

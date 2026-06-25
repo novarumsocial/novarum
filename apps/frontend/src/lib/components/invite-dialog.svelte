@@ -19,7 +19,7 @@
   let loading = $state(false);
 
   const inviteUrl = $derived(
-    `${window.location.origin}/i/$${code.toLowerCase()}@${anchor.homeServer}`
+    `${window.location.origin}/i/${code}@${anchor.homeServer}`
   );
 
   $effect(() => {
