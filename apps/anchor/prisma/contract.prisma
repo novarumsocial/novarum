@@ -11,11 +11,6 @@ model User {
 
   @@unique([username, homeserver])
   @@map("user")
-  sessions         Session[]
-  memberships GuildMember[]
-  ownedGuilds Guild[]      @relation("GuildOwner")
-  messages         Message[]
-  invites          GuildInvite[] @relation("GuildInviteCreator")
 }
 
 model LocalCredential {
@@ -48,10 +43,7 @@ model Guild {
   createdAt   DateTime @default(now())
   updatedAt   temporal.updatedAt()
 
-  owner    User          @relation("GuildOwner", fields: [ownerId], references: [id])
-  members  GuildMember[]
-  channels Channel[]
-  invites  GuildInvite[]
+  owner User @relation("GuildOwner", fields: [ownerId], references: [id])
 
   @@index([ownerId])
   @@map("guild")
@@ -80,8 +72,7 @@ model Channel {
   createdAt   DateTime    @default(now())
   updatedAt   temporal.updatedAt()
 
-  guild    Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  messages Message[]
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@unique([guildId, name])
   @@index([guildId, position])

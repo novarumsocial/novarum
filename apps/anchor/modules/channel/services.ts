@@ -20,9 +20,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     async ({ body, session, server }) => {
       const { name, guildId, type } = body;
 
-      const guild = await db.orm.public.Guild.where({ id: guildId })
-        .include('members', (member) => member.where({ userId: session.userId }))
-        .first();
+      const guild = await db.orm.public.Guild.where({ id: guildId }).first();
       if (!guild) {
         return { error: 'Guild not found' };
       }
@@ -64,15 +62,16 @@ export const channel = new Elysia({ prefix: '/channel' })
   .get(
     '/:id/users',
     async ({ params, session, status }) => {
-      const channel = await db.orm.public.Channel.where({ id: params.id })
-        .include('guild', (guild) => guild.include('members'))
-        .first();
+      const channel = await db.orm.public.Channel.where({ id: params.id }).first();
       if (!channel) {
         return status(404, { error: 'Channel not found' });
       }
 
-      const isMember = channel.guild.members.some((member) => member.userId === session.userId);
-      if (!isMember) {
+      const membership = await db.orm.public.GuildMember.where({
+        guildId: channel.guildId,
+        userId: session.userId,
+      }).first();
+      if (!membership) {
         return status(401, { error: 'Unauthorized' });
       }
 
