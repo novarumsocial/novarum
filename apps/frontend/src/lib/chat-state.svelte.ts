@@ -1,7 +1,15 @@
 import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { anchor } from '$lib/anchor.svelte';
-import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server, VoiceUser } from '$lib/types/chat';
+import type {
+  Author,
+  Channel,
+  ChannelCategory,
+  ChatRoute,
+  Message,
+  Server,
+  VoiceUser,
+} from '$lib/types/chat';
 
 function initialsFor(name: string) {
   const initials = name
@@ -91,7 +99,6 @@ function dmPath(userId: string) {
   return `/guilds/dms/${encodeURIComponent(userId)}`;
 }
 
-
 function currentRoute(): ChatRoute {
   const [first, second] = (page.params.path ?? '').split('/').filter(Boolean);
 
@@ -113,7 +120,6 @@ class ChatState {
   messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
   voiceUsers = $state<VoiceUser[]>([]);
-  guildsLoaded = $state(false);
   private loadedChannel: string | null = null;
 
   route = $derived(currentRoute());
@@ -168,15 +174,7 @@ class ChatState {
     const channelId = this.currentChannel?.id ?? null;
     if (channelId === this.loadedChannel) return;
 
-    this.loadedChannel = channelId;
-    if (!channelId) {
-      this.members = [];
-      return;
-    }
-
-    this.setChannelUnread(channelId, false);
-    void this.loadMessages(channelId);
-    void this.loadMembers(channelId);
+    void this.loadCurrentChannel();
   }
 
   addGuild(guild: { id: string; name: string }) {
@@ -233,10 +231,6 @@ class ChatState {
     }
 
     this.setGuildCategories(channel.guildId, categories);
-
-    if (this.activeServer === channel.guildId && !this.activeChannel) {
-      this.selectChannel(channel.id);
-    }
 
     return nextChannel;
   }
@@ -396,13 +390,19 @@ class ChatState {
 
   async getGuildInvite(inviteCode: string) {
     const result = await anchor.client.guilds({ id: inviteCode }).invites.get();
-    
+
     if (result.error || !result.data || 'error' in result.data) return;
 
     return result.data;
   }
 
-  async loadGuilds() {
+  async loadInitialData() {
+    await this.loadGuilds();
+    await this.selectInitialChannel();
+    await this.loadCurrentChannel();
+  }
+
+  private async loadGuilds() {
     const result = await anchor.client.guilds.list.get();
 
     if (result.error || !result.data) return;
@@ -414,9 +414,19 @@ class ChatState {
         this.addChannel(channel);
       }
     }
+  }
 
-    this.guildsLoaded = true;
-    this.selectInitialChannel();
+  private async loadCurrentChannel() {
+    const channelId = this.currentChannel?.id ?? null;
+    this.loadedChannel = channelId;
+
+    if (!channelId) {
+      this.members = [];
+      return;
+    }
+
+    this.setChannelUnread(channelId, false);
+    await Promise.all([this.loadMessages(channelId), this.loadMembers(channelId)]);
   }
 
   private firstChannelForServer(serverId?: string) {
@@ -430,7 +440,7 @@ class ChatState {
     const channelId = this.currentChannel?.id ?? this.firstChannelForServer(serverId)?.id ?? null;
 
     if (serverId !== this.activeServer || channelId !== this.activeChannel) {
-      void goto(guildPath(serverId, channelId ?? undefined), { replaceState: true });
+      return goto(guildPath(serverId, channelId ?? undefined), { replaceState: true });
     }
   }
 }
