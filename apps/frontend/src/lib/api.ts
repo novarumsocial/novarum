@@ -4,6 +4,26 @@ import type { App } from 'anchor';
 
 type AnchorRoutes = App['~Routes'];
 
+type AnchorInfo = {
+	app?: {
+		name?: string;
+		description?: string;
+	};
+	homeserver: string;
+	baseUrl: string;
+	version?: string;
+};
+
+export function normalizeHomeServer(homeServerUrl: string) {
+	const url = homeServerUrl.trim().replace(/\/+$/, '');
+
+	if (url.startsWith('http://') || url.startsWith('https://')) {
+		return new URL(url).host;
+	}
+
+	return url;
+}
+
 export function anchorUrlFromHomeServer(homeServerUrl: string) {
 	const url = homeServerUrl.trim().replace(/\/+$/, '');
 
@@ -15,8 +35,23 @@ export function anchorUrlFromHomeServer(homeServerUrl: string) {
 	return `https://${url}`;
 }
 
-export function createAnchorClient(homeServerUrl: string) {
-	return treaty(anchorUrlFromHomeServer(homeServerUrl), {
+export async function discoverAnchor(homeServerUrl: string) {
+	const homeServer = normalizeHomeServer(homeServerUrl);
+	const discoveryUrl = `${anchorUrlFromHomeServer(homeServerUrl)}/.well-known/anchor/info`;
+	const response = await fetch(discoveryUrl);
+
+	if (!response.ok) throw new Error('Homeserver discovery failed.');
+
+	const info = (await response.json()) as AnchorInfo;
+	if (info.homeserver !== homeServer) {
+		throw new Error('Homeserver identity mismatch.');
+	}
+
+	return info.baseUrl.replace(/\/+$/, '');
+}
+
+export function createAnchorClient(baseUrl: string) {
+	return treaty(baseUrl, {
 		fetch: {
 			credentials: 'include'
 		}

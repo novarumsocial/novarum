@@ -54,7 +54,13 @@
 	});
 
 	async function lookupInvite() {
-		anchor.setHomeServer(homeServer);
+		try {
+			await anchor.setHomeServer(homeServer);
+		} catch {
+			error = 'Could not discover this home server.';
+			loading = false;
+			return;
+		}
 
 		const result = await anchor.client.invite({ code: inviteCode }).get();
 

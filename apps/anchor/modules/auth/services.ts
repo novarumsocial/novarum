@@ -84,7 +84,6 @@ export const auth = new Elysia({ prefix: '/auth' })
       body: t.Object({
         username: t.String({ minLength: 2, maxLength: 32, pattern: '^[a-zA-Z0-9._]+$' }),
         displayName: t.Optional(t.String({ maxLength: 64 })),
-        homeserver: t.String({ minLength: 1, maxLength: 255 }),
         email: t.String({ type: 'email' }),
         password: t.String({ minLength: 8 }),
       }),
@@ -93,9 +92,10 @@ export const auth = new Elysia({ prefix: '/auth' })
   .post(
     '/login',
     async ({ body, cookie, request, status }) => {
-      const { username, homeserver, password } = body;
+      const { username, password } = body;
+      const homeserver = getConfig().server.homeserver;
 
-      const user = await db.orm.public.User.where({ username, homeserver: homeserver }).first();
+      const user = await db.orm.public.User.where({ username, homeserver }).first();
       if (!user) {
         status(401);
         return { error: 'Invalid username or password' };
@@ -128,7 +128,6 @@ export const auth = new Elysia({ prefix: '/auth' })
     {
       body: t.Object({
         username: t.String({ minLength: 2, maxLength: 32, pattern: '^[a-zA-Z0-9._]+$' }),
-        homeserver: t.String({ minLength: 1, maxLength: 255 }),
         password: t.String({ minLength: 8 }),
       }),
     }
