@@ -79,13 +79,19 @@
 				return;
 			}
 
-			anchor.setHomeServer(updatedForm.data.homeserver);
+			try {
+				await anchor.setHomeServer(updatedForm.data.homeserver);
+			} catch {
+				submitError = "Could not discover that home server.";
+				loading = false;
+				return;
+			}
+
 			const { error } = await anchor.client.auth.signup.post({
 				username: updatedForm.data.username,
 				displayName: updatedForm.data.displayName,
 				email: updatedForm.data.email,
-				password: updatedForm.data.password,
-				homeserver: updatedForm.data.homeserver
+				password: updatedForm.data.password
 			});
 
 			if (error) {

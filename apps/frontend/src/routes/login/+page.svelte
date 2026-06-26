@@ -65,10 +65,16 @@
 				return;
 			}
 
-			anchor.setHomeServer(updatedForm.data.homeServer);
+			try {
+				await anchor.setHomeServer(updatedForm.data.homeServer);
+			} catch {
+				submitError = "Could not discover that home server.";
+				loading = false;
+				return;
+			}
+
 			const { error } = await anchor.client.auth.login.post({
 				username: updatedForm.data.username,
-				homeserver: updatedForm.data.homeServer,
 				password: updatedForm.data.password
 			});
 

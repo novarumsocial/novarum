@@ -6,6 +6,7 @@ const schema = z.object({
 	server: z.object({
 		database_url: z.string().regex(/^postgresql:\/\/.*$/),
 		homeserver: z.string().regex(/^[a-zA-Z0-9.-]+$/),
+		baseUrl: z.url(),
 	}),
 });
 
