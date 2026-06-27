@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { anchor } from '$lib/anchor.svelte';
+  import { createAnchorClient, discoverAnchor, normalizeHomeServer } from '$lib/api';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -41,6 +42,7 @@
     rawInviteCode.startsWith('$') ? rawInviteCode.slice(1) : rawInviteCode
   );
   const homeServer = $derived(atIdx !== -1 ? raw.slice(atIdx + 1) : raw);
+  const normalizedHomeServer = $derived(normalizeHomeServer(homeServer));
 
   let loading = $state(true);
   let accepting = $state(false);
@@ -57,15 +59,17 @@
   });
 
   async function lookupInvite() {
+    let inviteClient: ReturnType<typeof createAnchorClient>;
+
     try {
-      await anchor.setHomeServer(homeServer);
+      inviteClient = createAnchorClient(await discoverAnchor(normalizedHomeServer));
     } catch {
       error = 'Could not discover this home server.';
       loading = false;
       return;
     }
 
-    const result = await anchor.client.invite({ code: inviteCode }).get();
+    const result = await inviteClient.invite({ code: inviteCode }).get();
 
     if (result.error || !result.data || 'error' in result.data) {
       error = 'This invite is invalid or has expired.';
@@ -80,7 +84,7 @@
   async function acceptInvite() {
     accepting = true;
     error = '';
-    const remoteInvite = homeServer !== userHomeServer;
+    const remoteInvite = normalizedHomeServer !== userHomeServer;
 
     if (remoteInvite) {
       try {
@@ -94,7 +98,7 @@
 
     const result = await anchor.client.invite.accept.post({
       code: inviteCode,
-      ...(remoteInvite ? { homeserver: homeServer } : {}),
+      ...(remoteInvite ? { homeserver: normalizedHomeServer } : {}),
     });
     const data = result.data as
       | { error?: string; guildId?: string; guild?: { id: string } }
@@ -122,7 +126,7 @@
         err.toLowerCase().includes('not authenticated') ||
         err.toLowerCase().includes('no session')
       ) {
-        await goto(`/login?redirect=/i/${raw}`);
+        await goto(`/login?redirect=${encodeURIComponent(`/i/${raw}`)}`);
         return;
       }
 

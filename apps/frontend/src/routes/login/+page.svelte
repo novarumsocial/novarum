@@ -3,6 +3,7 @@
 	import { defaults, superForm } from "sveltekit-superforms";
 	import { zod4, zod4Client } from "sveltekit-superforms/adapters";
 	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 	import { anchor } from "$lib/anchor.svelte";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -50,6 +51,12 @@
 		return "Could not sign you in.";
 	}
 
+	function safeRedirect(value: string | null) {
+		if (!value || !value.startsWith("/") || value.startsWith("//")) return "/guilds";
+
+		return value;
+	}
+
 	const form = superForm(defaults(zod4(loginSchema)), {
 		SPA: true,
 		validators: zod4Client(loginSchema),
@@ -84,7 +91,7 @@
 				return;
 			}
 
-			await goto("/guilds");
+			await goto(safeRedirect(page.url.searchParams.get("redirect")));
 		}
 	});
 

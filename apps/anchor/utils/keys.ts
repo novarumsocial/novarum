@@ -4,6 +4,14 @@ import { getConfig } from './config';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 
+type KeyMaterial = {
+  publicKey: string;
+  privateKey: string;
+  id: string;
+};
+
+let keyLoadPromise: Promise<KeyMaterial> | null = null;
+
 export async function generateKeys(keyDir: string) {
   const homeserver = getConfig().server.homeserver;
   const date = new Date().toISOString().split('T')[0];
@@ -20,13 +28,15 @@ export async function generateKeys(keyDir: string) {
   mkdirSync(keyDir, { recursive: true });
   await Bun.write(path.join(keyDir, privateKeyFilename), privateKeyBase64);
 
-  await db.orm.public.HomeserverKeys.where({ homeserver }).update({ active: false });
-  await db.orm.public.HomeserverKeys.create({
-    id,
-    homeserver,
-    publicKey: publicKeyBase64,
-    privateKeyFilename,
-    active: true,
+  await db.transaction(async (tx) => {
+    await tx.orm.public.HomeserverKeys.where({ homeserver }).update({ active: false });
+    await tx.orm.public.HomeserverKeys.create({
+      id,
+      homeserver,
+      publicKey: publicKeyBase64,
+      privateKeyFilename,
+      active: true,
+    });
   });
 
   return {
@@ -38,10 +48,23 @@ export async function generateKeys(keyDir: string) {
 }
 
 export async function getKeys() {
+  if (keyLoadPromise) return keyLoadPromise;
+
+  keyLoadPromise = loadKeys();
+  try {
+    return await keyLoadPromise;
+  } finally {
+    keyLoadPromise = null;
+  }
+}
+
+async function loadKeys(): Promise<KeyMaterial> {
   const activeKey = await db.orm.public.HomeserverKeys.where({
     active: true,
     homeserver: getConfig().server.homeserver,
-  }).first();
+  })
+    .orderBy((key) => key.createdAt.desc())
+    .first();
 
   if (!activeKey) {
     console.log('No active keys found for the homeserver, generating new keys...');
@@ -53,7 +76,9 @@ export async function getKeys() {
     };
   }
 
-  const privateKeyFile = Bun.file(path.join(getConfig().federation.key_dir, activeKey.privateKeyFilename));
+  const privateKeyFile = Bun.file(
+    path.join(getConfig().federation.key_dir, activeKey.privateKeyFilename)
+  );
   if (!(await privateKeyFile.exists())) {
     console.warn('Active homeserver key file is missing, generating a replacement key...');
     const newKeys = await generateKeys(getConfig().federation.key_dir);
