@@ -3,6 +3,7 @@ import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
+import { parseFederatedGuildId } from '../../utils/federationIds';
 
 export const guilds = new Elysia({ prefix: '/guilds' })
   .resolve(async ({ cookie, status }) => {
@@ -107,6 +108,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
   // this should probably be changed in the future but it should be fine for now
   .get('/:id/invites', async ({ params, session, status }) => {
     const { id: guildId } = params;
+    if (parseFederatedGuildId(guildId)) {
+      return status(400, { error: 'Cannot manage invites on a federated guild' });
+    }
 
     const guild = await db.orm.public.Guild.where({ id: guildId }).first();
     if (!guild) {
@@ -131,6 +135,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     '/:id/invites',
     async ({ params, body, session }) => {
       const { id: guildId } = params;
+      if (parseFederatedGuildId(guildId)) {
+        return { error: 'Cannot manage invites on a federated guild' };
+      }
 
       const guild = await db.orm.public.Guild.where({ id: guildId }).first();
       if (!guild) {

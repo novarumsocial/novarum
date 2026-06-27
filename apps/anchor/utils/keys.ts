@@ -53,9 +53,18 @@ export async function getKeys() {
     };
   }
 
-  const privateKey = await Bun.file(
-    path.join(getConfig().federation.key_dir, activeKey.privateKeyFilename)
-  ).text();
+  const privateKeyFile = Bun.file(path.join(getConfig().federation.key_dir, activeKey.privateKeyFilename));
+  if (!(await privateKeyFile.exists())) {
+    console.warn('Active homeserver key file is missing, generating a replacement key...');
+    const newKeys = await generateKeys(getConfig().federation.key_dir);
+    return {
+      publicKey: newKeys.publicKey,
+      privateKey: newKeys.privateKey,
+      id: newKeys.id,
+    };
+  }
+
+  const privateKey = await privateKeyFile.text();
 
   return {
     publicKey: activeKey.publicKey,
@@ -116,11 +125,15 @@ export async function storeNonce(nonce: string, homeserver: string) {
   const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
   if (existingNonce) return false;
 
-  await db.orm.public.FederationNonce.create({
-    id: crypto.randomUUID(),
-    nonce,
-    homeserver,
-  });
+  try {
+    await db.orm.public.FederationNonce.create({
+      id: crypto.randomUUID(),
+      nonce,
+      homeserver,
+    });
+  } catch {
+    return false;
+  }
 
   return true;
 }

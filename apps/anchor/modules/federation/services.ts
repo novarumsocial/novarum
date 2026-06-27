@@ -1,10 +1,21 @@
-import Elysia, { t } from 'elysia';
+import Elysia from 'elysia';
 import { discoverRemoteAnchor } from '../../utils/discovery';
 import { isNonceUsed, storeNonce, verifyMessage } from '../../utils/keys';
 import { getConfig } from '../../utils/config';
 import crypto from 'node:crypto';
 import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
+import { publishRealtime } from '../../utils/publishRealtime';
+
+const usernamePattern = /^[a-zA-Z0-9._]+$/;
+
+type FederationUserPayload = {
+  username: string;
+  homeserver: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isBot: boolean;
+};
 
 async function verifyFederationRequest(
   request: Request,
@@ -18,9 +29,11 @@ async function verifyFederationRequest(
     return { ok: false, status: 400, error: 'Missing X-Novarum-Homeserver header' };
   }
 
-  const discovered = await discoverRemoteAnchor(homeserver);
-  if (!discovered) {
-    return { ok: false, status: 404, error: 'Could not discover remote anchor' };
+  let discovered: Awaited<ReturnType<typeof discoverRemoteAnchor>>;
+  try {
+    discovered = await discoverRemoteAnchor(homeserver);
+  } catch {
+    return { ok: false, status: 400, error: 'Could not discover remote anchor' };
   }
 
   const keyId = request.headers.get('X-Novarum-Key-Id');
@@ -125,17 +138,18 @@ export const federation = new Elysia({ prefix: '/federation' })
   })
   .post(
     '/invites/:code/accept',
-    async ({ params, body, request, status }) => {
-      const verification = await verifyFederationRequest(request, JSON.stringify(body));
-      if (!verification.ok) {
-        return status(verification.status, { error: verification.error });
-      }
+    async ({ params, request, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
 
-      const { origin } = verification;
-      if (body.user.homeserver !== origin.homeserver) {
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+
+      const { origin } = parsed;
+      if (userPayload.homeserver.toLowerCase() !== origin.homeserver) {
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
-      if (body.user.homeserver === getConfig().server.homeserver) {
+      if (userPayload.homeserver.toLowerCase() === getConfig().server.homeserver.toLowerCase()) {
         return status(400, { error: 'Use local invite accept for local users' });
       }
 
@@ -149,31 +163,7 @@ export const federation = new Elysia({ prefix: '/federation' })
         return status(404, { error: 'Guild not found' });
       }
 
-      const now = new Date();
-      let user = await db.orm.public.User.where({
-        username: body.user.username,
-        homeserver: body.user.homeserver,
-      }).first();
-
-      if (user) {
-        await db.orm.public.User.where({ id: user.id }).update({
-          displayName: body.user.displayName,
-          avatarUrl: body.user.avatarUrl,
-          isBot: body.user.isBot,
-          updatedAt: now,
-        });
-      } else {
-        user = await db.orm.public.User.create({
-          id: randomString(),
-          username: body.user.username,
-          homeserver: body.user.homeserver,
-          displayName: body.user.displayName,
-          avatarUrl: body.user.avatarUrl,
-          isBot: body.user.isBot,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
+      const user = await upsertFederatedUser(userPayload);
 
       const membership = await db.orm.public.GuildMember.where({
         guildId: guild.id,
@@ -208,19 +198,247 @@ export const federation = new Elysia({ prefix: '/federation' })
           type: channel.type as 'TEXT' | 'VOICE',
         })),
       };
-    },
-    {
-      body: t.Object({
-        user: t.Object({
-          username: t.String({ minLength: 2, maxLength: 32, pattern: '^[a-zA-Z0-9._]+$' }),
-          homeserver: t.String({ minLength: 1, maxLength: 255 }),
-          displayName: t.Nullable(t.String({ maxLength: 64 })),
-          avatarUrl: t.Nullable(t.String()),
-          isBot: t.Boolean(),
-        }),
-      }),
     }
-  );
+  )
+  .post('/channels/:id/messages/send', async ({ params, request, server, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const content = getObjectProperty(parsed.body, 'content');
+    const nonce = getObjectProperty(parsed.body, 'nonce');
+    if (typeof content !== 'string' || typeof nonce !== 'string') {
+      return status(400, { error: 'Invalid federation message' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    const priorMsg = await db.orm.public.Message.where({
+      authorId: access.user.id,
+      nonce,
+    }).first();
+    if (priorMsg) {
+      if (priorMsg.channelId !== params.id || priorMsg.content !== content) {
+        return status(409, { error: 'Nonce already used for a different message' });
+      }
+
+      return { message: federatedMessageResponse(priorMsg, access.channel, access.user) };
+    }
+
+    const message = await db.orm.public.Message.create({
+      id: randomString(),
+      channelId: params.id,
+      authorId: access.user.id,
+      content,
+      nonce,
+    });
+
+    const responseMessage = federatedMessageResponse(message, access.channel, access.user);
+    if (server) {
+      publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        type: 'message.created',
+        data: responseMessage,
+      });
+    }
+
+    return { message: responseMessage };
+  })
+  .post('/channels/:id/messages', async ({ params, request, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    const messages = await db.orm.public.Message.where({ channelId: params.id })
+      .include('author')
+      .orderBy((message) => message.createdAt.asc())
+      .all();
+
+    return {
+      messages: messages.map((message) =>
+        federatedMessageResponse(message, access.channel, message.author)
+      ),
+    };
+  })
+  .post('/channels/:id/users', async ({ params, request, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    const members = await db.orm.public.GuildMember.where({ guildId: access.channel.guildId })
+      .include('user')
+      .all();
+
+    return {
+      users: members.map((member) => ({
+        userId: member.user.id as string,
+        username: member.user.username as string,
+        displayName: (member.user.displayName as string | null) ?? (member.user.username as string),
+        homeserver: member.user.homeserver as string,
+        avatarUrl: (member.user.avatarUrl as string | null) ?? undefined,
+        isBot: member.user.isBot as boolean,
+        status: member.user.status as 'ONLINE' | 'OFFLINE',
+        role: member.role as 'OWNER' | 'ADMIN' | 'MEMBER',
+        joinedAt: member.joinedAt as Date,
+      })),
+    };
+  });
+
+async function verifiedFederationJsonBody(
+  request: Request
+): Promise<
+  | { ok: true; origin: Awaited<ReturnType<typeof discoverRemoteAnchor>>; body: unknown }
+  | { ok: false; status: 400 | 401 | 404; error: string }
+> {
+  const rawBody = await request.text();
+  const verification = await verifyFederationRequest(request, rawBody);
+  if (!verification.ok) return verification;
+
+  try {
+    return { ok: true, origin: verification.origin, body: JSON.parse(rawBody) as unknown };
+  } catch {
+    return { ok: false, status: 400, error: 'Invalid federation JSON body' };
+  }
+}
+
+function parseFederationUserPayload(value: unknown): FederationUserPayload | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const username = getObjectProperty(value, 'username');
+  const homeserver = getObjectProperty(value, 'homeserver');
+  const displayName = getObjectProperty(value, 'displayName');
+  const avatarUrl = getObjectProperty(value, 'avatarUrl');
+  const isBot = getObjectProperty(value, 'isBot');
+
+  if (
+    typeof username !== 'string' ||
+    username.length < 2 ||
+    username.length > 32 ||
+    !usernamePattern.test(username) ||
+    typeof homeserver !== 'string' ||
+    homeserver.length < 1 ||
+    homeserver.length > 255 ||
+    (displayName !== null && (typeof displayName !== 'string' || displayName.length > 64)) ||
+    (avatarUrl !== null && typeof avatarUrl !== 'string') ||
+    typeof isBot !== 'boolean'
+  ) {
+    return null;
+  }
+
+  return { username, homeserver, displayName, avatarUrl, isBot };
+}
+
+function getObjectProperty(value: unknown, key: string) {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
+}
+
+async function upsertFederatedUser(input: FederationUserPayload) {
+  const now = new Date();
+  const existingUser = await db.orm.public.User.where({
+    username: input.username,
+    homeserver: input.homeserver,
+  }).first();
+
+  if (!existingUser) {
+    return await db.orm.public.User.create({
+      id: randomString(),
+      username: input.username,
+      homeserver: input.homeserver,
+      displayName: input.displayName,
+      avatarUrl: input.avatarUrl,
+      isBot: input.isBot,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  await db.orm.public.User.where({ id: existingUser.id }).update({
+    displayName: input.displayName,
+    avatarUrl: input.avatarUrl,
+    isBot: input.isBot,
+    updatedAt: now,
+  });
+
+  return {
+    ...existingUser,
+    displayName: input.displayName,
+    avatarUrl: input.avatarUrl,
+    isBot: input.isBot,
+    updatedAt: now,
+  };
+}
+
+async function getFederatedChannelAccess(channelId: string, userPayload: FederationUserPayload) {
+  const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+  if (!channel) return { ok: false as const, status: 404 as const, error: 'Channel not found' };
+
+  const user = await db.orm.public.User.where({
+    username: userPayload.username,
+    homeserver: userPayload.homeserver,
+  }).first();
+  if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+
+  await db.orm.public.User.where({ id: user.id }).update({
+    displayName: userPayload.displayName,
+    avatarUrl: userPayload.avatarUrl,
+    isBot: userPayload.isBot,
+    updatedAt: new Date(),
+  });
+
+  const membership = await db.orm.public.GuildMember.where({
+    guildId: channel.guildId,
+    userId: user.id,
+  }).first();
+  if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+
+  return {
+    ok: true as const,
+    channel,
+    user: {
+      ...user,
+      displayName: userPayload.displayName,
+      avatarUrl: userPayload.avatarUrl,
+      isBot: userPayload.isBot,
+    },
+  };
+}
+
+function federatedMessageResponse(message: any, channel: { guildId: string }, author: any) {
+  return {
+    id: message.id,
+    channelId: message.channelId,
+    guildId: channel.guildId,
+    content: message.content,
+    nonce: message.nonce,
+    createdAt: message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
+    author: {
+      id: author.id,
+      username: author.displayName || author.username,
+      avatar: author.avatarUrl ?? null,
+    },
+  };
+}
 
 function isStaleFederationDate(date: string) {
   const timestamp = new Date(date).getTime();

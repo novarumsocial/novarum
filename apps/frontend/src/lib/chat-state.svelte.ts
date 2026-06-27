@@ -296,7 +296,7 @@ class ChatState {
 
       this.setMessages(
         channelId,
-        result.data.messages.map((message) => ({
+        result.data.messages.map((message: any) => ({
           ...message,
           author: { username: String(message.author.username) },
         }))

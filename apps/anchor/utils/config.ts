@@ -11,7 +11,7 @@ const schema = z.object({
 	federation: z.object({
 		key_dir: z.string().optional().default("./keys"),
 		nonce_max_age_seconds: z.number().positive().optional().default(300),
-	}),
+	}).default({ key_dir: "./keys", nonce_max_age_seconds: 300 }),
 });
 
 export type Config = z.infer<typeof schema>;
