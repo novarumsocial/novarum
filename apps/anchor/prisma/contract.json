@@ -8,6 +8,10 @@
       "model": "Channel",
       "namespace": "public"
     },
+    "federation_nonce": {
+      "model": "FederationNonce",
+      "namespace": "public"
+    },
     "guild": {
       "model": "Guild",
       "namespace": "public"
@@ -18,6 +22,10 @@
     },
     "guild_member": {
       "model": "GuildMember",
+      "namespace": "public"
+    },
+    "homeserver_keys": {
+      "model": "HomeserverKeys",
       "namespace": "public"
     },
     "local_credential": {
@@ -136,6 +144,57 @@
               },
               "namespaceId": "public",
               "table": "channel"
+            }
+          },
+          "FederationNonce": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeserver": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "nonce": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "homeserver": {
+                  "column": "homeserver"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "nonce": {
+                  "column": "nonce"
+                }
+              },
+              "namespaceId": "public",
+              "table": "federation_nonce"
             }
           },
           "Guild": {
@@ -417,6 +476,87 @@
               },
               "namespaceId": "public",
               "table": "guild_member"
+            }
+          },
+          "HomeserverKeys": {
+            "fields": {
+              "active": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "homeserver": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "privateKeyFilename": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "publicKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "active": {
+                  "column": "active"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "homeserver": {
+                  "column": "homeserver"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "privateKeyFilename": {
+                  "column": "privateKeyFilename"
+                },
+                "publicKey": {
+                  "column": "publicKey"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "homeserver_keys"
             }
           },
           "LocalCredential": {
@@ -864,6 +1004,48 @@
                 }
               ]
             },
+            "federation_nonce": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "homeserver": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "nonce": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "nonce"
+                  ]
+                }
+              ]
+            },
             "guild": {
               "columns": {
                 "avatarUrl": {
@@ -1118,6 +1300,61 @@
                 "columns": [
                   "guildId",
                   "userId"
+                ]
+              },
+              "uniques": []
+            },
+            "homeserver_keys": {
+              "columns": {
+                "active": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "homeserver": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "privateKeyFilename": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "publicKey": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
                 ]
               },
               "uniques": []
@@ -1410,10 +1647,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:bb86b75b43feec2242a9edb927cbe84c9f15613b9c7dda378fd3c6c039482c0a"
+    "storageHash": "sha256:8026a54d33435185d91fb2e21508a73f8f5f44eec414e5daa0074111271742c6"
   },
   "execution": {
-    "executionHash": "sha256:475ff2bcd228e9f64f1c02fbbc5214698c648e53b469e454461a77b5a53e1006",
+    "executionHash": "sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc",
     "mutations": {
       "defaults": [
         {
@@ -1444,6 +1681,21 @@
             "column": "updatedAt",
             "namespace": "public",
             "table": "guild"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "homeserver_keys"
           }
         },
         {

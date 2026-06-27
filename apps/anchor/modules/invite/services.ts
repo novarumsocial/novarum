@@ -1,6 +1,8 @@
 import Elysia, { t } from 'elysia';
 import { db } from '../../prisma/db';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { discoverRemoteAnchor, signFederationRequest } from '../../utils/discovery';
+import { getConfig } from '../../utils/config';
 
 export const invite = new Elysia({ prefix: '/invite' })
   .get('/:code', async ({ params, status }) => {
@@ -38,6 +40,45 @@ export const invite = new Elysia({ prefix: '/invite' })
         return status(401, { error: 'Unauthorized' });
       }
 
+      if (body.homeserver && body.homeserver !== getConfig().server.homeserver) {
+        const remote = await discoverRemoteAnchor(body.homeserver);
+        const path = `/federation/invites/${encodeURIComponent(body.code)}/accept`;
+        const url = new URL(path, remote.baseUrl);
+        const requestBody = JSON.stringify({
+          user: {
+            username: session.user.username,
+            homeserver: session.user.homeserver,
+            displayName: session.user.displayName,
+            avatarUrl: session.user.avatarUrl,
+            isBot: session.user.isBot,
+          },
+        });
+        const { headers } = await signFederationRequest({
+          method: 'POST',
+          path,
+          host: url.host,
+          homeserver: getConfig().server.homeserver,
+          body: requestBody,
+        });
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'content-type': 'application/json',
+            accept: 'application/json',
+          },
+          body: requestBody,
+        });
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          return status(response.status, data ?? { error: 'Remote invite accept failed' });
+        }
+
+        return data;
+      }
+
       const invite = await db.orm.public.GuildInvite.where({ code: body.code }).first();
       if (!invite || isExpired(invite.expiresAt)) {
         return status(404, { error: 'Invite not found' });
@@ -65,6 +106,7 @@ export const invite = new Elysia({ prefix: '/invite' })
     {
       body: t.Object({
         code: t.String({ minLength: 1 }),
+        homeserver: t.Optional(t.String({ minLength: 1, maxLength: 255 })),
       }),
     }
   );
