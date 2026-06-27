@@ -5,6 +5,8 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { getConfig } from '../../utils/config';
 import { makeFederatedChannelId, makeFederatedGuildId } from '../../utils/federationIds';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { publishRealtime } from '../../utils/publishRealtime';
+import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 
 export const invite = new Elysia({ prefix: '/invite' })
   .get('/:code', async ({ params, status }) => {
@@ -35,7 +37,7 @@ export const invite = new Elysia({ prefix: '/invite' })
   })
   .post(
     '/accept',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, server, status }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) {
@@ -57,9 +59,27 @@ export const invite = new Elysia({ prefix: '/invite' })
           return status(response.status, data ?? { error: 'Remote invite accept failed' });
         }
 
-        const federatedInvite = await persistFederatedInviteSnapshot(session, remote.homeserver, data);
+        const federatedInvite = await persistFederatedInviteSnapshot(
+          session,
+          remote.homeserver,
+          data
+        );
         if (!federatedInvite) {
           return status(502, { error: 'Remote invite accept returned an invalid guild snapshot' });
+        }
+
+        if (server) {
+          void ensureFederatedGuildRealtimeBridge(server, federatedInvite.guild.id);
+
+          publishRealtime(server, `userEvents:${session.userId}`, {
+            type: 'guild.created',
+            data: {
+              id: federatedInvite.guild.id,
+              name: federatedInvite.guild.name,
+              ownerId: session.userId,
+              channels: federatedInvite.channels,
+            },
+          });
         }
 
         return federatedInvite;
@@ -85,6 +105,33 @@ export const invite = new Elysia({ prefix: '/invite' })
           userId: session.userId,
           role: 'MEMBER',
         });
+
+        if (server) {
+          publishRealtime(server, `guildEvents:${invite.guildId}`, {
+            type: 'member.joined',
+            data: {
+              guildId: invite.guildId,
+              user: {
+                userId: session.userId,
+                username: session.user.username,
+                displayName: session.user.displayName ?? session.user.username,
+                homeserver: session.user.homeserver,
+                isBot: session.user.isBot,
+                status: session.user.status as 'ONLINE' | 'OFFLINE',
+              },
+            },
+          });
+
+          publishRealtime(server, `userEvents:${session.userId}`, {
+            type: 'guild.created',
+            data: {
+              id: guild.id,
+              name: guild.name,
+              ownerId: guild.ownerId,
+              channels: await guildChannels(guild.id),
+            },
+          });
+        }
       }
 
       return { guildId: invite.guildId };
@@ -99,6 +146,20 @@ export const invite = new Elysia({ prefix: '/invite' })
 
 function isExpired(expiresAt: Date | string | null | undefined) {
   return expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
+}
+
+async function guildChannels(guildId: string) {
+  const channels = await db.orm.public.Channel.where({ guildId })
+    .orderBy((channel) => channel.position.asc())
+    .all();
+
+  return channels.map((channel) => ({
+    id: channel.id,
+    guildId: channel.guildId,
+    name: channel.name,
+    position: channel.position,
+    type: channel.type as 'TEXT' | 'VOICE',
+  }));
 }
 
 type Session = NonNullable<Awaited<ReturnType<typeof validateSessionToken>>>;
@@ -120,11 +181,7 @@ type RemoteInviteAccept = {
   }>;
 };
 
-async function persistFederatedInviteSnapshot(
-  session: Session,
-  homeserver: string,
-  data: unknown
-) {
+async function persistFederatedInviteSnapshot(session: Session, homeserver: string, data: unknown) {
   const snapshot = parseRemoteInviteAccept(data, homeserver);
   if (!snapshot) return null;
 
@@ -199,7 +256,10 @@ async function persistFederatedInviteSnapshot(
   };
 }
 
-function parseRemoteInviteAccept(data: unknown, expectedHomeserver: string): RemoteInviteAccept | null {
+function parseRemoteInviteAccept(
+  data: unknown,
+  expectedHomeserver: string
+): RemoteInviteAccept | null {
   if (!data || typeof data !== 'object') return null;
 
   const guild = property(data, 'guild');

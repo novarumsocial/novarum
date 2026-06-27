@@ -256,6 +256,20 @@ class ChatState {
     );
   }
 
+  addOrUpdateMember(guildId: string, member: ChannelMemberInput) {
+    if (this.activeServer !== guildId) return;
+
+    const nextMember = memberFromInput(member);
+    const existing = this.members.findIndex((item) => item.userId === nextMember.userId);
+
+    if (existing === -1) {
+      this.members = [...this.members, nextMember];
+      return;
+    }
+
+    this.members = this.members.map((item, index) => (index === existing ? nextMember : item));
+  }
+
   private setChannelMessages(channelId: string, messages: Message[]) {
     this.messagesByChannel = {
       ...this.messagesByChannel,

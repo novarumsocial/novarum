@@ -19,7 +19,8 @@ type FederationUserPayload = {
 
 async function verifyFederationRequest(
   request: Request,
-  body: string
+  body: string,
+  signedPath?: string
 ): Promise<
   | { ok: true; origin: Awaited<ReturnType<typeof discoverRemoteAnchor>> }
   | { ok: false; status: 400 | 401 | 404; error: string }
@@ -58,7 +59,7 @@ async function verifyFederationRequest(
   }
 
   const url = new URL(request.url);
-  const path = `${url.pathname}${url.search}`;
+  const path = signedPath ?? `${url.pathname}${url.search}`;
 
   const signingString = [
     'v1',
@@ -136,70 +137,84 @@ export const federation = new Elysia({ prefix: '/federation' })
       },
     };
   })
-  .post(
-    '/invites/:code/accept',
-    async ({ params, request, status }) => {
-      const parsed = await verifiedFederationJsonBody(request);
-      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+  .post('/invites/:code/accept', async ({ params, request, server, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
 
-      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
-      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
 
-      const { origin } = parsed;
-      if (userPayload.homeserver.toLowerCase() !== origin.homeserver) {
-        return status(401, { error: 'Federation user homeserver mismatch' });
-      }
-      if (userPayload.homeserver.toLowerCase() === getConfig().server.homeserver.toLowerCase()) {
-        return status(400, { error: 'Use local invite accept for local users' });
-      }
+    const { origin } = parsed;
+    if (userPayload.homeserver.toLowerCase() !== origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+    if (userPayload.homeserver.toLowerCase() === getConfig().server.homeserver.toLowerCase()) {
+      return status(400, { error: 'Use local invite accept for local users' });
+    }
 
-      const invite = await db.orm.public.GuildInvite.where({ code: params.code }).first();
-      if (!invite || isExpired(invite.expiresAt)) {
-        return status(404, { error: 'Invite not found' });
-      }
+    const invite = await db.orm.public.GuildInvite.where({ code: params.code }).first();
+    if (!invite || isExpired(invite.expiresAt)) {
+      return status(404, { error: 'Invite not found' });
+    }
 
-      const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
-      if (!guild) {
-        return status(404, { error: 'Guild not found' });
-      }
+    const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
+    if (!guild) {
+      return status(404, { error: 'Guild not found' });
+    }
 
-      const user = await upsertFederatedUser(userPayload);
+    const user = await upsertFederatedUser(userPayload);
 
-      const membership = await db.orm.public.GuildMember.where({
+    const membership = await db.orm.public.GuildMember.where({
+      guildId: guild.id,
+      userId: user.id,
+    }).first();
+
+    if (!membership) {
+      await db.orm.public.GuildMember.create({
         guildId: guild.id,
         userId: user.id,
-      }).first();
+        role: 'MEMBER',
+      });
 
-      if (!membership) {
-        await db.orm.public.GuildMember.create({
-          guildId: guild.id,
-          userId: user.id,
-          role: 'MEMBER',
+      if (server) {
+        publishRealtime(server, `guildEvents:${guild.id}`, {
+          type: 'member.joined',
+          data: {
+            guildId: guild.id,
+            user: {
+              userId: user.id,
+              username: user.username,
+              displayName: user.displayName ?? user.username,
+              homeserver: user.homeserver,
+              isBot: user.isBot,
+              status: user.status as 'ONLINE' | 'OFFLINE',
+            },
+          },
         });
       }
-
-      const channels = await db.orm.public.Channel.where({ guildId: guild.id })
-        .orderBy((channel) => channel.position.asc())
-        .all();
-
-      return {
-        guild: {
-          id: guild.id,
-          homeserver: getConfig().server.homeserver,
-          name: guild.name,
-          description: guild.description,
-          avatarUrl: guild.avatarUrl,
-        },
-        channels: channels.map((channel) => ({
-          id: channel.id,
-          guildId: channel.guildId,
-          name: channel.name,
-          position: channel.position,
-          type: channel.type as 'TEXT' | 'VOICE',
-        })),
-      };
     }
-  )
+
+    const channels = await db.orm.public.Channel.where({ guildId: guild.id })
+      .orderBy((channel) => channel.position.asc())
+      .all();
+
+    return {
+      guild: {
+        id: guild.id,
+        homeserver: getConfig().server.homeserver,
+        name: guild.name,
+        description: guild.description,
+        avatarUrl: guild.avatarUrl,
+      },
+      channels: channels.map((channel) => ({
+        id: channel.id,
+        guildId: channel.guildId,
+        name: channel.name,
+        position: channel.position,
+        type: channel.type as 'TEXT' | 'VOICE',
+      })),
+    };
+  })
   .post('/channels/:id/messages/send', async ({ params, request, server, status }) => {
     const parsed = await verifiedFederationJsonBody(request);
     if (!parsed.ok) return status(parsed.status, { error: parsed.error });
@@ -303,6 +318,88 @@ export const federation = new Elysia({ prefix: '/federation' })
         joinedAt: member.joinedAt as Date,
       })),
     };
+  })
+  .post('/guilds/:id/users/status', async ({ params, request, server, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const nextStatus = getObjectProperty(parsed.body, 'status');
+    if (nextStatus !== 'ONLINE' && nextStatus !== 'OFFLINE') {
+      return status(400, { error: 'Invalid federation user status' });
+    }
+
+    const access = await getFederatedGuildAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    await db.orm.public.User.where({ id: access.user.id }).update({
+      displayName: userPayload.displayName,
+      avatarUrl: userPayload.avatarUrl,
+      isBot: userPayload.isBot,
+      status: nextStatus,
+      updatedAt: new Date(),
+    });
+
+    if (server) {
+      publishRealtime(server, `guildEvents:${params.id}`, {
+        type: 'user.status.changed',
+        data: {
+          userId: access.user.id,
+          status: nextStatus,
+        },
+      });
+    }
+
+    return { ok: true };
+  })
+  .ws('/realtime/guilds/:id', {
+    async open(ws) {
+      const headers = new Headers();
+      const query = ws.data.query as Record<string, string | undefined>;
+      for (const key of [
+        'X-Novarum-Homeserver',
+        'X-Novarum-Key-Id',
+        'X-Novarum-Date',
+        'X-Novarum-Nonce',
+        'X-Novarum-Body-SHA256',
+        'X-Novarum-Signature',
+      ]) {
+        const value = query[key];
+        if (value) headers.set(key, value);
+      }
+
+      const request = new Request(ws.data.request.url, {
+        method: 'GET',
+        headers,
+      });
+      const signedPath = `/federation/realtime/guilds/${encodeURIComponent(ws.data.params.id)}`;
+      const verification = await verifyFederationRequest(request, '', signedPath);
+      if (!verification.ok) {
+        ws.close(1008, verification.error);
+        return;
+      }
+
+      const members = await db.orm.public.GuildMember.where({ guildId: ws.data.params.id })
+        .include('user')
+        .all();
+      const hasAccess = members.some(
+        (member) => member.user.homeserver === verification.origin.homeserver
+      );
+      if (!hasAccess) {
+        ws.close(1008, 'Forbidden');
+        return;
+      }
+
+      ws.subscribe(`guildEvents:${ws.data.params.id}`);
+    },
+    message() {
+      // Server-to-server realtime is publish-only for now.
+    },
   });
 
 async function verifiedFederationJsonBody(
@@ -424,6 +521,29 @@ async function getFederatedChannelAccess(channelId: string, userPayload: Federat
   };
 }
 
+async function getFederatedGuildAccess(guildId: string, userPayload: FederationUserPayload) {
+  const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+  if (!guild) return { ok: false as const, status: 404 as const, error: 'Guild not found' };
+
+  const user = await db.orm.public.User.where({
+    username: userPayload.username,
+    homeserver: userPayload.homeserver,
+  }).first();
+  if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+
+  const membership = await db.orm.public.GuildMember.where({
+    guildId,
+    userId: user.id,
+  }).first();
+  if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+
+  return {
+    ok: true as const,
+    guild,
+    user,
+  };
+}
+
 function federatedMessageResponse(message: any, channel: { guildId: string }, author: any) {
   return {
     id: message.id,
@@ -431,7 +551,8 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     guildId: channel.guildId,
     content: message.content,
     nonce: message.nonce,
-    createdAt: message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
+    createdAt:
+      message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
     author: {
       id: author.id,
       username: author.displayName || author.username,
