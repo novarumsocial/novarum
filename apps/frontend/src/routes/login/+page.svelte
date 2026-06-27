@@ -51,6 +51,10 @@
 		return "Could not sign you in.";
 	}
 
+	function cookieWarning() {
+		return "Sign-in worked, but your browser did not keep the session cookie. Enable third-party cookies for this site, then try again.";
+	}
+
 	function safeRedirect(value: string | null) {
 		if (!value || !value.startsWith("/") || value.startsWith("//")) return "/guilds";
 
@@ -87,6 +91,13 @@
 
 			if (error) {
 				submitError = getErrorMessage(error.value);
+				loading = false;
+				return;
+			}
+
+			const me = await anchor.client.auth.me.get();
+			if (!me.data?.user) {
+				submitError = cookieWarning();
 				loading = false;
 				return;
 			}

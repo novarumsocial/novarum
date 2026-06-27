@@ -1,4 +1,4 @@
-import { TOML } from "bun";
+import toml from "toml";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
@@ -7,6 +7,7 @@ const schema = z.object({
 		database_url: z.string().regex(/^postgresql:\/\/.*$/),
 		homeserver: z.string().regex(/^[a-zA-Z0-9.-]+$/),
 		baseUrl: z.url(),
+		listen_port: z.number().int().positive().optional().default(5049),
 	}),
 	federation: z.object({
 		key_dir: z.string().optional().default("./keys"),
@@ -17,7 +18,10 @@ const schema = z.object({
 export type Config = z.infer<typeof schema>;
 
 export function getConfig() {
-	// doing readfilesync so its not a pain to work with
-	const config = schema.parse(TOML.parse(readFileSync("./config.toml").toString()));	
+	// doing readfilesync so its not a pain to work with.
+	// also, you might be asking yourself: "why the hell is he using the toml package instead of bun's integrated parser?"
+	// the answer is pretty simple: for some reason, prisma-next has a strange runtime which is not bun to read the prisma-next.config.ts file, and it does not have the toml parser integrated. so we need to use the toml package to parse the config.toml file,
+	// so this might do the trick
+	const config = schema.parse(toml.parse(readFileSync("./config.toml").toString()));	
 	return config;
 }

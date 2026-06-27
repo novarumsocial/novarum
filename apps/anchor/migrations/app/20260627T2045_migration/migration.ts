@@ -4,7 +4,7 @@ import { Migration, MigrationCLI, col, fn, lit, primaryKey } from '@prisma-next/
 export default class M extends Migration {
   override describe() {
     return {
-      from: 'sha256:3f8c1ec46cef390e382511499ef04955856105ec75cdb61ca05a74e8f353a95f',
+      from: null,
       to: 'sha256:8026a54d33435185d91fb2e21508a73f8f5f44eec414e5daa0074111271742c6',
     };
   }
@@ -135,6 +135,16 @@ export default class M extends Migration {
       }),
       this.createTable({
         schema: 'public',
+        table: 'local_credential',
+        columns: [
+          col('email', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+          col('passwordHash', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+          col('userId', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+        ],
+        constraints: [primaryKey(['userId'])],
+      }),
+      this.createTable({
+        schema: 'public',
         table: 'message',
         columns: [
           col('authorId', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
@@ -155,14 +165,45 @@ export default class M extends Migration {
         ],
         constraints: [primaryKey(['id'])],
       }),
-      this.addColumn({
+      this.createTable({
+        schema: 'public',
+        table: 'session',
+        columns: [
+          col('createdAt', 'timestamptz', {
+            notNull: true,
+            codecRef: { codecId: 'pg/timestamptz@1' },
+          }),
+          col('id', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+          col('secretHash', 'bytea', { notNull: true, codecRef: { codecId: 'pg/bytea@1' } }),
+          col('userId', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+        ],
+        constraints: [primaryKey(['id'])],
+      }),
+      this.createTable({
         schema: 'public',
         table: 'user',
-        column: col('status', 'text', {
-          notNull: true,
-          default: lit('OFFLINE'),
-          codecRef: { codecId: 'pg/text@1' },
-        }),
+        columns: [
+          col('avatarUrl', 'text', { codecRef: { codecId: 'pg/text@1' } }),
+          col('createdAt', 'timestamptz', {
+            notNull: true,
+            codecRef: { codecId: 'pg/timestamptz@1' },
+          }),
+          col('displayName', 'text', { codecRef: { codecId: 'pg/text@1' } }),
+          col('homeserverName', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+          col('id', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+          col('isBot', 'bool', { notNull: true, codecRef: { codecId: 'pg/bool@1' } }),
+          col('status', 'text', {
+            notNull: true,
+            default: lit('OFFLINE'),
+            codecRef: { codecId: 'pg/text@1' },
+          }),
+          col('updatedAt', 'timestamptz', {
+            notNull: true,
+            codecRef: { codecId: 'pg/timestamptz@1' },
+          }),
+          col('username', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
+        ],
+        constraints: [primaryKey(['id'])],
       }),
       this.addUnique({
         schema: 'public',
@@ -184,9 +225,21 @@ export default class M extends Migration {
       }),
       this.addUnique({
         schema: 'public',
+        table: 'local_credential',
+        constraint: 'local_credential_email_key',
+        columns: ['email'],
+      }),
+      this.addUnique({
+        schema: 'public',
         table: 'message',
         constraint: 'message_authorId_nonce_key',
         columns: ['authorId', 'nonce'],
+      }),
+      this.addUnique({
+        schema: 'public',
+        table: 'user',
+        constraint: 'user_username_homeserverName_key',
+        columns: ['username', 'homeserverName'],
       }),
       this.createIndex({
         schema: 'public',
@@ -232,6 +285,12 @@ export default class M extends Migration {
       }),
       this.createIndex({
         schema: 'public',
+        table: 'local_credential',
+        index: 'local_credential_userId_idx',
+        columns: ['userId'],
+      }),
+      this.createIndex({
+        schema: 'public',
         table: 'message',
         index: 'message_channelId_createdAt_id_idx',
         columns: ['channelId', 'createdAt', 'id'],
@@ -250,8 +309,8 @@ export default class M extends Migration {
       }),
       this.createIndex({
         schema: 'public',
-        table: 'local_credential',
-        index: 'local_credential_userId_idx',
+        table: 'session',
+        index: 'session_userId_idx',
         columns: ['userId'],
       }),
       this.addForeignKey({
@@ -314,6 +373,16 @@ export default class M extends Migration {
       }),
       this.addForeignKey({
         schema: 'public',
+        table: 'local_credential',
+        foreignKey: {
+          name: 'local_credential_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+          onDelete: 'cascade',
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
         table: 'message',
         foreignKey: {
           name: 'message_channelId_fkey',
@@ -329,6 +398,16 @@ export default class M extends Migration {
           name: 'message_authorId_fkey',
           columns: ['authorId'],
           references: { schema: 'public', table: 'user', columns: ['id'] },
+        },
+      }),
+      this.addForeignKey({
+        schema: 'public',
+        table: 'session',
+        foreignKey: {
+          name: 'session_userId_fkey',
+          columns: ['userId'],
+          references: { schema: 'public', table: 'user', columns: ['id'] },
+          onDelete: 'cascade',
         },
       }),
     ];

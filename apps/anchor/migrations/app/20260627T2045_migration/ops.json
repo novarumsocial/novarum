@@ -234,6 +234,45 @@
     ]
   },
   {
+    "id": "table.local_credential",
+    "label": "Create table \"local_credential\"",
+    "summary": "Creates table \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"local_credential\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"local_credential\"",
+        "sql": "CREATE TABLE \"public\".\"local_credential\" (\n  \"email\" text NOT NULL,\n  \"passwordHash\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"local_credential\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ]
+  },
+  {
     "id": "table.message",
     "label": "Create table \"message\"",
     "summary": "Creates table \"message\"",
@@ -273,43 +312,79 @@
     ]
   },
   {
-    "id": "column.public.user.status",
-    "label": "Add column \"status\" to \"user\"",
+    "id": "table.session",
+    "label": "Create table \"session\"",
+    "summary": "Creates table \"session\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
         "schema": "public",
-        "objectType": "column",
-        "name": "status",
-        "table": "user"
+        "objectType": "table",
+        "name": "session"
       }
     },
     "precheck": [
       {
-        "description": "ensure column \"status\" is missing",
-        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "description": "ensure table \"session\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
         "params": [
-          "public",
-          "user",
-          "status"
+          "\"public\".\"session\""
         ]
       }
     ],
     "execute": [
       {
-        "description": "add column \"status\"",
-        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"status\" text DEFAULT 'OFFLINE' NOT NULL"
+        "description": "create table \"session\"",
+        "sql": "CREATE TABLE \"public\".\"session\" (\n  \"createdAt\" timestamptz NOT NULL,\n  \"id\" text NOT NULL,\n  \"secretHash\" bytea NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
       }
     ],
     "postcheck": [
       {
-        "description": "verify column \"status\" exists",
-        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "description": "verify table \"session\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
         "params": [
-          "public",
-          "user",
-          "status"
+          "\"public\".\"session\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.user",
+    "label": "Create table \"user\"",
+    "summary": "Creates table \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"user\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"user\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"user\"",
+        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"avatarUrl\" text,\n  \"createdAt\" timestamptz NOT NULL,\n  \"displayName\" text,\n  \"homeserverName\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"isBot\" bool NOT NULL,\n  \"status\" text DEFAULT 'OFFLINE' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"username\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"user\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"user\""
         ]
       }
     ]
@@ -441,6 +516,48 @@
     ]
   },
   {
+    "id": "unique.local_credential.local_credential_email_key",
+    "label": "Add unique constraint on \"local_credential\" (email)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "local_credential_email_key",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"local_credential_email_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "local_credential_email_key",
+          "public",
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"local_credential_email_key\"",
+        "sql": "ALTER TABLE \"public\".\"local_credential\" ADD CONSTRAINT \"local_credential_email_key\" UNIQUE (\"email\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"local_credential_email_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "local_credential_email_key",
+          "public",
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ]
+  },
+  {
     "id": "unique.message.message_authorId_nonce_key",
     "label": "Add unique constraint on \"message\" (authorId, nonce)",
     "operationClass": "additive",
@@ -478,6 +595,48 @@
           "message_authorId_nonce_key",
           "public",
           "\"public\".\"message\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.user.user_username_homeserverName_key",
+    "label": "Add unique constraint on \"user\" (username, homeserverName)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "user_username_homeserverName_key",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"user_username_homeserverName_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_username_homeserverName_key",
+          "public",
+          "\"public\".\"user\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"user_username_homeserverName_key\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD CONSTRAINT \"user_username_homeserverName_key\" UNIQUE (\"username\", \"homeserverName\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"user_username_homeserverName_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_username_homeserverName_key",
+          "public",
+          "\"public\".\"user\""
         ]
       }
     ]
@@ -749,6 +908,44 @@
     ]
   },
   {
+    "id": "index.local_credential.local_credential_userId_idx",
+    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "local_credential_userId_idx",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"local_credential_userId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"local_credential_userId_idx\"",
+        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"local_credential_userId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ]
+  },
+  {
     "id": "index.message.message_channelId_createdAt_id_idx",
     "label": "Create index \"message_channelId_createdAt_id_idx\" on \"message\"",
     "operationClass": "additive",
@@ -863,39 +1060,39 @@
     ]
   },
   {
-    "id": "index.local_credential.local_credential_userId_idx",
-    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "id": "index.session.session_userId_idx",
+    "label": "Create index \"session_userId_idx\" on \"session\"",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
         "schema": "public",
         "objectType": "index",
-        "name": "local_credential_userId_idx",
-        "table": "local_credential"
+        "name": "session_userId_idx",
+        "table": "session"
       }
     },
     "precheck": [
       {
-        "description": "ensure index \"local_credential_userId_idx\" does not exist",
+        "description": "ensure index \"session_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
         "params": [
-          "\"public\".\"local_credential_userId_idx\""
+          "\"public\".\"session_userId_idx\""
         ]
       }
     ],
     "execute": [
       {
-        "description": "create index \"local_credential_userId_idx\"",
-        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+        "description": "create index \"session_userId_idx\"",
+        "sql": "CREATE INDEX \"session_userId_idx\" ON \"public\".\"session\" (\"userId\")"
       }
     ],
     "postcheck": [
       {
-        "description": "verify index \"local_credential_userId_idx\" exists",
+        "description": "verify index \"session_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
         "params": [
-          "\"public\".\"local_credential_userId_idx\""
+          "\"public\".\"session_userId_idx\""
         ]
       }
     ]
@@ -1153,6 +1350,48 @@
     ]
   },
   {
+    "id": "foreignKey.local_credential.local_credential_userId_fkey",
+    "label": "Add foreign key \"local_credential_userId_fkey\" on \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "local_credential_userId_fkey",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"local_credential_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "local_credential_userId_fkey",
+          "public",
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"local_credential_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"local_credential\"\nADD CONSTRAINT \"local_credential_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"local_credential_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "local_credential_userId_fkey",
+          "public",
+          "\"public\".\"local_credential\""
+        ]
+      }
+    ]
+  },
+  {
     "id": "foreignKey.message.message_channelId_fkey",
     "label": "Add foreign key \"message_channelId_fkey\" on \"message\"",
     "operationClass": "additive",
@@ -1232,6 +1471,48 @@
           "message_authorId_fkey",
           "public",
           "\"public\".\"message\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.session.session_userId_fkey",
+    "label": "Add foreign key \"session_userId_fkey\" on \"session\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "session_userId_fkey",
+        "table": "session"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"session_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "session_userId_fkey",
+          "public",
+          "\"public\".\"session\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"session_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"session\"\nADD CONSTRAINT \"session_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"session_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "session_userId_fkey",
+          "public",
+          "\"public\".\"session\""
         ]
       }
     ]

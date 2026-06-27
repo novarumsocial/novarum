@@ -101,12 +101,9 @@ export function createBlankSessionCookie(request?: Request): SessionCookie {
 }
 
 function sessionCookieAttributes(maxAge: number, request?: Request): SessionCookie['attributes'] {
-  const forwardedHost = request?.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const requestHost = request ? new URL(request.url).host : 'localhost';
-  const host = forwardedHost ?? request?.headers.get('host') ?? requestHost;
-  const hostname = host.replace(/^\[/, '').replace(/\](:\d+)?$/, '').replace(/:\d+$/, '');
-  const local = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  const secure = !local;
+  const forwardedProto = request?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const protocol = forwardedProto ?? (request ? new URL(request.url).protocol.replace(/:$/, '') : 'http');
+  const secure = protocol === 'https';
 
   return {
     httpOnly: true,

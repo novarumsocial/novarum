@@ -64,6 +64,10 @@
 		return "Could not create your account.";
 	}
 
+	function cookieWarning() {
+		return "Account created, but your browser did not keep the session cookie. Enable third-party cookies for this site, then sign in.";
+	}
+
 	const form = superForm(defaults(zod4(registerSchema)), {
 		SPA: true,
 		validators: zod4Client(registerSchema),
@@ -96,6 +100,13 @@
 
 			if (error) {
 				submitError = getErrorMessage(error.value);
+				loading = false;
+				return;
+			}
+
+			const me = await anchor.client.auth.me.get();
+			if (!me.data?.user) {
+				submitError = cookieWarning();
 				loading = false;
 				return;
 			}

@@ -1,2 +1,3 @@
-export const version =
-  'v' + (await Bun.file(new URL('../package.json', import.meta.url)).json()).version;
+import packageJson from '../package.json' with { type: 'json' };
+
+export const version = 'v' + packageJson.version;
