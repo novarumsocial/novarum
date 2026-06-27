@@ -4,6 +4,7 @@ import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { parseFederatedGuildId } from '../../utils/federationIds';
+import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 
 export const guilds = new Elysia({ prefix: '/guilds' })
   .resolve(async ({ cookie, status }) => {
@@ -74,7 +75,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       }),
     }
   )
-  .get('/list', async ({ session }) => {
+  .get('/list', async ({ server, session }) => {
     const memberships = await db.orm.public.GuildMember.where({ userId: session.userId })
       .include('guild')
       .all();
@@ -98,6 +99,10 @@ export const guilds = new Elysia({ prefix: '/guilds' })
           type: channel.type as 'TEXT' | 'VOICE',
         })),
       });
+
+      if (server && parseFederatedGuildId(id)) {
+        void ensureFederatedGuildRealtimeBridge(server, id);
+      }
     }
 
     return { guilds };
@@ -146,7 +151,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       if (guild.ownerId !== session.userId) {
         return { error: 'Unauthorized' };
       }
-      
+
       // deletes prior invite (if any)
       await db.orm.public.GuildInvite.where({ guildId })
         .where({ creatorId: session.userId })
