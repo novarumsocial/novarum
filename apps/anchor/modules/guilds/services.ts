@@ -148,9 +148,10 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       if (!guild) {
         return { error: 'Guild not found' };
       }
-      if (guild.ownerId !== session.userId) {
+      /* idk if i should keep this check or not, too tired
+       if (guild.ownerId !== session.userId) {
         return { error: 'Unauthorized' };
-      }
+      } */
 
       // deletes prior invite (if any)
       await db.orm.public.GuildInvite.where({ guildId })
