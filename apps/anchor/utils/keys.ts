@@ -1,0 +1,133 @@
+import crypto from 'node:crypto';
+import { db } from '../prisma/db';
+import { getConfig } from './config';
+import path from 'node:path';
+import { mkdirSync } from 'node:fs';
+
+export async function generateKeys(keyDir: string) {
+  const homeserver = getConfig().server.homeserver;
+  const date = new Date().toISOString().split('T')[0];
+  const id = crypto.randomUUID();
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+
+  const exportedPublicKey = publicKey.export({ format: 'der', type: 'spki' });
+  const publicKeyBase64 = Buffer.from(exportedPublicKey).toString('base64');
+
+  const exportedPrivateKey = privateKey.export({ format: 'der', type: 'pkcs8' });
+  const privateKeyBase64 = Buffer.from(exportedPrivateKey).toString('base64');
+
+  const privateKeyFilename = `${date}_${id}_pkey.der.b64`;
+  mkdirSync(keyDir, { recursive: true });
+  await Bun.write(path.join(keyDir, privateKeyFilename), privateKeyBase64);
+
+  await db.orm.public.HomeserverKeys.where({ homeserver }).update({ active: false });
+  await db.orm.public.HomeserverKeys.create({
+    id,
+    homeserver,
+    publicKey: publicKeyBase64,
+    privateKeyFilename,
+    active: true,
+  });
+
+  return {
+    publicKey: publicKeyBase64,
+    privateKey: privateKeyBase64,
+    privateKeyFilename,
+    id,
+  };
+}
+
+export async function getKeys() {
+  const activeKey = await db.orm.public.HomeserverKeys.where({
+    active: true,
+    homeserver: getConfig().server.homeserver,
+  }).first();
+
+  if (!activeKey) {
+    console.log('No active keys found for the homeserver, generating new keys...');
+    const newKeys = await generateKeys(getConfig().federation.key_dir);
+    return {
+      publicKey: newKeys.publicKey,
+      privateKey: newKeys.privateKey,
+      id: newKeys.id,
+    };
+  }
+
+  const privateKey = await Bun.file(
+    path.join(getConfig().federation.key_dir, activeKey.privateKeyFilename)
+  ).text();
+
+  return {
+    publicKey: activeKey.publicKey,
+    privateKey,
+    id: activeKey.id,
+  };
+}
+
+export async function signMessage(message: string) {
+  const { privateKey } = await getKeys();
+  const privateKeyObject = crypto.createPrivateKey({
+    key: Buffer.from(privateKey, 'base64'),
+    format: 'der',
+    type: 'pkcs8',
+  });
+
+  const signature = crypto.sign(null, Buffer.from(message, 'utf8'), privateKeyObject);
+
+  return signature.toString('base64');
+}
+
+export function verifyMessage(message: string, signature: string, publicKey: string) {
+  const publicKeyObject = crypto.createPublicKey({
+    key: Buffer.from(publicKey, 'base64'),
+    format: 'der',
+    type: 'spki',
+  });
+
+  return crypto.verify(
+    null,
+    Buffer.from(message, 'utf8'),
+    publicKeyObject,
+    Buffer.from(signature, 'base64')
+  );
+}
+
+function federationNonceMaxAgeMs() {
+  return getConfig().federation.nonce_max_age_seconds * 1000;
+}
+
+function isExpiredNonce(createdAt: Date | string) {
+  return Date.now() - new Date(createdAt).getTime() > federationNonceMaxAgeMs();
+}
+
+async function deleteExpiredFederationNonces() {
+  const nonces = await db.orm.public.FederationNonce.all();
+
+  await Promise.all(
+    nonces
+      .filter((nonce) => isExpiredNonce(nonce.createdAt))
+      .map((nonce) => db.orm.public.FederationNonce.where({ id: nonce.id }).delete())
+  );
+}
+
+export async function storeNonce(nonce: string, homeserver: string) {
+  await deleteExpiredFederationNonces();
+
+  const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
+  if (existingNonce) return false;
+
+  await db.orm.public.FederationNonce.create({
+    id: crypto.randomUUID(),
+    nonce,
+    homeserver,
+  });
+
+  return true;
+}
+
+export async function isNonceUsed(nonce: string, _homeserver?: string) {
+  await deleteExpiredFederationNonces();
+
+  const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
+  return !!existingNonce;
+}
