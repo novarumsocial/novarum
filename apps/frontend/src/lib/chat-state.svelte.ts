@@ -99,6 +99,20 @@ function dmPath(userId: string) {
   return `/guilds/dms/${encodeURIComponent(userId)}`;
 }
 
+function errorStatus(error: unknown) {
+  if (!error || typeof error !== 'object' || !('status' in error)) return null;
+
+  const status = Number(error.status);
+  return Number.isFinite(status) ? status : null;
+}
+
+function sendToGuildsIfFederatedServerDown(error: unknown) {
+  if (errorStatus(error) !== 502) return false;
+
+  void goto('/guilds', { replaceState: true });
+  return true;
+}
+
 function currentRoute(): ChatRoute {
   const [first, second] = (page.params.path ?? '').split('/').filter(Boolean);
 
@@ -177,8 +191,15 @@ class ChatState {
     void this.loadCurrentChannel();
   }
 
-  addGuild(guild: { id: string; name: string; down: boolean }) {
-    if (this.servers.some((server) => server.id === guild.id)) return;
+  addGuild(guild: { id: string; name: string; down?: boolean }) {
+    const down = guild.down ?? false;
+
+    if (this.servers.some((server) => server.id === guild.id)) {
+      this.servers = this.servers.map((server) =>
+        server.id === guild.id ? { ...server, name: guild.name, down } : server
+      );
+      return;
+    }
 
     this.servers = [
       ...this.servers,
@@ -186,7 +207,7 @@ class ChatState {
         id: guild.id,
         name: guild.name,
         initials: initialsFor(guild.name),
-        down: guild.down,
+        down,
       },
     ];
   }
@@ -288,6 +309,8 @@ class ChatState {
     });
 
     if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
       console.error('Failed to send message', result.error ?? result.data);
       return;
     }
@@ -305,6 +328,8 @@ class ChatState {
       });
 
       if (result.error || !result.data || 'error' in result.data) {
+        if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
         console.error('Failed to load messages', result.error ?? result.data);
         return;
       }
@@ -450,6 +475,10 @@ class ChatState {
 
   private selectInitialChannel() {
     if (!this.activeServer) return;
+
+    if (this.currentServer?.down) {
+      return goto('/guilds', { replaceState: true });
+    }
 
     const serverId = this.currentServer?.id;
     const channelId = this.currentChannel?.id ?? this.firstChannelForServer(serverId)?.id ?? null;

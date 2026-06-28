@@ -38,6 +38,7 @@
       id: `srv-${Date.now()}`,
       name: trimmed,
       initials: initials(trimmed),
+      down: false,
     };
 
     onCreate?.(server);
