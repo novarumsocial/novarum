@@ -25,6 +25,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
           id: randomString(),
           name,
           ownerId: session.userId,
+          extAnchorDown: false,
         });
 
         await tx.orm.public.GuildMember.create({
@@ -91,6 +92,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       guilds.push({
         id,
         name: guild.name as string,
+        down: guild.extAnchorDown as boolean,
         channels: channels.map((channel) => ({
           id: channel.id,
           guildId: channel.guildId,

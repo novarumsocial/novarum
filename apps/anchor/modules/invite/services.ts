@@ -201,6 +201,7 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
       description: snapshot.guild.description,
       avatarUrl: snapshot.guild.avatarUrl,
       ownerId: session.userId,
+      extAnchorDown: false,
     });
   }
 

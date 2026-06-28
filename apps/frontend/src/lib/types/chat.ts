@@ -2,6 +2,7 @@ export interface Server {
   id: string;
   name: string;
   initials: string;
+  down: boolean;
   color?: string;
 }
 

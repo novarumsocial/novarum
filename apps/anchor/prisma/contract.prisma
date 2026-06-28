@@ -43,6 +43,7 @@ model Guild {
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   temporal.updatedAt()
+  extAnchorDown Boolean?
 
   owner User @relation("GuildOwner", fields: [ownerId], references: [id])
 

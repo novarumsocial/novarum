@@ -177,7 +177,7 @@ class ChatState {
     void this.loadCurrentChannel();
   }
 
-  addGuild(guild: { id: string; name: string }) {
+  addGuild(guild: { id: string; name: string; down: boolean }) {
     if (this.servers.some((server) => server.id === guild.id)) return;
 
     this.servers = [
@@ -186,6 +186,7 @@ class ChatState {
         id: guild.id,
         name: guild.name,
         initials: initialsFor(guild.name),
+        down: guild.down,
       },
     ];
   }

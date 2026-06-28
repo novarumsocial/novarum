@@ -4,13 +4,17 @@ import net from 'node:net';
 import { randomString } from './randomString';
 import { getKeys, signMessage } from './keys';
 import { getConfig } from './config';
+import { db } from '../prisma/db';
 
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 
 function anchorUrlFromHomeserver(homeserver: string) {
   const clean = normalizeFederationHomeserver(homeserver);
 
-  const protocol = allowLocalFederationTargets() && (isLocalHostname(clean) || isPrivateIp(clean)) ? 'http' : 'https';
+  const protocol =
+    allowLocalFederationTargets() && (isLocalHostname(clean) || isPrivateIp(clean))
+      ? 'http'
+      : 'https';
   return `${protocol}://${clean}`;
 }
 
@@ -49,8 +53,9 @@ export async function discoverRemoteAnchor(homeserver: string) {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch discovery info from ${discoveryUrl}: ${response.status} ${response.statusText}`
+      await markHomeserverGuildStatus(clean, false);
+      console.log(
+        `failed to fetch discovery info from ${homeserver} (probably down?): ${response.status} ${response.statusText}`
       );
     }
 
@@ -69,6 +74,8 @@ export async function discoverRemoteAnchor(homeserver: string) {
       throw new Error(`Invalid discovery base URL for ${clean}`);
     }
     await assertSafeFederationUrl(baseUrl);
+
+    await markHomeserverGuildStatus(clean, true);
 
     return {
       homeserver: discoveredHomeserver,
@@ -207,6 +214,14 @@ function isPrivateIp(address: string) {
   }
 
   return false;
+}
+
+async function markHomeserverGuildStatus(homeserver: string, up = true) {
+  await db.orm.public.Guild.where((guild) =>
+    guild.id.like(`fed:guild:${encodeURIComponent(homeserver)}:%`)
+  ).update({
+    extAnchorDown: !up,
+  });
 }
 
 interface SignedRequestData {
