@@ -1,13 +1,14 @@
 model User {
-  id             String @id
-  username       String
-  homeserver     String @map("homeserverName")
-  displayName    String?
-  avatarUrl      String?
-  isBot          Boolean
-  createdAt      DateTime
-  updatedAt      DateTime
-  status         String @default("OFFLINE")
+  // please put anything here that is publicly visible to other users and homeservers
+  id          String   @id
+  username    String
+  homeserver  String   @map("homeserverName")
+  displayName String?
+  avatarUrl   String?
+  isBot       Boolean
+  createdAt   DateTime
+  updatedAt   DateTime
+  status      String   @default("OFFLINE")
 
   @@unique([username, homeserver])
   @@map("user")
@@ -42,6 +43,7 @@ model Guild {
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   temporal.updatedAt()
+  extAnchorDown Boolean?
 
   owner User @relation("GuildOwner", fields: [ownerId], references: [id])
 
@@ -52,8 +54,8 @@ model Guild {
 model GuildMember {
   guildId  String
   userId   String
-  role     String    @default("MEMBER")
-  joinedAt DateTime  @default(now())
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
 
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -64,12 +66,12 @@ model GuildMember {
 }
 
 model Channel {
-  id          String      @id
-  guildId     String
-  name        String
-  type        String      @default("TEXT")
-  position    Int
-  createdAt   DateTime    @default(now())
+  id        String   @id
+  guildId   String
+  name      String
+  type      String   @default("TEXT")
+  position  Int
+  createdAt DateTime @default(now())
   updatedAt   temporal.updatedAt()
 
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
@@ -98,17 +100,40 @@ model Message {
 }
 
 model GuildInvite {
-  id        String   @id
+  id        String    @id
   guildId   String
-  code      String   @unique
-  createdAt DateTime @default(now())
+  code      String    @unique
+  createdAt DateTime  @default(now())
   expiresAt DateTime?
 
-  creator User  @relation("GuildInviteCreator", fields: [creatorId], references: [id])
+  creator   User   @relation("GuildInviteCreator", fields: [creatorId], references: [id])
   creatorId String
 
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId])
   @@map("guild_invite")
+}
+
+model HomeserverKeys {
+  id                 String  @id
+  homeserver         String
+  publicKey          String
+  privateKeyFilename String
+  active             Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
+
+  @@map("homeserver_keys")
+}
+
+model FederationNonce {
+  id         String   @id
+  nonce      String   @unique
+  homeserver String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("federation_nonce")
 }

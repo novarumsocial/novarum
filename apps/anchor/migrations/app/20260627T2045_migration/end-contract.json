@@ -220,13 +220,6 @@
                   "kind": "scalar"
                 }
               },
-              "extAnchorDown": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -283,9 +276,6 @@
                 },
                 "description": {
                   "column": "description"
-                },
-                "extAnchorDown": {
-                  "column": "extAnchorDown"
                 },
                 "id": {
                   "column": "id"
@@ -1042,13 +1032,7 @@
                 }
               },
               "foreignKeys": [],
-              "indexes": [
-                {
-                  "columns": [
-                    "createdAt"
-                  ]
-                }
-              ],
+              "indexes": [],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -1081,11 +1065,6 @@
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
-                  "nullable": true
-                },
-                "extAnchorDown": {
-                  "codecId": "pg/bool@1",
-                  "nativeType": "bool",
                   "nullable": true
                 },
                 "id": {
@@ -1668,7 +1647,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:997f145d5109c84fce252ed4940e218527a58b21a9b521ea2fafd5dc7629c911"
+    "storageHash": "sha256:8026a54d33435185d91fb2e21508a73f8f5f44eec414e5daa0074111271742c6"
   },
   "execution": {
     "executionHash": "sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc",

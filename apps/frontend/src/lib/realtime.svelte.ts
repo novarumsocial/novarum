@@ -51,6 +51,20 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       status: userStatusSchema,
     }),
   }),
+  z.object({
+    type: z.literal('member.joined'),
+    data: z.object({
+      guildId: z.string(),
+      user: z.object({
+        userId: z.string(),
+        username: z.string(),
+        displayName: z.string(),
+        homeserver: z.string(),
+        isBot: z.boolean(),
+        status: userStatusSchema,
+      }),
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 function parseRealtimeData(data: unknown) {
@@ -79,9 +93,11 @@ function parseRealtimeEvent(data: unknown) {
 
 class RealtimeState {
   connected = $state(false);
+  private socket: ReturnType<typeof anchor.client.realtime.subscribe> | null = null;
 
   connect() {
     const socket = anchor.client.realtime.subscribe();
+    this.socket = socket;
 
     socket.on('open', () => {
       this.connected = true;
@@ -100,6 +116,7 @@ class RealtimeState {
         event.data.channels.forEach((channel) => {
           chat.addChannel(channel);
         });
+        this.subscribeGuild(event.data.id);
         chat.selectServer(event.data.id);
       }
       if (event.type === 'channel.created') {
@@ -111,9 +128,21 @@ class RealtimeState {
       if (event.type === 'user.status.changed') {
         chat.updateMemberStatus(event.data.userId, event.data.status);
       }
+      if (event.type === 'member.joined') {
+        chat.addOrUpdateMember(event.data.guildId, event.data.user);
+      }
     });
 
-    return () => socket.close();
+    return () => {
+      if (this.socket === socket) this.socket = null;
+      socket.close();
+    };
+  }
+
+  subscribeGuild(guildId: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'subscribe.guild', guildId });
   }
 }
 

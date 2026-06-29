@@ -5,6 +5,9 @@ import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
 import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
 import type { Contract } from '../../prisma/contract';
+import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
+import { postSignedFederationJson } from '../../utils/discovery';
+import { federationUserPayload } from '../../utils/federationPayload';
 
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status }) => {
@@ -17,8 +20,11 @@ export const channel = new Elysia({ prefix: '/channel' })
   })
   .post(
     '/create',
-    async ({ body, session, server }) => {
+    async ({ body, session, server, status }) => {
       const { name, guildId, type } = body;
+      if (parseFederatedGuildId(guildId)) {
+        return status(400, { error: 'Cannot create channels on a federated guild' });
+      }
 
       const guild = await db.orm.public.Guild.where({ id: guildId }).first();
       if (!guild) {
@@ -75,6 +81,25 @@ export const channel = new Elysia({ prefix: '/channel' })
         return status(401, { error: 'Unauthorized' });
       }
 
+      const federatedChannel = parseFederatedChannelId(params.id);
+      if (federatedChannel) {
+        const result = await postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/users`,
+          { user: federationUserPayload(session) }
+        ).catch(() => null);
+
+        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+        if (!result.response.ok) {
+          return status(remoteStatus(result.response.status), result.data ?? { error: 'Remote users failed' });
+        }
+        if (!result.data || typeof result.data !== 'object' || !Array.isArray((result.data as any).users)) {
+          return status(502, { error: 'Remote users returned an invalid response' });
+        }
+
+        return result.data;
+      }
+
       const members = (await db.orm.public.GuildMember.where({ guildId: channel.guildId })
         .include('user')
         .all()) as ActuallyTypedMembers[];
@@ -116,9 +141,18 @@ export const channel = new Elysia({ prefix: '/channel' })
         401: t.Object({
           error: t.String(),
         }),
+        502: t.Object({
+          error: t.String(),
+        }),
       },
     }
   );
+
+function remoteStatus(status: number) {
+  if (status === 404) return 404;
+  if (status === 401 || status === 403) return 401;
+  return 502;
+}
 
 type ActuallyTypedMembers = DefaultModelRow<Contract, 'GuildMember'> & {
   user: DefaultModelRow<Contract, 'Users'>;

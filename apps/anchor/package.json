@@ -27,6 +27,7 @@
     "@prisma-next/postgres": "latest",
     "dotenv": "^17.4.2",
     "elysia": "latest",
+    "toml": "^4.1.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

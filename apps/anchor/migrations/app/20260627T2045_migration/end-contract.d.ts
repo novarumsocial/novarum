@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:997f145d5109c84fce252ed4940e218527a58b21a9b521ea2fafd5dc7629c911'>;
+  StorageHashBase<'sha256:8026a54d33435185d91fb2e21508a73f8f5f44eec414e5daa0074111271742c6'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc'>;
 export type ProfileHash =
@@ -68,7 +68,6 @@ export type FieldOutputTypes = {
       readonly ownerId: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
-      readonly extAnchorDown: CodecTypes['pg/bool@1']['output'] | null;
     };
     readonly GuildInvite: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -152,7 +151,6 @@ export type FieldInputTypes = {
       readonly ownerId: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
-      readonly extAnchorDown: CodecTypes['pg/bool@1']['input'] | null;
     };
     readonly GuildInvite: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -315,7 +313,7 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [{ readonly columns: readonly ['nonce'] }];
-              indexes: readonly [{ readonly columns: readonly ['createdAt'] }];
+              indexes: readonly [];
               foreignKeys: readonly [];
             };
             readonly guild: {
@@ -355,11 +353,6 @@ type ContractBase = Omit<
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz@1';
                   readonly nullable: false;
-                };
-                readonly extAnchorDown: {
-                  readonly nativeType: 'bool';
-                  readonly codecId: 'pg/bool@1';
-                  readonly nullable: true;
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -936,10 +929,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
               };
-              readonly extAnchorDown: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
-              };
             };
             readonly relations: {
               readonly owner: {
@@ -962,7 +951,6 @@ type ContractBase = Omit<
                 readonly ownerId: { readonly column: 'ownerId' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
-                readonly extAnchorDown: { readonly column: 'extAnchorDown' };
               };
             };
           };

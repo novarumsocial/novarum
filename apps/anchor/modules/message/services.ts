@@ -3,6 +3,9 @@ import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
 import { db } from '../../prisma/db';
 import { publishRealtime } from '../../utils/publishRealtime';
+import { parseFederatedChannelId } from '../../utils/federationIds';
+import { postSignedFederationJson } from '../../utils/discovery';
+import { federationUserPayload } from '../../utils/federationPayload';
 
 export const message = new Elysia({ prefix: '/message' })
   .resolve(async ({ cookie, status }) => {
@@ -29,6 +32,29 @@ export const message = new Elysia({ prefix: '/message' })
       }).first();
       if (!membership) {
         return status(403, { error: 'Forbidden' });
+      }
+
+      const federatedChannel = parseFederatedChannelId(channelId);
+      if (federatedChannel) {
+        const result = await postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages`,
+          { user: federationUserPayload(session) }
+        ).catch(() => null);
+
+        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+        if (!result.response.ok) {
+          return status(result.response.status, result.data ?? { error: 'Remote messages failed' });
+        }
+        if (!result.data || typeof result.data !== 'object' || !Array.isArray((result.data as any).messages)) {
+          return status(502, { error: 'Remote messages returned an invalid response' });
+        }
+
+        return {
+          messages: (result.data as any).messages.map((message: any) =>
+            mapFederatedMessage(message, channel.id, channel.guildId)
+          ),
+        };
       }
 
       const messages = await db.orm.public.Message.where({ channelId })
@@ -75,6 +101,39 @@ export const message = new Elysia({ prefix: '/message' })
       }).first();
       if (!membership) {
         return status(403, { error: 'Forbidden' });
+      }
+
+      const federatedChannel = parseFederatedChannelId(channelId);
+      if (federatedChannel) {
+        const result = await postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages/send`,
+          {
+            user: federationUserPayload(session),
+            content,
+            nonce,
+          }
+        ).catch(() => null);
+
+        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+        if (!result.response.ok) {
+          return status(result.response.status, result.data ?? { error: 'Remote send failed' });
+        }
+
+        const message = result.data && typeof result.data === 'object' ? (result.data as any).message : null;
+        if (!message || typeof message !== 'object') {
+          return status(502, { error: 'Remote send returned an invalid response' });
+        }
+
+        const mappedMessage = mapFederatedMessage(message, channel.id, channel.guildId);
+        if (server) {
+          publishRealtime(server, `guildEvents:${channel.guildId}`, {
+            type: 'message.created',
+            data: mappedMessage,
+          });
+        }
+
+        return { message: mappedMessage };
       }
 
       const priorMsg = await db.orm.public.Message.where({
@@ -129,3 +188,11 @@ export const message = new Elysia({ prefix: '/message' })
       }),
     }
   );
+
+function mapFederatedMessage(message: any, channelId: string, guildId: string) {
+  return {
+    ...message,
+    channelId,
+    guildId,
+  };
+}

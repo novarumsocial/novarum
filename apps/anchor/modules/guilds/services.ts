@@ -3,6 +3,8 @@ import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
+import { parseFederatedGuildId } from '../../utils/federationIds';
+import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 
 export const guilds = new Elysia({ prefix: '/guilds' })
   .resolve(async ({ cookie, status }) => {
@@ -23,6 +25,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
           id: randomString(),
           name,
           ownerId: session.userId,
+          extAnchorDown: false,
         });
 
         await tx.orm.public.GuildMember.create({
@@ -73,7 +76,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       }),
     }
   )
-  .get('/list', async ({ session }) => {
+  .get('/list', async ({ server, session }) => {
     const memberships = await db.orm.public.GuildMember.where({ userId: session.userId })
       .include('guild')
       .all();
@@ -89,6 +92,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       guilds.push({
         id,
         name: guild.name as string,
+        down: guild.extAnchorDown as boolean,
         channels: channels.map((channel) => ({
           id: channel.id,
           guildId: channel.guildId,
@@ -97,6 +101,10 @@ export const guilds = new Elysia({ prefix: '/guilds' })
           type: channel.type as 'TEXT' | 'VOICE',
         })),
       });
+
+      if (server && parseFederatedGuildId(id)) {
+        void ensureFederatedGuildRealtimeBridge(server, id);
+      }
     }
 
     return { guilds };
@@ -107,6 +115,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
   // this should probably be changed in the future but it should be fine for now
   .get('/:id/invites', async ({ params, session, status }) => {
     const { id: guildId } = params;
+    if (parseFederatedGuildId(guildId)) {
+      return status(400, { error: 'Cannot manage invites on a federated guild' });
+    }
 
     const guild = await db.orm.public.Guild.where({ id: guildId }).first();
     if (!guild) {
@@ -131,15 +142,18 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     '/:id/invites',
     async ({ params, body, session }) => {
       const { id: guildId } = params;
+      if (parseFederatedGuildId(guildId)) {
+        return { error: 'Cannot manage invites on a federated guild' };
+      }
 
       const guild = await db.orm.public.Guild.where({ id: guildId }).first();
       if (!guild) {
         return { error: 'Guild not found' };
       }
       if (guild.ownerId !== session.userId) {
-        return { error: 'Unauthorized' };
+        return { error: 'Cannot manage invites for this guild' };
       }
-      
+
       // deletes prior invite (if any)
       await db.orm.public.GuildInvite.where({ guildId })
         .where({ creatorId: session.userId })
