@@ -10,7 +10,7 @@ import {
 import type { RealtimeEvent } from './types';
 import { publishRealtime } from './publishRealtime';
 
-const activeBridges = new Map<string, WebSocket>();
+const activeBridges = new Map<string, WebSocket | null>();
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -80,24 +80,32 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
   const federatedGuild = parseFederatedGuildId(guildId);
   if (!federatedGuild || activeBridges.has(guildId)) return;
 
-  const remote = await discoverRemoteAnchor(federatedGuild.homeserver);
-  const path = `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`;
-  const url = new URL(path, remote.baseUrl);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  activeBridges.set(guildId, null);
 
-  const { headers } = await signFederationRequest({
-    method: 'GET',
-    path,
-    host: url.host,
-    homeserver: getConfig().server.homeserver,
-    body: '',
-  });
-  for (const [key, value] of Object.entries(headers)) {
-    url.searchParams.set(key, value);
+  let socket: WebSocket;
+  try {
+    const remote = await discoverRemoteAnchor(federatedGuild.homeserver);
+    const path = `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`;
+    const url = new URL(path, remote.baseUrl);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+
+    const { headers } = await signFederationRequest({
+      method: 'GET',
+      path,
+      host: url.host,
+      homeserver: getConfig().server.homeserver,
+      body: '',
+    });
+    for (const [key, value] of Object.entries(headers)) {
+      url.searchParams.set(key, value);
+    }
+
+    socket = new WebSocket(url);
+    activeBridges.set(guildId, socket);
+  } catch (error) {
+    if (activeBridges.get(guildId) === null) activeBridges.delete(guildId);
+    throw error;
   }
-
-  const socket = new WebSocket(url);
-  activeBridges.set(guildId, socket);
 
   socket.addEventListener('message', (message) => {
     const event = parseRealtimeEvent(message.data);

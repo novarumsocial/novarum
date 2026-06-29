@@ -10,7 +10,11 @@ type KeyMaterial = {
   id: string;
 };
 
+const federationNonceCleanupIntervalMs = 60 * 1000;
+
 let keyLoadPromise: Promise<KeyMaterial> | null = null;
+let nextFederationNonceCleanupAt = 0;
+let federationNonceCleanupPromise: Promise<void> | null = null;
 
 export async function generateKeys(keyDir: string) {
   const homeserver = getConfig().server.homeserver;
@@ -140,8 +144,21 @@ async function deleteExpiredFederationNonces() {
   await db.runtime().execute(plan);
 }
 
+async function maybeDeleteExpiredFederationNonces() {
+  const now = Date.now();
+  if (now < nextFederationNonceCleanupAt) return;
+  if (federationNonceCleanupPromise) return federationNonceCleanupPromise;
+
+  nextFederationNonceCleanupAt = now + federationNonceCleanupIntervalMs;
+  federationNonceCleanupPromise = deleteExpiredFederationNonces().finally(() => {
+    federationNonceCleanupPromise = null;
+  });
+
+  return federationNonceCleanupPromise;
+}
+
 export async function storeNonce(nonce: string, homeserver: string) {
-  await deleteExpiredFederationNonces();
+  await maybeDeleteExpiredFederationNonces();
 
   const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
   if (existingNonce) return false;
@@ -160,7 +177,7 @@ export async function storeNonce(nonce: string, homeserver: string) {
 }
 
 export async function isNonceUsed(nonce: string, _homeserver?: string) {
-  await deleteExpiredFederationNonces();
+  await maybeDeleteExpiredFederationNonces();
 
   const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
   return !!existingNonce;

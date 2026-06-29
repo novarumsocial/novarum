@@ -8,6 +8,8 @@ import { randomString } from '../../utils/randomString';
 import { publishRealtime } from '../../utils/publishRealtime';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
+const federatedMessagePageSize = 50;
+const maxFederatedMessagePageSize = 100;
 
 type FederationUserPayload = {
   username: string;
@@ -30,13 +32,6 @@ async function verifyFederationRequest(
     return { ok: false, status: 400, error: 'Missing X-Novarum-Homeserver header' };
   }
 
-  let discovered: Awaited<ReturnType<typeof discoverRemoteAnchor>>;
-  try {
-    discovered = await discoverRemoteAnchor(homeserver);
-  } catch {
-    return { ok: false, status: 400, error: 'Could not discover remote anchor' };
-  }
-
   const keyId = request.headers.get('X-Novarum-Key-Id');
   const date = request.headers.get('X-Novarum-Date');
   const nonce = request.headers.get('X-Novarum-Nonce');
@@ -44,9 +39,6 @@ async function verifyFederationRequest(
   const bodyHash = request.headers.get('X-Novarum-Body-SHA256');
   if (!keyId || !date || !nonce || !signature || !bodyHash) {
     return { ok: false, status: 400, error: 'Missing required federation headers' };
-  }
-  if (discovered.publicKey.id !== keyId) {
-    return { ok: false, status: 401, error: 'Unknown federation key' };
   }
   if (isStaleFederationDate(date)) {
     return { ok: false, status: 401, error: 'Stale federation request' };
@@ -56,6 +48,25 @@ async function verifyFederationRequest(
   }
   if (bodySha256(body) !== bodyHash) {
     return { ok: false, status: 401, error: 'Invalid federation body hash' };
+  }
+
+  let discovered: Awaited<ReturnType<typeof discoverRemoteAnchor>>;
+  try {
+    discovered = await discoverRemoteAnchor(homeserver);
+  } catch {
+    return { ok: false, status: 400, error: 'Could not discover remote anchor' };
+  }
+
+  if (discovered.publicKey.id !== keyId) {
+    try {
+      discovered = await discoverRemoteAnchor(homeserver, { refresh: true });
+    } catch {
+      return { ok: false, status: 400, error: 'Could not discover remote anchor' };
+    }
+
+    if (discovered.publicKey.id !== keyId) {
+      return { ok: false, status: 401, error: 'Unknown federation key' };
+    }
   }
 
   const url = new URL(request.url);
@@ -277,15 +288,21 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    const messages = await db.orm.public.Message.where({ channelId: params.id })
-      .include('author')
-      .orderBy((message) => message.createdAt.asc())
-      .all();
+    const pagination = parseFederatedMessagePagination(parsed.body);
+    if (!pagination.ok) return status(400, { error: pagination.error });
+
+    const messages = await fetchFederatedMessagePage(params.id, pagination.limit, pagination.cursor);
+    const visibleMessages = messages.slice(0, pagination.limit);
+    const lastMessage = visibleMessages[visibleMessages.length - 1];
 
     return {
-      messages: messages.map((message) =>
+      messages: visibleMessages.map((message) =>
         federatedMessageResponse(message, access.channel, message.author)
       ),
+      nextCursor:
+        messages.length > pagination.limit && lastMessage
+          ? encodeFederatedMessageCursor(lastMessage)
+          : null,
     };
   })
   .post('/channels/:id/users', async ({ params, request, status }) => {
@@ -448,6 +465,70 @@ function parseFederationUserPayload(value: unknown): FederationUserPayload | nul
 
 function getObjectProperty(value: unknown, key: string) {
   return value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
+}
+
+function parseFederatedMessagePagination(body: unknown):
+  | { ok: true; limit: number; cursor: { createdAt: Date; id: string } | null }
+  | { ok: false; error: string } {
+  const rawLimit = getObjectProperty(body, 'limit');
+  const rawCursor = getObjectProperty(body, 'cursor');
+
+  const limit =
+    rawLimit === undefined
+      ? federatedMessagePageSize
+      : typeof rawLimit === 'number' && Number.isInteger(rawLimit)
+        ? rawLimit
+        : null;
+  if (limit === null || limit < 1 || limit > maxFederatedMessagePageSize) {
+    return { ok: false, error: 'Invalid message page limit' };
+  }
+
+  if (rawCursor === undefined || rawCursor === null) {
+    return { ok: true, limit, cursor: null };
+  }
+  if (typeof rawCursor !== 'string') {
+    return { ok: false, error: 'Invalid message cursor' };
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(rawCursor, 'base64url').toString('utf8')) as unknown;
+    const createdAt = getObjectProperty(decoded, 'createdAt');
+    const id = getObjectProperty(decoded, 'id');
+    if (typeof createdAt !== 'string' || typeof id !== 'string') {
+      return { ok: false, error: 'Invalid message cursor' };
+    }
+
+    const createdAtDate = new Date(createdAt);
+    if (Number.isNaN(createdAtDate.getTime())) {
+      return { ok: false, error: 'Invalid message cursor' };
+    }
+
+    return { ok: true, limit, cursor: { createdAt: createdAtDate, id } };
+  } catch {
+    return { ok: false, error: 'Invalid message cursor' };
+  }
+}
+
+function encodeFederatedMessageCursor(message: { createdAt: Date | string; id: string }) {
+  const createdAt =
+    message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt;
+
+  return Buffer.from(JSON.stringify({ createdAt, id: message.id }), 'utf8').toString('base64url');
+}
+
+async function fetchFederatedMessagePage(
+  channelId: string,
+  limit: number,
+  cursor: { createdAt: Date; id: string } | null
+) {
+  const query = db.orm.public.Message.where({ channelId })
+    .include('author')
+    .orderBy([(message) => message.createdAt.asc(), (message) => message.id.asc()])
+    .take(limit + 1);
+
+  if (!cursor) return await query.all();
+
+  return await query.cursor(cursor).all();
 }
 
 async function upsertFederatedUser(input: FederationUserPayload) {
