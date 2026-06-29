@@ -7,6 +7,19 @@ import { getConfig } from './config';
 import { db } from '../prisma/db';
 
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
+const discoveryCacheTtlMs = 5 * 60 * 1000;
+
+type DiscoveredAnchor = {
+  homeserver: string;
+  baseUrl: string;
+  version: string;
+  publicKey: AnchorInfo['publicKey'];
+};
+
+const discoveryCache = new Map<
+  string,
+  { expiresAt: number; value?: DiscoveredAnchor; promise?: Promise<DiscoveredAnchor> }
+>();
 
 function anchorUrlFromHomeserver(homeserver: string) {
   const clean = normalizeFederationHomeserver(homeserver);
@@ -38,8 +51,28 @@ function normalizeFederationHomeserver(homeserver: string) {
   return clean;
 }
 
-export async function discoverRemoteAnchor(homeserver: string) {
+export async function discoverRemoteAnchor(homeserver: string, options?: { refresh?: boolean }) {
   const clean = normalizeFederationHomeserver(homeserver);
+  const cached = discoveryCache.get(clean);
+  if (!options?.refresh && cached && cached.expiresAt > Date.now()) {
+    if (cached.value) return cached.value;
+    if (cached.promise) return cached.promise;
+  }
+
+  const promise = discoverRemoteAnchorUncached(clean, homeserver);
+  discoveryCache.set(clean, { expiresAt: Date.now() + discoveryCacheTtlMs, promise });
+
+  try {
+    const value = await promise;
+    discoveryCache.set(clean, { expiresAt: Date.now() + discoveryCacheTtlMs, value });
+    return value;
+  } catch (error) {
+    discoveryCache.delete(clean);
+    throw error;
+  }
+}
+
+async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
   const discoveryUrl = new URL('/.well-known/anchor/info', anchorUrlFromHomeserver(clean));
 
   try {
