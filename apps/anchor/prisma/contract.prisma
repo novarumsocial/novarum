@@ -134,5 +134,6 @@ model FederationNonce {
   homeserver String
   createdAt  DateTime @default(now())
 
+  @@index([createdAt])
   @@map("federation_nonce")
 }

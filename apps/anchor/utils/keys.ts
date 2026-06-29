@@ -130,18 +130,14 @@ function federationNonceMaxAgeMs() {
   return getConfig().federation.nonce_max_age_seconds * 1000;
 }
 
-function isExpiredNonce(createdAt: Date | string) {
-  return Date.now() - new Date(createdAt).getTime() > federationNonceMaxAgeMs();
-}
-
 async function deleteExpiredFederationNonces() {
-  const nonces = await db.orm.public.FederationNonce.all();
+  const cutoff = new Date(Date.now() - federationNonceMaxAgeMs());
+  const plan = db.sql.public.federation_nonce
+    .delete()
+    .where((nonce, fns) => fns.lt(nonce.createdAt, cutoff))
+    .build();
 
-  await Promise.all(
-    nonces
-      .filter((nonce) => isExpiredNonce(nonce.createdAt))
-      .map((nonce) => db.orm.public.FederationNonce.where({ id: nonce.id }).delete())
-  );
+  await db.runtime().execute(plan);
 }
 
 export async function storeNonce(nonce: string, homeserver: string) {
