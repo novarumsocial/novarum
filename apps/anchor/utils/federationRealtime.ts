@@ -1,4 +1,5 @@
 import type { Server } from 'elysia/universal';
+import { z } from 'zod';
 import { discoverRemoteAnchor, signFederationRequest } from './discovery';
 import { getConfig } from './config';
 import {
@@ -10,6 +11,70 @@ import type { RealtimeEvent } from './types';
 import { publishRealtime } from './publishRealtime';
 
 const activeBridges = new Map<string, WebSocket>();
+
+const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
+const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
+
+const channelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  position: z.number(),
+  type: channelTypeSchema,
+  guildId: z.string(),
+});
+
+const realtimeEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('guild.created'),
+    data: z.object({
+      id: z.string(),
+      name: z.string(),
+      ownerId: z.string(),
+      channels: z.array(channelSchema),
+    }),
+  }),
+  z.object({
+    type: z.literal('channel.created'),
+    data: channelSchema,
+  }),
+  z.object({
+    type: z.literal('message.created'),
+    data: z.object({
+      id: z.string(),
+      channelId: z.string(),
+      guildId: z.string(),
+      content: z.string(),
+      nonce: z.string(),
+      createdAt: z.string(),
+      author: z.object({
+        id: z.string(),
+        username: z.string(),
+        avatar: z.string().nullable(),
+      }),
+    }),
+  }),
+  z.object({
+    type: z.literal('user.status.changed'),
+    data: z.object({
+      userId: z.string(),
+      status: userStatusSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('member.joined'),
+    data: z.object({
+      guildId: z.string(),
+      user: z.object({
+        userId: z.string(),
+        username: z.string(),
+        displayName: z.string(),
+        homeserver: z.string(),
+        isBot: z.boolean(),
+        status: userStatusSchema,
+      }),
+    }),
+  }),
+]) satisfies z.ZodType<RealtimeEvent>;
 
 export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId: string) {
   const federatedGuild = parseFederatedGuildId(guildId);
@@ -58,8 +123,9 @@ function parseRealtimeEvent(data: unknown): RealtimeEvent | null {
   if (typeof data !== 'string') return null;
 
   try {
-    const parsed = JSON.parse(data) as RealtimeEvent;
-    return parsed && typeof parsed === 'object' && 'type' in parsed ? parsed : null;
+    const parsed = JSON.parse(data) as unknown;
+    const event = realtimeEventSchema.safeParse(parsed);
+    return event.success ? event.data : null;
   } catch {
     return null;
   }
