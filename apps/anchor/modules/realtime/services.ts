@@ -1,6 +1,9 @@
 import Elysia, { t } from 'elysia';
 import { db } from '../../prisma/db';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
+import { parseFederatedGuildId } from '../../utils/federationIds';
+import { postSignedFederationJson } from '../../utils/discovery';
+import { federationUserPayload } from '../../utils/federationPayload';
 
 const activeRealtimeConnections = new Map<string, number>();
 
@@ -26,6 +29,10 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
   cookie: t.Cookie({
     [sessionCookieName]: t.Optional(t.String()),
   }),
+  body: t.Object({
+    type: t.Literal('subscribe.guild'),
+    guildId: t.String(),
+  }),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
@@ -49,18 +56,20 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
 
     await db.orm.public.User.where({ id: session.userId }).update({ status: 'ONLINE' });
 
-    for (const membership of memberships) {
-      ws.publish(
-        `guildEvents:${membership.guildId}`,
-        JSON.stringify({
-          type: 'user.status.changed',
-          data: {
-            userId: session.userId,
-            status: 'ONLINE',
-          },
-        })
-      );
-    }
+    await publishUserStatus(ws, session, memberships, 'ONLINE');
+  },
+  async message(ws, message) {
+    // @ts-ignore stored during open
+    const session = ws.data.session as SessionWithUser | undefined;
+    if (!session) return;
+
+    const membership = await db.orm.public.GuildMember.where({
+      guildId: message.guildId,
+      userId: session.userId,
+    }).first();
+    if (!membership) return;
+
+    ws.subscribe(`guildEvents:${message.guildId}`);
   },
   async close(ws) {
     // @ts-ignore using it here
@@ -73,17 +82,38 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     await db.orm.public.User.where({ id: session.userId }).update({ status: 'OFFLINE' });
 
     const memberships = await db.orm.public.GuildMember.where({ userId: session.userId }).all();
-    for (const membership of memberships) {
-      ws.publish(
-        `guildEvents:${membership.guildId}`,
-        JSON.stringify({
-          type: 'user.status.changed',
-          data: {
-            userId: session.userId,
-            status: 'OFFLINE',
-          },
-        })
-      );
-    }
+    await publishUserStatus(ws, session, memberships, 'OFFLINE');
   },
 });
+
+async function publishUserStatus(
+  ws: { publish(topic: string, data: string): void },
+  session: SessionWithUser,
+  memberships: { guildId: string }[],
+  status: 'ONLINE' | 'OFFLINE'
+) {
+  for (const membership of memberships) {
+    ws.publish(
+      `guildEvents:${membership.guildId}`,
+      JSON.stringify({
+        type: 'user.status.changed',
+        data: {
+          userId: session.userId,
+          status,
+        },
+      })
+    );
+
+    const federatedGuild = parseFederatedGuildId(membership.guildId);
+    if (!federatedGuild) continue;
+
+    void postSignedFederationJson(
+      federatedGuild.homeserver,
+      `/federation/guilds/${encodeURIComponent(federatedGuild.id)}/users/status`,
+      {
+        user: federationUserPayload(session),
+        status,
+      }
+    ).catch(() => null);
+  }
+}

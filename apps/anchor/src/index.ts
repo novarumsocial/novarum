@@ -7,9 +7,11 @@ import { realtime } from '../modules/realtime/services';
 import { channel } from '../modules/channel/services';
 import { message } from '../modules/message/services';
 import { invite } from '../modules/invite/services';
+import { federation } from '../modules/federation/services';
+import { getConfig } from '../utils/config';
 
 const app = new Elysia()
-  .use(cors({ credentials: true }))
+  .use(cors({ origin: true, credentials: true }))
   .use(wellKnown)
   .use(auth)
   .use(guilds)
@@ -17,8 +19,9 @@ const app = new Elysia()
   .use(channel)
   .use(message)
   .use(invite)
+  .use(federation)
   .get('/', () => 'this is anchor')
-  .listen(5049);
+  .listen(getConfig().server.listen_port);
 
 export type App = typeof app;
 export type { RealtimeEvent } from '../utils/types';

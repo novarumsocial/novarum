@@ -40,12 +40,15 @@
     {#if server.id !== 'home'}
       <button
         onclick={() => onSelect(server.id)}
-        class="flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.color ?? 'bg-primary'}"
+        class="flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down ? 'bg-destructive' : 'bg-primary'}"
         class:ring-2={activeId === server.id}
         class:ring-primary={activeId === server.id}
         class:ring-offset-1={activeId === server.id}
         class:ring-offset-background={activeId === server.id}
         class:opacity-60={activeId !== server.id}
+        class:opacity-40={server.down}
+        class:cursor-not-allowed={server.down}
+        disabled={server.down}
         aria-label={server.name}
       >
         {server.initials}

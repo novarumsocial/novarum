@@ -46,4 +46,18 @@ export type RealtimeEvent =
         userId: string;
         status: 'ONLINE' | 'OFFLINE';
       };
+    }
+  | {
+      type: 'member.joined';
+      data: {
+        guildId: string;
+        user: {
+          userId: string;
+          username: string;
+          displayName: string;
+          homeserver: string;
+          isBot: boolean;
+          status: 'ONLINE' | 'OFFLINE';
+        };
+      };
     };
