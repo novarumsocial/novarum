@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { Mic, Headphones, Settings } from '@lucide/svelte';
+  import { Mic, MicOff, Headphones, HeadphoneOff, Settings } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
+  import type { Voice } from '$lib/voice.svelte';
+  import { cn } from '$lib/utils';
 
   type UserAreaUser = {
     username: string;
@@ -8,7 +10,13 @@
     homeserver: string;
   };
 
-  let { user }: { user: UserAreaUser } = $props();
+  let {
+    voice,
+    user,
+  }: {
+    voice: Voice;
+    user: UserAreaUser;
+  } = $props();
   let settingsOpen = $state(false);
 </script>
 
@@ -30,16 +38,39 @@
   </div>
   <div class="flex items-center gap-0.5">
     <button
-      class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground"
-      aria-label="Mute"
+      class={cn(
+        'flex size-7 items-center justify-center transition-colors',
+        voice.selfMuted && !voice.selfDeafened
+          ? 'text-rose-400 hover:text-rose-300'
+          : voice.selfDeafened
+            ? 'text-rose-400 hover:text-rose-300'
+            : 'text-muted-foreground hover:text-sidebar-foreground',
+      )}
+      onclick={() => voice.setMuted(!voice.selfMuted)}
+      disabled={voice.selfDeafened}
+      aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
     >
-      <Mic class="size-4" />
+      {#if voice.selfMuted}
+        <MicOff class="size-4" />
+      {:else}
+        <Mic class="size-4" />
+      {/if}
     </button>
     <button
-      class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground"
-      aria-label="Deafen"
+      class={cn(
+        'flex size-7 items-center justify-center transition-colors',
+        voice.selfDeafened
+          ? 'text-rose-400 hover:text-rose-300'
+          : 'text-muted-foreground hover:text-sidebar-foreground',
+      )}
+      onclick={() => voice.setDeafened(!voice.selfDeafened)}
+      aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
     >
-      <Headphones class="size-4" />
+      {#if voice.selfDeafened}
+        <HeadphoneOff class="size-4" />
+      {:else}
+        <Headphones class="size-4" />
+      {/if}
     </button>
     <button
       class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground"

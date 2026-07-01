@@ -4,9 +4,11 @@
   import { anchor } from '$lib/anchor.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
+  import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
   import ChatArea from './chat-area.svelte';
+  import VoiceArea from './voice-area.svelte';
   import InitialLoader from './initial-loader.svelte';
   import MemberSidebar from './member-sidebar.svelte';
   import type { Channel } from '$lib/types/chat';
@@ -22,6 +24,25 @@
   const currentChannel = $derived(chat.currentChannel);
   const currentMessages = $derived(chat.currentMessages);
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
+
+  const voice = new Voice();
+
+  // auto-join/leave voice when channel type changes
+  $effect(() => {
+    const channel = currentChannel;
+
+    if (!channel || !currentUser) return;
+
+    if (channel.type === 'VOICE') {
+      void voice.join(channel.id);
+    }
+
+    return () => {
+      if (channel.type === 'VOICE') {
+        void voice.leave();
+      }
+    };
+  });
 
   $effect(() => {
     if (!booting) chat.syncActiveChannel();
@@ -45,7 +66,10 @@
     const disconnect = realtime.connect();
     void boot();
 
-    return disconnect;
+    return () => {
+      disconnect();
+      void voice.leave();
+    };
   });
 </script>
 
@@ -72,16 +96,18 @@
           />
         {/if}
       </div>
-      <UserArea user={currentUser.user} />
+      <UserArea {voice} user={currentUser.user} />
     </div>
 
-    {#if currentChannel}
+    {#if currentChannel && currentChannel.type === "TEXT"}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
         loading={currentMessagesLoading}
         onSend={(content) => chat.sendMessage(currentChannel.id, content)}
       />
+    {:else if currentChannel && currentChannel.type === "VOICE"}
+      <VoiceArea channel={currentChannel} {voice} />
     {:else}
       <main class="flex flex-1 items-center justify-center bg-background px-6">
         <div class="max-w-sm text-center">
@@ -90,6 +116,6 @@
         </div>
       </main>
     {/if}
-    <MemberSidebar members={chat.members} voiceUsers={chat.voiceUsers} />
+    <MemberSidebar members={chat.members} voiceUsers={chat.voiceUsers} {voice} />
   </div>
 {/if}
