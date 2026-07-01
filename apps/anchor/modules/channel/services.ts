@@ -8,6 +8,9 @@ import type { Contract } from '../../prisma/contract';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { getConfig } from '../../utils/config';
+import { AccessToken } from 'livekit-server-sdk';
+import { livekitServiceClient } from '../../utils/services/livekit';
 
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status }) => {
@@ -91,9 +94,16 @@ export const channel = new Elysia({ prefix: '/channel' })
 
         if (!result) return status(502, { error: 'Could not reach remote homeserver' });
         if (!result.response.ok) {
-          return status(remoteStatus(result.response.status), result.data ?? { error: 'Remote users failed' });
+          return status(
+            remoteStatus(result.response.status),
+            result.data ?? { error: 'Remote users failed' }
+          );
         }
-        if (!result.data || typeof result.data !== 'object' || !Array.isArray((result.data as any).users)) {
+        if (
+          !result.data ||
+          typeof result.data !== 'object' ||
+          !Array.isArray((result.data as any).users)
+        ) {
           return status(502, { error: 'Remote users returned an invalid response' });
         }
 
@@ -146,7 +156,62 @@ export const channel = new Elysia({ prefix: '/channel' })
         }),
       },
     }
-  );
+  )
+  .get('/:id/call/token', async ({ params, session, status }) => {
+    const voiceConfig = getConfig().voice;
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel || channel.type !== 'VOICE') {
+      return status(404, { error: 'Channel not right' });
+    }
+
+    const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
+      identity: session.userId,
+      name: session.user.displayName || session.user.username,
+      ttl: '5m',
+      metadata: JSON.stringify({
+        channelId: channel.id,
+        guildId: channel.guildId,
+        userId: session.userId,
+      }),
+    });
+
+    token.addGrant({
+      roomJoin: true,
+      room: `voice:${channel.id}`,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    return {
+      serverUrl: voiceConfig.livekit_url,
+      token: await token.toJwt(),
+    };
+  })
+  .get('/:id/call/participants', async ({ params, session, status }) => {
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel || channel.type !== 'VOICE') {
+      return status(404, { error: 'Channel not right' });
+    }
+
+    const channelMembership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!channelMembership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const participants = await livekitServiceClient.listParticipants(`voice:${channel.id}`);
+
+    return {
+      participants: participants.map((p) => ({
+        identity: p.identity,
+        name: p.name,
+        metadata: p.metadata,
+      })),
+    };
+  });
 
 function remoteStatus(status: number) {
   if (status === 404) return 404;
