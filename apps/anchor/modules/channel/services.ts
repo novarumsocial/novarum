@@ -11,6 +11,9 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { getConfig } from '../../utils/config';
 import { AccessToken } from 'livekit-server-sdk';
 import { livekitServiceClient } from '../../utils/services/livekit';
+import { z } from 'zod';
+
+const remoteErrorSchema = z.object({ error: z.string() });
 
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status }) => {
@@ -94,9 +97,11 @@ export const channel = new Elysia({ prefix: '/channel' })
 
         if (!result) return status(502, { error: 'Could not reach remote homeserver' });
         if (!result.response.ok) {
+          const remoteError = remoteErrorSchema.safeParse(result.data);
+
           return status(
             remoteStatus(result.response.status),
-            result.data ?? { error: 'Remote users failed' }
+            remoteError.success ? remoteError.data : { error: 'Remote users failed' }
           );
         }
         if (
@@ -107,7 +112,7 @@ export const channel = new Elysia({ prefix: '/channel' })
           return status(502, { error: 'Remote users returned an invalid response' });
         }
 
-        return result.data;
+        return result.data as ChannelUsersResponse;
       }
 
       const members = (await db.orm.public.GuildMember.where({ guildId: channel.guildId })
@@ -218,6 +223,22 @@ function remoteStatus(status: number) {
   if (status === 401 || status === 403) return 401;
   return 502;
 }
+
+type ChannelUsersResponse = {
+  users: ChannelUser[];
+};
+
+type ChannelUser = {
+  userId: string;
+  username: string;
+  displayName: string;
+  homeserver: string;
+  avatarUrl?: string;
+  isBot: boolean;
+  status: 'ONLINE' | 'OFFLINE';
+  role: 'OWNER' | 'ADMIN' | 'MEMBER';
+  joinedAt: Date;
+};
 
 type ActuallyTypedMembers = DefaultModelRow<Contract, 'GuildMember'> & {
   user: DefaultModelRow<Contract, 'Users'>;
