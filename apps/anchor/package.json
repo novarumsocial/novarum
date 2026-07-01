@@ -27,6 +27,7 @@
     "@prisma-next/postgres": "latest",
     "dotenv": "^17.4.2",
     "elysia": "latest",
+    "livekit-server-sdk": "^2.15.5",
     "toml": "^4.1.1",
     "zod": "^4.4.3"
   },
