@@ -54,7 +54,7 @@ export type RealtimeEvent =
         user: {
           userId: string;
           username: string;
-          displayName: string;
+          displayName: string | null;
           homeserver: string;
           isBot: boolean;
           status: 'ONLINE' | 'OFFLINE';

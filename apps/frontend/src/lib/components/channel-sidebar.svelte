@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
   import { ChevronDown, ChevronRight, Hash, MicOff, Plus, Settings, SquareArrowRightExit, UserRoundPlus, Volume2 } from '@lucide/svelte';
-  import type { Channel, ChannelCategory, Server } from '$lib/types/chat';
+  import type { Author, Channel, ChannelCategory, Server } from '$lib/types/chat';
   import type { Voice } from '$lib/voice.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
@@ -14,6 +14,7 @@
     onSelectChannel,
     onCreateChannel,
     voice,
+    members = [],
   }: {
     server: Server;
     categories: ChannelCategory[];
@@ -21,6 +22,7 @@
     onSelectChannel: (id: string) => void;
     onCreateChannel?: (channel: Channel) => Promise<Channel | void>;
     voice?: Voice | null;
+    members?: Author[];
   } = $props();
 
   let collapsed = $state<Record<string, boolean>>({});
@@ -42,6 +44,12 @@
       .map((part) => part[0]?.toUpperCase())
       .join('')
       .slice(0, 2);
+  }
+
+  function nameFor(identity: string) {
+    const member = members.find((item) => item.userId === identity);
+
+    return member?.displayName || member?.username || identity;
   }
 
   function avatarBg(id: string) {
@@ -158,8 +166,9 @@
           </button>
 
           {#if ch.type === 'VOICE' && voice?.channelId === ch.id && voice?.connected}
-            <div class="ml-3 mt-0.5 space-y-0.5 pb-0.5">
+            <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
               {#each Array.from(voice.voiceStates.entries()) as [identity, state]}
+                {@const name = nameFor(identity)}
                 <button
                   onclick={() => onSelectChannel(ch.id)}
                   class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
@@ -167,17 +176,14 @@
                   <div
                     class={cn(
                       'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
-                      avatarBg(identity),
+                      avatarBg(state.userId),
                       state.speaking && 'ring-2 ring-emerald-400'
                     )}
                   >
-                    {state.selfDeafened ? '!' : initialsFor(identity)}
+                    {state.selfDeafened ? '!' : initialsFor(name)}
                   </div>
                   <span class="min-w-0 flex-1 truncate">
-                    {identity}
-                    {#if identity === voice?.localIdentity}
-                      <span class="text-[10px] text-muted-foreground">(you)</span>
-                    {/if}
+                    {name}
                   </span>
                   {#if state.selfMuted || state.selfDeafened}
                     <MicOff class="size-3.5 shrink-0 text-rose-400" />

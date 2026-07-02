@@ -98,11 +98,14 @@ export const channel = new Elysia({ prefix: '/channel' })
         if (!result) return status(502, { error: 'Could not reach remote homeserver' });
         if (!result.response.ok) {
           const remoteError = remoteErrorSchema.safeParse(result.data);
+          const error = remoteError.success ? remoteError.data : { error: 'Remote users failed' };
 
-          return status(
-            remoteStatus(result.response.status),
-            remoteError.success ? remoteError.data : { error: 'Remote users failed' }
-          );
+          if (result.response.status === 404) return status(404, error);
+          if (result.response.status === 401 || result.response.status === 403) {
+            return status(401, error);
+          }
+
+          return status(502, error);
         }
         if (
           !result.data ||
@@ -122,7 +125,7 @@ export const channel = new Elysia({ prefix: '/channel' })
       const users = members.map((member) => ({
         userId: member.user.id as string,
         username: member.user.username as string,
-        displayName: member.user.displayName as string,
+        displayName: member.user.displayName as string | null,
         homeserver: member.user.homeserver as string,
         avatarUrl: (member.user.avatarUrl as string | null) ?? undefined,
         isBot: member.user.isBot as boolean,
@@ -140,7 +143,7 @@ export const channel = new Elysia({ prefix: '/channel' })
             t.Object({
               userId: t.String(),
               username: t.String(),
-              displayName: t.String(),
+              displayName: t.Union([t.String(), t.Null()]),
               homeserver: t.String(),
               avatarUrl: t.Optional(t.String()),
               isBot: t.Boolean(),
@@ -218,12 +221,6 @@ export const channel = new Elysia({ prefix: '/channel' })
     };
   });
 
-function remoteStatus(status: number) {
-  if (status === 404) return 404;
-  if (status === 401 || status === 403) return 401;
-  return 502;
-}
-
 type ChannelUsersResponse = {
   users: ChannelUser[];
 };
@@ -231,7 +228,7 @@ type ChannelUsersResponse = {
 type ChannelUser = {
   userId: string;
   username: string;
-  displayName: string;
+  displayName: string | null;
   homeserver: string;
   avatarUrl?: string;
   isBot: boolean;

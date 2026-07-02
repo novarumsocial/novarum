@@ -42,7 +42,7 @@ type AddMessageInput = {
 type ChannelMemberInput = {
   userId: string;
   username: string;
-  displayName: string;
+  displayName?: string | null;
   homeserver: string;
   isBot: boolean;
   status: 'ONLINE' | 'OFFLINE';

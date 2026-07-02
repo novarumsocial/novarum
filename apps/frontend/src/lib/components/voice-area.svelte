@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Volume2, Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, LoaderCircle } from '@lucide/svelte';
   import { cn } from '$lib/utils';
-  import type { Channel } from '$lib/types/chat';
+  import type { Author, Channel } from '$lib/types/chat';
   import type { Voice } from '$lib/voice.svelte';
   import { ConnectionState } from 'livekit-client';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -9,10 +9,12 @@
   let {
     channel,
     voice,
+    members,
     onLeave,
   }: {
     channel: Channel;
     voice: Voice;
+    members: Author[];
     onLeave: () => void;
   } = $props();
 
@@ -37,6 +39,12 @@
       .map((part) => part[0]?.toUpperCase())
       .join('')
       .slice(0, 2);
+  }
+
+  function nameFor(identity: string) {
+    const member = members.find((item) => item.userId === identity);
+
+    return member?.displayName || member?.username || identity;
   }
 
   function avatarBg(id: string) {
@@ -108,6 +116,7 @@
         style="grid-template-columns: repeat({maxCols}, minmax(0, 1fr))"
       >
         {#each participants as [identity, state]}
+          {@const name = nameFor(identity)}
           <div class="flex flex-col items-center gap-3">
             <!-- avatar with speaking ring -->
             <div class="relative">
@@ -126,7 +135,7 @@
                 {#if state.selfDeafened}
                   <HeadphoneOff class="size-8" />
                 {:else}
-                  {initialsFor(identity)}
+                  {initialsFor(name)}
                 {/if}
                 <!-- mic muted indicator -->
                 {#if state.selfMuted}
@@ -142,7 +151,7 @@
             </div>
             <!-- name -->
             <span class="text-sm font-medium text-foreground">
-              {identity}
+              {name}
               {#if identity === voice.localIdentity}
                 <span class="text-muted-foreground">(you)</span>
               {/if}

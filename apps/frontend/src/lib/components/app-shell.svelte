@@ -102,6 +102,7 @@
             onCreateChannel={async (channel: Channel) =>
               await chat.createChannel(currentServer.id, channel, channel.type)}
             {voice}
+            members={chat.members}
           />
         {/if}
       </div>
@@ -116,7 +117,7 @@
         onSend={(content) => chat.sendMessage(currentChannel.id, content)}
       />
     {:else if currentChannel && currentChannel.type === "VOICE"}
-      <VoiceArea channel={currentChannel} {voice} onLeave={leaveVoice} />
+      <VoiceArea channel={currentChannel} {voice} members={chat.members} onLeave={leaveVoice} />
     {:else}
       <main class="flex flex-1 items-center justify-center bg-background px-6">
         <div class="max-w-sm text-center">

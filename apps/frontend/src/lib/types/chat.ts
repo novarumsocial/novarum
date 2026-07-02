@@ -26,7 +26,7 @@ export interface Author {
   userId?: string;
   username: string;
   server: string;
-  displayName: string;
+  displayName?: string | null;
   avatarColor: string;
   isBot: boolean;
   status?: 'ONLINE' | 'OFFLINE';
