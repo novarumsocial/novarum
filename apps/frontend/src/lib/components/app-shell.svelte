@@ -101,6 +101,7 @@
             onSelectChannel={(id: string) => chat.selectChannel(id)}
             onCreateChannel={async (channel: Channel) =>
               await chat.createChannel(currentServer.id, channel, channel.type)}
+            {voice}
           />
         {/if}
       </div>
@@ -124,6 +125,6 @@
         </div>
       </main>
     {/if}
-    <MemberSidebar members={chat.members} voiceUsers={chat.voiceUsers} {voice} />
+    <MemberSidebar members={chat.members} />
   </div>
 {/if}
