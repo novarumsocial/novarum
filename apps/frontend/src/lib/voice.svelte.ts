@@ -2,10 +2,13 @@ import { ConnectionState, Participant, Room, RoomEvent, Track } from 'livekit-cl
 import { anchor } from './anchor.svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
+const livekitConnectionTimeoutMs = 15_000;
+
 export class Voice {
   room = $state<Room | null>(null);
   channelId = $state<string | null>(null);
   connectionState = $state<ConnectionState>(ConnectionState.Disconnected);
+  private connectionAttempt = 0;
 
   selfMuted = $state<boolean>(false);
   selfDeafened = $state<boolean>(false);
@@ -24,14 +27,17 @@ export class Voice {
   }
 
   async join(channelId: string) {
-    if (this.channelId === channelId && this.connected) return;
+    if (this.channelId === channelId && (this.connected || this.connecting)) return;
 
     await this.leave();
 
+    const connectionAttempt = ++this.connectionAttempt;
     this.channelId = channelId;
     this.connectionState = ConnectionState.Connecting;
 
     const { data, error } = await anchor.client.channel({ id: channelId }).call.token.get();
+    if (this.connectionAttempt !== connectionAttempt) return;
+
     if (error) {
       this.connectionState = ConnectionState.Disconnected;
       throw error;
@@ -39,10 +45,34 @@ export class Voice {
 
     const room = new Room();
     this.room = room;
-    await room.connect(data.serverUrl, data.token);
-
-    this.connectionState = room.state;
     this.bindRoomEvents(room, channelId);
+
+    const connectPromise = room.connect(data.serverUrl, data.token);
+    connectPromise.catch(() => null);
+
+    try {
+      await Promise.race([
+        connectPromise,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Voice connection timed out')), livekitConnectionTimeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      if (this.connectionAttempt !== connectionAttempt || this.room !== room) return;
+
+      this.room = null;
+      this.channelId = null;
+      this.connectionState = ConnectionState.Disconnected;
+      throw error;
+    }
+
+    if (this.connectionAttempt !== connectionAttempt || this.room !== room) {
+      await room.disconnect().catch(() => null);
+      return;
+    }
+
+    this.connectionState = ConnectionState.Connected;
+    this.syncParticipant(room.localParticipant, channelId);
 
     if (this.selfMuted) {
       await room.localParticipant.setMicrophoneEnabled(false);
@@ -53,13 +83,17 @@ export class Voice {
   }
 
   async leave() {
-    if (!this.room) return;
+    this.connectionAttempt++;
 
-    await this.room.disconnect();
+    const room = this.room;
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
     this.voiceStates.clear();
+
+    if (!room) return;
+
+    await room.disconnect().catch(() => null);
   }
 
   async setMuted(muted: boolean) {

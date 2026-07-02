@@ -11,7 +11,7 @@ import { federation } from '../modules/federation/services';
 import { getConfig } from '../utils/config';
 
 const app = new Elysia()
-  .use(cors())
+  .use(cors({ credentials: true }))
   .use(wellKnown)
   .use(auth)
   .use(guilds)

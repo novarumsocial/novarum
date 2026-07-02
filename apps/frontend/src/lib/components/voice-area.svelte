@@ -9,9 +9,11 @@
   let {
     channel,
     voice,
+    onLeave,
   }: {
     channel: Channel;
     voice: Voice;
+    onLeave: () => void;
   } = $props();
 
   const participants = $derived(Array.from(voice.voiceStates.entries()));
@@ -186,7 +188,7 @@
       variant="destructive"
       size="icon"
       class="size-10"
-      onclick={() => voice.leave()}
+      onclick={onLeave}
       aria-label="Leave call"
     >
       <PhoneOff class="size-5" />

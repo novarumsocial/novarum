@@ -103,7 +103,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       });
 
       if (server && parseFederatedGuildId(id)) {
-        void ensureFederatedGuildRealtimeBridge(server, id);
+        void ensureFederatedGuildRealtimeBridge(server, id).catch(() => null);
       }
     }
 

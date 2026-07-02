@@ -26,22 +26,25 @@
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
 
   const voice = new Voice();
+  let joinedVoiceChannelId: string | null = null;
 
   // auto-join/leave voice when channel type changes
   $effect(() => {
-    const channel = currentChannel;
+    const channelId = currentChannel?.type === 'VOICE' ? currentChannel.id : null;
+    const userId = currentUser?.user.id ?? null;
 
-    if (!channel || !currentUser) return;
-
-    if (channel.type === 'VOICE') {
-      void voice.join(channel.id);
-    }
-
-    return () => {
-      if (channel.type === 'VOICE') {
+    if (!channelId || !userId) {
+      if (joinedVoiceChannelId) {
+        joinedVoiceChannelId = null;
         void voice.leave();
       }
-    };
+      return;
+    }
+
+    if (joinedVoiceChannelId !== channelId) {
+      joinedVoiceChannelId = channelId;
+      void voice.join(channelId).catch(() => null);
+    }
   });
 
   $effect(() => {
@@ -60,6 +63,11 @@
 
     await chat.loadInitialData();
     booting = false;
+  }
+
+  function leaveVoice() {
+    joinedVoiceChannelId = null;
+    void voice.leave();
   }
 
   onMount(() => {
@@ -107,7 +115,7 @@
         onSend={(content) => chat.sendMessage(currentChannel.id, content)}
       />
     {:else if currentChannel && currentChannel.type === "VOICE"}
-      <VoiceArea channel={currentChannel} {voice} />
+      <VoiceArea channel={currentChannel} {voice} onLeave={leaveVoice} />
     {:else}
       <main class="flex flex-1 items-center justify-center bg-background px-6">
         <div class="max-w-sm text-center">
