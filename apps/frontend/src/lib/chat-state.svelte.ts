@@ -8,7 +8,6 @@ import type {
   ChatRoute,
   Message,
   Server,
-  VoiceUser,
 } from '$lib/types/chat';
 
 function initialsFor(name: string) {
@@ -133,7 +132,6 @@ class ChatState {
   messagesByChannel = $state<Record<string, Message[]>>({});
   messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
-  voiceUsers = $state<VoiceUser[]>([]);
   private loadedChannel: string | null = null;
 
   route = $derived(currentRoute());
