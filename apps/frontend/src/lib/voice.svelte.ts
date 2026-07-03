@@ -73,6 +73,9 @@ export class Voice {
 
     this.connectionState = ConnectionState.Connected;
     this.syncParticipant(room.localParticipant, channelId);
+    for (const participant of room.remoteParticipants.values()) {
+      this.syncParticipant(participant, channelId);
+    }
 
     if (this.selfMuted) {
       await room.localParticipant.setMicrophoneEnabled(false);
