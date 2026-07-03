@@ -1,4 +1,5 @@
 import { ConnectionState, Participant, Room, RoomEvent, Track } from 'livekit-client';
+import type { RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -12,8 +13,10 @@ export class Voice {
 
   selfMuted = $state<boolean>(false);
   selfDeafened = $state<boolean>(false);
+  audioPlaybackBlocked = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
+  private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
 
   connected = $derived(this.connectionState === ConnectionState.Connected);
   connecting = $derived(this.connectionState === ConnectionState.Connecting);
@@ -72,16 +75,20 @@ export class Voice {
     }
 
     this.connectionState = ConnectionState.Connected;
+    this.audioPlaybackBlocked = !room.canPlaybackAudio;
+
+    await this.syncLocalMicrophone(room);
+    if (this.connectionAttempt !== connectionAttempt || this.room !== room) {
+      await room.disconnect().catch(() => null);
+      return;
+    }
+
     this.syncParticipant(room.localParticipant, channelId);
     for (const participant of room.remoteParticipants.values()) {
       this.syncParticipant(participant, channelId);
-    }
-
-    if (this.selfMuted) {
-      await room.localParticipant.setMicrophoneEnabled(false);
-    }
-    if (this.selfDeafened) {
-      await room.localParticipant.setMicrophoneEnabled(false);
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.track) this.attachRemoteAudio(publication.track);
+      }
     }
   }
 
@@ -92,7 +99,9 @@ export class Voice {
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
+    this.audioPlaybackBlocked = false;
     this.voiceStates.clear();
+    this.detachRemoteAudio();
 
     if (!room) return;
 
@@ -103,7 +112,7 @@ export class Voice {
     this.selfMuted = muted;
     if (!this.room) return;
 
-    await this.room.localParticipant.setMicrophoneEnabled(!muted);
+    await this.syncLocalMicrophone(this.room);
 
     // keep the local participant in sync
     this.syncParticipant(this.room.localParticipant, this.channelId!);
@@ -111,6 +120,7 @@ export class Voice {
 
   async setDeafened(deafened: boolean) {
     this.selfDeafened = deafened;
+    this.updateRemoteAudioMuted();
 
     // deafening also mutes
     if (deafened) {
@@ -119,11 +129,28 @@ export class Voice {
 
     if (!this.room) return;
 
-    if (deafened) {
-      await this.room.localParticipant.setMicrophoneEnabled(false);
-    }
+    await this.syncLocalMicrophone(this.room);
 
     this.syncParticipant(this.room.localParticipant, this.channelId!);
+  }
+
+  async startAudio() {
+    if (!this.room) return;
+
+    await this.room.startAudio();
+    this.audioPlaybackBlocked = !this.room.canPlaybackAudio;
+  }
+
+  private async syncLocalMicrophone(room: Room) {
+    const enabled = !this.selfMuted && !this.selfDeafened;
+
+    try {
+      await room.localParticipant.setMicrophoneEnabled(enabled);
+    } catch {
+      if (this.room === room && enabled) {
+        this.selfMuted = true;
+      }
+    }
   }
 
   private bindRoomEvents(room: Room, channelId: string) {
@@ -137,7 +164,12 @@ export class Voice {
         this.room = null;
         this.channelId = null;
         this.connectionState = ConnectionState.Disconnected;
+        this.audioPlaybackBlocked = false;
         this.voiceStates.clear();
+        this.detachRemoteAudio();
+      })
+      .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        this.audioPlaybackBlocked = !room.canPlaybackAudio;
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         this.syncParticipant(participant, channelId);
@@ -150,6 +182,13 @@ export class Voice {
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        this.attachRemoteAudio(track);
+        this.syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackUnsubscribed, (track) => {
+        this.detachRemoteAudio(track);
       })
       .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const speakingSet = new Set(speakers.map((s) => s.identity));
@@ -178,6 +217,35 @@ export class Voice {
       screenShare: !!screenPub && !screenPub.isMuted,
       speaking: participant.isSpeaking,
     });
+  }
+
+  private attachRemoteAudio(track: RemoteTrack) {
+    if (track.kind !== Track.Kind.Audio) return;
+    if (this.remoteAudioElements.has(track)) return;
+
+    const element = track.attach();
+    element.autoplay = true;
+    element.muted = this.selfDeafened;
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    this.remoteAudioElements.set(track, element);
+  }
+
+  private detachRemoteAudio(track?: RemoteTrack) {
+    const elements = track ? track.detach() : [...this.remoteAudioElements.values()];
+
+    for (const element of elements) {
+      element.remove();
+    }
+
+    if (track) this.remoteAudioElements.delete(track);
+    else this.remoteAudioElements.clear();
+  }
+
+  private updateRemoteAudioMuted() {
+    for (const element of this.remoteAudioElements.values()) {
+      element.muted = this.selfDeafened;
+    }
   }
 }
 
