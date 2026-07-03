@@ -160,6 +160,11 @@
         {/each}
       </div>
     {/if}
+    {#if voice.audioPlaybackBlocked}
+      <Button class="absolute bottom-20" onclick={() => voice.startAudio()}>
+        Enable sound
+      </Button>
+    {/if}
   </div>
 
   <!-- control bar -->
