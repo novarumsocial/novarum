@@ -61,7 +61,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col bg-background">
+<div class="relative flex flex-1 flex-col bg-background">
   <!-- header -->
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
     <Volume2 class="size-5 text-muted-foreground" />
@@ -163,44 +163,44 @@
   </div>
 
   <!-- control bar -->
-  <div class="flex h-16 shrink-0 items-center justify-center gap-3 border-t border-border bg-sidebar/50 px-4">
+  <div class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-none border border-border bg-sidebar/80 px-2.5 py-2 shadow-lg backdrop-blur">
     <Button
       variant={voice.selfMuted ? 'destructive' : 'secondary'}
       size="icon"
-      class="size-10"
+      class="size-8"
       onclick={() => voice.setMuted(!voice.selfMuted)}
       disabled={voice.selfDeafened}
       aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
     >
       {#if voice.selfMuted}
-        <MicOff class="size-5" />
+        <MicOff class="size-3" />
       {:else}
-        <Mic class="size-5" />
+        <Mic class="size-3" />
       {/if}
     </Button>
 
     <Button
       variant={voice.selfDeafened ? 'destructive' : 'secondary'}
       size="icon"
-      class="size-10"
+      class="size-8"
       onclick={() => voice.setDeafened(!voice.selfDeafened)}
       aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
     >
       {#if voice.selfDeafened}
-        <HeadphoneOff class="size-5" />
+        <HeadphoneOff class="size-3" />
       {:else}
-        <Headphones class="size-5" />
+        <Headphones class="size-3" />
       {/if}
     </Button>
 
     <Button
       variant="destructive"
       size="icon"
-      class="size-10"
+      class="size-8"
       onclick={onLeave}
       aria-label="Leave call"
     >
-      <PhoneOff class="size-5" />
+      <PhoneOff class="size-3" />
     </Button>
   </div>
 </div>
