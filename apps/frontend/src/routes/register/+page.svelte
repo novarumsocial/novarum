@@ -277,6 +277,7 @@
                     onclick={() => (showPassword = !showPassword)}
                     class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    tabindex={-1}
                   >
                     {#if showPassword}
                       <EyeOff class="size-4" />
