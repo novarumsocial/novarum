@@ -39,6 +39,7 @@
 		"@elysia/eden": "^1.4.10",
 		"anchor": "workspace:*",
 		"elysia": "^1.4.29",
-		"livekit-client": "^2.20.0"
+		"livekit-client": "^2.20.0",
+		"svelte-sound": "^0.6.0"
 	}
 }
