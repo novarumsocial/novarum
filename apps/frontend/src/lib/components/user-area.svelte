@@ -28,11 +28,11 @@
   {#if voice.connected || voice.connecting}
     <div class="border-b border-border/80 px-3 py-2">
       <div class="flex items-center gap-2">
-        <div class="flex size-8 items-center justify-center bg-emerald-500/10 text-emerald-400">
+        <div class="flex size-8 items-center justify-center {voice.connecting ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'} text-xs font-bold">
           <Signal class="size-4" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-xs font-semibold uppercase tracking-wide text-emerald-400">
+          <p class="truncate text-xs font-semibold uppercase tracking-wide {voice.connecting ? 'text-amber-400' : 'text-emerald-400'}">
             {voice.connecting ? 'Voice Connecting' : 'Voice Connected'}
           </p>
           <p class="truncate text-[11px] text-muted-foreground">

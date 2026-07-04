@@ -64,6 +64,20 @@
     }
     return colors[Math.abs(hash) % colors.length];
   }
+
+  function selectChannel(channel: Channel) {
+    if (channel.type === 'VOICE') {
+      if (voice?.channelId === channel.id && (voice.connected || voice.connecting)) {
+        onSelectChannel(channel.id);
+        return;
+      }
+
+      void voice?.join(channel.id).catch(() => null);
+      return;
+    }
+
+    onSelectChannel(channel.id);
+  }
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
@@ -140,7 +154,7 @@
       {#if !collapsed[cat.id]}
         {#each cat.channels as ch}
           <button
-            onclick={() => onSelectChannel(ch.id)}
+            onclick={() => selectChannel(ch)}
             class={cn(
               'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors',
               activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
@@ -170,7 +184,7 @@
               {#each Array.from(voice.voiceStates.entries()) as [identity, state]}
                 {@const name = nameFor(identity)}
                 <button
-                  onclick={() => onSelectChannel(ch.id)}
+                  onclick={() => selectChannel(ch)}
                   class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
                 >
                   <div
