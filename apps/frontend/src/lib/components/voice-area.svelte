@@ -120,16 +120,11 @@
           <div class="flex flex-col items-center gap-3">
             <!-- avatar with speaking ring -->
             <div class="relative">
-              {#if state.speaking}
-                <div
-                  class="absolute -inset-1.5 animate-ping rounded-full bg-emerald-400/20"
-                ></div>
-              {/if}
               <div
                 class={cn(
                   'relative flex size-24 items-center justify-center text-2xl font-bold text-white transition-shadow duration-150',
                   avatarBg(identity),
-                  state.speaking && 'shadow-[0_0_20px_4px] shadow-emerald-400/40',
+                  state.speaking && 'ring-2 ring-emerald-400',
                 )}
               >
                 {#if state.selfDeafened}
