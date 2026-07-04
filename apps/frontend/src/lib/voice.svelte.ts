@@ -27,6 +27,8 @@ export class Voice {
 
   selfMuted = $state<boolean>(false);
   selfDeafened = $state<boolean>(false);
+  selfCamera = $state<boolean>(false);
+  selfScreenShare = $state<boolean>(false);
   audioPlaybackBlocked = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
@@ -76,7 +78,10 @@ export class Voice {
       await Promise.race([
         connectPromise,
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Voice connection timed out')), livekitConnectionTimeoutMs);
+          setTimeout(
+            () => reject(new Error('Voice connection timed out')),
+            livekitConnectionTimeoutMs
+          );
         }),
       ]);
     } catch (error) {
@@ -119,6 +124,8 @@ export class Voice {
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
     this.audioPlaybackBlocked = false;
+    this.selfCamera = false;
+    this.selfScreenShare = false;
     this.voiceStates.clear();
     this.detachRemoteAudio();
 
@@ -135,7 +142,7 @@ export class Voice {
     } else {
       muteReverseSound.play();
     }
-    
+
     if (!this.room) return;
 
     await this.syncLocalMicrophone(this.room);
@@ -147,7 +154,6 @@ export class Voice {
   async setDeafened(deafened: boolean) {
     this.selfDeafened = deafened;
     this.updateRemoteAudioMuted();
-
 
     // deafening also mutes
     if (deafened) {
@@ -169,6 +175,32 @@ export class Voice {
 
     await this.room.startAudio();
     this.audioPlaybackBlocked = !this.room.canPlaybackAudio;
+  }
+
+  async setCamera(enabled: boolean) {
+    if (!this.room) return;
+
+    try {
+      await this.room.localParticipant.setCameraEnabled(enabled);
+      this.selfCamera = enabled;
+    } catch {
+      this.selfCamera = false;
+    }
+
+    this.syncParticipant(this.room.localParticipant, this.channelId!);
+  }
+
+  async setScreenShare(enabled: boolean) {
+    if (!this.room) return;
+
+    try {
+      await this.room.localParticipant.setScreenShareEnabled(enabled, { audio: true });
+      this.selfScreenShare = enabled;
+    } catch {
+      this.selfScreenShare = false;
+    }
+
+    this.syncParticipant(this.room.localParticipant, this.channelId!);
   }
 
   private async syncLocalMicrophone(room: Room) {
@@ -195,6 +227,8 @@ export class Voice {
         this.channelId = null;
         this.connectionState = ConnectionState.Disconnected;
         this.audioPlaybackBlocked = false;
+        this.selfCamera = false;
+        this.selfScreenShare = false;
         this.voiceStates.clear();
         this.detachRemoteAudio();
       })
@@ -221,8 +255,9 @@ export class Voice {
         this.attachRemoteAudio(track);
         this.syncParticipant(participant, channelId);
       })
-      .on(RoomEvent.TrackUnsubscribed, (track) => {
+      .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
         this.detachRemoteAudio(track);
+        this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const speakingSet = new Set(speakers.map((s) => s.identity));
@@ -240,6 +275,18 @@ export class Voice {
 
     const isLocal = participant.isLocal;
     const micMuted = isLocal ? this.selfMuted : !micPub || micPub.isMuted;
+    const cameraTrack =
+      !cameraPub?.isMuted && cameraPub?.track?.kind === Track.Kind.Video
+        ? (cameraPub.track as VoiceVideoTrack)
+        : null;
+    const screenTrack =
+      !screenPub?.isMuted && screenPub?.track?.kind === Track.Kind.Video
+        ? (screenPub.track as VoiceVideoTrack)
+        : null;
+    if (isLocal) {
+      this.selfCamera = !!cameraTrack;
+      this.selfScreenShare = !!screenTrack;
+    }
 
     this.voiceStates.set(participant.identity, {
       userId: participant.identity,
@@ -247,8 +294,10 @@ export class Voice {
       selfMuted: micMuted,
       selfDeafened: isLocal ? this.selfDeafened : false,
       serverMuted: false,
-      camera: !!cameraPub && !cameraPub.isMuted,
-      screenShare: !!screenPub && !screenPub.isMuted,
+      camera: !!cameraTrack,
+      cameraTrack,
+      screenShare: !!screenTrack,
+      screenTrack,
       speaking: participant.isSpeaking,
     });
   }
@@ -292,6 +341,13 @@ export interface VoiceState {
   serverMuted: boolean;
 
   camera: boolean;
+  cameraTrack: VoiceVideoTrack | null;
   screenShare: boolean;
+  screenTrack: VoiceVideoTrack | null;
   speaking: boolean;
 }
+
+export type VoiceVideoTrack = {
+  attach(element?: HTMLMediaElement): HTMLMediaElement;
+  detach(element?: HTMLMediaElement): HTMLMediaElement[];
+};
