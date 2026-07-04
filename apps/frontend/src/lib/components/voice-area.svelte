@@ -127,7 +127,7 @@
     {/if}
   </div>
 
-  <div class="min-h-0 flex-1 px-4 py-4 pb-24">
+  <div class="min-h-0 flex-1 overflow-hidden px-4 py-4 pb-24">
     {#if voice.connecting}
       <div class="flex size-full flex-col items-center justify-center gap-3 text-center">
         <LoaderCircle class="size-8 animate-spin text-muted-foreground" />
@@ -145,75 +145,83 @@
       >
         {#each screenShares as [identity, state]}
           {@const name = nameFor(identity)}
-          <div
-            class="relative min-h-0 overflow-hidden rounded-sm border border-border bg-black shadow-2xl"
-          >
-            {#if state.screenTrack}
-              <video
-                class="size-full object-contain"
-                autoplay
-                playsinline
-                muted={identity === voice.localIdentity}
-                use:attachVideo={state.screenTrack}
-              ></video>
-            {/if}
+          <div class="flex min-h-0 min-w-0 items-center justify-center">
             <div
-              class="absolute left-3 top-3 rounded-sm bg-black/70 px-2 py-1 text-xs font-medium text-white backdrop-blur"
+              class="relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-black shadow-2xl"
             >
-              {name} is sharing their screen
+              {#if state.screenTrack}
+                <video
+                  class="size-full object-contain"
+                  autoplay
+                  playsinline
+                  muted={identity === voice.localIdentity}
+                  use:attachVideo={state.screenTrack}
+                ></video>
+              {/if}
+              <div
+                class="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-sm bg-black/65 px-2 py-1 text-sm font-medium text-white backdrop-blur"
+              >
+                <MonitorUp class="size-4" />
+                <span>{name}</span>
+                {#if identity === voice.localIdentity}
+                  <span class="text-white/70">(you)</span>
+                {/if}
+              </div>
             </div>
           </div>
         {/each}
 
         {#each participants as [identity, state]}
           {@const name = nameFor(identity)}
-          <div
-            class={cn(
-              'relative min-h-0 overflow-hidden rounded-sm border border-border bg-muted transition-shadow duration-150',
-              state.speaking && 'ring-2 ring-emerald-400'
-            )}
-          >
-            {#if state.cameraTrack}
-              <video
-                class="size-full object-cover"
-                autoplay
-                playsinline
-                muted={identity === voice.localIdentity}
-                use:attachVideo={state.cameraTrack}
-              ></video>
-            {:else}
+          <div class="flex min-h-0 min-w-0 items-center justify-center">
+            <div
+              class={cn(
+                'relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-muted transition-shadow duration-150',
+                state.speaking && 'ring-2 ring-emerald-400'
+              )}
+            >
+              {#if state.cameraTrack}
+                <video
+                  class="size-full object-cover"
+                  autoplay
+                  playsinline
+                  muted={identity === voice.localIdentity}
+                  use:attachVideo={state.cameraTrack}
+                ></video>
+              {:else}
+                <div
+                  class={cn(
+                    'flex size-full items-center justify-center text-3xl font-bold text-white',
+                    avatarBg(identity)
+                  )}
+                >
+                  {#if state.selfDeafened}
+                    <HeadphoneOff class="size-10" />
+                  {:else}
+                    <div class="flex size-24 items-center justify-center rounded-full bg-black/20">
+                      {initialsFor(name)}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+
               <div
-                class={cn(
-                  'flex size-full items-center justify-center text-3xl font-bold text-white',
-                  avatarBg(identity)
-                )}
+                class="absolute bottom-3 left-3 rounded-sm bg-black/65 px-2 py-1 text-sm font-medium text-white backdrop-blur"
               >
-                {#if state.selfDeafened}
-                  <HeadphoneOff class="size-10" />
-                {:else}
-                  <div class="flex size-24 items-center justify-center rounded-full bg-black/20">
-                    {initialsFor(name)}
-                  </div>
+                {name}
+                {#if identity === voice.localIdentity}
+                  <span class="text-white/70">(you)</span>
                 {/if}
               </div>
-            {/if}
 
-            <div
-              class="absolute bottom-3 left-3 rounded-sm bg-black/65 px-2 py-1 text-sm font-medium text-white backdrop-blur"
-            >
-              {name}
-              {#if identity === voice.localIdentity}
-                <span class="text-white/70">(you)</span>
+              {#if state.selfMuted || state.selfDeafened}
+                <div
+                  class="absolute bottom-3 right-3 flex size-7 items-center justify-center rounded-sm bg-rose-600"
+                >
+                  <MicOff class="size-4 text-white" />
+                </div>
               {/if}
             </div>
-
-            {#if state.selfMuted || state.selfDeafened}
-              <div
-                class="absolute bottom-3 right-3 flex size-7 items-center justify-center rounded-sm bg-rose-600"
-              >
-                <MicOff class="size-4 text-white" />
-              </div>
-            {/if}
           </div>
         {/each}
       </div>
