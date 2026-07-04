@@ -26,6 +26,7 @@ export class Voice {
   private connectionAttempt = 0;
 
   selfMuted = $state<boolean>(false);
+  mutedBeforeDeafen = $state<boolean>(false);
   selfDeafened = $state<boolean>(false);
   selfCamera = $state<boolean>(false);
   selfScreenShare = $state<boolean>(false);
@@ -158,9 +159,11 @@ export class Voice {
     // deafening also mutes
     if (deafened) {
       deafenSound.play();
+      this.mutedBeforeDeafen = this.selfMuted;
       this.selfMuted = true;
     } else {
       deafenReverseSound.play();
+      this.selfMuted = this.mutedBeforeDeafen;
     }
 
     if (!this.room) return;
