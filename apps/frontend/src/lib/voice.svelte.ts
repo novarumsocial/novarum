@@ -2,8 +2,22 @@ import { ConnectionState, Participant, Room, RoomEvent, Track } from 'livekit-cl
 import type { RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { SvelteMap } from 'svelte/reactivity';
+import { Sound } from 'svelte-sound';
+import JoinEffect from './sounds/join.opus?url';
+import Leave from './sounds/leave.opus?url';
+import Mute from './sounds/mute.opus?url';
+import Deafen from './sounds/deafen.opus?url';
+import MuteReverse from './sounds/mute-reverse.opus?url';
+import DeafenReverse from './sounds/deafen-reverse.opus?url';
 
 const livekitConnectionTimeoutMs = 15_000;
+
+const joinSound = new Sound(JoinEffect);
+const leaveSound = new Sound(Leave);
+const muteSound = new Sound(Mute);
+const deafenSound = new Sound(Deafen);
+const muteReverseSound = new Sound(MuteReverse);
+const deafenReverseSound = new Sound(DeafenReverse);
 
 export class Voice {
   room = $state<Room | null>(null);
@@ -32,8 +46,13 @@ export class Voice {
   async join(channelId: string) {
     if (this.channelId === channelId && (this.connected || this.connecting)) return;
 
-    await this.leave();
+    if (this.room) {
+      if (this.channelId === channelId) return;
+      await this.leave();
+      leaveSound.play();
+    }
 
+    joinSound.play();
     const connectionAttempt = ++this.connectionAttempt;
     this.channelId = channelId;
     this.connectionState = ConnectionState.Connecting;
@@ -106,10 +125,17 @@ export class Voice {
     if (!room) return;
 
     await room.disconnect().catch(() => null);
+    leaveSound.play();
   }
 
   async setMuted(muted: boolean) {
     this.selfMuted = muted;
+    if (muted) {
+      muteSound.play();
+    } else {
+      muteReverseSound.play();
+    }
+    
     if (!this.room) return;
 
     await this.syncLocalMicrophone(this.room);
@@ -122,9 +148,13 @@ export class Voice {
     this.selfDeafened = deafened;
     this.updateRemoteAudioMuted();
 
+
     // deafening also mutes
     if (deafened) {
+      deafenSound.play();
       this.selfMuted = true;
+    } else {
+      deafenReverseSound.play();
     }
 
     if (!this.room) return;
@@ -173,15 +203,19 @@ export class Voice {
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         this.syncParticipant(participant, channelId);
+        joinSound.play();
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.voiceStates.delete(participant.identity);
+        leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
+        muteSound.play();
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
+        muteReverseSound.play();
       })
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         this.attachRemoteAudio(track);

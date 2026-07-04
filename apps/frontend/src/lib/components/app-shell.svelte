@@ -28,16 +28,19 @@
   const voice = new Voice();
   let joinedVoiceChannelId: string | null = null;
 
-  // auto-join/leave voice when channel type changes
+  const voiceChannelName = $derived(
+    Object.values(chat.channelsByServer)
+      .flatMap((categories) => categories)
+      .flatMap((category) => category.channels)
+      .find((channel) => channel.id === voice.channelId)?.name ?? null
+  );
+
+  // Join voice channels when selected; keep the call alive while browsing text channels.
   $effect(() => {
     const channelId = currentChannel?.type === 'VOICE' ? currentChannel.id : null;
     const userId = currentUser?.user.id ?? null;
 
     if (!channelId || !userId) {
-      if (joinedVoiceChannelId) {
-        joinedVoiceChannelId = null;
-        void voice.leave();
-      }
       return;
     }
 
@@ -106,7 +109,7 @@
           />
         {/if}
       </div>
-      <UserArea {voice} user={currentUser.user} />
+      <UserArea {voice} user={currentUser.user} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
     {#if currentChannel && currentChannel.type === "TEXT"}
