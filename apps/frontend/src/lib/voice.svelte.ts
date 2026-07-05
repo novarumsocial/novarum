@@ -1,6 +1,7 @@
 import { ConnectionState, Participant, Room, RoomEvent, Track } from 'livekit-client';
 import type { RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
+import { realtime } from './realtime.svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { Sound } from 'svelte-sound';
 import JoinEffect from './sounds/join.opus?url';
@@ -109,6 +110,7 @@ export class Voice {
     }
 
     this.syncParticipant(room.localParticipant, channelId);
+    realtime.joinVoice(channelId);
     for (const participant of room.remoteParticipants.values()) {
       this.syncParticipant(participant, channelId);
       for (const publication of participant.trackPublications.values()) {
@@ -121,6 +123,7 @@ export class Voice {
     this.connectionAttempt++;
 
     const room = this.room;
+    const channelId = this.channelId;
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
@@ -133,6 +136,7 @@ export class Voice {
     if (!room) return;
 
     await room.disconnect().catch(() => null);
+    if (channelId) realtime.leaveVoice();
     leaveSound.play();
   }
 
@@ -234,6 +238,7 @@ export class Voice {
         this.selfScreenShare = false;
         this.voiceStates.clear();
         this.detachRemoteAudio();
+        realtime.leaveVoice();
       })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         this.audioPlaybackBlocked = !room.canPlaybackAudio;

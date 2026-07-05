@@ -65,7 +65,17 @@
   }
 
   function voiceUsersFor(channelId: string) {
-    return voiceStates[channelId] ?? [];
+    const users = [...(voiceStates[channelId] ?? [])];
+
+    if (voice?.channelId === channelId) {
+      for (const [userId] of voice.voiceStates) {
+        if (!users.some((user) => user.userId === userId)) {
+          users.push({ userId, name: nameFor(userId) });
+        }
+      }
+    }
+
+    return users;
   }
 
   function avatarBg(id: string) {

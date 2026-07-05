@@ -174,6 +174,18 @@ class RealtimeState {
 
     this.socket.send({ type: 'subscribe.guild', guildId });
   }
+
+  joinVoice(channelId: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'voice.join', channelId });
+  }
+
+  leaveVoice() {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'voice.leave' });
+  }
 }
 
 export const realtime = new RealtimeState();

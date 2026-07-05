@@ -4,7 +4,11 @@ import { sessionCookieName, validateSessionToken, type SessionWithUser } from '.
 import { parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
-import { voicePresenceForGuilds } from '../../utils/services/livekit';
+import {
+  removeVoicePresence,
+  setVoicePresence,
+  voicePresenceForGuilds,
+} from '../../utils/services/livekit';
 
 const activeRealtimeConnections = new Map<string, number>();
 
@@ -30,10 +34,19 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
   cookie: t.Cookie({
     [sessionCookieName]: t.Optional(t.String()),
   }),
-  body: t.Object({
-    type: t.Literal('subscribe.guild'),
-    guildId: t.String(),
-  }),
+  body: t.Union([
+    t.Object({
+      type: t.Literal('subscribe.guild'),
+      guildId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('voice.join'),
+      channelId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('voice.leave'),
+    }),
+  ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
@@ -72,6 +85,36 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     const session = ws.data.session as SessionWithUser | undefined;
     if (!session) return;
 
+    if (message.type === 'voice.leave') {
+      const previous = removeVoicePresence(session.userId);
+      if (previous) publishVoiceState(ws, previous, false);
+      return;
+    }
+
+    if (message.type === 'voice.join') {
+      const channel = await db.orm.public.Channel.where({ id: message.channelId }).first();
+      if (!channel || channel.type !== 'VOICE') return;
+
+      const membership = await db.orm.public.GuildMember.where({
+        guildId: channel.guildId,
+        userId: session.userId,
+      }).first();
+      if (!membership) return;
+
+      const previous = removeVoicePresence(session.userId);
+      if (previous && previous.channelId !== channel.id) publishVoiceState(ws, previous, false);
+
+      const state = {
+        guildId: channel.guildId,
+        channelId: channel.id,
+        userId: session.userId,
+        name: session.user.displayName || session.user.username,
+      };
+      setVoicePresence(state);
+      publishVoiceState(ws, state, true);
+      return;
+    }
+
     const membership = await db.orm.public.GuildMember.where({
       guildId: message.guildId,
       userId: session.userId,
@@ -91,6 +134,9 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     const session = ws.data.session as SessionWithUser;
     if (!session) return;
 
+    const previous = removeVoicePresence(session.userId);
+    if (previous) publishVoiceState(ws, previous, false);
+
     const becameOffline = removeUserConnection(session.userId);
     if (!becameOffline) return;
 
@@ -100,6 +146,20 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     await publishUserStatus(ws, session, memberships, 'OFFLINE');
   },
 });
+
+function publishVoiceState(
+  ws: { publish(topic: string, data: string): void },
+  state: { guildId: string; channelId: string; userId: string; name: string | null },
+  connected: boolean
+) {
+  ws.publish(
+    `guildEvents:${state.guildId}`,
+    JSON.stringify({
+      type: 'voice.state.changed',
+      data: { ...state, connected },
+    })
+  );
+}
 
 async function publishUserStatus(
   ws: { publish(topic: string, data: string): void },
