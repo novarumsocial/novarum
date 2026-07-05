@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { parseJson } from '../../utils/parseJson';
 
 const remoteErrorSchema = z.object({ error: z.string() });
+const callTokenResponseSchema = z.object({ serverUrl: z.string(), token: z.string() });
 const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 
 export const channel = new Elysia({ prefix: '/channel' })
@@ -174,6 +175,33 @@ export const channel = new Elysia({ prefix: '/channel' })
   )
   .get('/:id/call/token', async ({ params, session, status }) => {
     const voiceConfig = getConfig().voice;
+    const federatedChannel = parseFederatedChannelId(params.id);
+    if (federatedChannel) {
+      const result = await postSignedFederationJson(
+        federatedChannel.homeserver,
+        `/federation/channels/${encodeURIComponent(federatedChannel.id)}/call/token`,
+        { user: federationUserPayload(session) }
+      ).catch(() => null);
+
+      if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+      if (!result.response.ok) {
+        const remoteError = remoteErrorSchema.safeParse(result.data);
+        const remoteStatus = [401, 403, 404].includes(result.response.status)
+          ? (result.response.status as 401 | 403 | 404)
+          : 502;
+        return status(
+          remoteStatus,
+          remoteError.success ? remoteError.data : { error: 'Remote call token failed' }
+        );
+      }
+      const callToken = callTokenResponseSchema.safeParse(result.data);
+      if (!callToken.success) {
+        return status(502, { error: 'Remote call token returned an invalid response' });
+      }
+
+      return callToken.data;
+    }
+
     const channel = await db.orm.public.Channel.where({ id: params.id }).first();
     if (!channel || channel.type !== 'VOICE') {
       return status(404, { error: 'Channel not right' });
@@ -258,8 +286,11 @@ export const channel = new Elysia({ prefix: '/channel' })
     if (event.event !== 'participant_joined') return { ok: true };
 
     // holy crap this code...
-    const metadata = livekitMetadataSchema.safeParse(parseJson(event.participant?.metadata ?? '{}'));
-    const channelId = (!metadata.error && metadata.data.channelId) ?? event.room?.name?.replace(/^voice:/, '');
+    const metadata = livekitMetadataSchema.safeParse(
+      parseJson(event.participant?.metadata ?? '{}')
+    );
+    const channelId =
+      (!metadata.error && metadata.data.channelId) ?? event.room?.name?.replace(/^voice:/, '');
     if (!channelId) return { ok: true };
 
     const channel = await db.orm.public.Channel.where({ id: channelId }).first();
