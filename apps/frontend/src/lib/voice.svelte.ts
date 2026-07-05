@@ -1,4 +1,4 @@
-import { ConnectionState, Participant, Room, RoomEvent, Track } from 'livekit-client';
+import { ConnectionState, Participant, Room, RoomEvent, Track, TrackEvent } from 'livekit-client';
 import type { RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
@@ -10,6 +10,10 @@ import Mute from './sounds/mute.opus?url';
 import Deafen from './sounds/deafen.opus?url';
 import MuteReverse from './sounds/mute-reverse.opus?url';
 import DeafenReverse from './sounds/deafen-reverse.opus?url';
+import Camera from './sounds/camera.opus?url';
+import CameraOff from './sounds/camera-off.opus?url';
+import Screen from './sounds/screen.opus?url';
+import ScreenOff from './sounds/screen-off.opus?url';
 
 const livekitConnectionTimeoutMs = 15_000;
 
@@ -19,6 +23,10 @@ const muteSound = new Sound(Mute);
 const deafenSound = new Sound(Deafen);
 const muteReverseSound = new Sound(MuteReverse);
 const deafenReverseSound = new Sound(DeafenReverse);
+const cameraSound = new Sound(Camera);
+const cameraOffSound = new Sound(CameraOff);
+const screenSound = new Sound(Screen);
+const screenOffSound = new Sound(ScreenOff);
 
 export class Voice {
   room = $state<Room | null>(null);
@@ -35,6 +43,7 @@ export class Voice {
 
   voiceStates = new SvelteMap<string, VoiceState>();
   private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
+  private endedTrackListeners = new WeakSet<VoiceVideoTrack>();
 
   connected = $derived(this.connectionState === ConnectionState.Connected);
   connecting = $derived(this.connectionState === ConnectionState.Connecting);
@@ -190,7 +199,13 @@ export class Voice {
     try {
       await this.room.localParticipant.setCameraEnabled(enabled);
       this.selfCamera = enabled;
+      if (enabled) {
+        cameraSound.play();
+      } else {
+        cameraOffSound.play();
+      }
     } catch {
+      cameraOffSound.play();
       this.selfCamera = false;
     }
 
@@ -203,7 +218,13 @@ export class Voice {
     try {
       await this.room.localParticipant.setScreenShareEnabled(enabled, { audio: true });
       this.selfScreenShare = enabled;
+      if (enabled) {
+        screenSound.play();
+      } else {
+        screenOffSound.play();
+      }
     } catch {
+      screenOffSound.play();
       this.selfScreenShare = false;
     }
 
@@ -253,11 +274,15 @@ export class Voice {
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
-        muteSound.play();
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
-        muteReverseSound.play();
+      })
+      .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+        this.syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
+        this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         this.attachRemoteAudio(track);
@@ -283,17 +308,37 @@ export class Voice {
 
     const isLocal = participant.isLocal;
     const micMuted = isLocal ? this.selfMuted : !micPub || micPub.isMuted;
-    const cameraTrack =
-      !cameraPub?.isMuted && cameraPub?.track?.kind === Track.Kind.Video
-        ? (cameraPub.track as VoiceVideoTrack)
-        : null;
-    const screenTrack =
-      !screenPub?.isMuted && screenPub?.track?.kind === Track.Kind.Video
-        ? (screenPub.track as VoiceVideoTrack)
-        : null;
+    const cameraTrack = this.activeVideoTrack(cameraPub?.isMuted, cameraPub?.track);
+    const screenTrack = this.activeVideoTrack(screenPub?.isMuted, screenPub?.track);
+
+    if (screenTrack) {
+      this.syncWhenTrackEnds(screenTrack, participant, channelId);
+    }
+
     if (isLocal) {
       this.selfCamera = !!cameraTrack;
       this.selfScreenShare = !!screenTrack;
+    }
+
+    if (isLocal && micMuted && !this.selfMuted) {
+      muteSound.play();
+    }
+    if (isLocal && !micMuted && this.selfMuted) {
+      muteReverseSound.play();
+    }
+
+    if (isLocal && cameraTrack && !this.selfCamera) {
+      cameraSound.play();
+    }
+    if (isLocal && !cameraTrack && this.selfCamera) {
+      cameraOffSound.play();
+    }
+
+    if (isLocal && screenTrack && !this.selfScreenShare) {
+      screenSound.play();
+    }
+    if (isLocal && !screenTrack && this.selfScreenShare) {
+      screenOffSound.play();
     }
 
     this.voiceStates.set(participant.identity, {
@@ -307,6 +352,30 @@ export class Voice {
       screenShare: !!screenTrack,
       screenTrack,
       speaking: participant.isSpeaking,
+    });
+  }
+
+  private activeVideoTrack(isMuted: boolean | undefined, track: unknown): VoiceVideoTrack | null {
+    if (
+      isMuted ||
+      !(track && typeof track === 'object') ||
+      (track as { kind?: Track.Kind }).kind !== Track.Kind.Video
+    ) {
+      return null;
+    }
+
+    const videoTrack = track as VoiceVideoTrack;
+    return videoTrack.mediaStreamTrack?.readyState === 'ended' ? null : videoTrack;
+  }
+
+  private syncWhenTrackEnds(track: VoiceVideoTrack, participant: Participant, channelId: string) {
+    if (!track.on || this.endedTrackListeners.has(track)) return;
+
+    this.endedTrackListeners.add(track);
+    track.on(TrackEvent.Ended, () => {
+      if (this.channelId !== channelId) return;
+
+      this.syncParticipant(participant, channelId);
     });
   }
 
@@ -356,6 +425,9 @@ export interface VoiceState {
 }
 
 export type VoiceVideoTrack = {
+  kind?: Track.Kind;
+  mediaStreamTrack?: MediaStreamTrack;
+  on?(event: TrackEvent.Ended, callback: () => void): void;
   attach(element?: HTMLMediaElement): HTMLMediaElement;
   detach(element?: HTMLMediaElement): HTMLMediaElement[];
 };

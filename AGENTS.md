@@ -32,3 +32,8 @@
 
 ## Formatting
 - Prettier config is root `.prettierrc`: 2 spaces, single quotes, semicolons, trailing commas where valid, and `prettier-plugin-svelte` for `.svelte` files.
+
+## Code style
+
+Whenever possible, use the following conventions:
+- If there's an object you need to check, use Zod schema validation. No ugly helper functions with `if (typeof x === 'string')` or `if (x instanceof Array)`. Use Zod's `z.string()`, `z.array()`, etc.
