@@ -60,4 +60,24 @@ export type RealtimeEvent =
           status: 'ONLINE' | 'OFFLINE';
         };
       };
+    }
+  | {
+      type: 'voice.states.snapshot';
+      data: {
+        guildIds: string[];
+        states: VoicePresence[];
+      };
+    }
+  | {
+      type: 'voice.state.changed';
+      data: VoicePresence & {
+        connected: boolean;
+      };
     };
+
+export type VoicePresence = {
+  guildId: string;
+  channelId: string;
+  userId: string;
+  name: string | null;
+};

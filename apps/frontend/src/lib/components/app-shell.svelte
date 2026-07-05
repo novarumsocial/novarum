@@ -106,20 +106,21 @@
               await chat.createChannel(currentServer.id, channel, channel.type)}
             {voice}
             members={chat.members}
+            voiceStates={chat.voiceStates}
           />
         {/if}
       </div>
       <UserArea {voice} user={currentUser.user} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
-    {#if currentChannel && currentChannel.type === "TEXT"}
+    {#if currentChannel && currentChannel.type === 'TEXT'}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
         loading={currentMessagesLoading}
         onSend={(content) => chat.sendMessage(currentChannel.id, content)}
       />
-    {:else if currentChannel && currentChannel.type === "VOICE"}
+    {:else if currentChannel && currentChannel.type === 'VOICE'}
       <VoiceArea channel={currentChannel} {voice} members={chat.members} onLeave={leaveVoice} />
     {:else}
       <main class="flex flex-1 items-center justify-center bg-background px-6">

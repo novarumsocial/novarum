@@ -1,14 +1,7 @@
 import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { anchor } from '$lib/anchor.svelte';
-import type {
-  Author,
-  Channel,
-  ChannelCategory,
-  ChatRoute,
-  Message,
-  Server,
-} from '$lib/types/chat';
+import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from '$lib/types/chat';
 
 function initialsFor(name: string) {
   const initials = name
@@ -46,6 +39,13 @@ type ChannelMemberInput = {
   homeserver: string;
   isBot: boolean;
   status: 'ONLINE' | 'OFFLINE';
+};
+
+type VoicePresenceInput = {
+  guildId: string;
+  channelId: string;
+  userId: string;
+  name: string | null;
 };
 
 function messageFromInput(message: AddMessageInput): Message {
@@ -132,6 +132,7 @@ class ChatState {
   messagesByChannel = $state<Record<string, Message[]>>({});
   messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
+  voiceStates = $state<Record<string, VoicePresenceInput[]>>({});
   private loadedChannel: string | null = null;
 
   route = $derived(currentRoute());
@@ -288,6 +289,44 @@ class ChatState {
     }
 
     this.members = this.members.map((item, index) => (index === existing ? nextMember : item));
+  }
+
+  setVoiceStates(guildIds: string[], states: VoicePresenceInput[]) {
+    const guildSet = new Set(guildIds);
+    const next = Object.fromEntries(
+      Object.entries(this.voiceStates).filter(([, channelStates]) =>
+        channelStates.some((state) => !guildSet.has(state.guildId))
+      )
+    );
+
+    for (const state of states) {
+      next[state.channelId] = (next[state.channelId] ?? []).filter(
+        (item) => item.userId !== state.userId
+      );
+    }
+    for (const state of states) {
+      next[state.channelId] = [...(next[state.channelId] ?? []), state];
+    }
+
+    this.voiceStates = next;
+  }
+
+  updateVoiceState(state: VoicePresenceInput & { connected: boolean }) {
+    const next = { ...this.voiceStates };
+
+    for (const [channelId, states] of Object.entries(next)) {
+      const filtered = states.filter((item) => item.userId !== state.userId);
+      if (filtered.length === states.length) continue;
+
+      if (filtered.length === 0) delete next[channelId];
+      else next[channelId] = filtered;
+    }
+
+    if (state.connected) {
+      next[state.channelId] = [...(next[state.channelId] ?? []), state];
+    }
+
+    this.voiceStates = next;
   }
 
   private setChannelMessages(channelId: string, messages: Message[]) {

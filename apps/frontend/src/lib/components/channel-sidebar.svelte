@@ -1,6 +1,16 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
-  import { ChevronDown, ChevronRight, Hash, MicOff, Plus, Settings, SquareArrowRightExit, UserRoundPlus, Volume2 } from '@lucide/svelte';
+  import {
+    ChevronDown,
+    ChevronRight,
+    Hash,
+    MicOff,
+    Plus,
+    Settings,
+    SquareArrowRightExit,
+    UserRoundPlus,
+    Volume2,
+  } from '@lucide/svelte';
   import type { Author, Channel, ChannelCategory, Server } from '$lib/types/chat';
   import type { Voice } from '$lib/voice.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
@@ -15,6 +25,7 @@
     onCreateChannel,
     voice,
     members = [],
+    voiceStates = {},
   }: {
     server: Server;
     categories: ChannelCategory[];
@@ -23,12 +34,13 @@
     onCreateChannel?: (channel: Channel) => Promise<Channel | void>;
     voice?: Voice | null;
     members?: Author[];
+    voiceStates?: Record<string, { userId: string; name: string | null }[]>;
   } = $props();
 
   let collapsed = $state<Record<string, boolean>>({});
   let createOpen = $state(false);
   let createCategory = $state<ChannelCategory | null>(null);
-  
+
   let createInviteOpen = $state(false);
 
   function openCreateChannel(category: ChannelCategory) {
@@ -52,11 +64,24 @@
     return member?.displayName || member?.username || identity;
   }
 
+  function voiceUsersFor(channelId: string) {
+    return voiceStates[channelId] ?? [];
+  }
+
   function avatarBg(id: string) {
     const colors = [
-      'bg-rose-600', 'bg-sky-600', 'bg-emerald-600', 'bg-amber-600',
-      'bg-purple-600', 'bg-cyan-600', 'bg-pink-600', 'bg-lime-600',
-      'bg-indigo-600', 'bg-teal-600', 'bg-orange-600', 'bg-violet-600',
+      'bg-rose-600',
+      'bg-sky-600',
+      'bg-emerald-600',
+      'bg-amber-600',
+      'bg-purple-600',
+      'bg-cyan-600',
+      'bg-pink-600',
+      'bg-lime-600',
+      'bg-indigo-600',
+      'bg-teal-600',
+      'bg-orange-600',
+      'bg-violet-600',
     ];
     let hash = 0;
     for (let i = 0; i < id.length; i++) {
@@ -179,10 +204,11 @@
             {/if}
           </button>
 
-          {#if ch.type === 'VOICE' && voice?.channelId === ch.id && voice?.connected}
+          {@const connectedVoiceUsers = ch.type === 'VOICE' ? voiceUsersFor(ch.id) : []}
+          {#if connectedVoiceUsers.length > 0}
             <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
-              {#each Array.from(voice.voiceStates.entries()) as [identity, state]}
-                {@const name = nameFor(identity)}
+              {#each connectedVoiceUsers as state (state.userId)}
+                {@const name = state.name || nameFor(state.userId)}
                 <button
                   onclick={() => selectChannel(ch)}
                   class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
@@ -191,15 +217,19 @@
                     class={cn(
                       'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
                       avatarBg(state.userId),
-                      state.speaking && 'ring-2 ring-emerald-400'
+                      voice?.channelId === ch.id &&
+                        voice.voiceStates.get(state.userId)?.speaking &&
+                        'ring-2 ring-emerald-400'
                     )}
                   >
-                    {state.selfDeafened ? '!' : initialsFor(name)}
+                    {voice?.channelId === ch.id && voice.voiceStates.get(state.userId)?.selfDeafened
+                      ? '!'
+                      : initialsFor(name)}
                   </div>
                   <span class="min-w-0 flex-1 truncate">
                     {name}
                   </span>
-                  {#if state.selfMuted || state.selfDeafened}
+                  {#if voice?.channelId === ch.id && (voice.voiceStates.get(state.userId)?.selfMuted || voice.voiceStates.get(state.userId)?.selfDeafened)}
                     <MicOff class="size-3.5 shrink-0 text-rose-400" />
                   {/if}
                 </button>

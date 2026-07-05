@@ -4,6 +4,7 @@ import { sessionCookieName, validateSessionToken, type SessionWithUser } from '.
 import { parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { voicePresenceForGuilds } from '../../utils/services/livekit';
 
 const activeRealtimeConnections = new Map<string, number>();
 
@@ -51,6 +52,14 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       ws.subscribe(`guildEvents:${membership.guildId}`);
     }
 
+    const guildIds = memberships.map((membership) => membership.guildId);
+    ws.send(
+      JSON.stringify({
+        type: 'voice.states.snapshot',
+        data: { guildIds, states: voicePresenceForGuilds(guildIds) },
+      })
+    );
+
     const becameOnline = addUserConnection(session.userId);
     if (!becameOnline) return;
 
@@ -70,6 +79,12 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     if (!membership) return;
 
     ws.subscribe(`guildEvents:${message.guildId}`);
+    ws.send(
+      JSON.stringify({
+        type: 'voice.states.snapshot',
+        data: { guildIds: [message.guildId], states: voicePresenceForGuilds([message.guildId]) },
+      })
+    );
   },
   async close(ws) {
     // @ts-ignore using it here

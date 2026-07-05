@@ -65,6 +65,30 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       }),
     }),
   }),
+  z.object({
+    type: z.literal('voice.states.snapshot'),
+    data: z.object({
+      guildIds: z.array(z.string()),
+      states: z.array(
+        z.object({
+          guildId: z.string(),
+          channelId: z.string(),
+          userId: z.string(),
+          name: z.string().nullable(),
+        })
+      ),
+    }),
+  }),
+  z.object({
+    type: z.literal('voice.state.changed'),
+    data: z.object({
+      guildId: z.string(),
+      channelId: z.string(),
+      userId: z.string(),
+      name: z.string().nullable(),
+      connected: z.boolean(),
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 function parseRealtimeData(data: unknown) {
@@ -130,6 +154,12 @@ class RealtimeState {
       }
       if (event.type === 'member.joined') {
         chat.addOrUpdateMember(event.data.guildId, event.data.user);
+      }
+      if (event.type === 'voice.states.snapshot') {
+        chat.setVoiceStates(event.data.guildIds, event.data.states);
+      }
+      if (event.type === 'voice.state.changed') {
+        chat.updateVoiceState(event.data);
       }
     });
 

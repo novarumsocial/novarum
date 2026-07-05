@@ -10,10 +10,17 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { getConfig } from '../../utils/config';
 import { AccessToken } from 'livekit-server-sdk';
-import { livekitServiceClient } from '../../utils/services/livekit';
+import {
+  livekitServiceClient,
+  livekitWebhookReceiver,
+  removeVoicePresence,
+  setVoicePresence,
+} from '../../utils/services/livekit';
 import { z } from 'zod';
+import { parseJson } from '../../utils/parseJson';
 
 const remoteErrorSchema = z.object({ error: z.string() });
+const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status }) => {
@@ -172,6 +179,14 @@ export const channel = new Elysia({ prefix: '/channel' })
       return status(404, { error: 'Channel not right' });
     }
 
+    const membership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!membership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
     const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
       identity: session.userId,
       name: session.user.displayName || session.user.username,
@@ -219,6 +234,53 @@ export const channel = new Elysia({ prefix: '/channel' })
         metadata: p.metadata,
       })),
     };
+  })
+  .post('/livekit/webhook', async ({ request, headers, server }) => {
+    const event = await livekitWebhookReceiver.receive(
+      await request.text(),
+      headers.authorization ?? ''
+    );
+
+    const userId = event.participant?.identity;
+    if (!userId) return { ok: true };
+
+    if (event.event === 'participant_left') {
+      const previous = removeVoicePresence(userId);
+      if (previous && server) {
+        publishRealtime(server, `guildEvents:${previous.guildId}`, {
+          type: 'voice.state.changed',
+          data: { ...previous, connected: false },
+        });
+      }
+      return { ok: true };
+    }
+
+    if (event.event !== 'participant_joined') return { ok: true };
+
+    // holy crap this code...
+    const metadata = livekitMetadataSchema.safeParse(parseJson(event.participant?.metadata ?? '{}'));
+    const channelId = (!metadata.error && metadata.data.channelId) ?? event.room?.name?.replace(/^voice:/, '');
+    if (!channelId) return { ok: true };
+
+    const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+    if (!channel) return { ok: true };
+
+    const state = {
+      guildId: channel.guildId,
+      channelId: channel.id,
+      userId,
+      name: event.participant?.name ?? null,
+    };
+
+    setVoicePresence(state);
+    if (server) {
+      publishRealtime(server, `guildEvents:${state.guildId}`, {
+        type: 'voice.state.changed',
+        data: { ...state, connected: true },
+      });
+    }
+
+    return { ok: true };
   });
 
 type ChannelUsersResponse = {
