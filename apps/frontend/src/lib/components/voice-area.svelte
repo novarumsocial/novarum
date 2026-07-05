@@ -94,37 +94,6 @@
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
     <Volume2 class="size-5 text-muted-foreground" />
     <span class="text-sm font-semibold text-foreground">{channel.name}</span>
-    <span class="mx-1.5 text-muted-foreground/30">|</span>
-    <span
-      class={cn(
-        'inline-flex items-center gap-1.5 text-xs',
-        voice.connected && 'text-emerald-400',
-        voice.connecting && 'text-amber-400',
-        !voice.connected && !voice.connecting && 'text-muted-foreground'
-      )}
-    >
-      <span
-        class={cn(
-          'inline-block size-1.5 rounded-none',
-          voice.connected && 'bg-emerald-400',
-          voice.connecting && 'animate-pulse bg-amber-400',
-          !voice.connected && !voice.connecting && 'bg-muted-foreground'
-        )}
-      ></span>
-      {#if voice.connecting}
-        Connecting...
-      {:else if voice.connected}
-        Connected
-      {:else}
-        Disconnected
-      {/if}
-    </span>
-    {#if voice.participantCount > 0}
-      <span class="ml-auto text-xs text-muted-foreground">
-        {voice.participantCount}
-        {voice.participantCount === 1 ? 'member' : 'members'}
-      </span>
-    {/if}
   </div>
 
   <div class="min-h-0 flex-1 overflow-hidden px-4 py-4 pb-24">
