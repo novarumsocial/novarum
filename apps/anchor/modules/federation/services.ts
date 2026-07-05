@@ -6,6 +6,12 @@ import crypto from 'node:crypto';
 import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { publishRealtime } from '../../utils/publishRealtime';
+import { AccessToken } from 'livekit-server-sdk';
+import {
+  removeVoicePresence,
+  setVoicePresence,
+  voicePresenceForGuilds,
+} from '../../utils/services/livekit';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
 const federatedMessagePageSize = 50;
@@ -291,7 +297,11 @@ export const federation = new Elysia({ prefix: '/federation' })
     const pagination = parseFederatedMessagePagination(parsed.body);
     if (!pagination.ok) return status(400, { error: pagination.error });
 
-    const messages = await fetchFederatedMessagePage(params.id, pagination.limit, pagination.cursor);
+    const messages = await fetchFederatedMessagePage(
+      params.id,
+      pagination.limit,
+      pagination.cursor
+    );
     const visibleMessages = messages.slice(0, pagination.limit);
     const lastMessage = visibleMessages[visibleMessages.length - 1];
 
@@ -335,6 +345,81 @@ export const federation = new Elysia({ prefix: '/federation' })
         joinedAt: member.joinedAt as Date,
       })),
     };
+  })
+  .post('/channels/:id/call/token', async ({ params, request, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+    if (access.channel.type !== 'VOICE') return status(404, { error: 'Channel not right' });
+
+    const voiceConfig = getConfig().voice;
+    const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
+      identity: access.user.id,
+      name: access.user.displayName || access.user.username,
+      ttl: '5m',
+      metadata: JSON.stringify({
+        channelId: access.channel.id,
+        guildId: access.channel.guildId,
+        userId: access.user.id,
+      }),
+    });
+
+    token.addGrant({
+      roomJoin: true,
+      room: `voice:${access.channel.id}`,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    return {
+      serverUrl: voiceConfig.livekit_url,
+      token: await token.toJwt(),
+    };
+  })
+  .post('/channels/:id/voice-state', async ({ params, request, server, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const connected = getObjectProperty(parsed.body, 'connected');
+    if (typeof connected !== 'boolean') return status(400, { error: 'Invalid voice state' });
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+    if (access.channel.type !== 'VOICE') return status(404, { error: 'Channel not right' });
+
+    const state = {
+      guildId: access.channel.guildId,
+      channelId: access.channel.id,
+      userId: access.user.id,
+      name: access.user.displayName || access.user.username,
+    };
+
+    if (connected) setVoicePresence(state);
+    else removeVoicePresence(state.userId);
+
+    if (server) {
+      publishRealtime(server, `guildEvents:${state.guildId}`, {
+        type: 'voice.state.changed',
+        data: { ...state, connected },
+      });
+    }
+
+    return { state };
   })
   .post('/guilds/:id/users/status', async ({ params, request, server, status }) => {
     const parsed = await verifiedFederationJsonBody(request);
@@ -413,6 +498,15 @@ export const federation = new Elysia({ prefix: '/federation' })
       }
 
       ws.subscribe(`guildEvents:${ws.data.params.id}`);
+      ws.send(
+        JSON.stringify({
+          type: 'voice.states.snapshot',
+          data: {
+            guildIds: [ws.data.params.id],
+            states: voicePresenceForGuilds([ws.data.params.id]),
+          },
+        })
+      );
     },
     message() {
       // Server-to-server realtime is publish-only for now.
@@ -467,7 +561,9 @@ function getObjectProperty(value: unknown, key: string) {
   return value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
 }
 
-function parseFederatedMessagePagination(body: unknown):
+function parseFederatedMessagePagination(
+  body: unknown
+):
   | { ok: true; limit: number; cursor: { createdAt: Date; id: string } | null }
   | { ok: false; error: string } {
   const rawLimit = getObjectProperty(body, 'limit');
