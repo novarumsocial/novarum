@@ -128,3 +128,30 @@
 		@apply font-sans;
 	}
 }
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in oklch, var(--muted-foreground), var(--muted)) transparent;
+}
+
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+	background: color-mix(in oklch, var(--muted-foreground), var(--muted));
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background: color-mix(in oklch, var(--muted-foreground) 70%, var(--muted) 30%);
+}
+
+*::-webkit-scrollbar-thumb:active {
+	background: color-mix(in oklch, var(--muted-foreground) 85%, var(--muted) 15%);
+}
