@@ -39,7 +39,7 @@
       </div>
     {/if}
 
-    <div class="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+    <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
       {message.content}
     </div>
   </div>
