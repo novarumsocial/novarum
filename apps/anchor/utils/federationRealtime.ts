@@ -67,7 +67,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       user: z.object({
         userId: z.string(),
         username: z.string(),
-        displayName: z.string(),
+        displayName: z.string().nullable(),
         homeserver: z.string(),
         isBot: z.boolean(),
         status: userStatusSchema,

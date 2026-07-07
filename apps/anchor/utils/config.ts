@@ -9,12 +9,10 @@ const schema = z.object({
     baseUrl: z.string(),
     listen_port: z.number().int().positive().optional().default(5049),
   }),
-  federation: z
-    .object({
-      key_dir: z.string().optional().default('./keys'),
-      nonce_max_age_seconds: z.number().positive().optional().default(300),
-    })
-    .default({ key_dir: './keys', nonce_max_age_seconds: 300 }),
+  federation: z.object({
+    key_dir: z.string().optional().default('./keys'),
+    nonce_max_age_seconds: z.number().positive().optional().default(300),
+  }),
   voice: z.object({
     livekit_url: z.string().refine((val) => val.startsWith('wss://') || val.startsWith('ws://'), {
       error: 'livekit_url must start with ws:// or wss://',
