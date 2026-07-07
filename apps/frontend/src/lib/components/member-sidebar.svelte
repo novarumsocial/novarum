@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Users } from "@lucide/svelte";
-  import type { Author } from "$lib/types/chat";
+  import { Users } from '@lucide/svelte';
+  import type { Author } from '$lib/types/chat';
 
   let {
     members,

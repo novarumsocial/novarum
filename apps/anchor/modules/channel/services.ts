@@ -334,8 +334,8 @@ export const channel = new Elysia({ prefix: '/channel' })
       parseJson(event.participant?.metadata ?? '{}')
     );
     const channelId =
-      (!metadata.error && metadata.data.channelId) ?? event.room?.name?.replace(/^voice:/, '');
-    if (!channelId) return { ok: true };
+      (metadata.success ? metadata.data.channelId : undefined) ??
+      event.room?.name?.replace(/^voice:/, '');
 
     const channel = await db.orm.public.Channel.where({ id: channelId }).first();
     if (!channel) return { ok: true };

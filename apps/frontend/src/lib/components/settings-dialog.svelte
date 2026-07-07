@@ -36,7 +36,7 @@
       <Dialog.Description>Manage your account, appearance, and preferences.</Dialog.Description>
     </Dialog.Header>
 
-    <Tabs.Root value="account" orientation="vertical" class="flex min-h-90 gap-0">
+    <Tabs.Root value="account" orientation="vertical" class="flex min-h-[360px] gap-0">
       <div class="flex w-44 shrink-0 flex-col border-r border-border pr-2">
         <Tabs.List
           class="flex h-auto w-full flex-col items-stretch justify-start gap-0.5 bg-transparent p-0"
