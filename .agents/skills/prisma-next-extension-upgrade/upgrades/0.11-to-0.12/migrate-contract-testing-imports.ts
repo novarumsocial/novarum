@@ -91,7 +91,7 @@ for (const path of targets) {
 
 console.log();
 console.log(
-  `${targets.length} file(s) with legacy import: ${dryRun ? needsFix : fixed} ${dryRun ? 'needing rewrite' : 'rewritten'}.`,
+  `${targets.length} file(s) with legacy import: ${dryRun ? needsFix : fixed} ${dryRun ? 'needing rewrite' : 'rewritten'}.`
 );
 
 if (dryRun && needsFix > 0) process.exit(1);

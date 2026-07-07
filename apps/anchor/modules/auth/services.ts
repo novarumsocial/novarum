@@ -11,14 +11,17 @@ import {
 } from './provider';
 import { getConfig } from '../../utils/config';
 
-function userResponse(user: {
-  id: string;
-  username: string;
-  homeserver: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  isBot: boolean;
-}, email: string | null = null) {
+function userResponse(
+  user: {
+    id: string;
+    username: string;
+    homeserver: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isBot: boolean;
+  },
+  email: string | null = null
+) {
   return {
     id: user.id,
     username: user.username,

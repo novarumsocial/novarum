@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Settings, Signal } from '@lucide/svelte';
+  import {
+    Mic,
+    MicOff,
+    Headphones,
+    HeadphoneOff,
+    PhoneOff,
+    Settings,
+    Signal,
+  } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
@@ -28,11 +36,19 @@
   {#if voice.connected || voice.connecting}
     <div class="border-b border-border/80 px-3 py-2">
       <div class="flex items-center gap-2">
-        <div class="flex size-8 items-center justify-center {voice.connecting ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'} text-xs font-bold">
+        <div
+          class="flex size-8 items-center justify-center {voice.connecting
+            ? 'bg-amber-500/10 text-amber-400'
+            : 'bg-emerald-500/10 text-emerald-400'} text-xs font-bold"
+        >
           <Signal class="size-4" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-xs font-semibold uppercase tracking-wide {voice.connecting ? 'text-amber-400' : 'text-emerald-400'}">
+          <p
+            class="truncate text-xs font-semibold uppercase tracking-wide {voice.connecting
+              ? 'text-amber-400'
+              : 'text-emerald-400'}"
+          >
             {voice.connecting ? 'Voice Connecting' : 'Voice Connected'}
           </p>
           <p class="truncate text-[11px] text-muted-foreground">
@@ -72,7 +88,7 @@
             ? 'text-rose-400 hover:text-rose-300'
             : voice.selfDeafened
               ? 'text-rose-400 hover:text-rose-300'
-              : 'text-muted-foreground hover:text-sidebar-foreground',
+              : 'text-muted-foreground hover:text-sidebar-foreground'
         )}
         onclick={() => voice.setMuted(!voice.selfMuted)}
         disabled={voice.selfDeafened}
@@ -89,7 +105,7 @@
           'flex size-7 items-center justify-center transition-colors',
           voice.selfDeafened
             ? 'text-rose-400 hover:text-rose-300'
-            : 'text-muted-foreground hover:text-sidebar-foreground',
+            : 'text-muted-foreground hover:text-sidebar-foreground'
         )}
         onclick={() => voice.setDeafened(!voice.selfDeafened)}
         aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}

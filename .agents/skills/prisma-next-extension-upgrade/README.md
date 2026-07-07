@@ -1,6 +1,6 @@
 # prisma-next-extension-upgrade
 
-An agent skill that upgrades a Prisma Next **extension** package from one minor version to the next. The skill carries the per-step bump-install-instructions-check-pins-validate-commit flow plus the cumulative set of per-transition *upgrade instructions* (one directory per `(from-minor, to-minor)` pair).
+An agent skill that upgrades a Prisma Next **extension** package from one minor version to the next. The skill carries the per-step bump-install-instructions-check-pins-validate-commit flow plus the cumulative set of per-transition _upgrade instructions_ (one directory per `(from-minor, to-minor)` pair).
 
 The companion CLI `prisma-next-check-pins` ships separately from [`@prisma-next/extension-author-tools`](../../../packages/0-shared/extension-author-tools/) - extension authors install that as a normal `devDependency` and wire it into CI.
 
@@ -44,7 +44,7 @@ The agent reads `SKILL.md`, detects the current and target versions, applies one
 
 ### `prisma-next-check-pins` CLI
 
-The CLI enforces the *exact-pin rule* for Prisma Next extensions: every `@prisma-next/*` entry across `dependencies`, `peerDependencies`, and `optionalDependencies` must be a single exact-version string (no `^`, no `~`, no range, no wildcard, no `workspace:` specifier), and every entry must resolve to the same version.
+The CLI enforces the _exact-pin rule_ for Prisma Next extensions: every `@prisma-next/*` entry across `dependencies`, `peerDependencies`, and `optionalDependencies` must be a single exact-version string (no `^`, no `~`, no range, no wildcard, no `workspace:` specifier), and every entry must resolve to the same version.
 
 ```bash
 pnpm exec prisma-next-check-pins

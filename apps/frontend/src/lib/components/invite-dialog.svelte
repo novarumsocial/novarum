@@ -18,9 +18,7 @@
   let copied = $state(false);
   let loading = $state(false);
 
-  const inviteUrl = $derived(
-    `${window.location.origin}/i/${code}@${anchor.homeServer}`
-  );
+  const inviteUrl = $derived(`${window.location.origin}/i/${code}@${anchor.homeServer}`);
 
   $effect(() => {
     if (open && code === '') {
@@ -37,7 +35,7 @@
 
   async function fetchInvite() {
     loading = true;
-    const invite = await chat.getGuildInvite(guildId)
+    const invite = await chat.getGuildInvite(guildId);
     if (invite) {
       code = invite.invite.code;
       // loading false here because createinvite will also do so
@@ -48,7 +46,7 @@
   }
   async function createInvite() {
     loading = true;
-    const invite = await chat.createGuildInvite(guildId)
+    const invite = await chat.createGuildInvite(guildId);
     if (invite) {
       code = invite.invite.code;
     }

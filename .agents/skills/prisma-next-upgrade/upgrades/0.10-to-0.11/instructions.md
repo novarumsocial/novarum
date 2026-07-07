@@ -1,13 +1,13 @@
 ---
-from: "0.10"
-to: "0.11"
+from: '0.10'
+to: '0.11'
 changes:
   - id: insert-single-row-wrap-in-array
     summary: Wrap single-row `.insert({...})` call sites in an array - `.insert([{...}])`. The single-object overload is removed; `.insert()` now exclusively accepts an array of row objects.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - ".insert("
+        - '.insert('
       anyMatch: true
 ---
 

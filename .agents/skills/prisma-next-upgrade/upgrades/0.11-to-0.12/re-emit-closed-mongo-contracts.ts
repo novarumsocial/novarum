@@ -196,7 +196,7 @@ for (const { dir, contractPath } of mongoDirs) {
 
 console.log();
 console.log(
-  `${mongoDirs.length} Mongo contract(s): ${needsFix} ${dryRun ? 'needing re-emit' : 're-emitted'}, ${alreadyClean} already closed.`,
+  `${mongoDirs.length} Mongo contract(s): ${needsFix} ${dryRun ? 'needing re-emit' : 're-emitted'}, ${alreadyClean} already closed.`
 );
 
 if (dryRun && needsFix > 0) process.exit(1);

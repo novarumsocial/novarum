@@ -20,7 +20,7 @@ description: >-
 
 > **Edit your data contract. Prisma handles the rest.**
 
-Once the contract is emitted and the DB is up to date, this skill covers everything you do *with* the data: reading, writing, eager-loading relations, aggregating, and the choice between the ORM and the lower-level query lane.
+Once the contract is emitted and the DB is up to date, this skill covers everything you do _with_ the data: reading, writing, eager-loading relations, aggregating, and the choice between the ORM and the lower-level query lane.
 
 ## When to Use
 
@@ -30,7 +30,7 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 - User wants to wrap operations in a transaction (`db.transaction(...)` - Postgres and SQLite).
 - User wants to aggregate (`count`, `sum`, `avg`, …).
 - User asks about query lanes (ORM vs SQL builder / query builder).
-- User mentions: *query, select, where, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, drizzle-style, kysely-style, prisma client*.
+- User mentions: _query, select, where, orderBy, take, skip, include, eager load, first, all, count, aggregate, create, update, delete, upsert, returning, drizzle-style, kysely-style, prisma client_.
 
 ## When Not to Use
 
@@ -42,10 +42,10 @@ Once the contract is emitted and the DB is up to date, this skill covers everyth
 
 Prisma Next ships **two query lanes per target** on the same `db` value from `src/prisma/db.ts`. **Before writing queries, read `db.ts` and load the matching target guide:**
 
-| Runtime import in `db.ts` | Load |
-|---|---|
+| Runtime import in `db.ts`       | Load                                                                 |
+| ------------------------------- | -------------------------------------------------------------------- |
 | `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) - `db.orm.<Model>` + `db.sql.<table>` |
-| `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) - `db.orm.<root>` + `db.query.from(...)` |
+| `@prisma-next/mongo/runtime`    | [`mongo.md`](./mongo.md) - `db.orm.<root>` + `db.query.from(...)`    |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local - one query function picks one lane, not the whole app.
 
@@ -64,7 +64,7 @@ See [`postgres.md` § Namespace-aware accessors](./postgres.md#namespace-aware-a
 
 ## Consuming the result: `await`, `.toArray()`, or `for await`
 
-Critical to get right early - on **both Postgres and Mongo**, `.all()` returns an **`AsyncIterableResult<Row>`**, which is *both* a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
+Critical to get right early - on **both Postgres and Mongo**, `.all()` returns an **`AsyncIterableResult<Row>`**, which is _both_ a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
 
 ```typescript
 const users = await db.orm.User.select('id', 'email').all();
@@ -95,7 +95,7 @@ const required = await db.orm.User.where({ id }).all().firstOrThrow();
 //    ^? Row          ← buffers; throws `RUNTIME.NO_ROWS` if empty.
 ```
 
-For genuine single-row reads, prefer the *collection*-level `.first()` (which adds `LIMIT 1` to the SQL on Postgres) over `.all().first()` (which fetches all rows and discards the rest). The result-level helpers are for cases where you already need the full result and want the first row without an extra round-trip.
+For genuine single-row reads, prefer the _collection_-level `.first()` (which adds `LIMIT 1` to the SQL on Postgres) over `.all().first()` (which fetches all rows and discards the rest). The result-level helpers are for cases where you already need the full result and want the first row without an extra round-trip.
 
 **The result is single-consumption.** Each `AsyncIterableResult` instance can be consumed once - by `await`, by `.toArray()`, or by `for await`. Trying to consume it a second time throws **`RUNTIME.ITERATOR_CONSUMED`**. The fix is almost always to store the array in a variable on first consumption and reuse the variable:
 
@@ -115,7 +115,7 @@ If you've seen `collect(...)` / `toArray(...)` helpers in a codebase wrapping `.
 
 ## Running queries from a short script
 
-When the user is running a one-off `tsx my-script.ts` (not a long-lived server), call `await db.close()` at the end so the process exits cleanly - on Postgres the façade-owned pool keeps Node's event loop alive; on Mongo the façade-owned `MongoClient` does the same. See `prisma-next-runtime` § *Running as a script (teardown)* for the full pattern including `await using`.
+When the user is running a one-off `tsx my-script.ts` (not a long-lived server), call `await db.close()` at the end so the process exits cleanly - on Postgres the façade-owned pool keeps Node's event loop alive; on Mongo the façade-owned `MongoClient` does the same. See `prisma-next-runtime` § _Running as a script (teardown)_ for the full pattern including `await using`.
 
 ```typescript
 // src/scripts/seed.ts
@@ -138,7 +138,7 @@ await db.close();
 ## Common Pitfalls (cross-target)
 
 1. **Using Postgres examples on a Mongo project (or vice versa).** Check `db.ts` and load the correct target guide ([`postgres.md`](./postgres.md) or [`mongo.md`](./mongo.md)).
-2. **Writing a `collect()` / `toArray()` helper to convert `.all()` to an array.** `.all()` returns an `AsyncIterableResult<Row>` which *is* a `PromiseLike<Row[]>` - `await collection.all()` directly yields `Row[]`. See *Consuming the result* above.
+2. **Writing a `collect()` / `toArray()` helper to convert `.all()` to an array.** `.all()` returns an `AsyncIterableResult<Row>` which _is_ a `PromiseLike<Row[]>` - `await collection.all()` directly yields `Row[]`. See _Consuming the result_ above.
 3. **Consuming an `AsyncIterableResult` twice.** Each result is single-use. The second consumer throws `RUNTIME.ITERATOR_CONSUMED`. Buffer once into a variable and reuse the variable.
 
 Target-specific pitfalls live in the per-target guides.

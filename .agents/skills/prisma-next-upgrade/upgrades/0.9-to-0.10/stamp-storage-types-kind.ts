@@ -191,7 +191,7 @@ function stampEntry(name: string, raw: UntaggedCodecTriple): StampedEntry {
     // produce a malformed StampedPostgresEnum.
     if (!Array.isArray(values) || !values.every((v) => typeof v === 'string')) {
       throw new Error(
-        `invariant: storage.types[${JSON.stringify(name)}] reached stampEntry with codecId="${POSTGRES_ENUM_CODEC_ID}" but typeParams.values is not a string[]; the classifier should have rejected this entry`,
+        `invariant: storage.types[${JSON.stringify(name)}] reached stampEntry with codecId="${POSTGRES_ENUM_CODEC_ID}" but typeParams.values is not a string[]; the classifier should have rejected this entry`
       );
     }
     return {
@@ -240,7 +240,7 @@ function processContract(parsed: unknown, filePath: string): ProcessOutcome {
     }
     if (!looksLikeUntaggedCodecTriple(entry)) {
       throw new Error(
-        `${filePath}: storage.types[${JSON.stringify(name)}] is neither a stamped entry nor an untagged codec triple - refusing to guess. Hand-edit required.`,
+        `${filePath}: storage.types[${JSON.stringify(name)}] is neither a stamped entry nor an untagged codec triple - refusing to guess. Hand-edit required.`
       );
     }
     newTypes[name] = stampEntry(name, entry);
@@ -302,7 +302,7 @@ function formatJson(value: unknown, indentLevel = 0): string {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) return '{}';
     const lines = entries.map(
-      ([k, v]) => `${childIndent}${JSON.stringify(k)}: ${formatJson(v, indentLevel + 1)}`,
+      ([k, v]) => `${childIndent}${JSON.stringify(k)}: ${formatJson(v, indentLevel + 1)}`
     );
     return `{\n${lines.join(',\n')}\n${indent}}`;
   }
@@ -317,7 +317,7 @@ async function processFile(path: string): Promise<Result> {
     parsed = JSON.parse(raw);
   } catch (error) {
     throw new Error(
-      `${path}: not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+      `${path}: not valid JSON (${error instanceof Error ? error.message : String(error)})`
     );
   }
   const outcome = processContract(parsed, path);
@@ -354,7 +354,7 @@ for (const path of contracts) {
 
 console.log();
 console.log(
-  `${contracts.length} snapshot(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'} (${totalStamped} entries), ${alreadyClean} already clean.`,
+  `${contracts.length} snapshot(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'} (${totalStamped} entries), ${alreadyClean} already clean.`
 );
 
 if (dryRun && changed > 0) process.exit(1);

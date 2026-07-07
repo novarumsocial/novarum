@@ -28,9 +28,13 @@
       {#each online as member}
         {@const name = nameFor(member)}
         <div class="flex items-center gap-2 px-1 py-1">
-          <div class="relative flex size-7 shrink-0 items-center justify-center text-xs font-bold text-white {member.avatarColor}">
+          <div
+            class="relative flex size-7 shrink-0 items-center justify-center text-xs font-bold text-white {member.avatarColor}"
+          >
             {name.charAt(0).toUpperCase()}
-            <span class="absolute -bottom-px -right-px size-2.5 rounded-none border-2 border-sidebar bg-emerald-500"></span>
+            <span
+              class="absolute -bottom-px -right-px size-2.5 rounded-none border-2 border-sidebar bg-emerald-500"
+            ></span>
           </div>
           <div class="min-w-0 flex-1">
             <span class="block truncate text-sm text-foreground">{name}</span>
@@ -49,7 +53,9 @@
         {#each offline as member}
           {@const name = nameFor(member)}
           <div class="flex items-center gap-2 px-1 py-1">
-            <div class="flex size-7 items-center justify-center text-xs font-bold text-white {member.avatarColor}">
+            <div
+              class="flex size-7 items-center justify-center text-xs font-bold text-white {member.avatarColor}"
+            >
               {name.charAt(0).toUpperCase()}
             </div>
             <span class="text-sm text-foreground">{name}</span>

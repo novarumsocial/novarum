@@ -29,7 +29,9 @@ export async function createSession(userId: string): Promise<SessionWithToken> {
   return session;
 }
 
-export async function validateSessionToken(token: string | undefined): Promise<SessionWithUser | null> {
+export async function validateSessionToken(
+  token: string | undefined
+): Promise<SessionWithUser | null> {
   if (!token) {
     return null;
   }
@@ -67,7 +69,9 @@ export async function deleteSessionToken(token: string): Promise<void> {
 export async function getSession(sessionId: string): Promise<SessionWithUser | null> {
   const now = new Date();
 
-  const session = (await db.orm.public.Session.where({ id: sessionId }).include('user').first()) as SessionWithUser | null;
+  const session = (await db.orm.public.Session.where({ id: sessionId })
+    .include('user')
+    .first()) as SessionWithUser | null;
   if (!session) {
     return null;
   }
@@ -102,7 +106,8 @@ export function createBlankSessionCookie(request?: Request): SessionCookie {
 
 function sessionCookieAttributes(maxAge: number, request?: Request): SessionCookie['attributes'] {
   const forwardedProto = request?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  const protocol = forwardedProto ?? (request ? new URL(request.url).protocol.replace(/:$/, '') : 'http');
+  const protocol =
+    forwardedProto ?? (request ? new URL(request.url).protocol.replace(/:$/, '') : 'http');
   const secure = protocol === 'https';
 
   return {

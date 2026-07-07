@@ -1,11 +1,11 @@
 ---
-from: "0.8"
-to: "0.9"
+from: '0.8'
+to: '0.9'
 changes:
   - id: strip-inline-contracts-from-migration-manifests
     summary: Remove the inlined `fromContract` / `toContract` fields from every committed `migration.json`; the destination contract continues to live next door as `end-contract.json`.
     detection:
-      glob: "**/migrations/**/migration.json"
+      glob: '**/migrations/**/migration.json'
       contains:
         - '"fromContract"'
         - '"toContract"'
