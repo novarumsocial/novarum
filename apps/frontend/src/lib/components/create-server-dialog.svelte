@@ -5,7 +5,10 @@
   import { Hash, LoaderCircle, Plus } from '@lucide/svelte';
   import type { Server } from '$lib/types/chat';
 
-  let { open = $bindable(false), onCreate }: {
+  let {
+    open = $bindable(false),
+    onCreate,
+  }: {
     open: boolean;
     onCreate?: (server: Server) => void;
   } = $props();
@@ -61,9 +64,7 @@
   <Dialog.Content class="sm:max-w-md">
     <Dialog.Header>
       <Dialog.Title>Create Server</Dialog.Title>
-      <Dialog.Description>
-        Give your server a name and upload a picture.
-      </Dialog.Description>
+      <Dialog.Description>Give your server a name and upload a picture.</Dialog.Description>
     </Dialog.Header>
 
     <form method="POST" class="space-y-4" onsubmit={handleSubmit}>
@@ -75,11 +76,11 @@
         </div>
 
         <div class="grid w-full gap-1.5">
-          <label for="server-name" class="text-xs font-medium text-foreground">
-            Server Name
-          </label>
+          <label for="server-name" class="text-xs font-medium text-foreground"> Server Name </label>
           <div class="relative">
-            <Hash class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Hash
+              class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
               id="server-name"
               bind:value={name}
@@ -98,9 +99,7 @@
       {/if}
 
       <Dialog.Footer class="border-t border-border pt-3">
-        <Button type="button" variant="ghost" onclick={() => (open = false)}>
-          Cancel
-        </Button>
+        <Button type="button" variant="ghost" onclick={() => (open = false)}>Cancel</Button>
         <Button type="submit" disabled={loading || !name.trim()}>
           {#if loading}
             <LoaderCircle class="size-4 animate-spin" />

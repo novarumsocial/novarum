@@ -29,7 +29,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     if (new URL(request.url).pathname === '/channel/livekit/webhook') {
       return;
     }
-    
+
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
     if (!session) {
@@ -89,7 +89,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     '/:id/users',
     async ({ params, session, status }) => {
       if (!session) return status(401, { error: 'Unauthorized' });
-      
+
       const channel = await db.orm.public.Channel.where({ id: params.id }).first();
       if (!channel) {
         return status(404, { error: 'Channel not found' });
@@ -183,7 +183,7 @@ export const channel = new Elysia({ prefix: '/channel' })
   )
   .get('/:id/call/token', async ({ params, session, status }) => {
     if (!session) return status(401, { error: 'Unauthorized' });
-    
+
     const voiceConfig = getConfig().voice;
     const federatedChannel = parseFederatedChannelId(params.id);
     if (federatedChannel) {

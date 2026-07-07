@@ -46,7 +46,11 @@ export const message = new Elysia({ prefix: '/message' })
         if (!result.response.ok) {
           return status(result.response.status, result.data ?? { error: 'Remote messages failed' });
         }
-        if (!result.data || typeof result.data !== 'object' || !Array.isArray((result.data as any).messages)) {
+        if (
+          !result.data ||
+          typeof result.data !== 'object' ||
+          !Array.isArray((result.data as any).messages)
+        ) {
           return status(502, { error: 'Remote messages returned an invalid response' });
         }
 
@@ -120,7 +124,8 @@ export const message = new Elysia({ prefix: '/message' })
           return status(result.response.status, result.data ?? { error: 'Remote send failed' });
         }
 
-        const message = result.data && typeof result.data === 'object' ? (result.data as any).message : null;
+        const message =
+          result.data && typeof result.data === 'object' ? (result.data as any).message : null;
         if (!message || typeof message !== 'object') {
           return status(502, { error: 'Remote send returned an invalid response' });
         }

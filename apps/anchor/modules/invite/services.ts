@@ -69,7 +69,9 @@ export const invite = new Elysia({ prefix: '/invite' })
         }
 
         if (server) {
-          void ensureFederatedGuildRealtimeBridge(server, federatedInvite.guild.id).catch(() => null);
+          void ensureFederatedGuildRealtimeBridge(server, federatedInvite.guild.id).catch(
+            () => null
+          );
 
           publishRealtime(server, `userEvents:${session.userId}`, {
             type: 'guild.created',

@@ -192,7 +192,7 @@ for (const { configDir, contractPath } of targets) {
 
 console.log();
 console.log(
-  `${targets.length} contract-space(s): ${needsFix} ${dryRun ? 'needing re-emit' : 're-emitted'}.`,
+  `${targets.length} contract-space(s): ${needsFix} ${dryRun ? 'needing re-emit' : 're-emitted'}.`
 );
 
 if (dryRun && needsFix > 0) process.exit(1);

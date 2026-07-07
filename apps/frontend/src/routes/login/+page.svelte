@@ -58,7 +58,7 @@
     validationMethod: 'onsubmit',
     multipleSubmits: 'prevent',
     clearOnSubmit: 'none',
-		resetForm: false,
+    resetForm: false,
     onSubmit() {
       loading = true;
       submitError = '';
@@ -133,7 +133,7 @@
                   <Input
                     {...props}
                     bind:value={$formData.homeServer}
-										name="homeServer"
+                    name="homeServer"
                     placeholder="novarum.social"
                     class="pl-8"
                     autocomplete="url"
@@ -156,7 +156,7 @@
                   <Input
                     {...props}
                     bind:value={$formData.username}
-										name="username"
+                    name="username"
                     placeholder="alice"
                     class="pl-8"
                     autocomplete="username"

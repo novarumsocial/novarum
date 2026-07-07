@@ -123,7 +123,7 @@ async function readStorageHash(contractPath: string): Promise<string | null> {
 
 async function patchMigrationToHash(
   migrationTsPath: string,
-  storageHash: string,
+  storageHash: string
 ): Promise<boolean> {
   const raw = await readFile(migrationTsPath, 'utf-8');
   const patched = raw.replace(/(\bto:\s*['"])sha256:[0-9a-f]{64}(['"])/, `$1${storageHash}$2`);
@@ -217,7 +217,7 @@ for (const { dir, contractPath } of extensionRoots) {
 
 console.log();
 console.log(
-  `${extensionRoots.length} extension pack(s): ${needsFix} ${dryRun ? 'needing regeneration' : 'regenerated'}, ${alreadyClean} already on public default.`,
+  `${extensionRoots.length} extension pack(s): ${needsFix} ${dryRun ? 'needing regeneration' : 'regenerated'}, ${alreadyClean} already on public default.`
 );
 
 if (dryRun && needsFix > 0) process.exit(1);

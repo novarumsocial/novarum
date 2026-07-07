@@ -74,7 +74,8 @@ class SessionState {
 
       const user = await this.refresh();
       if (!user) {
-        this.error = 'Sign-in worked, but your browser did not keep the session cookie. Enable third-party cookies for this site, then try again.';
+        this.error =
+          'Sign-in worked, but your browser did not keep the session cookie. Enable third-party cookies for this site, then try again.';
         return { ok: false, error: this.error, cookieMissing: true };
       }
 
@@ -108,7 +109,8 @@ class SessionState {
 
       const user = await this.refresh();
       if (!user) {
-        this.error = 'Account created, but your browser did not keep the session cookie. Enable third-party cookies for this site, then sign in.';
+        this.error =
+          'Account created, but your browser did not keep the session cookie. Enable third-party cookies for this site, then sign in.';
         return { ok: false, error: this.error, cookieMissing: true };
       }
 

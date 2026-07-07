@@ -73,7 +73,7 @@ export type RealtimeEvent =
       data: VoicePresence & {
         connected: boolean;
       };
-  }
+    }
   | {
       type: 'channel.typing';
       data: {

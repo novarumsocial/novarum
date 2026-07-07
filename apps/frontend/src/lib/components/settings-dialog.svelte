@@ -74,7 +74,13 @@
           </Tabs.Trigger>
         </Tabs.List>
 
-        <Button variant="destructive" size="sm" class="mt-auto w-full rounded-none" disabled={logoutLoading} onclick={logout}>
+        <Button
+          variant="destructive"
+          size="sm"
+          class="mt-auto w-full rounded-none"
+          disabled={logoutLoading}
+          onclick={logout}
+        >
           <LogOut class="size-3.5" />
           Logout
         </Button>
