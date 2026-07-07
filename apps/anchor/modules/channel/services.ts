@@ -24,7 +24,12 @@ const callTokenResponseSchema = z.object({ serverUrl: z.string(), token: z.strin
 const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 
 export const channel = new Elysia({ prefix: '/channel' })
-  .resolve(async ({ cookie, status }) => {
+  .resolve(async ({ cookie, status, request }) => {
+    // this has its own auth
+    if (new URL(request.url).pathname === '/channel/livekit/webhook') {
+      return;
+    }
+    
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
     if (!session) {
@@ -36,6 +41,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     '/create',
     async ({ body, session, server, status }) => {
       const { name, guildId, type } = body;
+      if (!session) return { error: 'Unauthorized' };
       if (parseFederatedGuildId(guildId)) {
         return status(400, { error: 'Cannot create channels on a federated guild' });
       }
@@ -82,6 +88,8 @@ export const channel = new Elysia({ prefix: '/channel' })
   .get(
     '/:id/users',
     async ({ params, session, status }) => {
+      if (!session) return status(401, { error: 'Unauthorized' });
+      
       const channel = await db.orm.public.Channel.where({ id: params.id }).first();
       if (!channel) {
         return status(404, { error: 'Channel not found' });
@@ -174,6 +182,8 @@ export const channel = new Elysia({ prefix: '/channel' })
     }
   )
   .get('/:id/call/token', async ({ params, session, status }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
+    
     const voiceConfig = getConfig().voice;
     const federatedChannel = parseFederatedChannelId(params.id);
     if (federatedChannel) {
@@ -240,6 +250,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     };
   })
   .post('/:id/typing', async ({ params, session, status, server }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
     const channel = await db.orm.public.Channel.where({ id: params.id }).first();
     if (!channel) {
       return status(404, { error: 'Channel not found' });
@@ -284,6 +295,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     return { ok: true };
   })
   .get('/:id/call/participants', async ({ params, session, status }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
     const channel = await db.orm.public.Channel.where({ id: params.id }).first();
     if (!channel || channel.type !== 'VOICE') {
       return status(404, { error: 'Channel not right' });
