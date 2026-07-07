@@ -41,14 +41,12 @@ export const auth = new Elysia({ prefix: '/auth' })
 
       const existingCredential = await db.orm.public.LocalCredential.where({ email }).first();
       if (existingCredential) {
-        status(409);
-        return { error: 'User already exists' };
+        return status(409, { error: 'User already exists' });
       }
 
       const existingUsername = await db.orm.public.User.where({ username, homeserver }).first();
       if (existingUsername) {
-        status(409);
-        return { error: 'Username is already taken' };
+        return status(409, { error: 'Username is already taken' });
       }
 
       const user = await db.orm.public.User.create({
@@ -97,20 +95,17 @@ export const auth = new Elysia({ prefix: '/auth' })
 
       const user = await db.orm.public.User.where({ username, homeserver }).first();
       if (!user) {
-        status(401);
-        return { error: 'Invalid username or password' };
+        return status(401, { error: 'Invalid username or password' });
       }
 
       const credential = await db.orm.public.LocalCredential.where({ userId: user.id }).first();
       if (!credential) {
-        status(401);
-        return { error: 'Invalid username or password' };
+        return status(401, { error: 'Invalid username or password' });
       }
 
       const validPassword = await Bun.password.verify(password, credential.passwordHash);
       if (!validPassword) {
-        status(401);
-        return { error: 'Invalid username or password' };
+        return status(401, { error: 'Invalid username or password' });
       }
 
       const session = await createSession(user.id);

@@ -5,9 +5,11 @@
   let {
     placeholder = 'Send a message',
     onSend = () => {},
+    onTyping = () => {},
   }: {
     placeholder?: string;
     onSend?: (content: string) => void;
+    onTyping?: () => void;
   } = $props();
 
   function handleSend() {
@@ -21,7 +23,10 @@
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
     }
+
+    if (content.trim() || e.key.length === 1) onTyping();
   }
 </script>
 

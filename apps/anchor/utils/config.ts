@@ -5,8 +5,8 @@ import { z } from 'zod';
 const schema = z.object({
   server: z.object({
     database_url: z.string().regex(/^postgresql:\/\/.*$/),
-    homeserver: z.string().regex(/^[a-zA-Z0-9.-]+$/),
-    baseUrl: z.url(),
+    homeserver: z.string(),
+    baseUrl: z.string(),
     listen_port: z.number().int().positive().optional().default(5049),
   }),
   federation: z
@@ -19,8 +19,8 @@ const schema = z.object({
     livekit_url: z.string().refine((val) => val.startsWith('wss://') || val.startsWith('ws://'), {
       error: 'livekit_url must start with ws:// or wss://',
     }),
-		livekit_key: z.string().min(1, 'livekit_key must be a non-empty string'),
-		livekit_secret: z.string().min(1, 'livekit_secret must be a non-empty string'),
+    livekit_key: z.string().min(1, 'livekit_key must be a non-empty string'),
+    livekit_secret: z.string().min(1, 'livekit_secret must be a non-empty string'),
   }),
 });
 

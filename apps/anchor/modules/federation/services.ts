@@ -346,6 +346,35 @@ export const federation = new Elysia({ prefix: '/federation' })
       })),
     };
   })
+  .post('/channels/:id/typing', async ({ params, request, server, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    if (server) {
+      publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        type: 'channel.typing',
+        data: {
+          channelId: access.channel.id,
+          userId: access.user.id,
+          username: access.user.username,
+          displayName: access.user.displayName,
+          homeserver: access.user.homeserver,
+          time: new Date().toISOString(),
+        },
+      });
+    }
+
+    return { ok: true };
+  })
   .post('/channels/:id/call/token', async ({ params, request, status }) => {
     const parsed = await verifiedFederationJsonBody(request);
     if (!parsed.ok) return status(parsed.status, { error: parsed.error });

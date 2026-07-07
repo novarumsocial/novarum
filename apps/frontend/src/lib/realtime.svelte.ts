@@ -89,6 +89,17 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       connected: z.boolean(),
     }),
   }),
+  z.object({
+    type: z.literal('channel.typing'),
+    data: z.object({
+      channelId: z.string(),
+      userId: z.string(),
+      username: z.string(),
+      displayName: z.string().nullable(),
+      homeserver: z.string(),
+      time: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 function parseRealtimeData(data: unknown) {
@@ -148,6 +159,7 @@ class RealtimeState {
       }
       if (event.type === 'message.created') {
         chat.addMessage(event.data);
+        chat.clearTyping(event.data.channelId, event.data.author.id);
       }
       if (event.type === 'user.status.changed') {
         chat.updateMemberStatus(event.data.userId, event.data.status);
@@ -160,6 +172,13 @@ class RealtimeState {
       }
       if (event.type === 'voice.state.changed') {
         chat.updateVoiceState(event.data);
+      }
+      if (event.type === 'channel.typing') {
+        chat.setTyping(
+          event.data.channelId,
+          event.data.userId,
+          event.data.displayName ?? event.data.username
+        );
       }
     });
 

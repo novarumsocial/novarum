@@ -98,6 +98,17 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       connected: z.boolean(),
     }),
   }),
+  z.object({
+    type: z.literal('channel.typing'),
+    data: z.object({
+      channelId: z.string(),
+      userId: z.string(),
+      username: z.string(),
+      displayName: z.string().nullable(),
+      homeserver: z.string(),
+      time: z.string(),
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId: string) {
@@ -231,6 +242,16 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       data: {
         ...event.data,
         guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
+      },
+    };
+  }
+
+  if (event.type === 'channel.typing') {
+    return {
+      ...event,
+      data: {
+        ...event.data,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
       },
     };

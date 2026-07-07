@@ -3,7 +3,7 @@
   import { defaults, superForm } from 'sveltekit-superforms';
   import { zod4, zod4Client } from 'sveltekit-superforms/adapters';
   import { goto } from '$app/navigation';
-  import { anchor } from '$lib/anchor.svelte';
+  import { useSession } from '$lib/session.svelte';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Form from '$lib/components/ui/form/index.js';
@@ -55,18 +55,7 @@
   let loading = $state(false);
   let showPassword = $state(false);
   let submitError = $state('');
-
-  function getErrorMessage(error: unknown) {
-    if (error && typeof error === 'object' && 'error' in error) {
-      return String(error.error);
-    }
-
-    return 'Could not create your account.';
-  }
-
-  function cookieWarning() {
-    return 'Account created, but your browser did not keep the session cookie. Enable third-party cookies for this site, then sign in.';
-  }
+  const session = useSession();
 
   const form = superForm(defaults(zod4(registerSchema)), {
     SPA: true,
@@ -84,30 +73,16 @@
         return;
       }
 
-      try {
-        await anchor.setHomeServer(updatedForm.data.homeserver);
-      } catch {
-        submitError = 'Could not discover that home server.';
-        loading = false;
-        return;
-      }
-
-      const { error } = await anchor.client.auth.signup.post({
+      const result = await session.signup({
+        homeServer: updatedForm.data.homeserver,
         username: updatedForm.data.username,
         displayName: updatedForm.data.displayName,
         email: updatedForm.data.email,
         password: updatedForm.data.password,
       });
 
-      if (error) {
-        submitError = getErrorMessage(error.value);
-        loading = false;
-        return;
-      }
-
-      const me = await anchor.client.auth.me.get();
-      if (!me.data?.user) {
-        submitError = cookieWarning();
+      if (!result.ok) {
+        submitError = result.error;
         loading = false;
         return;
       }

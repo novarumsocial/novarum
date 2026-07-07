@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { anchor } from '$lib/anchor.svelte';
+  import { useSession } from '$lib/session.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { Voice } from '$lib/voice.svelte';
@@ -14,9 +14,9 @@
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
 
-  type MeData = Awaited<ReturnType<typeof anchor.client.auth.me.get>>['data'];
+  const session = useSession();
 
-  let currentUser = $state<MeData | null>(null);
+  const currentUser = $derived(session.user);
   let booting = $state(true);
 
   const currentServer = $derived(chat.currentServer);
@@ -38,7 +38,7 @@
   // Join voice channels when selected; keep the call alive while browsing text channels.
   $effect(() => {
     const channelId = currentChannel?.type === 'VOICE' ? currentChannel.id : null;
-    const userId = currentUser?.user.id ?? null;
+    const userId = currentUser?.id ?? null;
 
     if (!channelId || !userId) {
       return;
@@ -55,11 +55,9 @@
   });
 
   async function boot() {
-    const me = await anchor.client.auth.me.get();
+    const user = await session.refresh();
 
-    currentUser = me.data ?? null;
-
-    if (!currentUser) {
+    if (!user) {
       await goto('/login');
       return;
     }
@@ -110,7 +108,7 @@
           />
         {/if}
       </div>
-      <UserArea {voice} user={currentUser.user} {voiceChannelName} onLeaveVoice={leaveVoice} />
+      <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
     {#if currentChannel && currentChannel.type === 'TEXT'}

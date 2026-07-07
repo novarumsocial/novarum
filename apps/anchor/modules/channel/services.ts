@@ -239,6 +239,50 @@ export const channel = new Elysia({ prefix: '/channel' })
       token: await token.toJwt(),
     };
   })
+  .post('/:id/typing', async ({ params, session, status, server }) => {
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel) {
+      return status(404, { error: 'Channel not found' });
+    }
+
+    const channelMembership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!channelMembership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const federatedChannel = parseFederatedChannelId(params.id);
+    if (federatedChannel) {
+      const result = await postSignedFederationJson(
+        federatedChannel.homeserver,
+        `/federation/channels/${encodeURIComponent(federatedChannel.id)}/typing`,
+        { user: federationUserPayload(session) }
+      ).catch(() => null);
+
+      if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+      if (!result.response.ok) {
+        return status(result.response.status, result.data ?? { error: 'Remote typing failed' });
+      }
+    }
+
+    if (server) {
+      publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        type: 'channel.typing',
+        data: {
+          channelId: channel.id,
+          userId: session.userId,
+          username: session.user.username,
+          displayName: session.user.displayName,
+          homeserver: session.user.homeserver,
+          time: new Date().toISOString(),
+        },
+      });
+    }
+
+    return { ok: true };
+  })
   .get('/:id/call/participants', async ({ params, session, status }) => {
     const channel = await db.orm.public.Channel.where({ id: params.id }).first();
     if (!channel || channel.type !== 'VOICE') {
