@@ -237,9 +237,5 @@
         </Tabs.Content>
       </div>
     </Tabs.Root>
-
-    <Dialog.Footer class="border-t border-border pt-3">
-      <Button variant="outline" onclick={() => (open = false)}>Close</Button>
-    </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
