@@ -4,12 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --parallel --filter '*' dev"
+    "dev": "bun run --parallel --filter '*' dev",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "prettier": "^3.8.4",
-    "prettier-plugin-svelte": "^4.1.1"
+    "oxfmt": "^0.58.0"
   },
   "peerDependencies": {
     "typescript": "^5"
