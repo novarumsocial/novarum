@@ -1,0 +1,75 @@
+# dependencies (bun install)
+*node_modules
+
+# output
+out
+dist
+*.tgz
+build
+.svelte-kit
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env*
+!.env.example
+!.env.*.example
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# secrets and local credentials
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.der
+*.der.b64
+id_rsa*
+id_ed25519*
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# caches
+.eslintcache
+.cache
+.bun-cache
+.vite
+*.tsbuildinfo
+
+# VCS and local tooling metadata
+.git
+.gitignore
+.github
+.agents
+.commandcode
+.opencode
+.vscode
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+testing/
+dev/
+!dev/compose.yml
+
+apps/anchor/config.toml
+apps/anchor/keys
+
+apps/frontend/.svelte-kit

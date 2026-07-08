@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "bun run --parallel --filter '*' dev",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "anchor:docker": "docker build -f apps/anchor/Dockerfile -t ghcr.io/novarumsocial/anchor:latest .",
+    "anchor:push": "docker push ghcr.io/novarumsocial/anchor:latest"
   },
   "devDependencies": {
     "@types/bun": "latest",
