@@ -1,30 +1,30 @@
 ---
-from: "0.11"
-to: "0.12"
+from: '0.11'
+to: '0.12'
 changes:
   - id: replace-verify-with-verify-marker
     summary: |
       The SQL runtime's `verify: { mode; requireMarker }` option is removed; replaced by `verifyMarker?: 'onFirstUse' | false` (default `'onFirstUse'`). The runtime no longer throws on contract-marker drift - instead it emits a structured `warn`-level log line once per runtime instance and proceeds with the query. Callers that previously caught `CONTRACT.MARKER_MISMATCH` to detect deploy-skew migrate to log scraping (filter on `code: 'CONTRACT.MARKER_MISMATCH'` / `code: 'CONTRACT.MARKER_MISSING'` from the runtime's `Log.warn` sink) or invoke the explicit `db-verify` CLI for fail-fast verification.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "verify:"
-        - "requireMarker"
+        - 'verify:'
+        - 'requireMarker'
       anyMatch: false
   - id: remove-capabilities-from-define-contract
     summary: |
       The `capabilities` field on the first argument of `defineContract({...}, ...)` is removed. Capabilities are now contributed automatically by extension packs and target components; declaring them by hand is no longer accepted and the contract builder will refuse the literal. Delete the `capabilities: { ... }` block from every `defineContract` call site, then re-emit your contract artefacts (`pnpm emit`, which runs `prisma-next contract emit`) to refresh `contract.json` / `contract.d.ts`. The regenerated artefacts pick up the contributor-declared capabilities - including two new ones in the 0.12 line, `postgres.distinctOn` and `sql.lateral`, which extensions contribute on your behalf when their pack is in `extensionPacks`.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "defineContract"
-        - "capabilities:"
+        - 'defineContract'
+        - 'capabilities:'
       anyMatch: false
   - id: strip-migration-labels-hints
     summary: |
       The 0.12 migration manifest schema is closed (`'+': 'reject'`) and the metadata model no longer carries `labels` or `hints`; any on-disk `migration.json` still holding either key fails to load with `INVALID_MANIFEST` naming the offending key. Both fields are also dropped from the content-addressed migration identity, so `migrationHash` is now computed over `{ from, to, providedInvariants, createdAt }` plus the sibling `ops.json`. Run the colocated codemod to strip both keys from every `migration.json` and recompute its `migrationHash` over the slimmed envelope.
     detection:
-      glob: "**/migration.json"
+      glob: '**/migration.json'
       contains:
         - '"labels"'
         - '"hints"'
@@ -34,7 +34,7 @@ changes:
     summary: |
       Re-emit Mongo contract artefacts so emitted `$jsonSchema` validators are closed (`additionalProperties: false` at every level, including polymorphic `oneOf` branches). Each non-variant Mongo model must resolve to an `objectId` `_id` before emit succeeds - otherwise interpret fails with `PSL_MONGO_ID_REQUIRED`. After re-emitting, apply the open→closed validator migration with `prisma-next db update -y`; the planner classifies the tightening as `destructive` and refuses without confirmation.
     detection:
-      glob: "**/contract.json"
+      glob: '**/contract.json'
       contains:
         - '"kind": "mongo-database"'
       anyMatch: true
@@ -43,7 +43,7 @@ changes:
     summary: |
       Un-namespaced Postgres models now emit under the `public` namespace instead of the `__unbound__` sentinel; explicit `namespace unbound { … }` in PSL still round-trips to `__unbound__`. Re-emit contract artefacts (`pnpm emit`, i.e. `prisma-next contract emit`) so `contract.json` / `contract.d.ts` pick up the new storage/domain namespace key (`__unbound__`/`postgres-unbound-schema` → `public`/`postgres-schema`). No hand-editing of emitted JSON is required when the PSL/TS contract source is unchanged.
     detection:
-      glob: "**/contract.json"
+      glob: '**/contract.json'
       contains:
         - '"kind": "postgres-unbound-schema"'
       anyMatch: true
@@ -52,7 +52,7 @@ changes:
     summary: |
       `contract.models` / `contract.valueObjects` moved under `contract.domain.namespaces.<ns>` (symmetric domain plane). Re-emit contract artefacts (`pnpm emit`) so emitted JSON and `contract.d.ts` carry the namespaced domain envelope; generated types switch from `Contract['models']` to `ContractModelsMap<Contract>`.
     detection:
-      glob: "**/contract.d.ts"
+      glob: '**/contract.d.ts'
       contains:
         - "Contract['models']"
       anyMatch: true
@@ -61,7 +61,7 @@ changes:
     summary: |
       Postgres runtime SQL now emits namespace-qualified table identifiers (e.g. `"public"."user"`). Flat `db.sql.*` / `db.*` call sites are unchanged. Update integration or snapshot tests that assert raw SQL strings. Re-emit contract artefacts only if you are still catching up an earlier 0.12 namespacing transition.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
         - 'FROM "user"'
       anyMatch: true
@@ -71,7 +71,7 @@ changes:
 
 ## `replace-verify-with-verify-marker`
 
-Starting at the 0.12 release, the SQL runtime's marker-verification API is simplified. The previous `verify: { mode; requireMarker }` option carried two concerns - *when* to verify and *whether to throw on absent markers* - both of which leaked internal implementation detail into the public API. The new option is a single discriminated union: `verifyMarker?: 'onFirstUse' | false`, with `'onFirstUse'` as the default.
+Starting at the 0.12 release, the SQL runtime's marker-verification API is simplified. The previous `verify: { mode; requireMarker }` option carried two concerns - _when_ to verify and _whether to throw on absent markers_ - both of which leaked internal implementation detail into the public API. The new option is a single discriminated union: `verifyMarker?: 'onFirstUse' | false`, with `'onFirstUse'` as the default.
 
 The runtime's response to contract-marker drift also changes. Previously the runtime threw `CONTRACT.MARKER_MISMATCH` (or `CONTRACT.MARKER_MISSING`) on every query when the database's contract hash didn't match the runtime's. From 0.12 onward, the runtime emits a structured `warn`-level log line **once per runtime instance** and proceeds with the query. The intent is to make rolling deploys safe by default: a drifted-but-running app surfaces the warning loudly without crashing every query for the duration of the deploy window.
 
@@ -183,7 +183,7 @@ export const contract = defineContract(
   },
   ({ field, model }) => {
     // … model definitions …
-  },
+  }
 );
 ```
 
@@ -199,7 +199,7 @@ export const contract = defineContract(
   },
   ({ field, model }) => {
     // … model definitions …
-  },
+  }
 );
 ```
 
@@ -298,7 +298,7 @@ After re-emitting and applying, run `pnpm typecheck && pnpm test` (or your appli
 
 Starting at the 0.12 release, un-namespaced Postgres models resolve to the `public` namespace id instead of falling back to the `__unbound__` sentinel. The emitted contract's default storage namespace key changes from `__unbound__` with `"kind": "postgres-unbound-schema"` to `public` with `"kind": "postgres-schema"`. Domain roots, FK `namespaceId` fields, and `contract.d.ts` namespace literals follow the same rename.
 
-Explicit opt-in to the sentinel remains available: `namespace unbound { … }` in PSL still round-trips to `__unbound__` on Postgres. Only contracts whose *default* namespace is still the old sentinel shape need this migration.
+Explicit opt-in to the sentinel remains available: `namespace unbound { … }` in PSL still round-trips to `__unbound__` on Postgres. Only contracts whose _default_ namespace is still the old sentinel shape need this migration.
 
 ### Re-emit Postgres contracts
 

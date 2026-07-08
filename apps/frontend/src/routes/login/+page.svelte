@@ -4,7 +4,8 @@
   import { zod4, zod4Client } from 'sveltekit-superforms/adapters';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { anchor } from '$lib/anchor.svelte';
+  import { onMount } from 'svelte';
+  import { useSession } from '$lib/session.svelte';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Form from '$lib/components/ui/form/index.js';
@@ -35,18 +36,7 @@
 
   let loading = $state(false);
   let submitError = $state('');
-
-  function getErrorMessage(error: unknown) {
-    if (error && typeof error === 'object' && 'error' in error) {
-      return String(error.error);
-    }
-
-    return 'Could not sign you in.';
-  }
-
-  function cookieWarning() {
-    return 'Sign-in worked, but your browser did not keep the session cookie. Enable third-party cookies for this site, then try again.';
-  }
+  const session = useSession();
 
   function safeRedirect(value: string | null) {
     if (!value || !value.startsWith('/') || value.startsWith('//')) return '/guilds';
@@ -54,13 +44,21 @@
     return value;
   }
 
+  onMount(() => {
+    void session.refresh().then(async (user) => {
+      if (user) {
+        await goto(safeRedirect(page.url.searchParams.get('redirect')));
+      }
+    });
+  });
+
   const form = superForm(defaults(zod4(loginSchema)), {
     SPA: true,
     validators: zod4Client(loginSchema),
     validationMethod: 'onsubmit',
     multipleSubmits: 'prevent',
     clearOnSubmit: 'none',
-		resetForm: false,
+    resetForm: false,
     onSubmit() {
       loading = true;
       submitError = '';
@@ -71,28 +69,14 @@
         return;
       }
 
-      try {
-        await anchor.setHomeServer(updatedForm.data.homeServer);
-      } catch {
-        submitError = 'Could not discover that home server.';
-        loading = false;
-        return;
-      }
-
-      const { error } = await anchor.client.auth.login.post({
+      const result = await session.login({
+        homeServer: updatedForm.data.homeServer,
         username: updatedForm.data.username,
         password: updatedForm.data.password,
       });
 
-      if (error) {
-        submitError = getErrorMessage(error.value);
-        loading = false;
-        return;
-      }
-
-      const me = await anchor.client.auth.me.get();
-      if (!me.data?.user) {
-        submitError = cookieWarning();
+      if (!result.ok) {
+        submitError = result.error;
         loading = false;
         return;
       }
@@ -149,7 +133,7 @@
                   <Input
                     {...props}
                     bind:value={$formData.homeServer}
-										name="homeServer"
+                    name="homeServer"
                     placeholder="novarum.social"
                     class="pl-8"
                     autocomplete="url"
@@ -172,7 +156,7 @@
                   <Input
                     {...props}
                     bind:value={$formData.username}
-										name="username"
+                    name="username"
                     placeholder="alice"
                     class="pl-8"
                     autocomplete="username"

@@ -89,7 +89,7 @@ function sortKeys(value: unknown): unknown {
   }
   const sorted: Record<string, unknown> = Object.create(null);
   for (const [key, entry] of Object.entries(value).sort(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
+    a < b ? -1 : a > b ? 1 : 0
   )) {
     sorted[key] = sortKeys(entry);
   }
@@ -259,7 +259,7 @@ async function processFile(path: string): Promise<Result> {
     parsed = JSON.parse(raw);
   } catch (error) {
     throw new Error(
-      `${path}: not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+      `${path}: not valid JSON (${error instanceof Error ? error.message : String(error)})`
     );
   }
   if (!isJsonObject(parsed)) {
@@ -334,7 +334,7 @@ for (const path of manifests) {
 
 console.log();
 console.log(
-  `${manifests.length} manifest(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'}, ${alreadyClean} already clean${skipped > 0 ? `, ${skipped} skipped (no ops.json)` : ''}.`,
+  `${manifests.length} manifest(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'}, ${alreadyClean} already clean${skipped > 0 ? `, ${skipped} skipped (no ops.json)` : ''}.`
 );
 
 if (dryRun && changed > 0) process.exit(1);

@@ -18,9 +18,7 @@
   let createOpen = $state(false);
 </script>
 
-<nav
-  class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3"
->
+<nav class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3">
   <button
     onclick={() => onSelect(undefined)}
     class="flex size-10 items-center justify-center text-base font-bold text-primary-foreground transition-opacity hover:opacity-80"
@@ -40,7 +38,9 @@
     {#if server.id !== 'home'}
       <button
         onclick={() => onSelect(server.id)}
-        class="flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down ? 'bg-destructive' : 'bg-primary'}"
+        class="flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
+          ? 'bg-destructive'
+          : 'bg-primary'}"
         class:ring-2={activeId === server.id}
         class:ring-primary={activeId === server.id}
         class:ring-offset-1={activeId === server.id}

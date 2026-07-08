@@ -58,11 +58,46 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       user: z.object({
         userId: z.string(),
         username: z.string(),
-        displayName: z.string(),
+        displayName: z.string().nullable(),
         homeserver: z.string(),
         isBot: z.boolean(),
         status: userStatusSchema,
       }),
+    }),
+  }),
+  z.object({
+    type: z.literal('voice.states.snapshot'),
+    data: z.object({
+      guildIds: z.array(z.string()),
+      states: z.array(
+        z.object({
+          guildId: z.string(),
+          channelId: z.string(),
+          userId: z.string(),
+          name: z.string().nullable(),
+        })
+      ),
+    }),
+  }),
+  z.object({
+    type: z.literal('voice.state.changed'),
+    data: z.object({
+      guildId: z.string(),
+      channelId: z.string(),
+      userId: z.string(),
+      name: z.string().nullable(),
+      connected: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('channel.typing'),
+    data: z.object({
+      channelId: z.string(),
+      userId: z.string(),
+      username: z.string(),
+      displayName: z.string().nullable(),
+      homeserver: z.string(),
+      time: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
     }),
   }),
 ]) satisfies z.ZodType<RealtimeEvent>;
@@ -124,12 +159,26 @@ class RealtimeState {
       }
       if (event.type === 'message.created') {
         chat.addMessage(event.data);
+        chat.clearTyping(event.data.channelId, event.data.author.id);
       }
       if (event.type === 'user.status.changed') {
         chat.updateMemberStatus(event.data.userId, event.data.status);
       }
       if (event.type === 'member.joined') {
         chat.addOrUpdateMember(event.data.guildId, event.data.user);
+      }
+      if (event.type === 'voice.states.snapshot') {
+        chat.setVoiceStates(event.data.guildIds, event.data.states);
+      }
+      if (event.type === 'voice.state.changed') {
+        chat.updateVoiceState(event.data);
+      }
+      if (event.type === 'channel.typing') {
+        chat.setTyping(
+          event.data.channelId,
+          event.data.userId,
+          event.data.displayName ?? event.data.username
+        );
       }
     });
 
@@ -143,6 +192,18 @@ class RealtimeState {
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'subscribe.guild', guildId });
+  }
+
+  joinVoice(channelId: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'voice.join', channelId });
+  }
+
+  leaveVoice() {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'voice.leave' });
   }
 }
 

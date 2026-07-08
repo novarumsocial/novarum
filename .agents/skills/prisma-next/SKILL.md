@@ -7,12 +7,12 @@ description: Route a vague Prisma Next prompt to the right specific skill. Use f
 
 > **Edit your data contract. Prisma handles the rest.**
 
-This skill exists to disambiguate vague Prisma Next prompts. When the user hasn't yet committed to a specific workflow (e.g. *"help me with Prisma Next"*, *"explain how Prisma Next works"*, *"I'm new to PN, where do I start?"*), this skill fires and routes them to the right specific skill.
+This skill exists to disambiguate vague Prisma Next prompts. When the user hasn't yet committed to a specific workflow (e.g. _"help me with Prisma Next"_, _"explain how Prisma Next works"_, _"I'm new to PN, where do I start?"_), this skill fires and routes them to the right specific skill.
 
 ## When to Use
 
 - The user has not yet stated a concrete task.
-- The user types a meta-question about Prisma Next (*"what is Prisma Next?"*, *"how does PN compare to Drizzle/Prisma 7?"*).
+- The user types a meta-question about Prisma Next (_"what is Prisma Next?"_, _"how does PN compare to Drizzle/Prisma 7?"_).
 - The user asks for a tour, an overview, or a starting point.
 
 ## When Not to Use
@@ -34,19 +34,19 @@ If the user's prompt clearly matches one of the workflow skills, route there dir
 
 Otherwise, ask **one** disambiguating question. Pick from:
 
-- *"Are you new to Prisma Next and asking what you can do with it, or where to start?"* (and any *"what can I do with Prisma Next?"* / *"I just ran createprisma"* variant) → `prisma-next-quickstart` (first-touch orientation path).
-- *"Do you want to set up a new Prisma Next project, or wire it into an existing database?"* → `prisma-next-quickstart`.
-- *"Do you want to edit your data contract (add a model / field / relation), or work with the database (migrations, queries)?"* → `prisma-next-contract` vs the others.
-- *"Is this about authoring a migration, or about reviewing what's going to run on deploy?"* → `prisma-next-migrations` vs `prisma-next-migration-review`.
-- *"Is this about wiring Prisma Next into your build tool (Vite / Next.js / …), or about wiring `db.ts` and middleware at runtime?"* → `prisma-next-build` vs `prisma-next-runtime`.
-- *"What error or symptom are you seeing?"* → `prisma-next-debug`.
-- *"Do you want to report this as a bug to the Prisma Next team, or is this a feature request?"* → `prisma-next-feedback`.
+- _"Are you new to Prisma Next and asking what you can do with it, or where to start?"_ (and any _"what can I do with Prisma Next?"_ / _"I just ran createprisma"_ variant) → `prisma-next-quickstart` (first-touch orientation path).
+- _"Do you want to set up a new Prisma Next project, or wire it into an existing database?"_ → `prisma-next-quickstart`.
+- _"Do you want to edit your data contract (add a model / field / relation), or work with the database (migrations, queries)?"_ → `prisma-next-contract` vs the others.
+- _"Is this about authoring a migration, or about reviewing what's going to run on deploy?"_ → `prisma-next-migrations` vs `prisma-next-migration-review`.
+- _"Is this about wiring Prisma Next into your build tool (Vite / Next.js / …), or about wiring `db.ts` and middleware at runtime?"_ → `prisma-next-build` vs `prisma-next-runtime`.
+- _"What error or symptom are you seeing?"_ → `prisma-next-debug`.
+- _"Do you want to report this as a bug to the Prisma Next team, or is this a feature request?"_ → `prisma-next-feedback`.
 
 If you still can't tell which skill applies, ask the user what they want to do. Do not guess.
 
 ## The canonical model (one paragraph)
 
-Prisma Next is a contract-first data layer. You author a **data contract** (a `contract.prisma` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces on SQL targets: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw(...)`). On MongoDB targets only the ORM lane exists, and its keys are collection storage names (`db.orm.users`) rather than PSL model names - `prisma-next-queries` § *MongoDB ORM addressing* covers the rule. Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
+Prisma Next is a contract-first data layer. You author a **data contract** (a `contract.prisma` file, or a TypeScript builder). The framework emits machine-readable artifacts (`contract.json`, `contract.d.ts`) and gives you three runtime surfaces on SQL targets: a typed SQL query builder (`db.sql.from(...)`), a typed ORM client (`db.orm.User.select(...)`), and a raw SQL escape hatch (`db.sql.raw(...)`). On MongoDB targets only the ORM lane exists, and its keys are collection storage names (`db.orm.users`) rather than PSL model names - `prisma-next-queries` § _MongoDB ORM addressing_ covers the rule. Migrations are planned from the contract diff; you review them, optionally edit the `migration.ts` for data transforms, and apply.
 
 Three steps the user does:
 

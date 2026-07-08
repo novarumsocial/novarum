@@ -1,15 +1,8 @@
 import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { anchor } from '$lib/anchor.svelte';
-import type {
-  Author,
-  Channel,
-  ChannelCategory,
-  ChatRoute,
-  Message,
-  Server,
-  VoiceUser,
-} from '$lib/types/chat';
+import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from '$lib/types/chat';
+import { useSession } from './session.svelte';
 
 function initialsFor(name: string) {
   const initials = name
@@ -43,11 +36,27 @@ type AddMessageInput = {
 type ChannelMemberInput = {
   userId: string;
   username: string;
-  displayName: string;
+  displayName?: string | null;
   homeserver: string;
   isBot: boolean;
   status: 'ONLINE' | 'OFFLINE';
 };
+
+type VoicePresenceInput = {
+  guildId: string;
+  channelId: string;
+  userId: string;
+  name: string | null;
+};
+
+type TypingInput = {
+  userId: string;
+  name: string;
+  expiresAt: number;
+};
+
+const typingRequestIntervalMs = 5_000;
+const typingExpiryMs = 6_000;
 
 function messageFromInput(message: AddMessageInput): Message {
   return {
@@ -133,8 +142,10 @@ class ChatState {
   messagesByChannel = $state<Record<string, Message[]>>({});
   messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
-  voiceUsers = $state<VoiceUser[]>([]);
+  voiceStates = $state<Record<string, VoicePresenceInput[]>>({});
+  typingByChannel = $state<Record<string, TypingInput[]>>({});
   private loadedChannel: string | null = null;
+  private lastTypingByChannel = new Map<string, number>();
 
   route = $derived(currentRoute());
   activeServer = $derived(this.route.kind === 'guild' ? this.route.serverId : null);
@@ -170,6 +181,12 @@ class ChatState {
     return this.currentChannel
       ? (this.messagesLoadingByChannel[this.currentChannel.id] ?? false)
       : false;
+  }
+
+  get currentTyping() {
+    if (!this.currentChannel) return [];
+
+    return this.typingByChannel[this.currentChannel.id] ?? [];
   }
 
   selectServer(id?: string) {
@@ -292,6 +309,44 @@ class ChatState {
     this.members = this.members.map((item, index) => (index === existing ? nextMember : item));
   }
 
+  setVoiceStates(guildIds: string[], states: VoicePresenceInput[]) {
+    const guildSet = new Set(guildIds);
+    const next = Object.fromEntries(
+      Object.entries(this.voiceStates).filter(([, channelStates]) =>
+        channelStates.some((state) => !guildSet.has(state.guildId))
+      )
+    );
+
+    for (const state of states) {
+      next[state.channelId] = (next[state.channelId] ?? []).filter(
+        (item) => item.userId !== state.userId
+      );
+    }
+    for (const state of states) {
+      next[state.channelId] = [...(next[state.channelId] ?? []), state];
+    }
+
+    this.voiceStates = next;
+  }
+
+  updateVoiceState(state: VoicePresenceInput & { connected: boolean }) {
+    const next = { ...this.voiceStates };
+
+    for (const [channelId, states] of Object.entries(next)) {
+      const filtered = states.filter((item) => item.userId !== state.userId);
+      if (filtered.length === states.length) continue;
+
+      if (filtered.length === 0) delete next[channelId];
+      else next[channelId] = filtered;
+    }
+
+    if (state.connected) {
+      next[state.channelId] = [...(next[state.channelId] ?? []), state];
+    }
+
+    this.voiceStates = next;
+  }
+
   private setChannelMessages(channelId: string, messages: Message[]) {
     this.messagesByChannel = {
       ...this.messagesByChannel,
@@ -347,6 +402,65 @@ class ChatState {
         [channelId]: false,
       };
     }
+  }
+
+  async onTyping() {
+    if (!this.activeChannel) return;
+
+    const now = Date.now();
+    const lastTyping = this.lastTypingByChannel.get(this.activeChannel) ?? 0;
+    if (now - lastTyping < typingRequestIntervalMs) {
+      return;
+    }
+
+    this.lastTypingByChannel.set(this.activeChannel, now);
+    const result = await anchor.client.channel({ id: this.activeChannel }).typing.post();
+
+    if (result.error || !result.data || 'error' in result.data) {
+      console.error('Failed to send typing event', result.error ?? result.data);
+    }
+  }
+
+  setTyping(channelId: string, userId: string, name: string) {
+    const session = useSession();
+
+    if (!session.user) return;
+    if (userId === session.user.id) return;
+
+    const expiresAt = Date.now() + typingExpiryMs;
+    const typing = this.typingByChannel[channelId] ?? [];
+    const nextTyping = typing.filter((item) => item.userId !== userId);
+
+    nextTyping.push({ userId, name, expiresAt });
+
+    this.typingByChannel = {
+      ...this.typingByChannel,
+      [channelId]: nextTyping,
+    };
+
+    setTimeout(() => this.expireTyping(channelId, userId, expiresAt), typingExpiryMs);
+  }
+
+  clearTyping(channelId: string, userId: string) {
+    const nextTyping = (this.typingByChannel[channelId] ?? []).filter(
+      (item) => item.userId !== userId
+    );
+
+    this.typingByChannel = {
+      ...this.typingByChannel,
+      [channelId]: nextTyping,
+    };
+  }
+
+  private expireTyping(channelId: string, userId: string, expiresAt: number) {
+    const nextTyping = (this.typingByChannel[channelId] ?? []).filter(
+      (item) => item.userId !== userId || item.expiresAt !== expiresAt
+    );
+
+    this.typingByChannel = {
+      ...this.typingByChannel,
+      [channelId]: nextTyping,
+    };
   }
 
   async loadMembers(channelId: string) {

@@ -1,11 +1,11 @@
 ---
-from: "0.9"
-to: "0.10"
+from: '0.9'
+to: '0.10'
 changes:
   - id: stamp-storage-types-kind-on-contract-snapshots
     summary: Stamp the `kind` discriminator (`"codec-instance"` / `"postgres-enum"`) on every entry in `storage.types` inside every committed `start-contract.json` / `end-contract.json` snapshot (extension seed migrations included). The SQL family's contract serializer is now strict - untagged entries fail to load with a deserializer diagnostic naming the offending entry.
     detection:
-      glob: "**/migrations/**/{start,end}-contract.json"
+      glob: '**/migrations/**/{start,end}-contract.json'
       contains:
         - '"codecId"'
       anyMatch: true
@@ -13,10 +13,10 @@ changes:
   - id: stamp-storage-types-kind-in-source
     summary: Wrap untagged codec-triple inputs to `SqlStorage` (or any builder that materialises `storage.types`) with `toStorageTypeInstance(...)`, and use the target-specific `PostgresEnumType` class for Postgres-enum entries - the `SqlStorage` constructor now throws on untagged entries instead of papering over them.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "storage.types"
-        - "codecId"
+        - 'storage.types'
+        - 'codecId'
       anyMatch: true
 ---
 
@@ -37,10 +37,10 @@ Before 0.10, seed snapshots looked like this:
       "Embedding1536": {
         "codecId": "pg/vector@1",
         "nativeType": "vector",
-        "typeParams": { "length": 1536 }
-      }
-    }
-  }
+        "typeParams": { "length": 1536 },
+      },
+    },
+  },
 }
 ```
 
@@ -54,10 +54,10 @@ Starting at 0.10 the same entries must look like this:
         "kind": "codec-instance",
         "codecId": "pg/vector@1",
         "nativeType": "vector",
-        "typeParams": { "length": 1536 }
-      }
-    }
-  }
+        "typeParams": { "length": 1536 },
+      },
+    },
+  },
 }
 ```
 

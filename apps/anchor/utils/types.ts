@@ -54,10 +54,41 @@ export type RealtimeEvent =
         user: {
           userId: string;
           username: string;
-          displayName: string;
+          displayName: string | null;
           homeserver: string;
           isBot: boolean;
           status: 'ONLINE' | 'OFFLINE';
         };
       };
+    }
+  | {
+      type: 'voice.states.snapshot';
+      data: {
+        guildIds: string[];
+        states: VoicePresence[];
+      };
+    }
+  | {
+      type: 'voice.state.changed';
+      data: VoicePresence & {
+        connected: boolean;
+      };
+    }
+  | {
+      type: 'channel.typing';
+      data: {
+        channelId: string;
+        userId: string;
+        username: string;
+        displayName: string | null;
+        homeserver: string;
+        time: string;
+      };
     };
+
+export type VoicePresence = {
+  guildId: string;
+  channelId: string;
+  userId: string;
+  name: string | null;
+};

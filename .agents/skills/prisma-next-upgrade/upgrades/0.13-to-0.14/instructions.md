@@ -1,6 +1,6 @@
 ---
-from: "0.13"
-to: "0.14"
+from: '0.13'
+to: '0.14'
 changes:
   - id: uuid-preset-rename
     summary: |
@@ -11,11 +11,11 @@ changes:
       `field.uuidNative()` / `field.id.uuidv4Native()` / `field.id.uuidv7Native()`
       presets from `@prisma-next/postgres/contract-builder`.
     detection:
-      glob: "**/*.ts"
+      glob: '**/*.ts'
       contains:
-        - "field.uuid()"
-        - "field.id.uuidv4()"
-        - "field.id.uuidv7()"
+        - 'field.uuid()'
+        - 'field.id.uuidv4()'
+        - 'field.id.uuidv7()'
       anyMatch: true
     script: uuid-preset-rename.ts
   - id: qualify-flat-builder-accessors
@@ -33,10 +33,10 @@ changes:
       is no codemod: the correct namespace is the one each table/model is declared in, which
       is call-site-specific.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "db.sql."
-        - "db.orm."
+        - 'db.sql.'
+        - 'db.orm.'
       anyMatch: true
   - id: sql-runtime-base-class-naming
     summary: |
@@ -47,11 +47,11 @@ changes:
       depend on in extension and app code. App code using the facade factories
       (`postgres(...)`, `sqlite(...)`) is unaffected.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "SqlRuntime"
-        - "PostgresRuntime"
-        - "SqliteRuntime"
+        - 'SqlRuntime'
+        - 'PostgresRuntime'
+        - 'SqliteRuntime'
       anyMatch: true
   - id: create-runtime-removed
     summary: |
@@ -61,9 +61,9 @@ changes:
       `new SqliteRuntimeImpl({...})` from `@prisma-next/sqlite/runtime`. App code
       using the facade factories (`postgres(...)`, `sqlite(...)`) is unaffected.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "createRuntime"
+        - 'createRuntime'
   - id: migration-op-factories-to-methods
     summary: |
       The bare migration op factory functions are removed from
@@ -71,7 +71,7 @@ changes:
       the corresponding method on `this` inside your `Migration` subclass. The
       option shapes changed from positional arguments to a single options object.
     detection:
-      glob: "**/migration.ts"
+      glob: '**/migration.ts'
       contains:
         - "from '@prisma-next/postgres/migration'"
         - "from '@prisma-next/target-postgres/migration'"
@@ -87,9 +87,9 @@ changes:
       switch to `new PostgresContractSerializer()` imported from
       `@prisma-next/target-postgres/runtime`.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "SqlContractSerializer"
+        - 'SqlContractSerializer'
   - id: enum-becomes-domain-concept
     summary: |
       The PSL `enum` keyword now authors the domain enum (a text-class column whose
@@ -108,10 +108,10 @@ changes:
       column to text USING ::text, add the value-set CHECK, DROP TYPE) - `contract
       infer` refuses native enum types by design and names them in its diagnostic.
     detection:
-      glob: "**/*.prisma"
+      glob: '**/*.prisma'
       contains:
-        - "enum "
-        - "enum2 "
+        - 'enum '
+        - 'enum2 '
       anyMatch: true
   - id: generated-models-export-removed
     summary: |
@@ -122,9 +122,9 @@ changes:
       for a standard single-schema Postgres project, `__unbound__` for SQLite or
       Mongo). Re-emit the contract to drop the export.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "Models"
+        - 'Models'
 ---
 
 <!--
@@ -162,9 +162,9 @@ or public-API change. Incidental substrate diff only.
 
 The uuid field preset names now include the storage encoding suffix:
 
-| Before | After |
-| --- | --- |
-| `field.uuid()` | `field.uuidString()` |
+| Before              | After                     |
+| ------------------- | ------------------------- |
+| `field.uuid()`      | `field.uuidString()`      |
 | `field.id.uuidv4()` | `field.id.uuidv4String()` |
 | `field.id.uuidv7()` | `field.id.uuidv7String()` |
 
@@ -190,7 +190,7 @@ No change to `contract.json` - both the old and new preset names emit the same c
 
 The query builder and ORM client are now **always qualified by namespace**. The flat by-bare-name accessors are gone: there is no `sql.<table>` and no `orm.<Model>` at the builder layer, and the **Postgres** facade exposes the qualified surface (`db.sql` / `db.orm` are the namespace map). You reach a table or model by naming its namespace.
 
-Namespace selection separates *which namespace's table* from *the ergonomic shorthand for the single-namespace case*. The builder layer always names the namespace; the single-namespace shorthand is recovered by the facade on targets that have only one namespace (SQLite, Mongo).
+Namespace selection separates _which namespace's table_ from _the ergonomic shorthand for the single-namespace case_. The builder layer always names the namespace; the single-namespace shorthand is recovered by the facade on targets that have only one namespace (SQLite, Mongo).
 
 ### Who needs to change code
 
@@ -267,7 +267,12 @@ const db = postgres({ contract, ...opts });
 
 // Or construct the target class directly (for advanced/test use)
 import { PostgresRuntimeImpl } from '@prisma-next/postgres/runtime';
-const runtime = new PostgresRuntimeImpl({ adapter: stackInstance.adapter, context, driver, ...opts });
+const runtime = new PostgresRuntimeImpl({
+  adapter: stackInstance.adapter,
+  context,
+  driver,
+  ...opts,
+});
 ```
 
 The constructor options are identical to what `createRuntime` accepted, except `stackInstance` is not taken: pass `adapter` from `stackInstance.adapter` directly.
@@ -280,16 +285,16 @@ The option shapes also changed: positional arguments are replaced by a single op
 
 Remove the bare names from your import and replace each call-site:
 
-| Before (bare function) | After (method) |
-| --- | --- |
-| `dropColumn(schema, table, column)` | `this.dropColumn({ schema, table, column })` |
-| `setNotNull(schema, table, column)` | `this.setNotNull({ schema, table, column })` |
-| `setDefault(schema, table, column, defaultSql)` | `this.setDefault({ schema, table, column, defaultSql })` |
-| `addPrimaryKey(schema, table, name, columns)` | `this.addPrimaryKey({ schema, table, constraint: name, columns })` |
+| Before (bare function)                                                  | After (method)                                                                               |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `dropColumn(schema, table, column)`                                     | `this.dropColumn({ schema, table, column })`                                                 |
+| `setNotNull(schema, table, column)`                                     | `this.setNotNull({ schema, table, column })`                                                 |
+| `setDefault(schema, table, column, defaultSql)`                         | `this.setDefault({ schema, table, column, defaultSql })`                                     |
+| `addPrimaryKey(schema, table, name, columns)`                           | `this.addPrimaryKey({ schema, table, constraint: name, columns })`                           |
 | `addForeignKey(schema, table, { name, columns, references, onDelete })` | `this.addForeignKey({ schema, table, foreignKey: { name, columns, references, onDelete } })` |
-| `addCheckConstraint(schema, table, name, column, values)` | `this.addCheckConstraint({ schema, table, constraint: name, column, values })` |
-| `createIndex(schema, table, indexName, columns)` | `this.createIndex({ schema, table, index: indexName, columns })` |
-| `installExtension({ id, extensionName, invariantId })` | `this.installExtension({ id, extensionName, invariantId })` |
+| `addCheckConstraint(schema, table, name, column, values)`               | `this.addCheckConstraint({ schema, table, constraint: name, column, values })`               |
+| `createIndex(schema, table, indexName, columns)`                        | `this.createIndex({ schema, table, index: indexName, columns })`                             |
+| `installExtension({ id, extensionName, invariantId })`                  | `this.installExtension({ id, extensionName, invariantId })`                                  |
 
 Example:
 
@@ -392,7 +397,7 @@ import { defineContract, enumType, member } from '@prisma-next/postgres/contract
 const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 const UserType = enumType('user_type', pgText, member('admin', 'admin'), member('user', 'user'));
 
-export const contract = defineContract({ /* … */ }, ({ field, model }) => ({
+export const contract = defineContract({/* … */}, ({ field, model }) => ({
   enums: { user_type: UserType },
   models: {
     User: model('User', {

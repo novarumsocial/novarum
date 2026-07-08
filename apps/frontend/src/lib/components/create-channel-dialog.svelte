@@ -78,11 +78,11 @@
 
     <form method="POST" class="space-y-4" onsubmit={handleSubmit}>
       <div class="grid gap-1.5">
-        <label for="channel-name" class="text-xs font-medium text-foreground">
-          Channel Name
-        </label>
+        <label for="channel-name" class="text-xs font-medium text-foreground"> Channel Name </label>
         <div class="relative">
-          <Hash class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Hash
+            class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             id="channel-name"
             bind:value={name}
@@ -102,7 +102,7 @@
             type="button"
             class={cn(
               'flex items-center gap-2 border border-border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent',
-              type === 'TEXT' && 'border-primary bg-primary/10',
+              type === 'TEXT' && 'border-primary bg-primary/10'
             )}
             onclick={() => (type = 'TEXT')}
           >
@@ -113,7 +113,7 @@
             type="button"
             class={cn(
               'flex items-center gap-2 border border-border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent',
-              type === 'VOICE' && 'border-primary bg-primary/10',
+              type === 'VOICE' && 'border-primary bg-primary/10'
             )}
             onclick={() => (type = 'VOICE')}
           >
@@ -128,9 +128,7 @@
       {/if}
 
       <Dialog.Footer class="border-t border-border pt-3">
-        <Button type="button" variant="ghost" onclick={() => (open = false)}>
-          Cancel
-        </Button>
+        <Button type="button" variant="ghost" onclick={() => (open = false)}>Cancel</Button>
         <Button type="submit" disabled={loading || !name.trim()}>
           {#if loading}
             <LoaderCircle class="size-4 animate-spin" />

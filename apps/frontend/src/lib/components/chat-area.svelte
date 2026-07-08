@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Hash, Globe, Volume2 } from '@lucide/svelte';
+  import { chat } from '$lib/chat-state.svelte';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
@@ -18,6 +19,15 @@
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
 
+  const typingText = $derived.by(() => {
+    const typing = chat.currentTyping;
+    if (typing.length === 0) return null;
+    if (typing.length === 1) return `${typing[0].name} is typing...`;
+    if (typing.length === 2) return `${typing[0].name} and ${typing[1].name} are typing...`;
+
+    return 'Several people are typing...';
+  });
+
   $effect(() => {
     channel.id;
     loading;
@@ -31,7 +41,7 @@
   });
 </script>
 
-<div class="flex flex-1 flex-col bg-background">
+<div class="flex min-w-0 flex-1 flex-col bg-background">
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
     {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />
@@ -45,7 +55,7 @@
     {/if}
   </div>
 
-  <div bind:this={scrollContainer} class="flex-1 overflow-y-auto">
+  <div bind:this={scrollContainer} class="min-w-0 flex-1 overflow-y-auto">
     <div class="flex min-h-full flex-col justify-end px-4 py-4">
       {#if loading}
         <div class="space-y-5">
@@ -86,5 +96,9 @@
     </div>
   </div>
 
-  <MessageInput placeholder="Message #{channel.name}" {onSend} />
+  <div class="flex h-6 shrink-0 items-center px-4 text-xs text-muted-foreground" aria-live="polite">
+    {typingText ?? ''}
+  </div>
+
+  <MessageInput placeholder="Message #{channel.name}" {onSend} onTyping={() => chat.onTyping()} />
 </div>

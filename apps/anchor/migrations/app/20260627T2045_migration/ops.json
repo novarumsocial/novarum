@@ -16,9 +16,7 @@
       {
         "description": "ensure table \"channel\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel\""
-        ]
+        "params": ["\"public\".\"channel\""]
       }
     ],
     "execute": [
@@ -32,9 +30,7 @@
       {
         "description": "verify table \"channel\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel\""
-        ]
+        "params": ["\"public\".\"channel\""]
       }
     ]
   },
@@ -55,9 +51,7 @@
       {
         "description": "ensure table \"federation_nonce\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"federation_nonce\""
-        ]
+        "params": ["\"public\".\"federation_nonce\""]
       }
     ],
     "execute": [
@@ -71,9 +65,7 @@
       {
         "description": "verify table \"federation_nonce\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"federation_nonce\""
-        ]
+        "params": ["\"public\".\"federation_nonce\""]
       }
     ]
   },
@@ -94,9 +86,7 @@
       {
         "description": "ensure table \"guild\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild\""
-        ]
+        "params": ["\"public\".\"guild\""]
       }
     ],
     "execute": [
@@ -110,9 +100,7 @@
       {
         "description": "verify table \"guild\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild\""
-        ]
+        "params": ["\"public\".\"guild\""]
       }
     ]
   },
@@ -133,9 +121,7 @@
       {
         "description": "ensure table \"guild_invite\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["\"public\".\"guild_invite\""]
       }
     ],
     "execute": [
@@ -149,9 +135,7 @@
       {
         "description": "verify table \"guild_invite\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["\"public\".\"guild_invite\""]
       }
     ]
   },
@@ -172,9 +156,7 @@
       {
         "description": "ensure table \"guild_member\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["\"public\".\"guild_member\""]
       }
     ],
     "execute": [
@@ -188,9 +170,7 @@
       {
         "description": "verify table \"guild_member\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["\"public\".\"guild_member\""]
       }
     ]
   },
@@ -211,9 +191,7 @@
       {
         "description": "ensure table \"homeserver_keys\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"homeserver_keys\""
-        ]
+        "params": ["\"public\".\"homeserver_keys\""]
       }
     ],
     "execute": [
@@ -227,9 +205,7 @@
       {
         "description": "verify table \"homeserver_keys\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"homeserver_keys\""
-        ]
+        "params": ["\"public\".\"homeserver_keys\""]
       }
     ]
   },
@@ -250,9 +226,7 @@
       {
         "description": "ensure table \"local_credential\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["\"public\".\"local_credential\""]
       }
     ],
     "execute": [
@@ -266,9 +240,7 @@
       {
         "description": "verify table \"local_credential\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["\"public\".\"local_credential\""]
       }
     ]
   },
@@ -289,9 +261,7 @@
       {
         "description": "ensure table \"message\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message\""
-        ]
+        "params": ["\"public\".\"message\""]
       }
     ],
     "execute": [
@@ -305,9 +275,7 @@
       {
         "description": "verify table \"message\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message\""
-        ]
+        "params": ["\"public\".\"message\""]
       }
     ]
   },
@@ -328,9 +296,7 @@
       {
         "description": "ensure table \"session\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"session\""
-        ]
+        "params": ["\"public\".\"session\""]
       }
     ],
     "execute": [
@@ -344,9 +310,7 @@
       {
         "description": "verify table \"session\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"session\""
-        ]
+        "params": ["\"public\".\"session\""]
       }
     ]
   },
@@ -367,9 +331,7 @@
       {
         "description": "ensure table \"user\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"user\""
-        ]
+        "params": ["\"public\".\"user\""]
       }
     ],
     "execute": [
@@ -383,9 +345,7 @@
       {
         "description": "verify table \"user\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"user\""
-        ]
+        "params": ["\"public\".\"user\""]
       }
     ]
   },
@@ -406,11 +366,7 @@
       {
         "description": "ensure constraint \"channel_guildId_name_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "channel_guildId_name_key",
-          "public",
-          "\"public\".\"channel\""
-        ]
+        "params": ["channel_guildId_name_key", "public", "\"public\".\"channel\""]
       }
     ],
     "execute": [
@@ -423,11 +379,7 @@
       {
         "description": "verify constraint \"channel_guildId_name_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "channel_guildId_name_key",
-          "public",
-          "\"public\".\"channel\""
-        ]
+        "params": ["channel_guildId_name_key", "public", "\"public\".\"channel\""]
       }
     ]
   },
@@ -448,11 +400,7 @@
       {
         "description": "ensure constraint \"federation_nonce_nonce_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "federation_nonce_nonce_key",
-          "public",
-          "\"public\".\"federation_nonce\""
-        ]
+        "params": ["federation_nonce_nonce_key", "public", "\"public\".\"federation_nonce\""]
       }
     ],
     "execute": [
@@ -465,11 +413,7 @@
       {
         "description": "verify constraint \"federation_nonce_nonce_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "federation_nonce_nonce_key",
-          "public",
-          "\"public\".\"federation_nonce\""
-        ]
+        "params": ["federation_nonce_nonce_key", "public", "\"public\".\"federation_nonce\""]
       }
     ]
   },
@@ -490,11 +434,7 @@
       {
         "description": "ensure constraint \"guild_invite_code_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_code_key",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_code_key", "public", "\"public\".\"guild_invite\""]
       }
     ],
     "execute": [
@@ -507,11 +447,7 @@
       {
         "description": "verify constraint \"guild_invite_code_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_code_key",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_code_key", "public", "\"public\".\"guild_invite\""]
       }
     ]
   },
@@ -532,11 +468,7 @@
       {
         "description": "ensure constraint \"local_credential_email_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "local_credential_email_key",
-          "public",
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["local_credential_email_key", "public", "\"public\".\"local_credential\""]
       }
     ],
     "execute": [
@@ -549,11 +481,7 @@
       {
         "description": "verify constraint \"local_credential_email_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "local_credential_email_key",
-          "public",
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["local_credential_email_key", "public", "\"public\".\"local_credential\""]
       }
     ]
   },
@@ -574,11 +502,7 @@
       {
         "description": "ensure constraint \"message_authorId_nonce_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_authorId_nonce_key",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_authorId_nonce_key", "public", "\"public\".\"message\""]
       }
     ],
     "execute": [
@@ -591,11 +515,7 @@
       {
         "description": "verify constraint \"message_authorId_nonce_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_authorId_nonce_key",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_authorId_nonce_key", "public", "\"public\".\"message\""]
       }
     ]
   },
@@ -616,11 +536,7 @@
       {
         "description": "ensure constraint \"user_username_homeserverName_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "user_username_homeserverName_key",
-          "public",
-          "\"public\".\"user\""
-        ]
+        "params": ["user_username_homeserverName_key", "public", "\"public\".\"user\""]
       }
     ],
     "execute": [
@@ -633,11 +549,7 @@
       {
         "description": "verify constraint \"user_username_homeserverName_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "user_username_homeserverName_key",
-          "public",
-          "\"public\".\"user\""
-        ]
+        "params": ["user_username_homeserverName_key", "public", "\"public\".\"user\""]
       }
     ]
   },
@@ -658,9 +570,7 @@
       {
         "description": "ensure index \"channel_guildId_position_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel_guildId_position_idx\""
-        ]
+        "params": ["\"public\".\"channel_guildId_position_idx\""]
       }
     ],
     "execute": [
@@ -673,9 +583,7 @@
       {
         "description": "verify index \"channel_guildId_position_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel_guildId_position_idx\""
-        ]
+        "params": ["\"public\".\"channel_guildId_position_idx\""]
       }
     ]
   },
@@ -696,9 +604,7 @@
       {
         "description": "ensure index \"channel_guildId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel_guildId_idx\""
-        ]
+        "params": ["\"public\".\"channel_guildId_idx\""]
       }
     ],
     "execute": [
@@ -711,9 +617,7 @@
       {
         "description": "verify index \"channel_guildId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"channel_guildId_idx\""
-        ]
+        "params": ["\"public\".\"channel_guildId_idx\""]
       }
     ]
   },
@@ -734,9 +638,7 @@
       {
         "description": "ensure index \"guild_ownerId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_ownerId_idx\""
-        ]
+        "params": ["\"public\".\"guild_ownerId_idx\""]
       }
     ],
     "execute": [
@@ -749,9 +651,7 @@
       {
         "description": "verify index \"guild_ownerId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_ownerId_idx\""
-        ]
+        "params": ["\"public\".\"guild_ownerId_idx\""]
       }
     ]
   },
@@ -772,9 +672,7 @@
       {
         "description": "ensure index \"guild_invite_guildId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite_guildId_idx\""
-        ]
+        "params": ["\"public\".\"guild_invite_guildId_idx\""]
       }
     ],
     "execute": [
@@ -787,9 +685,7 @@
       {
         "description": "verify index \"guild_invite_guildId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite_guildId_idx\""
-        ]
+        "params": ["\"public\".\"guild_invite_guildId_idx\""]
       }
     ]
   },
@@ -810,9 +706,7 @@
       {
         "description": "ensure index \"guild_invite_creatorId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite_creatorId_idx\""
-        ]
+        "params": ["\"public\".\"guild_invite_creatorId_idx\""]
       }
     ],
     "execute": [
@@ -825,9 +719,7 @@
       {
         "description": "verify index \"guild_invite_creatorId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_invite_creatorId_idx\""
-        ]
+        "params": ["\"public\".\"guild_invite_creatorId_idx\""]
       }
     ]
   },
@@ -848,9 +740,7 @@
       {
         "description": "ensure index \"guild_member_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member_userId_idx\""
-        ]
+        "params": ["\"public\".\"guild_member_userId_idx\""]
       }
     ],
     "execute": [
@@ -863,9 +753,7 @@
       {
         "description": "verify index \"guild_member_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member_userId_idx\""
-        ]
+        "params": ["\"public\".\"guild_member_userId_idx\""]
       }
     ]
   },
@@ -886,9 +774,7 @@
       {
         "description": "ensure index \"guild_member_guildId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member_guildId_idx\""
-        ]
+        "params": ["\"public\".\"guild_member_guildId_idx\""]
       }
     ],
     "execute": [
@@ -901,9 +787,7 @@
       {
         "description": "verify index \"guild_member_guildId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"guild_member_guildId_idx\""
-        ]
+        "params": ["\"public\".\"guild_member_guildId_idx\""]
       }
     ]
   },
@@ -924,9 +808,7 @@
       {
         "description": "ensure index \"local_credential_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ],
     "execute": [
@@ -939,9 +821,7 @@
       {
         "description": "verify index \"local_credential_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ]
   },
@@ -962,9 +842,7 @@
       {
         "description": "ensure index \"message_channelId_createdAt_id_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_channelId_createdAt_id_idx\""
-        ]
+        "params": ["\"public\".\"message_channelId_createdAt_id_idx\""]
       }
     ],
     "execute": [
@@ -977,9 +855,7 @@
       {
         "description": "verify index \"message_channelId_createdAt_id_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_channelId_createdAt_id_idx\""
-        ]
+        "params": ["\"public\".\"message_channelId_createdAt_id_idx\""]
       }
     ]
   },
@@ -1000,9 +876,7 @@
       {
         "description": "ensure index \"message_channelId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_channelId_idx\""
-        ]
+        "params": ["\"public\".\"message_channelId_idx\""]
       }
     ],
     "execute": [
@@ -1015,9 +889,7 @@
       {
         "description": "verify index \"message_channelId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_channelId_idx\""
-        ]
+        "params": ["\"public\".\"message_channelId_idx\""]
       }
     ]
   },
@@ -1038,9 +910,7 @@
       {
         "description": "ensure index \"message_authorId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_authorId_idx\""
-        ]
+        "params": ["\"public\".\"message_authorId_idx\""]
       }
     ],
     "execute": [
@@ -1053,9 +923,7 @@
       {
         "description": "verify index \"message_authorId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_authorId_idx\""
-        ]
+        "params": ["\"public\".\"message_authorId_idx\""]
       }
     ]
   },
@@ -1076,9 +944,7 @@
       {
         "description": "ensure index \"session_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"session_userId_idx\""
-        ]
+        "params": ["\"public\".\"session_userId_idx\""]
       }
     ],
     "execute": [
@@ -1091,9 +957,7 @@
       {
         "description": "verify index \"session_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"session_userId_idx\""
-        ]
+        "params": ["\"public\".\"session_userId_idx\""]
       }
     ]
   },
@@ -1114,11 +978,7 @@
       {
         "description": "ensure FK \"channel_guildId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "channel_guildId_fkey",
-          "public",
-          "\"public\".\"channel\""
-        ]
+        "params": ["channel_guildId_fkey", "public", "\"public\".\"channel\""]
       }
     ],
     "execute": [
@@ -1131,11 +991,7 @@
       {
         "description": "verify FK \"channel_guildId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "channel_guildId_fkey",
-          "public",
-          "\"public\".\"channel\""
-        ]
+        "params": ["channel_guildId_fkey", "public", "\"public\".\"channel\""]
       }
     ]
   },
@@ -1156,11 +1012,7 @@
       {
         "description": "ensure FK \"guild_ownerId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_ownerId_fkey",
-          "public",
-          "\"public\".\"guild\""
-        ]
+        "params": ["guild_ownerId_fkey", "public", "\"public\".\"guild\""]
       }
     ],
     "execute": [
@@ -1173,11 +1025,7 @@
       {
         "description": "verify FK \"guild_ownerId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_ownerId_fkey",
-          "public",
-          "\"public\".\"guild\""
-        ]
+        "params": ["guild_ownerId_fkey", "public", "\"public\".\"guild\""]
       }
     ]
   },
@@ -1198,11 +1046,7 @@
       {
         "description": "ensure FK \"guild_invite_creatorId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_creatorId_fkey",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_creatorId_fkey", "public", "\"public\".\"guild_invite\""]
       }
     ],
     "execute": [
@@ -1215,11 +1059,7 @@
       {
         "description": "verify FK \"guild_invite_creatorId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_creatorId_fkey",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_creatorId_fkey", "public", "\"public\".\"guild_invite\""]
       }
     ]
   },
@@ -1240,11 +1080,7 @@
       {
         "description": "ensure FK \"guild_invite_guildId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_guildId_fkey",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_guildId_fkey", "public", "\"public\".\"guild_invite\""]
       }
     ],
     "execute": [
@@ -1257,11 +1093,7 @@
       {
         "description": "verify FK \"guild_invite_guildId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_invite_guildId_fkey",
-          "public",
-          "\"public\".\"guild_invite\""
-        ]
+        "params": ["guild_invite_guildId_fkey", "public", "\"public\".\"guild_invite\""]
       }
     ]
   },
@@ -1282,11 +1114,7 @@
       {
         "description": "ensure FK \"guild_member_guildId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_member_guildId_fkey",
-          "public",
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["guild_member_guildId_fkey", "public", "\"public\".\"guild_member\""]
       }
     ],
     "execute": [
@@ -1299,11 +1127,7 @@
       {
         "description": "verify FK \"guild_member_guildId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_member_guildId_fkey",
-          "public",
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["guild_member_guildId_fkey", "public", "\"public\".\"guild_member\""]
       }
     ]
   },
@@ -1324,11 +1148,7 @@
       {
         "description": "ensure FK \"guild_member_userId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_member_userId_fkey",
-          "public",
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["guild_member_userId_fkey", "public", "\"public\".\"guild_member\""]
       }
     ],
     "execute": [
@@ -1341,11 +1161,7 @@
       {
         "description": "verify FK \"guild_member_userId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "guild_member_userId_fkey",
-          "public",
-          "\"public\".\"guild_member\""
-        ]
+        "params": ["guild_member_userId_fkey", "public", "\"public\".\"guild_member\""]
       }
     ]
   },
@@ -1366,11 +1182,7 @@
       {
         "description": "ensure FK \"local_credential_userId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "local_credential_userId_fkey",
-          "public",
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["local_credential_userId_fkey", "public", "\"public\".\"local_credential\""]
       }
     ],
     "execute": [
@@ -1383,11 +1195,7 @@
       {
         "description": "verify FK \"local_credential_userId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "local_credential_userId_fkey",
-          "public",
-          "\"public\".\"local_credential\""
-        ]
+        "params": ["local_credential_userId_fkey", "public", "\"public\".\"local_credential\""]
       }
     ]
   },
@@ -1408,11 +1216,7 @@
       {
         "description": "ensure FK \"message_channelId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_channelId_fkey",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_channelId_fkey", "public", "\"public\".\"message\""]
       }
     ],
     "execute": [
@@ -1425,11 +1229,7 @@
       {
         "description": "verify FK \"message_channelId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_channelId_fkey",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_channelId_fkey", "public", "\"public\".\"message\""]
       }
     ]
   },
@@ -1450,11 +1250,7 @@
       {
         "description": "ensure FK \"message_authorId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_authorId_fkey",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_authorId_fkey", "public", "\"public\".\"message\""]
       }
     ],
     "execute": [
@@ -1467,11 +1263,7 @@
       {
         "description": "verify FK \"message_authorId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_authorId_fkey",
-          "public",
-          "\"public\".\"message\""
-        ]
+        "params": ["message_authorId_fkey", "public", "\"public\".\"message\""]
       }
     ]
   },
@@ -1492,11 +1284,7 @@
       {
         "description": "ensure FK \"session_userId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "session_userId_fkey",
-          "public",
-          "\"public\".\"session\""
-        ]
+        "params": ["session_userId_fkey", "public", "\"public\".\"session\""]
       }
     ],
     "execute": [
@@ -1509,11 +1297,7 @@
       {
         "description": "verify FK \"session_userId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "session_userId_fkey",
-          "public",
-          "\"public\".\"session\""
-        ]
+        "params": ["session_userId_fkey", "public", "\"public\".\"session\""]
       }
     ]
   }

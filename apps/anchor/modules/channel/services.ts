@@ -8,9 +8,28 @@ import type { Contract } from '../../prisma/contract';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { getConfig } from '../../utils/config';
+import { AccessToken } from 'livekit-server-sdk';
+import {
+  livekitServiceClient,
+  livekitWebhookReceiver,
+  removeVoicePresence,
+  setVoicePresence,
+} from '../../utils/services/livekit';
+import { z } from 'zod';
+import { parseJson } from '../../utils/parseJson';
+
+const remoteErrorSchema = z.object({ error: z.string() });
+const callTokenResponseSchema = z.object({ serverUrl: z.string(), token: z.string() });
+const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 
 export const channel = new Elysia({ prefix: '/channel' })
-  .resolve(async ({ cookie, status }) => {
+  .resolve(async ({ cookie, status, request }) => {
+    // this has its own auth
+    if (new URL(request.url).pathname === '/channel/livekit/webhook') {
+      return;
+    }
+
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
     if (!session) {
@@ -22,6 +41,7 @@ export const channel = new Elysia({ prefix: '/channel' })
     '/create',
     async ({ body, session, server, status }) => {
       const { name, guildId, type } = body;
+      if (!session) return { error: 'Unauthorized' };
       if (parseFederatedGuildId(guildId)) {
         return status(400, { error: 'Cannot create channels on a federated guild' });
       }
@@ -68,6 +88,8 @@ export const channel = new Elysia({ prefix: '/channel' })
   .get(
     '/:id/users',
     async ({ params, session, status }) => {
+      if (!session) return status(401, { error: 'Unauthorized' });
+
       const channel = await db.orm.public.Channel.where({ id: params.id }).first();
       if (!channel) {
         return status(404, { error: 'Channel not found' });
@@ -91,13 +113,25 @@ export const channel = new Elysia({ prefix: '/channel' })
 
         if (!result) return status(502, { error: 'Could not reach remote homeserver' });
         if (!result.response.ok) {
-          return status(remoteStatus(result.response.status), result.data ?? { error: 'Remote users failed' });
+          const remoteError = remoteErrorSchema.safeParse(result.data);
+          const error = remoteError.success ? remoteError.data : { error: 'Remote users failed' };
+
+          if (result.response.status === 404) return status(404, error);
+          if (result.response.status === 401 || result.response.status === 403) {
+            return status(401, error);
+          }
+
+          return status(502, error);
         }
-        if (!result.data || typeof result.data !== 'object' || !Array.isArray((result.data as any).users)) {
+        if (
+          !result.data ||
+          typeof result.data !== 'object' ||
+          !Array.isArray((result.data as any).users)
+        ) {
           return status(502, { error: 'Remote users returned an invalid response' });
         }
 
-        return result.data;
+        return result.data as ChannelUsersResponse;
       }
 
       const members = (await db.orm.public.GuildMember.where({ guildId: channel.guildId })
@@ -107,7 +141,7 @@ export const channel = new Elysia({ prefix: '/channel' })
       const users = members.map((member) => ({
         userId: member.user.id as string,
         username: member.user.username as string,
-        displayName: member.user.displayName as string,
+        displayName: member.user.displayName as string | null,
         homeserver: member.user.homeserver as string,
         avatarUrl: (member.user.avatarUrl as string | null) ?? undefined,
         isBot: member.user.isBot as boolean,
@@ -125,7 +159,7 @@ export const channel = new Elysia({ prefix: '/channel' })
             t.Object({
               userId: t.String(),
               username: t.String(),
-              displayName: t.String(),
+              displayName: t.Union([t.String(), t.Null()]),
               homeserver: t.String(),
               avatarUrl: t.Optional(t.String()),
               isBot: t.Boolean(),
@@ -146,13 +180,211 @@ export const channel = new Elysia({ prefix: '/channel' })
         }),
       },
     }
-  );
+  )
+  .get('/:id/call/token', async ({ params, session, status }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
 
-function remoteStatus(status: number) {
-  if (status === 404) return 404;
-  if (status === 401 || status === 403) return 401;
-  return 502;
-}
+    const voiceConfig = getConfig().voice;
+    const federatedChannel = parseFederatedChannelId(params.id);
+    if (federatedChannel) {
+      const result = await postSignedFederationJson(
+        federatedChannel.homeserver,
+        `/federation/channels/${encodeURIComponent(federatedChannel.id)}/call/token`,
+        { user: federationUserPayload(session) }
+      ).catch(() => null);
+
+      if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+      if (!result.response.ok) {
+        const remoteError = remoteErrorSchema.safeParse(result.data);
+        const remoteStatus = [401, 403, 404].includes(result.response.status)
+          ? (result.response.status as 401 | 403 | 404)
+          : 502;
+        return status(
+          remoteStatus,
+          remoteError.success ? remoteError.data : { error: 'Remote call token failed' }
+        );
+      }
+      const callToken = callTokenResponseSchema.safeParse(result.data);
+      if (!callToken.success) {
+        return status(502, { error: 'Remote call token returned an invalid response' });
+      }
+
+      return callToken.data;
+    }
+
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel || channel.type !== 'VOICE') {
+      return status(404, { error: 'Channel not right' });
+    }
+
+    const membership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!membership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
+      identity: session.userId,
+      name: session.user.displayName || session.user.username,
+      ttl: '5m',
+      metadata: JSON.stringify({
+        channelId: channel.id,
+        guildId: channel.guildId,
+        userId: session.userId,
+      }),
+    });
+
+    token.addGrant({
+      roomJoin: true,
+      room: `voice:${channel.id}`,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    return {
+      serverUrl: voiceConfig.livekit_url,
+      token: await token.toJwt(),
+    };
+  })
+  .post('/:id/typing', async ({ params, session, status, server }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel) {
+      return status(404, { error: 'Channel not found' });
+    }
+
+    const channelMembership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!channelMembership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const federatedChannel = parseFederatedChannelId(params.id);
+    if (federatedChannel) {
+      const result = await postSignedFederationJson(
+        federatedChannel.homeserver,
+        `/federation/channels/${encodeURIComponent(federatedChannel.id)}/typing`,
+        { user: federationUserPayload(session) }
+      ).catch(() => null);
+
+      if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+      if (!result.response.ok) {
+        return status(result.response.status, result.data ?? { error: 'Remote typing failed' });
+      }
+    }
+
+    if (server) {
+      publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        type: 'channel.typing',
+        data: {
+          channelId: channel.id,
+          userId: session.userId,
+          username: session.user.username,
+          displayName: session.user.displayName,
+          homeserver: session.user.homeserver,
+          time: new Date().toISOString(),
+        },
+      });
+    }
+
+    return { ok: true };
+  })
+  .get('/:id/call/participants', async ({ params, session, status }) => {
+    if (!session) return status(401, { error: 'Unauthorized' });
+    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    if (!channel || channel.type !== 'VOICE') {
+      return status(404, { error: 'Channel not right' });
+    }
+
+    const channelMembership = await db.orm.public.GuildMember.where({
+      guildId: channel.guildId,
+      userId: session.userId,
+    }).first();
+    if (!channelMembership) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const participants = await livekitServiceClient.listParticipants(`voice:${channel.id}`);
+
+    return {
+      participants: participants.map((p) => ({
+        identity: p.identity,
+        name: p.name,
+        metadata: p.metadata,
+      })),
+    };
+  })
+  .post('/livekit/webhook', async ({ request, headers, server }) => {
+    const event = await livekitWebhookReceiver.receive(
+      await request.text(),
+      headers.authorization ?? ''
+    );
+
+    const userId = event.participant?.identity;
+    if (!userId) return { ok: true };
+
+    if (event.event === 'participant_left') {
+      const previous = removeVoicePresence(userId);
+      if (previous && server) {
+        publishRealtime(server, `guildEvents:${previous.guildId}`, {
+          type: 'voice.state.changed',
+          data: { ...previous, connected: false },
+        });
+      }
+      return { ok: true };
+    }
+
+    if (event.event !== 'participant_joined') return { ok: true };
+
+    // holy crap this code...
+    const metadata = livekitMetadataSchema.safeParse(
+      parseJson(event.participant?.metadata ?? '{}')
+    );
+    const channelId =
+      (metadata.success ? metadata.data.channelId : undefined) ??
+      event.room?.name?.replace(/^voice:/, '');
+
+    const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+    if (!channel) return { ok: true };
+
+    const state = {
+      guildId: channel.guildId,
+      channelId: channel.id,
+      userId,
+      name: event.participant?.name ?? null,
+    };
+
+    setVoicePresence(state);
+    if (server) {
+      publishRealtime(server, `guildEvents:${state.guildId}`, {
+        type: 'voice.state.changed',
+        data: { ...state, connected: true },
+      });
+    }
+
+    return { ok: true };
+  });
+
+type ChannelUsersResponse = {
+  users: ChannelUser[];
+};
+
+type ChannelUser = {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  homeserver: string;
+  avatarUrl?: string;
+  isBot: boolean;
+  status: 'ONLINE' | 'OFFLINE';
+  role: 'OWNER' | 'ADMIN' | 'MEMBER';
+  joinedAt: Date;
+};
 
 type ActuallyTypedMembers = DefaultModelRow<Contract, 'GuildMember'> & {
   user: DefaultModelRow<Contract, 'Users'>;

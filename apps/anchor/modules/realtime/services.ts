@@ -1,11 +1,17 @@
 import Elysia, { t } from 'elysia';
 import { db } from '../../prisma/db';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
-import { parseFederatedGuildId } from '../../utils/federationIds';
+import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import {
+  removeVoicePresence,
+  setVoicePresence,
+  voicePresenceForGuilds,
+} from '../../utils/services/livekit';
 
 const activeRealtimeConnections = new Map<string, number>();
+const federatedVoiceChannelsByUser = new Map<string, string>();
 
 function addUserConnection(userId: string) {
   const nextCount = (activeRealtimeConnections.get(userId) ?? 0) + 1;
@@ -29,10 +35,19 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
   cookie: t.Cookie({
     [sessionCookieName]: t.Optional(t.String()),
   }),
-  body: t.Object({
-    type: t.Literal('subscribe.guild'),
-    guildId: t.String(),
-  }),
+  body: t.Union([
+    t.Object({
+      type: t.Literal('subscribe.guild'),
+      guildId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('voice.join'),
+      channelId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('voice.leave'),
+    }),
+  ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
@@ -51,6 +66,14 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       ws.subscribe(`guildEvents:${membership.guildId}`);
     }
 
+    const guildIds = memberships.map((membership) => membership.guildId);
+    ws.send(
+      JSON.stringify({
+        type: 'voice.states.snapshot',
+        data: { guildIds, states: voicePresenceForGuilds(guildIds) },
+      })
+    );
+
     const becameOnline = addUserConnection(session.userId);
     if (!becameOnline) return;
 
@@ -63,6 +86,62 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     const session = ws.data.session as SessionWithUser | undefined;
     if (!session) return;
 
+    if (message.type === 'voice.leave') {
+      const previous = removeVoicePresence(session.userId);
+      if (previous) {
+        publishVoiceState(ws, previous, false);
+      }
+
+      leaveFederatedVoice(session);
+      return;
+    }
+
+    if (message.type === 'voice.join') {
+      const federatedChannel = parseFederatedChannelId(message.channelId);
+      if (federatedChannel) {
+        const result = await postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+          { user: federationUserPayload(session), connected: true }
+        ).catch(() => null);
+        if (!result?.response.ok || !result.data || typeof result.data !== 'object') return;
+
+        const remoteState = (result.data as { state?: { guildId?: string } }).state;
+        if (typeof remoteState?.guildId !== 'string') return;
+
+        const previous = removeVoicePresence(session.userId);
+        if (previous && previous.channelId !== message.channelId)
+          publishVoiceState(ws, previous, false);
+        leaveFederatedVoice(session, message.channelId);
+        federatedVoiceChannelsByUser.set(session.userId, message.channelId);
+        return;
+      }
+
+      leaveFederatedVoice(session);
+
+      const channel = await db.orm.public.Channel.where({ id: message.channelId }).first();
+      if (!channel || channel.type !== 'VOICE') return;
+
+      const membership = await db.orm.public.GuildMember.where({
+        guildId: channel.guildId,
+        userId: session.userId,
+      }).first();
+      if (!membership) return;
+
+      const previous = removeVoicePresence(session.userId);
+      if (previous && previous.channelId !== channel.id) publishVoiceState(ws, previous, false);
+
+      const state = {
+        guildId: channel.guildId,
+        channelId: channel.id,
+        userId: session.userId,
+        name: session.user.displayName || session.user.username,
+      };
+      setVoicePresence(state);
+      publishVoiceState(ws, state, true);
+      return;
+    }
+
     const membership = await db.orm.public.GuildMember.where({
       guildId: message.guildId,
       userId: session.userId,
@@ -70,11 +149,21 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     if (!membership) return;
 
     ws.subscribe(`guildEvents:${message.guildId}`);
+    ws.send(
+      JSON.stringify({
+        type: 'voice.states.snapshot',
+        data: { guildIds: [message.guildId], states: voicePresenceForGuilds([message.guildId]) },
+      })
+    );
   },
   async close(ws) {
     // @ts-ignore using it here
     const session = ws.data.session as SessionWithUser;
     if (!session) return;
+
+    const previous = removeVoicePresence(session.userId);
+    if (previous) publishVoiceState(ws, previous, false);
+    leaveFederatedVoice(session);
 
     const becameOffline = removeUserConnection(session.userId);
     if (!becameOffline) return;
@@ -85,6 +174,35 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     await publishUserStatus(ws, session, memberships, 'OFFLINE');
   },
 });
+
+function publishVoiceState(
+  ws: { publish(topic: string, data: string): void },
+  state: { guildId: string; channelId: string; userId: string; name: string | null },
+  connected: boolean
+) {
+  ws.publish(
+    `guildEvents:${state.guildId}`,
+    JSON.stringify({
+      type: 'voice.state.changed',
+      data: { ...state, connected },
+    })
+  );
+}
+
+function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string) {
+  const channelId = federatedVoiceChannelsByUser.get(session.userId);
+  if (!channelId || channelId === exceptChannelId) return;
+
+  federatedVoiceChannelsByUser.delete(session.userId);
+  const federatedChannel = parseFederatedChannelId(channelId);
+  if (!federatedChannel) return;
+
+  void postSignedFederationJson(
+    federatedChannel.homeserver,
+    `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+    { user: federationUserPayload(session), connected: false }
+  ).catch(() => null);
+}
 
 async function publishUserStatus(
   ws: { publish(topic: string, data: string): void },

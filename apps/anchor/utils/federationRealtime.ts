@@ -67,11 +67,46 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       user: z.object({
         userId: z.string(),
         username: z.string(),
-        displayName: z.string(),
+        displayName: z.string().nullable(),
         homeserver: z.string(),
         isBot: z.boolean(),
         status: userStatusSchema,
       }),
+    }),
+  }),
+  z.object({
+    type: z.literal('voice.states.snapshot'),
+    data: z.object({
+      guildIds: z.array(z.string()),
+      states: z.array(
+        z.object({
+          guildId: z.string(),
+          channelId: z.string(),
+          userId: z.string(),
+          name: z.string().nullable(),
+        })
+      ),
+    }),
+  }),
+  z.object({
+    type: z.literal('voice.state.changed'),
+    data: z.object({
+      guildId: z.string(),
+      channelId: z.string(),
+      userId: z.string(),
+      name: z.string().nullable(),
+      connected: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('channel.typing'),
+    data: z.object({
+      channelId: z.string(),
+      userId: z.string(),
+      username: z.string(),
+      displayName: z.string().nullable(),
+      homeserver: z.string(),
+      time: z.string(),
     }),
   }),
 ]) satisfies z.ZodType<RealtimeEvent>;
@@ -183,6 +218,41 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       data: {
         ...event.data,
         guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+      },
+    };
+  }
+
+  if (event.type === 'voice.states.snapshot') {
+    return {
+      ...event,
+      data: {
+        guildIds: event.data.guildIds.map((guildId) => makeFederatedGuildId(homeserver, guildId)),
+        states: event.data.states.map((state) => ({
+          ...state,
+          guildId: makeFederatedGuildId(homeserver, state.guildId),
+          channelId: makeFederatedChannelId(homeserver, state.channelId),
+        })),
+      },
+    };
+  }
+
+  if (event.type === 'voice.state.changed') {
+    return {
+      ...event,
+      data: {
+        ...event.data,
+        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
+      },
+    };
+  }
+
+  if (event.type === 'channel.typing') {
+    return {
+      ...event,
+      data: {
+        ...event.data,
+        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
       },
     };
   }

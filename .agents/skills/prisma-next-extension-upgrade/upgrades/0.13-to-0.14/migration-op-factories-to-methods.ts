@@ -256,7 +256,7 @@ function processFile(src: string): string {
 
 const raw = execSync(
   'git ls-files --cached --others --exclude-standard -- "**migration.ts" "migration.ts"',
-  { encoding: 'utf-8' },
+  { encoding: 'utf-8' }
 ).trim();
 
 const files = raw

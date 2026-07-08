@@ -12,6 +12,8 @@
   function formatTime(date: Date): string {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   }
+
+  const authorName = $derived(message.author.displayName || message.author.username);
 </script>
 
 <div class="flex gap-3" class:mt-1={grouped} class:mt-4={!grouped}>
@@ -20,7 +22,7 @@
       class="mt-0.5 flex size-9 shrink-0 items-center justify-center text-xs font-bold text-white {message
         .author.avatarColor}"
     >
-      {message.author.displayName.charAt(0).toUpperCase()}
+      {authorName.charAt(0).toUpperCase()}
     </div>
   {:else}
     <div class="w-9 shrink-0"></div>
@@ -30,14 +32,14 @@
     {#if !grouped}
       <div class="flex items-baseline gap-2">
         <span class="text-sm font-semibold text-foreground">
-          {message.author.displayName}
+          {authorName}
         </span>
         <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
         <span class="text-[10px] text-muted-foreground/50">{message.author.server}</span>
       </div>
     {/if}
 
-    <div class="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+    <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
       {message.content}
     </div>
   </div>

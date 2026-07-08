@@ -20,13 +20,15 @@
     "migration:plan": "bun prisma-next migration plan",
     "migrate": "bun prisma-next migrate",
     "migration:status": "bun prisma-next migration status",
-    "migration:show": "bun prisma-next migration show"
+    "migration:show": "bun prisma-next migration show",
+    "build": "bun build --compile --target bun --outfile ../../testing/server src/index.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
     "@prisma-next/postgres": "latest",
     "dotenv": "^17.4.2",
     "elysia": "latest",
+    "livekit-server-sdk": "^2.15.5",
     "toml": "^4.1.1",
     "zod": "^4.4.3"
   },

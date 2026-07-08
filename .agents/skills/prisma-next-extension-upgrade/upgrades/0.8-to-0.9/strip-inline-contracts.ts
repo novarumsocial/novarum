@@ -220,7 +220,7 @@ for (const path of manifests) {
 
 console.log();
 console.log(
-  `${manifests.length} manifest(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'}, ${alreadyClean} already clean.`,
+  `${manifests.length} manifest(s) scanned: ${changed} ${dryRun ? 'needing fix' : 'fixed'}, ${alreadyClean} already clean.`
 );
 
 if (dryRun && changed > 0) process.exit(1);

@@ -1,20 +1,22 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { anchor } from '$lib/anchor.svelte';
+  import { useSession } from '$lib/session.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
+  import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
   import ChatArea from './chat-area.svelte';
+  import VoiceArea from './voice-area.svelte';
   import InitialLoader from './initial-loader.svelte';
   import MemberSidebar from './member-sidebar.svelte';
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
 
-  type MeData = Awaited<ReturnType<typeof anchor.client.auth.me.get>>['data'];
+  const session = useSession();
 
-  let currentUser = $state<MeData | null>(null);
+  const currentUser = $derived(session.user);
   let booting = $state(true);
 
   const currentServer = $derived(chat.currentServer);
@@ -23,16 +25,39 @@
   const currentMessages = $derived(chat.currentMessages);
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
 
+  const voice = new Voice();
+  let joinedVoiceChannelId: string | null = null;
+
+  const voiceChannelName = $derived(
+    Object.values(chat.channelsByServer)
+      .flatMap((categories) => categories)
+      .flatMap((category) => category.channels)
+      .find((channel) => channel.id === voice.channelId)?.name ?? null
+  );
+
+  // Join voice channels when selected; keep the call alive while browsing text channels.
+  $effect(() => {
+    const channelId = currentChannel?.type === 'VOICE' ? currentChannel.id : null;
+    const userId = currentUser?.id ?? null;
+
+    if (!channelId || !userId) {
+      return;
+    }
+
+    if (joinedVoiceChannelId !== channelId) {
+      joinedVoiceChannelId = channelId;
+      void voice.join(channelId).catch(() => null);
+    }
+  });
+
   $effect(() => {
     if (!booting) chat.syncActiveChannel();
   });
 
   async function boot() {
-    const me = await anchor.client.auth.me.get();
+    const user = await session.refresh();
 
-    currentUser = me.data ?? null;
-
-    if (!currentUser) {
+    if (!user) {
       await goto('/login');
       return;
     }
@@ -41,11 +66,19 @@
     booting = false;
   }
 
+  function leaveVoice() {
+    joinedVoiceChannelId = null;
+    void voice.leave();
+  }
+
   onMount(() => {
     const disconnect = realtime.connect();
     void boot();
 
-    return disconnect;
+    return () => {
+      disconnect();
+      void voice.leave();
+    };
   });
 </script>
 
@@ -69,19 +102,24 @@
             onSelectChannel={(id: string) => chat.selectChannel(id)}
             onCreateChannel={async (channel: Channel) =>
               await chat.createChannel(currentServer.id, channel, channel.type)}
+            {voice}
+            members={chat.members}
+            voiceStates={chat.voiceStates}
           />
         {/if}
       </div>
-      <UserArea user={currentUser.user} />
+      <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
-    {#if currentChannel}
+    {#if currentChannel && currentChannel.type === 'TEXT'}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
         loading={currentMessagesLoading}
         onSend={(content) => chat.sendMessage(currentChannel.id, content)}
       />
+    {:else if currentChannel && currentChannel.type === 'VOICE'}
+      <VoiceArea channel={currentChannel} {voice} members={chat.members} onLeave={leaveVoice} />
     {:else}
       <main class="flex flex-1 items-center justify-center bg-background px-6">
         <div class="max-w-sm text-center">
@@ -90,6 +128,6 @@
         </div>
       </main>
     {/if}
-    <MemberSidebar members={chat.members} voiceUsers={chat.voiceUsers} />
+    <MemberSidebar members={chat.members} />
   </div>
 {/if}

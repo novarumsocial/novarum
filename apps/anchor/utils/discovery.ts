@@ -8,6 +8,15 @@ import { db } from '../prisma/db';
 
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 const discoveryCacheTtlMs = 5 * 60 * 1000;
+const discoveryFailureCacheTtlMs = 30 * 1000;
+
+class DiscoveryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DiscoveryError';
+    this.stack = `${this.name}: ${message}`;
+  }
+}
 
 type DiscoveredAnchor = {
   homeserver: string;
@@ -31,7 +40,11 @@ function anchorUrlFromHomeserver(homeserver: string) {
   return `${protocol}://${clean}`;
 }
 
-function normalizeFederationHomeserver(homeserver: string) {
+function normalizeFederationHomeserver(homeserver: unknown) {
+  if (typeof homeserver !== 'string') {
+    throw new DiscoveryError('Invalid homeserver name');
+  }
+
   const clean = homeserver.trim().replace(/\/+$/, '').toLowerCase();
   if (
     !clean ||
@@ -45,7 +58,7 @@ function normalizeFederationHomeserver(homeserver: string) {
     clean.includes('..') ||
     !homeserverPattern.test(clean)
   ) {
-    throw new Error('Invalid homeserver name');
+    throw new DiscoveryError('Invalid homeserver name');
   }
 
   return clean;
@@ -67,7 +80,7 @@ export async function discoverRemoteAnchor(homeserver: string, options?: { refre
     discoveryCache.set(clean, { expiresAt: Date.now() + discoveryCacheTtlMs, value });
     return value;
   } catch (error) {
-    discoveryCache.delete(clean);
+    discoveryCache.set(clean, { expiresAt: Date.now() + discoveryFailureCacheTtlMs, promise });
     throw error;
   }
 }
@@ -87,24 +100,32 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
 
     if (!response.ok) {
       await markHomeserverGuildStatus(clean, false);
-      console.log(
-        `failed to fetch discovery info from ${homeserver} (probably down?): ${response.status} ${response.statusText}`
+      throw new DiscoveryError(
+        `remote returned ${response.status} ${response.statusText || 'during discovery'}`
       );
     }
 
-    const data = (await response.json()) as AnchorInfo;
+    const data = (await response.json().catch(() => null)) as Partial<AnchorInfo> | null;
+    if (!data || typeof data !== 'object') {
+      throw new DiscoveryError(`Invalid discovery response for ${clean}`);
+    }
+
     const discoveredHomeserver = normalizeFederationHomeserver(data.homeserver);
     if (discoveredHomeserver !== clean) {
-      throw new Error(`Homeserver mismatch: expected ${clean}, got ${data.homeserver}`);
+      throw new DiscoveryError(`Homeserver mismatch: expected ${clean}, got ${data.homeserver}`);
     }
 
     if (data.publicKey?.algorithm !== 'ed25519' || !data.publicKey.id || !data.publicKey.key) {
-      throw new Error(`Invalid discovery public key for ${clean}`);
+      throw new DiscoveryError(`Invalid discovery public key for ${clean}`);
+    }
+
+    if (typeof data.baseUrl !== 'string' || typeof data.version !== 'string') {
+      throw new DiscoveryError(`Invalid discovery response for ${clean}`);
     }
 
     const baseUrl = new URL(data.baseUrl);
     if (baseUrl.search || baseUrl.hash || baseUrl.username || baseUrl.password) {
-      throw new Error(`Invalid discovery base URL for ${clean}`);
+      throw new DiscoveryError(`Invalid discovery base URL for ${clean}`);
     }
     await assertSafeFederationUrl(baseUrl);
 
@@ -117,7 +138,9 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       publicKey: data.publicKey,
     };
   } catch (error) {
-    console.error(`Error discovering remote anchor at ${discoveryUrl}:`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    const log = error instanceof DiscoveryError ? console.info : console.warn;
+    log(`Remote anchor unavailable at ${discoveryUrl}: ${message}`);
     throw error;
   }
 }

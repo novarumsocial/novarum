@@ -1,15 +1,15 @@
 ---
-from: "0.12"
-to: "0.13"
+from: '0.12'
+to: '0.13'
 changes:
   - id: sqlite-create-table-method
     summary: |
       SQLite migrations: `createTable` is no longer a free function exported from `@prisma-next/sqlite/migration`. It is now a protected method on the `Migration` base class. If your extension ships SQLite migration files, replace every free `createTable(...)` call with `this.createTable({ table: ..., columns: [...], constraints: [...] })`. If your extension's migration facade re-export test asserts `createTable` is defined, remove that assertion. The `col()`, `lit()`, `fn()`, `primaryKey()`, `foreignKey()`, and `unique()` builder helpers are now exported from `@prisma-next/sqlite/migration` directly.
     detection:
-      glob: "**/migration.ts"
+      glob: '**/migration.ts'
       contains:
-        - "createTable"
-        - "@prisma-next/sqlite/migration"
+        - 'createTable'
+        - '@prisma-next/sqlite/migration'
       anyMatch: false
   - id: regen-extension-contracts-strip-empty-type-params
     summary: |
@@ -19,7 +19,7 @@ changes:
       contract artefacts and re-pin its migration baselines so the on-disk hashes match the
       new canonical form.
     detection:
-      glob: "**/contract.json"
+      glob: '**/contract.json'
       contains:
         - '"typeParams": {}'
       anyMatch: true
@@ -27,10 +27,10 @@ changes:
     summary: |
       The codec-resolution SPI in `@prisma-next/sql-relational-core` now takes a leading, required `namespaceId` coordinate. The `CodecDescriptorRegistry.codecRefForColumn(table, column)` build-time helper - the one AST authors call to stamp `codec` onto every column-bound `ParamRef` / `ProjectionItem`, exported from `@prisma-next/sql-relational-core/query-lane-context` and `@prisma-next/sql-relational-core/codec-descriptor-registry` - is now `codecRefForColumn(namespaceId, table, column)`. The underlying free function `codecRefForStorageColumn(storage, table, column)` (exported from `@prisma-next/sql-relational-core/codec-descriptor-registry`) is now `codecRefForStorageColumn(storage, namespaceId, table, column)`. Extension authors who derive codec refs directly must thread the namespace the table sits in at every call site: pass the explicit `namespaceId` ahead of `table`. There is no codemod - the right namespace is call-site-specific (read it from the model/table you are building the ref for). Two same-bare-named tables in different namespaces now resolve to their own per-namespace columns/codecs instead of the first scan hit.
     detection:
-      glob: "**/*.{ts,tsx}"
+      glob: '**/*.{ts,tsx}'
       contains:
-        - "codecRefForColumn("
-        - "codecRefForStorageColumn("
+        - 'codecRefForColumn('
+        - 'codecRefForStorageColumn('
       anyMatch: true
   - id: storage-namespace-envelope-re-emit
     summary: |
@@ -42,7 +42,7 @@ changes:
       `end-contract.d.ts`, `migration.json`, `migration.ts`, and `ops.json` all reflect
       the new hash. No source change is required - re-emitting is sufficient.
     detection:
-      glob: "**/contract.json"
+      glob: '**/contract.json'
       anyMatch: true
 ---
 

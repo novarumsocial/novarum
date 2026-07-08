@@ -1,11 +1,11 @@
 ---
-from: "0.9"
-to: "0.10"
+from: '0.9'
+to: '0.10'
 changes:
   - id: stamp-storage-types-kind-on-contract-snapshots
     summary: Stamp the `kind` discriminator (`"codec-instance"` / `"postgres-enum"`) on every entry in `storage.types` inside every committed `start-contract.json` / `end-contract.json` snapshot. The SQL family's contract serializer is now strict - untagged entries fail to load with a deserializer diagnostic naming the offending entry.
     detection:
-      glob: "**/migrations/**/{start,end}-contract.json"
+      glob: '**/migrations/**/{start,end}-contract.json'
       contains:
         - '"codecId"'
       anyMatch: true
@@ -27,15 +27,15 @@ Before 0.10, on-disk contract snapshots committed alongside your migrations look
       "Embedding1536": {
         "codecId": "pg/vector@1",
         "nativeType": "vector",
-        "typeParams": { "length": 1536 }
+        "typeParams": { "length": 1536 },
       },
       "user_type": {
         "codecId": "pg/enum@1",
         "nativeType": "user_type",
-        "typeParams": { "values": ["admin", "user"] }
-      }
-    }
-  }
+        "typeParams": { "values": ["admin", "user"] },
+      },
+    },
+  },
 }
 ```
 
@@ -49,17 +49,17 @@ Starting at 0.10 the same snapshots must look like this:
         "kind": "codec-instance",
         "codecId": "pg/vector@1",
         "nativeType": "vector",
-        "typeParams": { "length": 1536 }
+        "typeParams": { "length": 1536 },
       },
       "user_type": {
         "kind": "postgres-enum",
         "name": "user_type",
         "nativeType": "user_type",
         "values": ["admin", "user"],
-        "codecId": "pg/enum@1"
-      }
-    }
-  }
+        "codecId": "pg/enum@1",
+      },
+    },
+  },
 }
 ```
 
