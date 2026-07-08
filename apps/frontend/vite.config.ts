@@ -15,7 +15,9 @@ export default defineConfig({
           async: true,
         },
       },
-      adapter: adapter(),
+      adapter: adapter({
+        fallback: 'index.html',
+      }),
     }),
   ],
 });
