@@ -47,6 +47,9 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     t.Object({
       type: t.Literal('voice.leave'),
     }),
+    t.Object({
+      type: t.Literal('misc.ping'),
+    })
   ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
@@ -80,6 +83,14 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     await db.orm.public.User.where({ id: session.userId }).update({ status: 'ONLINE' });
 
     await publishUserStatus(ws, session, memberships, 'ONLINE');
+
+    setInterval(() => {
+      ws.send(
+        JSON.stringify({
+          type: 'misc.ping',
+        })
+      );
+    }, 30_000);
   },
   async message(ws, message) {
     // @ts-ignore stored during open
@@ -141,6 +152,8 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       publishVoiceState(ws, state, true);
       return;
     }
+
+    if (message.type === 'misc.ping') return;
 
     const membership = await db.orm.public.GuildMember.where({
       guildId: message.guildId,
