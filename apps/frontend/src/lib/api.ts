@@ -1,18 +1,21 @@
 import { treaty } from '@elysia/eden';
 import type { Treaty } from '@elysia/eden';
+import { z } from 'zod';
 import type { App } from 'anchor';
 
 type AnchorRoutes = App['~Routes'];
 
-type AnchorInfo = {
-  app?: {
-    name?: string;
-    description?: string;
-  };
-  homeserver: string;
-  baseUrl: string;
-  version?: string;
-};
+const anchorInfoSchema = z.object({
+  app: z
+    .object({
+      name: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .optional(),
+  homeserver: z.string(),
+  baseUrl: z.string().url(),
+  version: z.string().optional(),
+});
 
 export function normalizeHomeServer(homeServerUrl: string) {
   const url = homeServerUrl.trim().replace(/\/+$/, '');
@@ -38,13 +41,30 @@ export function anchorUrlFromHomeServer(homeServerUrl: string) {
 export async function discoverAnchor(homeServerUrl: string) {
   const homeServer = normalizeHomeServer(homeServerUrl);
   const discoveryUrl = `${anchorUrlFromHomeServer(homeServerUrl)}/.well-known/anchor/info`;
-  const response = await fetch(discoveryUrl);
+  let response: Response;
 
-  if (!response.ok) throw new Error('Homeserver discovery failed.');
+  try {
+    response = await fetch(discoveryUrl);
+  } catch {
+    throw new Error(`Could not reach ${homeServer}. Check the server address and try again.`);
+  }
 
-  const info = (await response.json()) as AnchorInfo;
+  if (!response.ok) {
+    throw new Error(
+      `${homeServer} returned ${response.status} while looking for its Anchor server information.`
+    );
+  }
+
+  const infoResult = anchorInfoSchema.safeParse(await response.json().catch(() => null));
+  if (!infoResult.success) {
+    throw new Error(`${homeServer} returned invalid Anchor server information.`);
+  }
+
+  const info = infoResult.data;
   if (info.homeserver !== homeServer) {
-    throw new Error('Homeserver identity mismatch.');
+    throw new Error(
+      `The server identified itself as ${info.homeserver}, not ${homeServer}. Check the server address.`
+    );
   }
 
   return info.baseUrl.replace(/\/+$/, '');
