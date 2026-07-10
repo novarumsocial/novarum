@@ -5,6 +5,13 @@ import type { RealtimeEvent } from 'anchor';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
+const attachmentSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  size: z.number(),
+  url: z.string().url(),
+});
 
 const channelSchema = z.object({
   id: z.string(),
@@ -36,6 +43,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string(),
       content: z.string(),
       nonce: z.string(),
+      attachments: z.array(attachmentSchema),
       createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
       author: z.object({
         id: z.string(),

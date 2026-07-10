@@ -39,6 +39,15 @@ export interface Message {
   timestamp: Date;
   edited: boolean;
   replies: number;
+  attachments: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
 }
 
 export interface VoiceUser {

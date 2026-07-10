@@ -1,5 +1,6 @@
 import { cors } from '@elysiajs/cors';
 import { Elysia } from 'elysia';
+import { getConfig } from '../utils/config';
 import { wellKnown } from '../modules/well-known/services';
 import { auth } from '../modules/auth/services';
 import { guilds } from '../modules/guilds/services';
@@ -8,7 +9,10 @@ import { channel } from '../modules/channel/services';
 import { message } from '../modules/message/services';
 import { invite } from '../modules/invite/services';
 import { federation } from '../modules/federation/services';
-import { getConfig } from '../utils/config';
+import { upload } from '../modules/upload/services';
+import { configureStorageCors } from '../utils/services/storage';
+
+await configureStorageCors();
 
 const app = new Elysia()
   .use(cors({ credentials: true }))
@@ -20,6 +24,7 @@ const app = new Elysia()
   .use(message)
   .use(invite)
   .use(federation)
+  .use(upload)
   .get('/', () => 'this is anchor')
   .listen(getConfig().server.listen_port);
 

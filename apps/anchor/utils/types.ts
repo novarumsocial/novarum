@@ -32,6 +32,7 @@ export type RealtimeEvent =
         guildId: string;
         content: string;
         nonce: string;
+        attachments: AttachmentPayload[];
         createdAt: string;
         author: {
           id: string;
@@ -85,6 +86,14 @@ export type RealtimeEvent =
         time: string;
       };
     };
+
+export type AttachmentPayload = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
+};
 
 export type VoicePresence = {
   guildId: string;

@@ -26,6 +26,7 @@
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
     "@prisma-next/postgres": "latest",
+    "aws4fetch": "^1.0.20",
     "dotenv": "^17.4.2",
     "elysia": "latest",
     "livekit-server-sdk": "^2.15.5",

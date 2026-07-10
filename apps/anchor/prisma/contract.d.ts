@@ -934,6 +934,10 @@ type ContractBase = Omit<
     };
     readonly channel: { readonly namespace: 'public' & NamespaceId; readonly model: 'Channel' };
     readonly message: { readonly namespace: 'public' & NamespaceId; readonly model: 'Message' };
+    readonly attachment: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'Attachment';
+    };
     readonly guild_invite: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'GuildInvite';
@@ -945,10 +949,6 @@ type ContractBase = Omit<
     readonly federation_nonce: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'FederationNonce';
-    };
-    readonly attachment: {
-      readonly namespace: 'public' & NamespaceId;
-      readonly model: 'Attachment';
     };
   };
   readonly domain: {

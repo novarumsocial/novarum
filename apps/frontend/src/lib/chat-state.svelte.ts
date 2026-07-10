@@ -31,6 +31,13 @@ type AddMessageInput = {
   author: {
     username: string;
   };
+  attachments?: {
+    id: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    url: string;
+  }[];
 };
 
 type ChannelMemberInput = {
@@ -72,6 +79,7 @@ function messageFromInput(message: AddMessageInput): Message {
     timestamp: new Date(message.createdAt),
     edited: false,
     replies: 0,
+    attachments: message.attachments ?? [],
   };
 }
 
@@ -354,20 +362,45 @@ class ChatState {
     };
   }
 
-  async sendMessage(channelId: string, content: string) {
+  async sendMessage(channelId: string, content: string, files: File[] = []) {
     const nonce = messageNonce();
+    const attachmentIds: string[] = [];
+
+    for (const file of files) {
+      const contentType = file.type || 'application/octet-stream';
+      const presign = await anchor.client.upload.presign.post({
+        channelId,
+        filename: file.name,
+        contentType,
+        size: file.size,
+      });
+
+      if (presign.error || !presign.data || 'error' in presign.data) {
+        throw new Error(`Could not prepare ${file.name} for upload`);
+      }
+
+      const uploaded = await fetch(presign.data.uploadUrl, {
+        method: 'PUT',
+        headers: presign.data.headers,
+        body: file,
+      });
+      if (!uploaded.ok) throw new Error(`Could not upload ${file.name}`);
+
+      attachmentIds.push(presign.data.attachmentId);
+    }
 
     const result = await anchor.client.message.send.post({
       channelId,
       content,
       nonce,
+      attachmentIds,
     });
 
     if (result.error || !result.data || 'error' in result.data) {
       if (sendToGuildsIfFederatedServerDown(result.error)) return;
 
       console.error('Failed to send message', result.error ?? result.data);
-      return;
+      throw new Error('Failed to send message');
     }
   }
 

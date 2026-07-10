@@ -7,6 +7,7 @@
   let files = $state<File[]>([]);
   let uploadDialogOpen = $state(false);
   let sending = $state(false);
+  let sendError = $state('');
   let {
     placeholder = 'Send a message',
     onSend = () => {},
@@ -22,10 +23,13 @@
     if (!trimmed || sending) return;
 
     sending = true;
+    sendError = '';
     try {
       await onSend(trimmed, files);
       content = '';
       files = [];
+    } catch (error) {
+      sendError = error instanceof Error ? error.message : 'Could not send message';
     } finally {
       sending = false;
     }
@@ -67,6 +71,14 @@
         </div>
       {/each}
     </div>
+  {/if}
+
+  {#if sendError}
+    <p
+      class="mb-2 border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive"
+    >
+      {sendError}
+    </p>
   {/if}
 
   <div

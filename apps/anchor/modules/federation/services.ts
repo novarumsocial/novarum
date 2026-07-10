@@ -12,6 +12,14 @@ import {
   setVoicePresence,
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
+import {
+  attachmentPayload,
+  attachmentPresignSchema,
+  isAllowedAttachmentType,
+  maxAttachmentCount,
+} from '../../utils/attachments';
+import { createPendingAttachment } from '../upload/services';
+import { verifyPendingAttachments } from '../message/services';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
 const federatedMessagePageSize = 50;
@@ -244,9 +252,11 @@ export const federation = new Elysia({ prefix: '/federation' })
 
     const content = getObjectProperty(parsed.body, 'content');
     const nonce = getObjectProperty(parsed.body, 'nonce');
+    const attachmentIdsResult = federationAttachmentIds(parsed.body);
     if (typeof content !== 'string' || typeof nonce !== 'string') {
       return status(400, { error: 'Invalid federation message' });
     }
+    if (!attachmentIdsResult.ok) return status(400, { error: attachmentIdsResult.error });
 
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
@@ -254,7 +264,9 @@ export const federation = new Elysia({ prefix: '/federation' })
     const priorMsg = await db.orm.public.Message.where({
       authorId: access.user.id,
       nonce,
-    }).first();
+    })
+      .include('attachments')
+      .first();
     if (priorMsg) {
       if (priorMsg.channelId !== params.id || priorMsg.content !== content) {
         return status(409, { error: 'Nonce already used for a different message' });
@@ -263,12 +275,31 @@ export const federation = new Elysia({ prefix: '/federation' })
       return { message: federatedMessageResponse(priorMsg, access.channel, access.user) };
     }
 
-    const message = await db.orm.public.Message.create({
-      id: randomString(),
-      channelId: params.id,
-      authorId: access.user.id,
-      content,
-      nonce,
+    const attachments = await verifyPendingAttachments(
+      attachmentIdsResult.value,
+      access.user.id,
+      params.id
+    );
+    if (!attachments.ok) return status(400, { error: attachments.error });
+
+    const message = await db.transaction(async (tx) => {
+      const created = await tx.orm.public.Message.create({
+        id: randomString(),
+        channelId: params.id,
+        authorId: access.user.id,
+        content,
+        nonce,
+      });
+
+      for (const attachment of attachments.value) {
+        const updated = await tx.orm.public.Attachment.where({
+          id: attachment.id,
+          status: 'PENDING',
+        }).update({ messageId: created.id, status: 'ATTACHED' });
+        if (!updated) throw new Error('Attachment was already claimed');
+      }
+
+      return { ...created, attachments: attachments.value };
     });
 
     const responseMessage = federatedMessageResponse(message, access.channel, access.user);
@@ -280,6 +311,32 @@ export const federation = new Elysia({ prefix: '/federation' })
     }
 
     return { message: responseMessage };
+  })
+  .post('/channels/:id/attachments/presign', async ({ params, request, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const uploadInput = attachmentPresignSchema.safeParse(parsed.body);
+    if (!uploadInput.success) return status(400, { error: 'Invalid attachment metadata' });
+    if (!isAllowedAttachmentType(uploadInput.data.contentType)) {
+      return status(415, { error: 'Unsupported file type' });
+    }
+
+    const access = await getFederatedChannelAccess(params.id, userPayload);
+    if (!access.ok) return status(access.status, { error: access.error });
+
+    return createPendingAttachment({
+      channelId: access.channel.id,
+      guildId: access.channel.guildId,
+      uploaderId: access.user.id,
+      ...uploadInput.data,
+    });
   })
   .post('/channels/:id/messages', async ({ params, request, status }) => {
     const parsed = await verifiedFederationJsonBody(request);
@@ -648,6 +705,7 @@ async function fetchFederatedMessagePage(
 ) {
   const query = db.orm.public.Message.where({ channelId })
     .include('author')
+    .include('attachments')
     .orderBy([(message) => message.createdAt.asc(), (message) => message.id.asc()])
     .take(limit + 1);
 
@@ -757,6 +815,9 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     guildId: channel.guildId,
     content: message.content,
     nonce: message.nonce,
+    attachments: Array.isArray(message.attachments)
+      ? message.attachments.map(attachmentPayload)
+      : [],
     createdAt:
       message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
     author: {
@@ -765,6 +826,21 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
       avatar: author.avatarUrl ?? null,
     },
   };
+}
+
+function federationAttachmentIds(body: unknown) {
+  const attachmentIds = getObjectProperty(body, 'attachmentIds');
+  if (attachmentIds === undefined) return { ok: true as const, value: [] as string[] };
+  if (
+    !Array.isArray(attachmentIds) ||
+    attachmentIds.length > maxAttachmentCount ||
+    attachmentIds.some((id) => typeof id !== 'string') ||
+    new Set(attachmentIds).size !== attachmentIds.length
+  ) {
+    return { ok: false as const, error: 'Invalid attachment IDs' };
+  }
+
+  return { ok: true as const, value: attachmentIds as string[] };
 }
 
 function isStaleFederationDate(date: string) {
