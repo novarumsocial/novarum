@@ -1,0 +1,399 @@
+[
+  {
+    "id": "table.attachment",
+    "label": "Create table \"attachment\"",
+    "summary": "Creates table \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"attachment\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"attachment\"",
+        "sql": "CREATE TABLE \"public\".\"attachment\" (\n  \"channelId\" text NOT NULL,\n  \"contentType\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"filename\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"messageId\" text,\n  \"objectKey\" text NOT NULL,\n  \"size\" int4 NOT NULL,\n  \"status\" text DEFAULT 'PENDING' NOT NULL,\n  \"uploaderId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"attachment\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.attachment.attachment_objectKey_key",
+    "label": "Add unique constraint on \"attachment\" (objectKey)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "attachment_objectKey_key",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"attachment_objectKey_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_objectKey_key",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"attachment_objectKey_key\"",
+        "sql": "ALTER TABLE \"public\".\"attachment\" ADD CONSTRAINT \"attachment_objectKey_key\" UNIQUE (\"objectKey\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"attachment_objectKey_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_objectKey_key",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.attachment.attachment_uploaderId_status_idx",
+    "label": "Create index \"attachment_uploaderId_status_idx\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "attachment_uploaderId_status_idx",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"attachment_uploaderId_status_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_uploaderId_status_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"attachment_uploaderId_status_idx\"",
+        "sql": "CREATE INDEX \"attachment_uploaderId_status_idx\" ON \"public\".\"attachment\" (\"uploaderId\", \"status\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"attachment_uploaderId_status_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_uploaderId_status_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.attachment.attachment_channelId_idx",
+    "label": "Create index \"attachment_channelId_idx\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "attachment_channelId_idx",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"attachment_channelId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_channelId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"attachment_channelId_idx\"",
+        "sql": "CREATE INDEX \"attachment_channelId_idx\" ON \"public\".\"attachment\" (\"channelId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"attachment_channelId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_channelId_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.attachment.attachment_messageId_idx",
+    "label": "Create index \"attachment_messageId_idx\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "attachment_messageId_idx",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"attachment_messageId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_messageId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"attachment_messageId_idx\"",
+        "sql": "CREATE INDEX \"attachment_messageId_idx\" ON \"public\".\"attachment\" (\"messageId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"attachment_messageId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_messageId_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.attachment.attachment_uploaderId_idx",
+    "label": "Create index \"attachment_uploaderId_idx\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "attachment_uploaderId_idx",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"attachment_uploaderId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_uploaderId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"attachment_uploaderId_idx\"",
+        "sql": "CREATE INDEX \"attachment_uploaderId_idx\" ON \"public\".\"attachment\" (\"uploaderId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"attachment_uploaderId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"attachment_uploaderId_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.local_credential.local_credential_userId_idx",
+    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "local_credential_userId_idx",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"local_credential_userId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"local_credential_userId_idx\"",
+        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"local_credential_userId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.attachment.attachment_uploaderId_fkey",
+    "label": "Add foreign key \"attachment_uploaderId_fkey\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "attachment_uploaderId_fkey",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"attachment_uploaderId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_uploaderId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"attachment_uploaderId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"attachment\"\nADD CONSTRAINT \"attachment_uploaderId_fkey\"\nFOREIGN KEY (\"uploaderId\")\nREFERENCES \"public\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"attachment_uploaderId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_uploaderId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.attachment.attachment_channelId_fkey",
+    "label": "Add foreign key \"attachment_channelId_fkey\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "attachment_channelId_fkey",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"attachment_channelId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_channelId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"attachment_channelId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"attachment\"\nADD CONSTRAINT \"attachment_channelId_fkey\"\nFOREIGN KEY (\"channelId\")\nREFERENCES \"public\".\"channel\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"attachment_channelId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_channelId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.attachment.attachment_messageId_fkey",
+    "label": "Add foreign key \"attachment_messageId_fkey\" on \"attachment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "attachment_messageId_fkey",
+        "table": "attachment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"attachment_messageId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_messageId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"attachment_messageId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"attachment\"\nADD CONSTRAINT \"attachment_messageId_fkey\"\nFOREIGN KEY (\"messageId\")\nREFERENCES \"public\".\"message\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"attachment_messageId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "attachment_messageId_fkey",
+          "public",
+          "\"public\".\"attachment\""
+        ]
+      }
+    ]
+  }
+]
