@@ -49,7 +49,7 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     }),
     t.Object({
       type: t.Literal('misc.ping'),
-    })
+    }),
   ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;

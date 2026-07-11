@@ -16,9 +16,7 @@
       {
         "description": "ensure table \"attachment\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment\""
-        ]
+        "params": ["\"public\".\"attachment\""]
       }
     ],
     "execute": [
@@ -32,9 +30,7 @@
       {
         "description": "verify table \"attachment\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment\""
-        ]
+        "params": ["\"public\".\"attachment\""]
       }
     ]
   },
@@ -55,11 +51,7 @@
       {
         "description": "ensure constraint \"attachment_objectKey_key\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_objectKey_key",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_objectKey_key", "public", "\"public\".\"attachment\""]
       }
     ],
     "execute": [
@@ -72,11 +64,7 @@
       {
         "description": "verify constraint \"attachment_objectKey_key\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_objectKey_key",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_objectKey_key", "public", "\"public\".\"attachment\""]
       }
     ]
   },
@@ -97,9 +85,7 @@
       {
         "description": "ensure index \"attachment_uploaderId_status_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_uploaderId_status_idx\""
-        ]
+        "params": ["\"public\".\"attachment_uploaderId_status_idx\""]
       }
     ],
     "execute": [
@@ -112,9 +98,7 @@
       {
         "description": "verify index \"attachment_uploaderId_status_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_uploaderId_status_idx\""
-        ]
+        "params": ["\"public\".\"attachment_uploaderId_status_idx\""]
       }
     ]
   },
@@ -135,9 +119,7 @@
       {
         "description": "ensure index \"attachment_channelId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_channelId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_channelId_idx\""]
       }
     ],
     "execute": [
@@ -150,9 +132,7 @@
       {
         "description": "verify index \"attachment_channelId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_channelId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_channelId_idx\""]
       }
     ]
   },
@@ -173,9 +153,7 @@
       {
         "description": "ensure index \"attachment_messageId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_messageId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_messageId_idx\""]
       }
     ],
     "execute": [
@@ -188,9 +166,7 @@
       {
         "description": "verify index \"attachment_messageId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_messageId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_messageId_idx\""]
       }
     ]
   },
@@ -211,9 +187,7 @@
       {
         "description": "ensure index \"attachment_uploaderId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_uploaderId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_uploaderId_idx\""]
       }
     ],
     "execute": [
@@ -226,9 +200,7 @@
       {
         "description": "verify index \"attachment_uploaderId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"attachment_uploaderId_idx\""
-        ]
+        "params": ["\"public\".\"attachment_uploaderId_idx\""]
       }
     ]
   },
@@ -249,9 +221,7 @@
       {
         "description": "ensure index \"local_credential_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ],
     "execute": [
@@ -264,9 +234,7 @@
       {
         "description": "verify index \"local_credential_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ]
   },
@@ -287,11 +255,7 @@
       {
         "description": "ensure FK \"attachment_uploaderId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_uploaderId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_uploaderId_fkey", "public", "\"public\".\"attachment\""]
       }
     ],
     "execute": [
@@ -304,11 +268,7 @@
       {
         "description": "verify FK \"attachment_uploaderId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_uploaderId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_uploaderId_fkey", "public", "\"public\".\"attachment\""]
       }
     ]
   },
@@ -329,11 +289,7 @@
       {
         "description": "ensure FK \"attachment_channelId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_channelId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_channelId_fkey", "public", "\"public\".\"attachment\""]
       }
     ],
     "execute": [
@@ -346,11 +302,7 @@
       {
         "description": "verify FK \"attachment_channelId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_channelId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_channelId_fkey", "public", "\"public\".\"attachment\""]
       }
     ]
   },
@@ -371,11 +323,7 @@
       {
         "description": "ensure FK \"attachment_messageId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_messageId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_messageId_fkey", "public", "\"public\".\"attachment\""]
       }
     ],
     "execute": [
@@ -388,11 +336,7 @@
       {
         "description": "verify FK \"attachment_messageId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "attachment_messageId_fkey",
-          "public",
-          "\"public\".\"attachment\""
-        ]
+        "params": ["attachment_messageId_fkey", "public", "\"public\".\"attachment\""]
       }
     ]
   }

@@ -131,7 +131,9 @@
       />
 
       {#if error}
-        <p class="border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p
+          class="border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
           {error}
         </p>
       {/if}
@@ -152,7 +154,9 @@
           <div class="max-h-52 divide-y divide-border overflow-y-auto">
             {#each files as file (fileKey(file))}
               <div class="flex min-w-0 items-center gap-3 px-3 py-2.5">
-                <div class="flex size-8 shrink-0 items-center justify-center bg-muted text-muted-foreground">
+                <div
+                  class="flex size-8 shrink-0 items-center justify-center bg-muted text-muted-foreground"
+                >
                   {#if file.type.startsWith('image/')}
                     <FileImage class="size-4" />
                   {:else if file.type.startsWith('video/')}
