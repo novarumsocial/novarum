@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Message } from '$lib/types/chat';
-  import { Download, FileText } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { Download, FileAudio, FileText, FileVideo } from '@lucide/svelte';
+  import AttachmentViewer from './attachment-viewer.svelte';
 
   let {
     message,
@@ -21,6 +23,22 @@
   }
 
   const authorName = $derived(message.author.displayName || message.author.username);
+  const viewableAttachments = $derived(
+    message.attachments.filter(
+      (attachment) =>
+        attachment.contentType.startsWith('image/') ||
+        attachment.contentType.startsWith('video/') ||
+        attachment.contentType.startsWith('audio/') ||
+        attachment.contentType === 'application/pdf',
+    ),
+  );
+  let viewerOpen = $state(false);
+  let viewerIndex = $state(0);
+
+  function viewAttachment(id: string) {
+    viewerIndex = viewableAttachments.findIndex((attachment) => attachment.id === id);
+    viewerOpen = true;
+  }
 </script>
 
 <div class="flex gap-3" class:mt-1={grouped} class:mt-4={!grouped}>
@@ -51,34 +69,49 @@
     </div>
 
     {#if message.attachments.length > 0}
-      <div class="mt-2 grid max-w-xl gap-2 sm:grid-cols-2">
+      <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
         {#each message.attachments as attachment (attachment.id)}
           {#if attachment.contentType.startsWith('image/')}
-            <a
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              class="group relative block overflow-hidden border border-border bg-muted/20"
+            <Button
+              variant="outline"
+              class="group relative aspect-[4/3] h-auto min-w-0 overflow-hidden p-0 text-left"
+              aria-label={`View ${attachment.filename}`}
+              onclick={() => viewAttachment(attachment.id)}
             >
               <img
                 src={attachment.url}
                 alt={attachment.filename}
                 loading="lazy"
-                class="max-h-72 w-full object-cover"
+                class="size-full object-cover transition-transform group-hover:scale-[1.02]"
               />
-              <span
-                class="absolute right-0 bottom-0 left-0 flex items-center justify-between gap-3 bg-background/90 px-2 py-1.5 text-[11px] backdrop-blur-sm"
-              >
-                <span class="truncate font-medium">{attachment.filename}</span>
-                <Download class="size-3.5 shrink-0 text-muted-foreground" />
+            </Button>
+          {:else if attachment.contentType.startsWith('video/') || attachment.contentType.startsWith('audio/') || attachment.contentType === 'application/pdf'}
+            <Button
+              variant="outline"
+              class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+              onclick={() => viewAttachment(attachment.id)}
+            >
+              <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
+                {#if attachment.contentType.startsWith('video/')}
+                  <FileVideo class="size-4 text-primary" />
+                {:else if attachment.contentType.startsWith('audio/')}
+                  <FileAudio class="size-4 text-primary" />
+                {:else}
+                  <FileText class="size-4 text-primary" />
+                {/if}
+              </div>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-[11px] font-medium">{attachment.filename}</span>
+                <span class="font-mono text-[9px] uppercase text-muted-foreground">View</span>
               </span>
-            </a>
+            </Button>
           {:else}
-            <a
+            <Button
               href={attachment.url}
               target="_blank"
               rel="noreferrer"
-              class="flex min-w-0 items-center gap-3 border border-border bg-muted/20 p-2.5 transition-colors hover:bg-muted/40"
+              variant="outline"
+              class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
             >
               <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
                 <FileText class="size-4 text-primary" />
@@ -90,10 +123,12 @@
                 </span>
               </span>
               <Download class="size-3.5 shrink-0 text-muted-foreground" />
-            </a>
+            </Button>
           {/if}
         {/each}
       </div>
     {/if}
   </div>
 </div>
+
+<AttachmentViewer bind:open={viewerOpen} bind:index={viewerIndex} attachments={viewableAttachments} />

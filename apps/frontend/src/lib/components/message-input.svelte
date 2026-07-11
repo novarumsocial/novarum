@@ -8,6 +8,10 @@
   let uploadDialogOpen = $state(false);
   let sending = $state(false);
   let sendError = $state('');
+  let dragDepth = $state(0);
+  let draggingFiles = $state(false);
+  const maxFiles = 5;
+  const maxFileSize = 10 * 1024 * 1024;
   let {
     placeholder = 'Send a message',
     onSend = () => {},
@@ -44,9 +48,68 @@
 
     if (content.trim() || e.key.length === 1) onTyping();
   }
+
+  function fileKey(file: File) {
+    return `${file.name}:${file.size}:${file.lastModified}`;
+  }
+
+  function addFiles(nextFiles: File[]) {
+    sendError = '';
+    const existing = new Set(files.map(fileKey));
+    const unique = nextFiles.filter((file) => !existing.has(fileKey(file)));
+    const oversized = unique.find((file) => file.size > maxFileSize);
+
+    if (oversized) {
+      sendError = `${oversized.name} exceeds the 10 MB limit.`;
+      return;
+    }
+
+    if (files.length + unique.length > maxFiles) {
+      sendError = `You can attach up to ${maxFiles} files at once.`;
+      return;
+    }
+
+    files = [...files, ...unique];
+  }
+
+  function hasDraggedFiles(event: DragEvent) {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  }
+
+  function handleDragEnter(event: DragEvent) {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    dragDepth += 1;
+    draggingFiles = true;
+  }
+
+  function handleDragLeave(event: DragEvent) {
+    if (!draggingFiles) return;
+    event.preventDefault();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) draggingFiles = false;
+  }
+
+  function handleDrop(event: DragEvent) {
+    if (!hasDraggedFiles(event)) return;
+    event.preventDefault();
+    dragDepth = 0;
+    draggingFiles = false;
+    addFiles(Array.from(event.dataTransfer?.files ?? []));
+  }
 </script>
 
-<div class="border-t border-border p-4">
+<div
+  class="border-t border-border p-4"
+  role="group"
+  aria-label="Message composer"
+  ondragenter={handleDragEnter}
+  ondragover={(event) => {
+    if (hasDraggedFiles(event)) event.preventDefault();
+  }}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
+>
   {#if files.length > 0}
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
       {#each files as file (`${file.name}:${file.size}:${file.lastModified}`)}
@@ -82,12 +145,12 @@
   {/if}
 
   <div
-    class="flex items-end gap-2 border border-border bg-background p-2 focus-within:border-primary/50"
+    class={`flex items-end gap-2 border bg-background p-2 transition-colors focus-within:border-primary/50 ${draggingFiles ? 'border-primary bg-primary/5' : 'border-border'}`}
   >
     <Button
       variant="ghost"
       size="icon-lg"
-      class="text-muted-foreground hover:text-foreground"
+      class="self-center text-muted-foreground hover:text-foreground"
       aria-label="Add attachments"
       onclick={() => (uploadDialogOpen = true)}
     >
@@ -111,4 +174,4 @@
   </div>
 </div>
 
-<FileUploadDialog bind:open={uploadDialogOpen} bind:files />
+<FileUploadDialog bind:open={uploadDialogOpen} bind:files {maxFiles} {maxFileSize} />
