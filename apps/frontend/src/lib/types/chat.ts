@@ -3,6 +3,8 @@ export interface Server {
   name: string;
   initials: string;
   down: boolean;
+  avatarUrl?: string | null;
+  description?: string | null;
   color?: string;
 }
 

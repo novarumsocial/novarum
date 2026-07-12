@@ -5,6 +5,8 @@ export type RealtimeEvent =
         id: string;
         name: string;
         ownerId: string;
+        avatarUrl: string | null;
+        description: string | null;
         channels: {
           id: string;
           name: string;

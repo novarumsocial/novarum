@@ -37,6 +37,8 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       id: z.string(),
       name: z.string(),
       ownerId: z.string(),
+      avatarUrl: z.string().url().nullable(),
+      description: z.string().nullable(),
       channels: z.array(channelSchema),
     }),
   }),

@@ -245,12 +245,27 @@ class ChatState {
     void this.loadCurrentChannel();
   }
 
-  addGuild(guild: { id: string; name: string; down?: boolean }) {
+  addGuild(guild: {
+    id: string;
+    name: string;
+    down?: boolean;
+    avatarUrl?: string | null;
+    description?: string | null;
+  }) {
     const down = guild.down ?? false;
 
     if (this.servers.some((server) => server.id === guild.id)) {
       this.servers = this.servers.map((server) =>
-        server.id === guild.id ? { ...server, name: guild.name, down } : server
+        server.id === guild.id
+          ? {
+              ...server,
+              name: guild.name,
+              initials: initialsFor(guild.name),
+              down,
+              avatarUrl: guild.avatarUrl ?? null,
+              description: guild.description ?? null,
+            }
+          : server
       );
       return;
     }
@@ -262,6 +277,8 @@ class ChatState {
         name: guild.name,
         initials: initialsFor(guild.name),
         down,
+        avatarUrl: guild.avatarUrl ?? null,
+        description: guild.description ?? null,
       },
     ];
   }
@@ -564,6 +581,12 @@ class ChatState {
 
   async createServer(server: Server) {
     await anchor.client.guilds.create.post({ name: server.name });
+  }
+
+  updateGuildAvatar(guildId: string, avatarUrl: string) {
+    this.servers = this.servers.map((server) =>
+      server.id === guildId ? { ...server, avatarUrl } : server
+    );
   }
 
   createLocalChannel(categoryId: string, channel: Channel) {

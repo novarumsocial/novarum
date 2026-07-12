@@ -5,8 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "bun run --parallel --filter '*' dev",
-    "format": "oxfmt",
+    "format": "git diff --name-only -z --diff-filter=ACMR HEAD | xargs -0 bun oxfmt",
     "format:check": "oxfmt --check",
+    "format:all": "oxfmt",
     "anchor:docker": "depot build -f apps/anchor/Dockerfile -t ghcr.io/novarumsocial/anchor:latest --push .",
     "anchor:push": "docker push ghcr.io/novarumsocial/anchor:latest"
   },

@@ -15,6 +15,7 @@
   import type { Voice } from '$lib/voice.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
+  import GuildSettingsDialog from './guild-settings-dialog.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   let {
@@ -42,6 +43,7 @@
   let createCategory = $state<ChannelCategory | null>(null);
 
   let createInviteOpen = $state(false);
+  let settingsOpen = $state(false);
 
   function openCreateChannel(category: ChannelCategory) {
     createCategory = category;
@@ -137,7 +139,7 @@
           Invite
           <DropdownMenu.Shortcut><UserRoundPlus class="size-3" /></DropdownMenu.Shortcut>
         </DropdownMenu.Item>
-        <DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => (settingsOpen = true)}>
           Settings
           <DropdownMenu.Shortcut><Settings class="size-3" /></DropdownMenu.Shortcut>
         </DropdownMenu.Item>
@@ -267,3 +269,4 @@
 />
 
 <InviteDialog bind:open={createInviteOpen} guildId={server.id} />
+<GuildSettingsDialog bind:open={settingsOpen} {server} />

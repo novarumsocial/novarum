@@ -6,10 +6,16 @@
     open = $bindable(false),
     file,
     onCrop,
+    title = 'Crop Avatar',
+    description = 'Adjust the image to fit your profile.',
+    actionLabel = 'Use Avatar',
   }: {
     open: boolean;
     file: File | null;
     onCrop: (avatar: Blob) => void;
+    title?: string;
+    description?: string;
+    actionLabel?: string;
   } = $props();
 
   let image = $state<HTMLImageElement | null>(null);
@@ -77,8 +83,8 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="sm:max-w-sm">
     <Dialog.Header>
-      <Dialog.Title>Crop Avatar</Dialog.Title>
-      <Dialog.Description>Adjust the image to fit your profile.</Dialog.Description>
+      <Dialog.Title>{title}</Dialog.Title>
+      <Dialog.Description>{description}</Dialog.Description>
     </Dialog.Header>
 
     <div class="relative mx-auto size-[280px] overflow-hidden bg-muted">
@@ -111,7 +117,7 @@
 
     <Dialog.Footer>
       <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-      <Button onclick={crop} disabled={!image}>Use Avatar</Button>
+      <Button onclick={crop} disabled={!image}>{actionLabel}</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
