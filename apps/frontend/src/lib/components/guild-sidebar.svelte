@@ -55,6 +55,7 @@
         <Avatar
           src={server.avatarUrl}
           name={server.name}
+          fallback={server.initials}
           class="size-full bg-transparent text-xs"
           focused={activeId === server.id}
         />

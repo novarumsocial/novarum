@@ -6,11 +6,13 @@
     name,
     class: className = '',
     focused = true,
+    fallback,
   }: {
     src?: string | null;
     name: string;
     class?: string;
     focused?: boolean;
+    fallback?: string;
   } = $props();
 
   let playGif = $state(focused);
@@ -88,6 +90,6 @@
       />
     {/if}
   {:else}
-    {name.charAt(0).toUpperCase() || '?'}
+    {fallback || name.charAt(0).toUpperCase() || '?'}
   {/if}
 </div>
