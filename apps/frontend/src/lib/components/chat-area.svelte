@@ -14,7 +14,7 @@
     channel: Channel;
     messages: Message[];
     loading?: boolean;
-    onSend?: (content: string) => void;
+    onSend?: (content: string, files: File[]) => void | Promise<void>;
   } = $props();
 
   let scrollContainer = $state<HTMLDivElement | null>(null);

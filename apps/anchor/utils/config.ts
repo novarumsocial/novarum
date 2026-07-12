@@ -20,6 +20,22 @@ const schema = z.object({
     livekit_key: z.string().min(1, 'livekit_key must be a non-empty string'),
     livekit_secret: z.string().min(1, 'livekit_secret must be a non-empty string'),
   }),
+  files: z.object({
+    max_file_size: z.number().positive().optional().default(10),
+    max_avatar_size: z.number().positive().optional().default(2),
+    s3_access_key: z.string().min(1),
+    s3_secret_key: z.string().min(1),
+    // apparently the rest is optional if you use amazon s3
+    s3_bucket: z.string().min(1).optional(),
+    s3_endpoint: z.string().min(1).optional(),
+    s3_region: z.string().min(1).optional(),
+    s3_virtual_hosted_style: z.boolean().optional().default(false),
+    s3_cors_origins: z
+      .array(z.union([z.url(), z.literal('*')]))
+      .min(1)
+      .optional()
+      .default(['*']),
+  }),
 });
 
 export type Config = z.infer<typeof schema>;

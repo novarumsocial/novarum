@@ -14,6 +14,13 @@ const activeBridges = new Map<string, WebSocket | null>();
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
+const attachmentSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  size: z.number(),
+  url: z.string().url(),
+});
 
 const channelSchema = z.object({
   id: z.string(),
@@ -30,6 +37,8 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       id: z.string(),
       name: z.string(),
       ownerId: z.string(),
+      avatarUrl: z.string().url().nullable(),
+      description: z.string().nullable(),
       channels: z.array(channelSchema),
     }),
   }),
@@ -45,6 +54,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string(),
       content: z.string(),
       nonce: z.string(),
+      attachments: z.array(attachmentSchema),
       createdAt: z.string(),
       author: z.object({
         id: z.string(),
@@ -68,6 +78,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
         userId: z.string(),
         username: z.string(),
         displayName: z.string().nullable(),
+        avatarUrl: z.string().url().nullable(),
         homeserver: z.string(),
         isBot: z.boolean(),
         status: userStatusSchema,

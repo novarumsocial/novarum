@@ -19,6 +19,74 @@
     "namespaces": {
       "public": {
         "models": {
+          "Attachment": {
+            "fields": {
+              "channelId": {
+                "nullable": false,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              },
+              "contentType": {
+                "nullable": false,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": { "codecId": "pg/timestamptz@1", "kind": "scalar" }
+              },
+              "filename": {
+                "nullable": false,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              },
+              "id": { "nullable": false, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
+              "messageId": {
+                "nullable": true,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              },
+              "objectKey": {
+                "nullable": false,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              },
+              "size": { "nullable": false, "type": { "codecId": "pg/int4@1", "kind": "scalar" } },
+              "status": { "nullable": false, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
+              "uploaderId": {
+                "nullable": false,
+                "type": { "codecId": "pg/text@1", "kind": "scalar" }
+              }
+            },
+            "relations": {
+              "channel": {
+                "cardinality": "N:1",
+                "on": { "localFields": ["channelId"], "targetFields": ["id"] },
+                "to": { "model": "Channel", "namespace": "public" }
+              },
+              "message": {
+                "cardinality": "N:1",
+                "on": { "localFields": ["messageId"], "targetFields": ["id"] },
+                "to": { "model": "Message", "namespace": "public" }
+              },
+              "uploader": {
+                "cardinality": "N:1",
+                "on": { "localFields": ["uploaderId"], "targetFields": ["id"] },
+                "to": { "model": "User", "namespace": "public" }
+              }
+            },
+            "storage": {
+              "fields": {
+                "channelId": { "column": "channelId" },
+                "contentType": { "column": "contentType" },
+                "createdAt": { "column": "createdAt" },
+                "filename": { "column": "filename" },
+                "id": { "column": "id" },
+                "messageId": { "column": "messageId" },
+                "objectKey": { "column": "objectKey" },
+                "size": { "column": "size" },
+                "status": { "column": "status" },
+                "uploaderId": { "column": "uploaderId" }
+              },
+              "namespaceId": "public",
+              "table": "attachment"
+            }
+          },
           "Channel": {
             "fields": {
               "createdAt": {
@@ -316,6 +384,11 @@
               }
             },
             "relations": {
+              "attachments": {
+                "cardinality": "1:N",
+                "on": { "localFields": ["id"], "targetFields": ["messageId"] },
+                "to": { "model": "Attachment", "namespace": "public" }
+              },
               "author": {
                 "cardinality": "N:1",
                 "on": { "localFields": ["authorId"], "targetFields": ["id"] },
@@ -455,6 +528,7 @@
   "meta": {},
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
+    "attachment": { "model": "Attachment", "namespace": "public" },
     "channel": { "model": "Channel", "namespace": "public" },
     "federation_nonce": { "model": "FederationNonce", "namespace": "public" },
     "guild": { "model": "Guild", "namespace": "public" },
@@ -472,6 +546,71 @@
       "public": {
         "entries": {
           "table": {
+            "attachment": {
+              "columns": {
+                "channelId": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "contentType": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "createdAt": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": { "expression": "now()", "kind": "function" },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "filename": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "id": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "messageId": { "codecId": "pg/text@1", "nativeType": "text", "nullable": true },
+                "objectKey": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "size": { "codecId": "pg/int4@1", "nativeType": "int4", "nullable": false },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": { "kind": "literal", "value": "PENDING" },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "uploaderId": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false }
+              },
+              "foreignKeys": [
+                {
+                  "constraint": true,
+                  "index": true,
+                  "source": {
+                    "columns": ["uploaderId"],
+                    "namespaceId": "public",
+                    "tableName": "attachment"
+                  },
+                  "target": { "columns": ["id"], "namespaceId": "public", "tableName": "user" }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": ["channelId"],
+                    "namespaceId": "public",
+                    "tableName": "attachment"
+                  },
+                  "target": { "columns": ["id"], "namespaceId": "public", "tableName": "channel" }
+                },
+                {
+                  "constraint": true,
+                  "index": true,
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": ["messageId"],
+                    "namespaceId": "public",
+                    "tableName": "attachment"
+                  },
+                  "target": { "columns": ["id"], "namespaceId": "public", "tableName": "message" }
+                }
+              ],
+              "indexes": [
+                { "columns": ["uploaderId", "status"] },
+                { "columns": ["channelId"] },
+                { "columns": ["messageId"] }
+              ],
+              "primaryKey": { "columns": ["id"] },
+              "uniques": [{ "columns": ["objectKey"] }]
+            },
             "channel": {
               "columns": {
                 "createdAt": {
@@ -831,7 +970,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:997f145d5109c84fce252ed4940e218527a58b21a9b521ea2fafd5dc7629c911"
+    "storageHash": "sha256:28d29df53d9611f9ec50511126e930a304552e355a94ad45275761d145238fd1"
   },
   "target": "postgres",
   "targetFamily": "sql"

@@ -116,7 +116,7 @@
         channel={currentChannel}
         messages={currentMessages}
         loading={currentMessagesLoading}
-        onSend={(content) => chat.sendMessage(currentChannel.id, content)}
+        onSend={(content, files) => chat.sendMessage(currentChannel.id, content, files)}
       />
     {:else if currentChannel && currentChannel.type === 'VOICE'}
       <VoiceArea channel={currentChannel} {voice} members={chat.members} onLeave={leaveVoice} />

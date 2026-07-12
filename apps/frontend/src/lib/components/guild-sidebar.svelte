@@ -2,6 +2,7 @@
   import { Compass, MessagesSquare, Plus } from '@lucide/svelte';
   import type { Server } from '$lib/types/chat';
   import CreateServerDialog from './create-server-dialog.svelte';
+  import Avatar from './avatar.svelte';
 
   let {
     servers,
@@ -51,7 +52,12 @@
         disabled={server.down}
         aria-label={server.name}
       >
-        {server.initials}
+        <Avatar
+          src={server.avatarUrl}
+          name={server.name}
+          class="size-full bg-transparent text-xs"
+          focused={activeId === server.id}
+        />
       </button>
     {/if}
   {/each}

@@ -11,29 +11,6 @@ import {
 } from './provider';
 import { getConfig } from '../../utils/config';
 
-function userResponse(
-  user: {
-    id: string;
-    username: string;
-    homeserver: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    isBot: boolean;
-  },
-  email: string | null = null
-) {
-  return {
-    id: user.id,
-    username: user.username,
-    homeserver: user.homeserver,
-    handle: `@${user.username}:${user.homeserver}`,
-    displayName: user.displayName,
-    email,
-    avatarUrl: user.avatarUrl,
-    isBot: user.isBot,
-  };
-}
-
 export const auth = new Elysia({ prefix: '/auth' })
   .post(
     '/signup',
@@ -173,3 +150,26 @@ export const auth = new Elysia({ prefix: '/auth' })
       user: userResponse(user, credential?.email ?? null),
     };
   });
+
+export function userResponse(
+  user: {
+    id: string;
+    username: string;
+    homeserver: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isBot: boolean;
+  },
+  email: string | null = null
+) {
+  return {
+    id: user.id,
+    username: user.username,
+    homeserver: user.homeserver,
+    handle: `@${user.username}:${user.homeserver}`,
+    displayName: user.displayName,
+    email,
+    avatarUrl: user.avatarUrl,
+    isBot: user.isBot,
+  };
+}

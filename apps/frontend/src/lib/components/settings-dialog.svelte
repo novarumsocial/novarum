@@ -8,17 +8,68 @@
   import { User, Palette, Bell, Volume2, LogOut } from '@lucide/svelte';
   import { anchor } from '$lib/anchor.svelte';
   import { goto } from '$app/navigation';
+  import { useSession } from '$lib/session.svelte';
+  import AvatarCropDialog from './avatar-crop-dialog.svelte';
+  import Avatar from './avatar.svelte';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
 
-  let displayName = $state('Rizan');
-  let email = $state('rizan@example.com');
+  const session = useSession();
+  let displayName = $state('');
+  let email = $state('');
+  let fileInput: HTMLInputElement;
+  let cropFile = $state<File | null>(null);
+  let cropOpen = $state(false);
+  let avatarLoading = $state(false);
+  let avatarError = $state<string | null>(null);
   let pushNotifications = $state(true);
   let messagePreview = $state(true);
   let mentionSound = $state(true);
   let showOnlineStatus = $state(true);
 
   let logoutLoading = $state(false);
+
+  $effect(() => {
+    if (!session.user) return;
+    displayName = session.user.displayName ?? '';
+    email = session.user.email ?? '';
+  });
+
+  function selectAvatar(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      avatarError = 'Choose a JPEG, PNG, or WebP image.';
+      return;
+    }
+
+    avatarError = null;
+    cropFile = file;
+    cropOpen = true;
+  }
+
+  async function uploadAvatar(blob: Blob) {
+    avatarLoading = true;
+    avatarError = null;
+    const avatar = new File([blob], 'avatar.png', { type: 'image/png' });
+
+    try {
+      const result = await anchor.client.user.avatar.post({ avatar });
+      if (result.error || !result.data || 'error' in result.data) {
+        avatarError = 'Could not upload your avatar.';
+        return;
+      }
+      await session.refresh();
+    } catch {
+      avatarError = 'Could not upload your avatar.';
+    } finally {
+      avatarLoading = false;
+    }
+  }
+
   async function logout() {
     logoutLoading = true;
     await anchor.client.auth.logout.post();
@@ -90,17 +141,34 @@
         <Tabs.Content value="account" class="space-y-4">
           <div class="grid gap-3">
             <div class="flex items-center gap-4">
-              <div
-                class="flex size-14 items-center justify-center bg-primary/20 text-lg font-bold text-primary"
-              >
-                R
-              </div>
+              <Avatar
+                src={session.user?.avatarUrl}
+                name={session.user?.displayName || session.user?.username || '?'}
+                class="size-14 text-lg"
+              />
               <div class="space-y-1">
                 <p class="text-xs font-medium">Avatar</p>
                 <p class="text-[11px] text-muted-foreground">
                   Upload a photo to personalize your profile
                 </p>
-                <Button variant="outline" size="xs">Change Avatar</Button>
+                <input
+                  bind:this={fileInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="hidden"
+                  onchange={selectAvatar}
+                />
+                <Button
+                  variant="outline"
+                  size="xs"
+                  disabled={avatarLoading}
+                  onclick={() => fileInput.click()}
+                >
+                  {avatarLoading ? 'Uploading...' : 'Change Avatar'}
+                </Button>
+                {#if avatarError}
+                  <p class="text-[11px] text-destructive">{avatarError}</p>
+                {/if}
               </div>
             </div>
             <div class="grid gap-1.5">
@@ -245,3 +313,5 @@
     </Tabs.Root>
   </Dialog.Content>
 </Dialog.Root>
+
+<AvatarCropDialog bind:open={cropOpen} file={cropFile} onCrop={uploadAvatar} />

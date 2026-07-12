@@ -16,11 +16,7 @@
       {
         "description": "ensure column \"extAnchorDown\" is missing",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
-        "params": [
-          "public",
-          "guild",
-          "extAnchorDown"
-        ]
+        "params": ["public", "guild", "extAnchorDown"]
       }
     ],
     "execute": [
@@ -33,11 +29,7 @@
       {
         "description": "verify column \"extAnchorDown\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
-        "params": [
-          "public",
-          "guild",
-          "extAnchorDown"
-        ]
+        "params": ["public", "guild", "extAnchorDown"]
       }
     ]
   },
@@ -58,9 +50,7 @@
       {
         "description": "ensure index \"federation_nonce_createdAt_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"federation_nonce_createdAt_idx\""
-        ]
+        "params": ["\"public\".\"federation_nonce_createdAt_idx\""]
       }
     ],
     "execute": [
@@ -73,9 +63,7 @@
       {
         "description": "verify index \"federation_nonce_createdAt_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"federation_nonce_createdAt_idx\""
-        ]
+        "params": ["\"public\".\"federation_nonce_createdAt_idx\""]
       }
     ]
   },
@@ -96,9 +84,7 @@
       {
         "description": "ensure index \"local_credential_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ],
     "execute": [
@@ -111,9 +97,7 @@
       {
         "description": "verify index \"local_credential_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"local_credential_userId_idx\""
-        ]
+        "params": ["\"public\".\"local_credential_userId_idx\""]
       }
     ]
   }

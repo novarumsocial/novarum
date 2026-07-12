@@ -6,6 +6,8 @@ import { publishRealtime } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
+import { storage } from '../../utils/services/storage';
 
 export const message = new Elysia({ prefix: '/message' })
   .resolve(async ({ cookie, status }) => {
@@ -63,6 +65,7 @@ export const message = new Elysia({ prefix: '/message' })
 
       const messages = await db.orm.public.Message.where({ channelId })
         .include('author')
+        .include('attachments')
         .orderBy((message) => message.createdAt.asc())
         .all();
 
@@ -73,6 +76,9 @@ export const message = new Elysia({ prefix: '/message' })
           guildId: channel.guildId,
           content: message.content,
           nonce: message.nonce,
+          attachments: message.attachments.map((attachment) =>
+            attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
+          ),
           createdAt:
             message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
           author: {
@@ -92,7 +98,7 @@ export const message = new Elysia({ prefix: '/message' })
   .post(
     '/send',
     async ({ body, session, status, server }) => {
-      const { channelId, content, nonce } = body;
+      const { channelId, content, nonce, attachmentIds = [] } = body;
 
       const channel = await db.orm.public.Channel.where({ id: channelId }).first();
       if (!channel) {
@@ -116,6 +122,7 @@ export const message = new Elysia({ prefix: '/message' })
             user: federationUserPayload(session),
             content,
             nonce,
+            attachmentIds,
           }
         ).catch(() => null);
 
@@ -144,22 +151,50 @@ export const message = new Elysia({ prefix: '/message' })
       const priorMsg = await db.orm.public.Message.where({
         authorId: session.userId,
         nonce,
-      }).first();
+      })
+        .include('attachments')
+        .first();
       if (priorMsg) {
         if (priorMsg.channelId !== channelId || priorMsg.content !== content) {
           return status(409, { error: 'Nonce already used for a different message' });
         }
 
-        return { message: priorMsg };
+        return {
+          message: {
+            ...priorMsg,
+            attachments: priorMsg.attachments.map((attachment) =>
+              attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
+            ),
+          },
+        };
       }
 
-      const message = await db.orm.public.Message.create({
-        id: randomString(),
-        channelId,
-        authorId: session.userId,
-        content,
-        nonce,
+      const attachments = await verifyPendingAttachments(attachmentIds, session.userId, channelId);
+      if (!attachments.ok) return status(400, { error: attachments.error });
+
+      const message = await db.transaction(async (tx) => {
+        const created = await tx.orm.public.Message.create({
+          id: randomString(),
+          channelId,
+          authorId: session.userId,
+          content,
+          nonce,
+        });
+
+        for (const attachment of attachments.value) {
+          const updated = await tx.orm.public.Attachment.where({
+            id: attachment.id,
+            status: 'PENDING',
+          }).update({
+            messageId: created.id,
+            status: 'ATTACHED',
+          });
+          if (!updated) throw new Error('Attachment was already claimed');
+        }
+
+        return created;
       });
+      const responseAttachments = attachments.value.map(attachmentPayload);
 
       if (server) {
         publishRealtime(server, `guildEvents:${channel.guildId}`, {
@@ -170,6 +205,7 @@ export const message = new Elysia({ prefix: '/message' })
             guildId: channel.guildId,
             content: message.content,
             nonce: message.nonce,
+            attachments: responseAttachments,
             createdAt:
               message.createdAt instanceof Date
                 ? message.createdAt.toISOString()
@@ -183,13 +219,16 @@ export const message = new Elysia({ prefix: '/message' })
         });
       }
 
-      return { message };
+      return { message: { ...message, attachments: responseAttachments } };
     },
     {
       body: t.Object({
         channelId: t.String(),
         content: t.String(),
         nonce: t.String(),
+        attachmentIds: t.Optional(
+          t.Array(t.String(), { maxItems: maxAttachmentCount, uniqueItems: true })
+        ),
       }),
     }
   );
@@ -200,4 +239,42 @@ function mapFederatedMessage(message: any, channelId: string, guildId: string) {
     channelId,
     guildId,
   };
+}
+
+export async function verifyPendingAttachments(
+  attachmentIds: string[],
+  uploaderId: string,
+  channelId: string
+) {
+  const attachments = [];
+
+  for (const id of attachmentIds) {
+    const attachment = await db.orm.public.Attachment.where({
+      id,
+      uploaderId,
+      channelId,
+      status: 'PENDING',
+    }).first();
+    if (!attachment) return { ok: false as const, error: 'Invalid attachment' };
+
+    try {
+      const metadata = await storage.file(attachment.objectKey).stat();
+      if (metadata.size !== attachment.size) {
+        await storage
+          .file(attachment.objectKey)
+          .delete()
+          .catch(() => {});
+        return { ok: false as const, error: `${attachment.filename} has an invalid size` };
+      }
+    } catch {
+      return {
+        ok: false as const,
+        error: `${attachment.filename} has not finished uploading`,
+      };
+    }
+
+    attachments.push(attachment);
+  }
+
+  return { ok: true as const, value: attachments };
 }

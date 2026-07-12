@@ -5,6 +5,8 @@ export type RealtimeEvent =
         id: string;
         name: string;
         ownerId: string;
+        avatarUrl: string | null;
+        description: string | null;
         channels: {
           id: string;
           name: string;
@@ -32,6 +34,7 @@ export type RealtimeEvent =
         guildId: string;
         content: string;
         nonce: string;
+        attachments: AttachmentPayload[];
         createdAt: string;
         author: {
           id: string;
@@ -55,6 +58,7 @@ export type RealtimeEvent =
           userId: string;
           username: string;
           displayName: string | null;
+          avatarUrl: string | null;
           homeserver: string;
           isBot: boolean;
           status: 'ONLINE' | 'OFFLINE';
@@ -85,6 +89,14 @@ export type RealtimeEvent =
         time: string;
       };
     };
+
+export type AttachmentPayload = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
+};
 
 export type VoicePresence = {
   guildId: string;

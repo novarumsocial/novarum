@@ -79,6 +79,8 @@ export const invite = new Elysia({ prefix: '/invite' })
               id: federatedInvite.guild.id,
               name: federatedInvite.guild.name,
               ownerId: session.userId,
+              avatarUrl: federatedInvite.guild.avatarUrl,
+              description: federatedInvite.guild.description,
               channels: federatedInvite.channels,
             },
           });
@@ -117,6 +119,7 @@ export const invite = new Elysia({ prefix: '/invite' })
                 userId: session.userId,
                 username: session.user.username,
                 displayName: session.user.displayName,
+                avatarUrl: session.user.avatarUrl,
                 homeserver: session.user.homeserver,
                 isBot: session.user.isBot,
                 status: session.user.status as 'ONLINE' | 'OFFLINE',
@@ -130,6 +133,8 @@ export const invite = new Elysia({ prefix: '/invite' })
               id: guild.id,
               name: guild.name,
               ownerId: guild.ownerId,
+              avatarUrl: guild.avatarUrl,
+              description: guild.description,
               channels: await guildChannels(guild.id),
             },
           });

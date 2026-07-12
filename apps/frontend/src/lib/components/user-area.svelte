@@ -11,11 +11,13 @@
   import SettingsDialog from './settings-dialog.svelte';
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
+  import Avatar from './avatar.svelte';
 
   type UserAreaUser = {
     username: string;
     displayName?: string | null;
     homeserver: string;
+    avatarUrl?: string | null;
   };
 
   let {
@@ -67,11 +69,7 @@
   {/if}
 
   <div class="flex h-14 items-center gap-2.5 px-3">
-    <div
-      class="flex size-8 shrink-0 items-center justify-center bg-primary/20 text-xs font-bold text-primary"
-    >
-      {user.username.slice(0, 1).toUpperCase() || '?'}
-    </div>
+    <Avatar src={user.avatarUrl} name={user.displayName || user.username} class="size-8 text-xs" />
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
         {user.displayName || user.username}

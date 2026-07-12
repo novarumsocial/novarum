@@ -30,13 +30,22 @@ type AddMessageInput = {
   createdAt: string | Date;
   author: {
     username: string;
+    avatar?: string | null;
   };
+  attachments?: {
+    id: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    url: string;
+  }[];
 };
 
 type ChannelMemberInput = {
   userId: string;
   username: string;
   displayName?: string | null;
+  avatarUrl?: string | null;
   homeserver: string;
   isBot: boolean;
   status: 'ONLINE' | 'OFFLINE';
@@ -57,6 +66,31 @@ type TypingInput = {
 
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
+const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+async function stripImageMetadata(file: File) {
+  if (!reencodedImageTypes.has(file.type)) return file;
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error(`Could not process ${file.name}`);
+    context.drawImage(bitmap, 0, 0);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, file.type, file.type === 'image/jpeg' ? 0.92 : undefined)
+    );
+    if (!blob) throw new Error(`Could not process ${file.name}`);
+
+    return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+}
 
 function messageFromInput(message: AddMessageInput): Message {
   return {
@@ -64,6 +98,7 @@ function messageFromInput(message: AddMessageInput): Message {
     author: {
       username: message.author.username,
       displayName: message.author.username,
+      avatarUrl: message.author.avatar ?? null,
       server: '',
       avatarColor: 'bg-primary',
       isBot: false,
@@ -72,6 +107,7 @@ function messageFromInput(message: AddMessageInput): Message {
     timestamp: new Date(message.createdAt),
     edited: false,
     replies: 0,
+    attachments: message.attachments ?? [],
   };
 }
 
@@ -80,6 +116,7 @@ function memberFromInput(member: ChannelMemberInput): Author {
     userId: member.userId,
     username: member.username,
     displayName: member.displayName,
+    avatarUrl: member.avatarUrl ?? null,
     server: member.homeserver,
     avatarColor: 'bg-primary',
     isBot: member.isBot,
@@ -208,12 +245,27 @@ class ChatState {
     void this.loadCurrentChannel();
   }
 
-  addGuild(guild: { id: string; name: string; down?: boolean }) {
+  addGuild(guild: {
+    id: string;
+    name: string;
+    down?: boolean;
+    avatarUrl?: string | null;
+    description?: string | null;
+  }) {
     const down = guild.down ?? false;
 
     if (this.servers.some((server) => server.id === guild.id)) {
       this.servers = this.servers.map((server) =>
-        server.id === guild.id ? { ...server, name: guild.name, down } : server
+        server.id === guild.id
+          ? {
+              ...server,
+              name: guild.name,
+              initials: initialsFor(guild.name),
+              down,
+              avatarUrl: guild.avatarUrl ?? null,
+              description: guild.description ?? null,
+            }
+          : server
       );
       return;
     }
@@ -225,6 +277,8 @@ class ChatState {
         name: guild.name,
         initials: initialsFor(guild.name),
         down,
+        avatarUrl: guild.avatarUrl ?? null,
+        description: guild.description ?? null,
       },
     ];
   }
@@ -354,20 +408,46 @@ class ChatState {
     };
   }
 
-  async sendMessage(channelId: string, content: string) {
+  async sendMessage(channelId: string, content: string, files: File[] = []) {
     const nonce = messageNonce();
+    const attachmentIds: string[] = [];
+
+    for (const file of files) {
+      const uploadFile = await stripImageMetadata(file);
+      const contentType = uploadFile.type || 'application/octet-stream';
+      const presign = await anchor.client.upload.presign.post({
+        channelId,
+        filename: uploadFile.name,
+        contentType,
+        size: uploadFile.size,
+      });
+
+      if (presign.error || !presign.data || 'error' in presign.data) {
+        throw new Error(`Could not prepare ${file.name} for upload`);
+      }
+
+      const uploaded = await fetch(presign.data.uploadUrl, {
+        method: 'PUT',
+        headers: presign.data.headers,
+        body: uploadFile,
+      });
+      if (!uploaded.ok) throw new Error(`Could not upload ${file.name}`);
+
+      attachmentIds.push(presign.data.attachmentId);
+    }
 
     const result = await anchor.client.message.send.post({
       channelId,
       content,
       nonce,
+      attachmentIds,
     });
 
     if (result.error || !result.data || 'error' in result.data) {
       if (sendToGuildsIfFederatedServerDown(result.error)) return;
 
       console.error('Failed to send message', result.error ?? result.data);
-      return;
+      throw new Error('Failed to send message');
     }
   }
 
@@ -393,7 +473,10 @@ class ChatState {
         channelId,
         result.data.messages.map((message: any) => ({
           ...message,
-          author: { username: String(message.author.username) },
+          author: {
+            username: String(message.author.username),
+            avatar: message.author.avatar ?? null,
+          },
         }))
       );
     } finally {
@@ -498,6 +581,12 @@ class ChatState {
 
   async createServer(server: Server) {
     await anchor.client.guilds.create.post({ name: server.name });
+  }
+
+  updateGuildAvatar(guildId: string, avatarUrl: string) {
+    this.servers = this.servers.map((server) =>
+      server.id === guildId ? { ...server, avatarUrl } : server
+    );
   }
 
   createLocalChannel(categoryId: string, channel: Channel) {

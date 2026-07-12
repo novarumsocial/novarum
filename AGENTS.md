@@ -15,6 +15,7 @@
 - Routes are SPA-only: `src/routes/+layout.server.ts` sets `ssr = false` and `prerender = false`.
 - The typed API client is `src/lib/api.ts` using `@elysia/eden` against the backend `App` type exported by the `anchor` workspace.
 - Active homeserver state lives in `src/lib/anchor.svelte.ts`: `localStorage` keys are `novarum:home-server` and `novarum:anchor-base-url`; localhost-style homeservers are forced to `http://`, others to `https://`.
+- Use shadcn-svelte components wherever possible.
 - shadcn-svelte component config lives in `apps/frontend/components.json`; generated UI components go under `$lib/components/ui`.
 
 ## Backend (`apps/anchor`)

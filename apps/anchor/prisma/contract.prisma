@@ -93,10 +93,33 @@ model Message {
 
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author  User    @relation(fields: [authorId], references: [id])
+  attachments Attachment[]
 
   @@unique([authorId, nonce])
   @@index([channelId, createdAt, id])
   @@map("message")
+}
+
+model Attachment {
+  id          String   @id
+  objectKey   String   @unique
+  filename    String
+  contentType String
+  size        Int
+  status      String   @default("PENDING")
+  uploaderId  String
+  channelId   String
+  messageId   String?
+  createdAt   DateTime @default(now())
+
+  uploader User     @relation(fields: [uploaderId], references: [id])
+  channel  Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  message  Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([uploaderId, status])
+  @@index([channelId])
+  @@index([messageId])
+  @@map("attachment")
 }
 
 model GuildInvite {
@@ -137,3 +160,4 @@ model FederationNonce {
   @@index([createdAt])
   @@map("federation_nonce")
 }
+

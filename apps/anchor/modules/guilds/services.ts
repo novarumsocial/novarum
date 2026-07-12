@@ -5,8 +5,27 @@ import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { parseFederatedGuildId } from '../../utils/federationIds';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
+import { storage } from '../../utils/services/storage';
+import { getConfig } from '../../utils/config';
+
+const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 
 export const guilds = new Elysia({ prefix: '/guilds' })
+  .get('/avatar/:id', async ({ params, query, status }) => {
+    const guild = await db.orm.public.Guild.where({ id: params.id }).first();
+    if (!guild?.avatarUrl) return status(404, { error: 'Guild picture not found' });
+
+    const format = query.format === 'gif' ? 'gif' : 'png';
+    const type = format === 'gif' ? 'image/gif' : 'image/png';
+    const url = storage.presign(`guild-avatars/${guild.id}.${format}`, {
+      method: 'GET',
+      expiresIn: 5 * 60,
+      type,
+      contentDisposition: 'inline',
+    });
+
+    return Response.redirect(url);
+  })
   .resolve(async ({ cookie, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
@@ -15,6 +34,42 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     }
     return { session };
   })
+  .post(
+    '/:id/avatar',
+    async ({ params, body, session, status }) => {
+      if (parseFederatedGuildId(params.id)) {
+        return status(400, { error: 'Cannot manage a federated guild' });
+      }
+
+      const guild = await db.orm.public.Guild.where({ id: params.id }).first();
+      if (!guild) return status(404, { error: 'Guild not found' });
+      if (guild.ownerId !== session.userId) return status(403, { error: 'Forbidden' });
+      if (body.avatar.type !== 'image/png' && body.avatar.type !== 'image/gif') {
+        return status(415, { error: 'Guild picture must be a PNG or GIF image' });
+      }
+      if (body.avatar.size > maxAvatarSize) {
+        return status(413, { error: 'Guild picture is too large' });
+      }
+
+      const format = body.avatar.type === 'image/gif' ? 'gif' : 'png';
+      await storage.write(`guild-avatars/${guild.id}.${format}`, body.avatar, {
+        type: body.avatar.type,
+      });
+
+      const avatarUrl = new URL(
+        `/guilds/avatar/${encodeURIComponent(guild.id)}?format=${format}&v=${Date.now()}`,
+        getConfig().server.baseUrl
+      ).toString();
+      await db.orm.public.Guild.where({ id: guild.id }).update({ avatarUrl });
+
+      return { avatarUrl };
+    },
+    {
+      body: t.Object({
+        avatar: t.File({ maxSize: maxAvatarSize }),
+      }),
+    }
+  )
   .post(
     '/create',
     async ({ body, server, session }) => {
@@ -55,6 +110,8 @@ export const guilds = new Elysia({ prefix: '/guilds' })
             id: guild.id,
             name: guild.name,
             ownerId: guild.ownerId,
+            avatarUrl: guild.avatarUrl,
+            description: guild.description,
             channels: [
               {
                 id: channel.id,
@@ -93,6 +150,8 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         id,
         name: guild.name as string,
         down: guild.extAnchorDown as boolean,
+        avatarUrl: guild.avatarUrl as string | null,
+        description: guild.description as string | null,
         channels: channels.map((channel) => ({
           id: channel.id,
           guildId: channel.guildId,

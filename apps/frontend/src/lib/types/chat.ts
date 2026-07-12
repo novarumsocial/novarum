@@ -3,6 +3,8 @@ export interface Server {
   name: string;
   initials: string;
   down: boolean;
+  avatarUrl?: string | null;
+  description?: string | null;
   color?: string;
 }
 
@@ -27,6 +29,7 @@ export interface Author {
   username: string;
   server: string;
   displayName?: string | null;
+  avatarUrl?: string | null;
   avatarColor: string;
   isBot: boolean;
   status?: 'ONLINE' | 'OFFLINE';
@@ -39,6 +42,15 @@ export interface Message {
   timestamp: Date;
   edited: boolean;
   replies: number;
+  attachments: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
 }
 
 export interface VoiceUser {
