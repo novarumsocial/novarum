@@ -87,14 +87,14 @@
       <Dialog.Description>Manage your account, appearance, and preferences.</Dialog.Description>
     </Dialog.Header>
 
-    <Tabs.Root value="account" orientation="vertical" class="flex min-h-[360px] gap-0">
-      <div class="flex w-44 shrink-0 flex-col border-r border-border pr-2">
+    <Tabs.Root value="account" orientation="vertical" class="flex flex-col gap-4 sm:min-h-[360px] sm:flex-row sm:gap-0">
+      <div class="flex min-w-0 shrink-0 flex-col gap-2 sm:w-44 sm:border-r sm:border-border sm:pr-2">
         <Tabs.List
-          class="flex h-auto w-full flex-col items-stretch justify-start gap-0.5 bg-transparent p-0"
+          class="flex h-auto w-full items-stretch justify-start gap-0.5 overflow-x-auto bg-transparent p-0 sm:flex-col"
         >
           <Tabs.Trigger
             value="account"
-            class="w-full justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
           >
             <User class="size-3.5" />
             Account
@@ -102,7 +102,7 @@
 
           <Tabs.Trigger
             value="appearance"
-            class="w-full justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
           >
             <Palette class="size-3.5" />
             Appearance
@@ -110,7 +110,7 @@
 
           <Tabs.Trigger
             value="notifications"
-            class="w-full justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
           >
             <Bell class="size-3.5" />
             Notifications
@@ -118,7 +118,7 @@
 
           <Tabs.Trigger
             value="voice"
-            class="w-full justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
           >
             <Volume2 class="size-3.5" />
             Voice & Audio
@@ -128,7 +128,7 @@
         <Button
           variant="destructive"
           size="sm"
-          class="mt-auto w-full rounded-none"
+          class="w-full rounded-none sm:mt-auto"
           disabled={logoutLoading}
           onclick={logout}
         >
@@ -137,7 +137,7 @@
         </Button>
       </div>
 
-      <div class="min-w-0 flex-1 pl-4">
+      <div class="min-w-0 flex-1 sm:pl-4">
         <Tabs.Content value="account" class="space-y-4">
           <div class="grid gap-3">
             <div class="flex items-center gap-4">

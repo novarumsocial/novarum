@@ -17,7 +17,7 @@
   }
 </script>
 
-<aside class="flex w-56 flex-col bg-sidebar">
+<aside class="flex size-full w-56 flex-col bg-sidebar">
   <div class="h-12 shrink-0 border-b border-border"></div>
 
   <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">

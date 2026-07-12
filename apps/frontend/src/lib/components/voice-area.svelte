@@ -10,6 +10,8 @@
     Video,
     VideoOff,
     MonitorUp,
+    Menu,
+    Users,
   } from '@lucide/svelte';
   import { cn } from '$lib/utils';
   import type { Author, Channel } from '$lib/types/chat';
@@ -21,11 +23,15 @@
     voice,
     members,
     onLeave,
+    onOpenNavigation,
+    onOpenMembers,
   }: {
     channel: Channel;
     voice: Voice;
     members: Author[];
     onLeave: () => void;
+    onOpenNavigation?: () => void;
+    onOpenMembers?: () => void;
   } = $props();
 
   const participants = $derived(Array.from(voice.voiceStates.entries()));
@@ -91,12 +97,18 @@
 
 <div class="relative flex flex-1 flex-col bg-background">
   <!-- header -->
-  <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+  <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
+    <Button variant="ghost" size="icon-lg" class="md:hidden" onclick={onOpenNavigation} aria-label="Open channels">
+      <Menu class="size-5" />
+    </Button>
     <Volume2 class="size-5 text-muted-foreground" />
     <span class="text-sm font-semibold text-foreground">{channel.name}</span>
+    <Button variant="ghost" size="icon-lg" class="ml-auto lg:hidden" onclick={onOpenMembers} aria-label="Open members">
+      <Users class="size-5" />
+    </Button>
   </div>
 
-  <div class="min-h-0 flex-1 overflow-hidden px-4 py-4 pb-24">
+  <div class="min-h-0 flex-1 overflow-y-auto px-2 py-3 pb-24 sm:px-4 sm:py-4">
     {#if voice.connecting}
       <div class="flex size-full flex-col items-center justify-center gap-3 text-center">
         <LoaderCircle class="size-8 animate-spin text-muted-foreground" />
@@ -109,8 +121,8 @@
       </div>
     {:else}
       <div
-        class="grid size-full gap-3"
-        style="grid-template-columns: repeat({gridColumns}, minmax(0, 1fr)); grid-template-rows: repeat({gridRows}, minmax(0, 1fr));"
+        class="participant-grid grid min-h-full gap-3 sm:size-full"
+        style={`--grid-columns: ${gridColumns}; --grid-rows: ${gridRows};`}
       >
         {#each screenShares as [identity, state]}
           {@const name = nameFor(identity)}
@@ -167,7 +179,7 @@
                   {#if state.selfDeafened}
                     <HeadphoneOff class="size-10" />
                   {:else}
-                    <div class="flex size-24 items-center justify-center rounded-full bg-black/20">
+                  <div class="flex size-16 items-center justify-center rounded-full bg-black/20 sm:size-24">
                       {initialsFor(name)}
                     </div>
                   {/if}
@@ -202,12 +214,12 @@
 
   <!-- control bar -->
   <div
-    class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-none border border-border bg-sidebar/80 px-2.5 py-2 shadow-lg backdrop-blur"
+    class="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-none border border-border bg-sidebar/80 px-2 py-2 shadow-lg backdrop-blur sm:bottom-4 sm:gap-2 sm:px-2.5"
   >
     <Button
       variant={voice.selfMuted ? 'destructive' : 'secondary'}
       size="icon"
-      class="size-8"
+      class="size-10 sm:size-8"
       onclick={() => voice.setMuted(!voice.selfMuted)}
       disabled={voice.selfDeafened}
       aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
@@ -222,7 +234,7 @@
     <Button
       variant={voice.selfDeafened ? 'destructive' : 'secondary'}
       size="icon"
-      class="size-8"
+      class="size-10 sm:size-8"
       onclick={() => voice.setDeafened(!voice.selfDeafened)}
       aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
     >
@@ -236,7 +248,7 @@
     <Button
       variant={voice.selfCamera ? 'default' : 'secondary'}
       size="icon"
-      class="size-8"
+      class="size-10 sm:size-8"
       onclick={() => voice.setCamera(!voice.selfCamera)}
       aria-label={voice.selfCamera ? 'Turn camera off' : 'Turn camera on'}
     >
@@ -250,7 +262,7 @@
     <Button
       variant={voice.selfScreenShare ? 'default' : 'secondary'}
       size="icon"
-      class="size-8"
+      class="size-10 sm:size-8"
       onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
       aria-label={voice.selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
     >
@@ -260,7 +272,7 @@
     <Button
       variant="destructive"
       size="icon"
-      class="size-8"
+      class="size-10 sm:size-8"
       onclick={onLeave}
       aria-label="Leave call"
     >
@@ -268,3 +280,17 @@
     </Button>
   </div>
 </div>
+
+<style>
+  .participant-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(180px, 1fr);
+  }
+
+  @media (min-width: 640px) {
+    .participant-grid {
+      grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--grid-rows), minmax(0, 1fr));
+    }
+  }
+</style>

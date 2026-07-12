@@ -105,7 +105,7 @@
 </script>
 
 <div
-  class="border-t border-border p-4"
+  class="border-t border-border p-2 sm:p-4"
   role="group"
   aria-label="Message composer"
   ondragenter={handleDragEnter}

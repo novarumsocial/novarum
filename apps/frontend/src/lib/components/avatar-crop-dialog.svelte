@@ -87,7 +87,7 @@
       <Dialog.Description>{description}</Dialog.Description>
     </Dialog.Header>
 
-    <div class="relative mx-auto size-[280px] overflow-hidden bg-muted">
+    <div class="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden bg-muted">
       {#if imageUrl}
         <img
           src={imageUrl}
@@ -103,7 +103,7 @@
         <span class="text-muted-foreground">Zoom</span>
         <input type="range" min="1" max="3" step="0.01" bind:value={zoom} class="accent-primary" />
       </label>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid gap-3 sm:grid-cols-2">
         <label class="grid gap-1 text-xs">
           <span class="text-muted-foreground">Horizontal</span>
           <input type="range" min="-100" max="100" bind:value={horizontal} class="accent-primary" />

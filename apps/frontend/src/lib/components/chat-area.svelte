@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Hash, Globe, Volume2 } from '@lucide/svelte';
+  import { Hash, Menu, Users, Volume2 } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
   import { chat } from '$lib/chat-state.svelte';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
@@ -10,11 +11,15 @@
     messages,
     loading = false,
     onSend,
+    onOpenNavigation,
+    onOpenMembers,
   }: {
     channel: Channel;
     messages: Message[];
     loading?: boolean;
     onSend?: (content: string, files: File[]) => void | Promise<void>;
+    onOpenNavigation?: () => void;
+    onOpenMembers?: () => void;
   } = $props();
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
@@ -42,7 +47,10 @@
 </script>
 
 <div class="flex min-w-0 flex-1 flex-col bg-background">
-  <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+  <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
+    <Button variant="ghost" size="icon-lg" class="md:hidden" onclick={onOpenNavigation} aria-label="Open channels">
+      <Menu class="size-5" />
+    </Button>
     {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />
     {:else}
@@ -53,10 +61,13 @@
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
+    <Button variant="ghost" size="icon-lg" class="ml-auto lg:hidden" onclick={onOpenMembers} aria-label="Open members">
+      <Users class="size-5" />
+    </Button>
   </div>
 
   <div bind:this={scrollContainer} class="min-w-0 flex-1 overflow-y-auto">
-    <div class="flex min-h-full flex-col justify-end px-4 py-4">
+    <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
       {#if loading}
         <div class="space-y-5">
           {#each Array.from({ length: 5 }) as _, i}
@@ -96,7 +107,7 @@
     </div>
   </div>
 
-  <div class="flex h-6 shrink-0 items-center px-4 text-xs text-muted-foreground" aria-live="polite">
+  <div class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4" aria-live="polite">
     {typingText ?? ''}
   </div>
 
