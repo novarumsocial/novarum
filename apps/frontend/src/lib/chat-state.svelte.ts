@@ -645,6 +645,11 @@ class ChatState {
     await this.loadCurrentChannel();
   }
 
+  async recoverRealtimeState() {
+    await this.loadGuilds();
+    await this.loadCurrentChannel();
+  }
+
   private async loadGuilds() {
     const result = await anchor.client.guilds.list.get();
 

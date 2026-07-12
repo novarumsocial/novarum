@@ -140,17 +140,67 @@ function parseRealtimeEvent(data: unknown) {
 class RealtimeState {
   connected = $state(false);
   private socket: ReturnType<typeof anchor.client.realtime.subscribe> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
+  private active = false;
+  private shouldRecover = false;
+  private voiceChannelId: string | null = null;
 
   connect() {
+    this.active = true;
+
+    const reconnectWhenOnline = () => {
+      if (!this.active || this.connected) return;
+
+      this.clearReconnectTimer();
+      this.openSocket();
+    };
+
+    window.addEventListener('online', reconnectWhenOnline);
+    this.openSocket();
+
+    return () => {
+      this.active = false;
+      this.connected = false;
+      this.clearReconnectTimer();
+      window.removeEventListener('online', reconnectWhenOnline);
+
+      const socket = this.socket;
+      this.socket = null;
+      socket?.close();
+    };
+  }
+
+  private openSocket() {
+    if (!this.active || this.socket) return;
+
     const socket = anchor.client.realtime.subscribe();
     this.socket = socket;
 
     socket.on('open', () => {
+      if (!this.active || this.socket !== socket) return;
+
       this.connected = true;
+      this.reconnectAttempt = 0;
+
+      for (const guild of chat.servers) this.subscribeGuild(guild.id);
+      if (this.voiceChannelId) socket.send({ type: 'voice.join', channelId: this.voiceChannelId });
+
+      if (this.shouldRecover) {
+        this.shouldRecover = false;
+        void chat
+          .recoverRealtimeState()
+          .catch((error) => console.error('Failed to recover realtime state', error));
+      }
     });
 
     socket.on('close', () => {
+      if (this.socket !== socket) return;
+
+      this.socket = null;
       this.connected = false;
+      this.shouldRecover = true;
+      this.scheduleReconnect();
     });
 
     socket.subscribe((message) => {
@@ -192,11 +242,24 @@ class RealtimeState {
         );
       }
     });
+  }
 
-    return () => {
-      if (this.socket === socket) this.socket = null;
-      socket.close();
-    };
+  private scheduleReconnect() {
+    if (!this.active || this.reconnectTimer) return;
+
+    const delay = Math.min(1_000 * 2 ** this.reconnectAttempt, 30_000);
+    this.reconnectAttempt += 1;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.openSocket();
+    }, delay);
+  }
+
+  private clearReconnectTimer() {
+    if (!this.reconnectTimer) return;
+
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   subscribeGuild(guildId: string) {
@@ -206,12 +269,14 @@ class RealtimeState {
   }
 
   joinVoice(channelId: string) {
+    this.voiceChannelId = channelId;
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'voice.join', channelId });
   }
 
   leaveVoice() {
+    this.voiceChannelId = null;
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'voice.leave' });
