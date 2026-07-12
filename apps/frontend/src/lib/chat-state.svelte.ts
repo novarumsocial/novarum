@@ -66,6 +66,31 @@ type TypingInput = {
 
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
+const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+async function stripImageMetadata(file: File) {
+  if (!reencodedImageTypes.has(file.type)) return file;
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error(`Could not process ${file.name}`);
+    context.drawImage(bitmap, 0, 0);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, file.type, file.type === 'image/jpeg' ? 0.92 : undefined)
+    );
+    if (!blob) throw new Error(`Could not process ${file.name}`);
+
+    return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+}
 
 function messageFromInput(message: AddMessageInput): Message {
   return {
@@ -371,12 +396,13 @@ class ChatState {
     const attachmentIds: string[] = [];
 
     for (const file of files) {
-      const contentType = file.type || 'application/octet-stream';
+      const uploadFile = await stripImageMetadata(file);
+      const contentType = uploadFile.type || 'application/octet-stream';
       const presign = await anchor.client.upload.presign.post({
         channelId,
-        filename: file.name,
+        filename: uploadFile.name,
         contentType,
-        size: file.size,
+        size: uploadFile.size,
       });
 
       if (presign.error || !presign.data || 'error' in presign.data) {
@@ -386,7 +412,7 @@ class ChatState {
       const uploaded = await fetch(presign.data.uploadUrl, {
         method: 'PUT',
         headers: presign.data.headers,
-        body: file,
+        body: uploadFile,
       });
       if (!uploaded.ok) throw new Error(`Could not upload ${file.name}`);
 

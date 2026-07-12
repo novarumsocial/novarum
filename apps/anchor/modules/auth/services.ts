@@ -10,47 +10,8 @@ import {
   validateSessionToken,
 } from './provider';
 import { getConfig } from '../../utils/config';
-import { storage } from '../../utils/services/storage';
-
-const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
-
-function userResponse(
-  user: {
-    id: string;
-    username: string;
-    homeserver: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    isBot: boolean;
-  },
-  email: string | null = null
-) {
-  return {
-    id: user.id,
-    username: user.username,
-    homeserver: user.homeserver,
-    handle: `@${user.username}:${user.homeserver}`,
-    displayName: user.displayName,
-    email,
-    avatarUrl: user.avatarUrl,
-    isBot: user.isBot,
-  };
-}
 
 export const auth = new Elysia({ prefix: '/auth' })
-  .get('/avatar/:userId', async ({ params, status }) => {
-    const user = await db.orm.public.User.where({ id: params.userId }).first();
-    if (!user?.avatarUrl) return status(404, { error: 'Avatar not found' });
-
-    const url = storage.presign(`avatars/${user.id}`, {
-      method: 'GET',
-      expiresIn: 5 * 60,
-      type: 'image/png',
-      contentDisposition: 'inline',
-    });
-
-    return Response.redirect(url);
-  })
   .post(
     '/signup',
     async ({ body, cookie, request, status }) => {
@@ -160,44 +121,6 @@ export const auth = new Elysia({ prefix: '/auth' })
 
     return { success: true, message: 'Logged out successfully' };
   })
-  .post(
-    '/avatar',
-    async ({ body, cookie, status }) => {
-      const token = cookie[sessionCookieName]?.value as string | undefined;
-      const session = await validateSessionToken(token);
-      if (!session) return status(401, { error: 'Unauthorized' });
-      if (body.avatar.type !== 'image/png') {
-        return status(415, { error: 'Avatar must be a PNG image' });
-      }
-      if (body.avatar.size > maxAvatarSize) {
-        return status(413, { error: 'Avatar must be smaller than 2 MB' });
-      }
-
-      await storage.write(`avatars/${session.userId}`, body.avatar, { type: 'image/png' });
-
-      const version = Date.now();
-      const avatarUrl = new URL(
-        `/auth/avatar/${encodeURIComponent(session.userId)}?v=${version}`,
-        getConfig().server.baseUrl
-      ).toString();
-      await db.orm.public.User.where({ id: session.userId }).update({
-        avatarUrl,
-        updatedAt: new Date(),
-      });
-      const user = await db.orm.public.User.where({ id: session.userId }).first();
-      if (!user) return status(404, { error: 'User not found' });
-
-      return { user: userResponse(user) };
-    },
-    {
-      body: t.Object({
-        avatar: t.File({
-          type: 'image/png',
-          maxSize: maxAvatarSize,
-        }),
-      }),
-    }
-  )
   .get('/me', async ({ cookie, request, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
     if (!token) {
@@ -227,3 +150,26 @@ export const auth = new Elysia({ prefix: '/auth' })
       user: userResponse(user, credential?.email ?? null),
     };
   });
+
+export function userResponse(
+  user: {
+    id: string;
+    username: string;
+    homeserver: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isBot: boolean;
+  },
+  email: string | null = null
+) {
+  return {
+    id: user.id,
+    username: user.username,
+    homeserver: user.homeserver,
+    handle: `@${user.username}:${user.homeserver}`,
+    displayName: user.displayName,
+    email,
+    avatarUrl: user.avatarUrl,
+    isBot: user.isBot,
+  };
+}

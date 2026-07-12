@@ -10,6 +10,7 @@ import { message } from '../modules/message/services';
 import { invite } from '../modules/invite/services';
 import { federation } from '../modules/federation/services';
 import { upload } from '../modules/upload/services';
+import { user } from '../modules/user/services';
 import { configureStorageCors } from '../utils/services/storage';
 
 await configureStorageCors();
@@ -25,6 +26,7 @@ const app = new Elysia()
   .use(invite)
   .use(federation)
   .use(upload)
+  .use(user)
   .get('/', () => 'this is anchor')
   .listen(getConfig().server.listen_port);
 

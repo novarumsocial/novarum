@@ -57,7 +57,7 @@
     const avatar = new File([blob], 'avatar.png', { type: 'image/png' });
 
     try {
-      const result = await anchor.client.auth.avatar.post({ avatar });
+      const result = await anchor.client.user.avatar.post({ avatar });
       if (result.error || !result.data || 'error' in result.data) {
         avatarError = 'Could not upload your avatar.';
         return;
