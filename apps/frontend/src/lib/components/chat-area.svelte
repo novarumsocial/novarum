@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Hash, Globe, Volume2 } from '@lucide/svelte';
+  import { tick } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
@@ -35,13 +36,11 @@
 
     if (!scrollContainer || loading) return;
 
-    requestAnimationFrame(() => {
-      scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight });
-    });
+    void tick().then(() => scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight }));
   });
 </script>
 
-<div class="flex min-w-0 flex-1 flex-col bg-background">
+<div class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
     {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />

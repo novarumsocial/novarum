@@ -64,6 +64,10 @@
     return member?.displayName || member?.username || identity;
   }
 
+  function avatarFor(identity: string) {
+    return members.find((item) => item.userId === identity)?.avatarUrl;
+  }
+
   function voiceUsersFor(channelId: string) {
     const users = [...(voiceStates[channelId] ?? [])];
 
@@ -219,6 +223,7 @@
             <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
               {#each connectedVoiceUsers as state (state.userId)}
                 {@const name = state.name || nameFor(state.userId)}
+                {@const avatarUrl = avatarFor(state.userId)}
                 <button
                   onclick={() => selectChannel(ch)}
                   class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
@@ -232,9 +237,13 @@
                         'ring-2 ring-emerald-400'
                     )}
                   >
-                    {voice?.channelId === ch.id && voice.voiceStates.get(state.userId)?.selfDeafened
-                      ? '!'
-                      : initialsFor(name)}
+                    {#if voice?.channelId === ch.id && voice.voiceStates.get(state.userId)?.selfDeafened}
+                      !
+                    {:else if avatarUrl}
+                      <img class="size-full object-cover" src={avatarUrl} alt="" />
+                    {:else}
+                      {initialsFor(name)}
+                    {/if}
                   </div>
                   <span class="min-w-0 flex-1 truncate">
                     {name}

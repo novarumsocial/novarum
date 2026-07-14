@@ -50,6 +50,10 @@
     return member?.displayName || member?.username || identity;
   }
 
+  function avatarFor(identity: string) {
+    return members.find((item) => item.userId === identity)?.avatarUrl;
+  }
+
   function avatarBg(id: string) {
     const colors = [
       'bg-rose-600',
@@ -142,6 +146,7 @@
 
         {#each participants as [identity, state]}
           {@const name = nameFor(identity)}
+          {@const avatarUrl = avatarFor(identity)}
           <div class="flex min-h-0 min-w-0 items-center justify-center">
             <div
               class={cn(
@@ -167,8 +172,12 @@
                   {#if state.selfDeafened}
                     <HeadphoneOff class="size-10" />
                   {:else}
-                    <div class="flex size-24 items-center justify-center rounded-full bg-black/20">
-                      {initialsFor(name)}
+                    <div class="flex size-24 items-center justify-center overflow-hidden rounded-full bg-black/20">
+                      {#if avatarUrl}
+                        <img class="size-full object-cover" src={avatarUrl} alt="" />
+                      {:else}
+                        {initialsFor(name)}
+                      {/if}
                     </div>
                   {/if}
                 </div>

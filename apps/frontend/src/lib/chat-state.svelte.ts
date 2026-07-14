@@ -38,6 +38,7 @@ type ChannelMemberInput = {
   username: string;
   displayName?: string | null;
   homeserver: string;
+  avatarUrl?: string;
   isBot: boolean;
   status: 'ONLINE' | 'OFFLINE';
 };
@@ -81,6 +82,7 @@ function memberFromInput(member: ChannelMemberInput): Author {
     username: member.username,
     displayName: member.displayName,
     server: member.homeserver,
+    avatarUrl: member.avatarUrl,
     avatarColor: 'bg-primary',
     isBot: member.isBot,
     status: member.status,

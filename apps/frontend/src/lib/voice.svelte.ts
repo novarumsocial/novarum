@@ -16,6 +16,9 @@ import Screen from './sounds/screen.opus?url';
 import ScreenOff from './sounds/screen-off.opus?url';
 
 const livekitConnectionTimeoutMs = 15_000;
+const soundEffectTopic = 'novarum.sound-effect';
+const soundEffectEncoder = new TextEncoder();
+const soundEffectDecoder = new TextDecoder();
 
 const joinSound = new Sound(JoinEffect);
 const leaveSound = new Sound(Leave);
@@ -159,6 +162,13 @@ export class Voice {
 
     if (!this.room) return;
 
+    void this.room.localParticipant
+      .publishData(soundEffectEncoder.encode(muted ? 'mute' : 'unmute'), {
+        reliable: true,
+        topic: soundEffectTopic,
+      })
+      .catch(() => null);
+
     await this.syncLocalMicrophone(this.room);
 
     // keep the local participant in sync
@@ -263,6 +273,13 @@ export class Voice {
       })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         this.audioPlaybackBlocked = !room.canPlaybackAudio;
+      })
+      .on(RoomEvent.DataReceived, (payload, participant, kind, topic) => {
+        if (topic !== soundEffectTopic) return;
+
+        const effect = soundEffectDecoder.decode(payload);
+        if (effect === 'mute') muteSound.play();
+        if (effect === 'unmute') muteReverseSound.play();
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         this.syncParticipant(participant, channelId);
