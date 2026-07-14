@@ -72,7 +72,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     },
     {
       body: t.Object({
-        name: t.String({ minLength: 1, maxLength: 100 }),
+        name: t.String({ minLength: 1, maxLength: 256 }),
       }),
     }
   )
