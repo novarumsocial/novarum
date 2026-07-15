@@ -118,7 +118,7 @@
           </p>
         </div>
       {:else}
-        <div class="space-y-4">
+        <div>
           {#each messages as msg, i}
             {@const prev = messages[i - 1]}
             {@const repliedMessage = messages.find((message) => message.id === msg.replyTo) ?? null}

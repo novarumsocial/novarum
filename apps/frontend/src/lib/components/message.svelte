@@ -136,8 +136,8 @@
 </script>
 
 <div
-  class="relative flex gap-3 hover:bg-muted/30 py-0.5"
-  class:mt-1={grouped}
+  class="relative flex gap-3 py-0.5 first:mt-0 hover:bg-muted/30"
+  class:mt-0.5={grouped}
   class:mt-4={!grouped}
   onmouseenter={() => (hovered = true)}
   onmouseleave={() => (hovered = false)}
