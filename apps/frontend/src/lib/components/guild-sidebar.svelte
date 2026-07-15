@@ -56,7 +56,7 @@
           src={server.avatarUrl}
           name={server.name}
           fallback={server.initials}
-          class="size-full bg-transparent text-xs"
+          class="size-full bg-transparent text-xs text-primary-foreground"
           focused={activeId === server.id}
         />
       </button>
