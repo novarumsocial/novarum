@@ -16,6 +16,7 @@
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
   import GuildSettingsDialog from './guild-settings-dialog.svelte';
+  import Avatar from './avatar.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
   let {
@@ -64,6 +65,10 @@
     const member = members.find((item) => item.userId === identity);
 
     return member?.displayName || member?.username || identity;
+  }
+
+  function avatarFor(identity: string) {
+    return members.find((item) => item.userId === identity)?.avatarUrl;
   }
 
   function voiceUsersFor(channelId: string) {
@@ -225,7 +230,10 @@
                   onclick={() => selectChannel(ch)}
                   class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
                 >
-                  <div
+                  <Avatar
+                    src={avatarFor(state.userId)}
+                    {name}
+                    fallback={initialsFor(name)}
                     class={cn(
                       'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
                       avatarBg(state.userId),
@@ -233,11 +241,7 @@
                         voice.voiceStates.get(state.userId)?.speaking &&
                         'ring-2 ring-emerald-400'
                     )}
-                  >
-                    {voice?.channelId === ch.id && voice.voiceStates.get(state.userId)?.selfDeafened
-                      ? '!'
-                      : initialsFor(name)}
-                  </div>
+                  />
                   <span class="min-w-0 flex-1 truncate">
                     {name}
                   </span>

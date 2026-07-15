@@ -17,6 +17,7 @@
   import type { Author, Channel } from '$lib/types/chat';
   import type { Voice, VoiceVideoTrack } from '$lib/voice.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import Avatar from './avatar.svelte';
 
   let {
     channel,
@@ -50,9 +51,12 @@
       .slice(0, 2);
   }
 
-  function nameFor(identity: string) {
-    const member = members.find((item) => item.userId === identity);
+  function memberFor(identity: string) {
+    return members.find((item) => item.userId === identity);
+  }
 
+  function nameFor(identity: string) {
+    const member = memberFor(identity);
     return member?.displayName || member?.username || identity;
   }
 
@@ -166,6 +170,7 @@
 
         {#each participants as [identity, state]}
           {@const name = nameFor(identity)}
+          {@const member = memberFor(identity)}
           <div class="flex min-h-0 min-w-0 items-center justify-center">
             <div
               class={cn(
@@ -182,21 +187,13 @@
                   use:attachVideo={state.cameraTrack}
                 ></video>
               {:else}
-                <div
-                  class={cn(
-                    'flex size-full items-center justify-center text-3xl font-bold text-white',
-                    avatarBg(identity)
-                  )}
-                >
-                  {#if state.selfDeafened}
-                    <HeadphoneOff class="size-10" />
-                  {:else}
-                    <div
-                      class="flex size-16 items-center justify-center rounded-full bg-black/20 sm:size-24"
-                    >
-                      {initialsFor(name)}
-                    </div>
-                  {/if}
+                <div class={cn('flex size-full items-center justify-center', avatarBg(identity))}>
+                  <Avatar
+                    src={member?.avatarUrl}
+                    {name}
+                    fallback={initialsFor(name)}
+                    class="size-20 rounded-full border-2 border-white/20 bg-black/20 text-2xl text-white shadow-xl sm:size-28 sm:text-3xl"
+                  />
                 </div>
               {/if}
 
