@@ -7,6 +7,7 @@ import { parseFederatedGuildId } from '../../utils/federationIds';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 import { storage } from '../../utils/services/storage';
 import { getConfig } from '../../utils/config';
+import { randomInt } from 'node:crypto';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 
@@ -237,12 +238,17 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     }
   );
 
-function randomAlphanumericString(length: number) {
+function randomAlphanumericString(length: number): string {
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw new RangeError('length must be a non-negative safe integer');
+  }
+
   const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
+
   for (let i = 0; i < length; i++) {
-    const randomIndex = Math.floor(Math.random() * characters.length);
-    result += characters.charAt(randomIndex);
+    result += characters[randomInt(characters.length)];
   }
+
   return result;
 }
