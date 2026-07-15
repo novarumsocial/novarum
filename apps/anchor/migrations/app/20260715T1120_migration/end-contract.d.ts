@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:9ab74198e40d6ea166f71e23a24bc88ea6354fd100d9b480e0dbfb56554deb35'>;
+  StorageHashBase<'sha256:518db60751f94effbcfded5114e111bd16a78d9d37518fae36a2e5df3bf9e005'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc'>;
 export type ProfileHash =
@@ -116,7 +116,7 @@ export type FieldOutputTypes = {
       readonly authorId: CodecTypes['pg/text@1']['output'];
       readonly content: CodecTypes['pg/text@1']['output'];
       readonly nonce: CodecTypes['pg/text@1']['output'];
-      readonly replyTo: CodecTypes['pg/text@1']['output'] | null;
+      readonly replyTo: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
@@ -213,7 +213,7 @@ export type FieldInputTypes = {
       readonly authorId: CodecTypes['pg/text@1']['input'];
       readonly content: CodecTypes['pg/text@1']['input'];
       readonly nonce: CodecTypes['pg/text@1']['input'];
-      readonly replyTo: CodecTypes['pg/text@1']['input'] | null;
+      readonly replyTo: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['input'] | null;
@@ -764,7 +764,7 @@ type ContractBase = Omit<
                 readonly replyTo: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
+                  readonly nullable: false;
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -1419,7 +1419,7 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly replyTo: {
-                readonly nullable: true;
+                readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly createdAt: {

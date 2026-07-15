@@ -1,0 +1,83 @@
+[
+  {
+    "id": "alterNullability.dropNotNull.message.replyTo",
+    "label": "Drop NOT NULL on \"message\".\"replyTo\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "replyTo",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"replyTo\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "replyTo"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop NOT NULL on \"replyTo\"",
+        "sql": "ALTER TABLE \"public\".\"message\" ALTER COLUMN \"replyTo\" DROP NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"replyTo\" is nullable",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "replyTo",
+          "YES"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.local_credential.local_credential_userId_idx",
+    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "local_credential_userId_idx",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"local_credential_userId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"local_credential_userId_idx\"",
+        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"local_credential_userId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"local_credential_userId_idx\""
+        ]
+      }
+    ]
+  }
+]

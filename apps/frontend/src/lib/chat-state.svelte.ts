@@ -106,7 +106,6 @@ function messageFromInput(message: AddMessageInput): Message {
     content: message.content,
     timestamp: new Date(message.createdAt),
     edited: false,
-    replies: 0,
     attachments: message.attachments ?? [],
   };
 }

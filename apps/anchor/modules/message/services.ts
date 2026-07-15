@@ -76,6 +76,7 @@ export const message = new Elysia({ prefix: '/message' })
           guildId: channel.guildId,
           content: message.content,
           nonce: message.nonce,
+          replyTo: message.replyTo ?? null,
           attachments: message.attachments.map((attachment) =>
             attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
           ),
@@ -98,7 +99,7 @@ export const message = new Elysia({ prefix: '/message' })
   .post(
     '/send',
     async ({ body, session, status, server }) => {
-      const { channelId, content, nonce, attachmentIds = [] } = body;
+      const { channelId, content, nonce, replyTo, attachmentIds = [] } = body;
 
       const channel = await db.orm.public.Channel.where({ id: channelId }).first();
       if (!channel) {
@@ -122,6 +123,7 @@ export const message = new Elysia({ prefix: '/message' })
             user: federationUserPayload(session),
             content,
             nonce,
+            replyTo,
             attachmentIds,
           }
         ).catch(() => null);
@@ -155,7 +157,11 @@ export const message = new Elysia({ prefix: '/message' })
         .include('attachments')
         .first();
       if (priorMsg) {
-        if (priorMsg.channelId !== channelId || priorMsg.content !== content) {
+        if (
+          priorMsg.channelId !== channelId ||
+          priorMsg.content !== content ||
+          priorMsg.replyTo !== (replyTo ?? null)
+        ) {
           return status(409, { error: 'Nonce already used for a different message' });
         }
 
@@ -169,6 +175,13 @@ export const message = new Elysia({ prefix: '/message' })
         };
       }
 
+      if (
+        replyTo &&
+        !(await db.orm.public.Message.where({ id: replyTo, channelId }).first())
+      ) {
+        return status(400, { error: 'Invalid reply target' });
+      }
+
       const attachments = await verifyPendingAttachments(attachmentIds, session.userId, channelId);
       if (!attachments.ok) return status(400, { error: attachments.error });
 
@@ -178,6 +191,7 @@ export const message = new Elysia({ prefix: '/message' })
           channelId,
           authorId: session.userId,
           content,
+          replyTo: replyTo ?? null,
           nonce,
         });
 
@@ -205,6 +219,7 @@ export const message = new Elysia({ prefix: '/message' })
             guildId: channel.guildId,
             content: message.content,
             nonce: message.nonce,
+            replyTo: message.replyTo ?? null,
             attachments: responseAttachments,
             createdAt:
               message.createdAt instanceof Date
@@ -226,6 +241,7 @@ export const message = new Elysia({ prefix: '/message' })
         channelId: t.String(),
         content: t.String(),
         nonce: t.String(),
+        replyTo: t.Optional(t.String()),
         attachmentIds: t.Optional(
           t.Array(t.String(), { maxItems: maxAttachmentCount, uniqueItems: true })
         ),

@@ -41,7 +41,6 @@ export interface Message {
   content: string;
   timestamp: Date;
   edited: boolean;
-  replies: number;
   attachments: Attachment[];
 }
 
