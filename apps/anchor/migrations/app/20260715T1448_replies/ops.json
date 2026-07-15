@@ -1,0 +1,44 @@
+[
+  {
+    "id": "column.public.message.replyTo",
+    "label": "Add column \"replyTo\" to \"message\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "replyTo",
+        "table": "message"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"replyTo\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "replyTo"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"replyTo\"",
+        "sql": "ALTER TABLE \"public\".\"message\" ADD COLUMN \"replyTo\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"replyTo\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "message",
+          "replyTo"
+        ]
+      }
+    ]
+  }
+]

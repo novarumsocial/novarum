@@ -798,13 +798,6 @@
                   "kind": "scalar"
                 }
               },
-              "replyTo": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -870,9 +863,6 @@
                 },
                 "nonce": {
                   "column": "nonce"
-                },
-                "replyTo": {
-                  "column": "replyTo"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -1668,11 +1658,6 @@
                   "nativeType": "text",
                   "nullable": false
                 },
-                "replyTo": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz@1",
                   "nativeType": "timestamptz",
@@ -1839,7 +1824,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:518db60751f94effbcfded5114e111bd16a78d9d37518fae36a2e5df3bf9e005"
+    "storageHash": "sha256:28d29df53d9611f9ec50511126e930a304552e355a94ad45275761d145238fd1"
   },
   "execution": {
     "executionHash": "sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc",

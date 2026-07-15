@@ -259,7 +259,7 @@ export const federation = new Elysia({ prefix: '/federation' })
     if (
       typeof content !== 'string' ||
       typeof nonce !== 'string' ||
-      (replyTo !== undefined && typeof replyTo !== 'string')
+      (replyTo != null && typeof replyTo !== 'string')
     ) {
       return status(400, { error: 'Invalid federation message' });
     }

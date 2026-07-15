@@ -54,7 +54,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string(),
       content: z.string(),
       nonce: z.string(),
-      replyTo: z.string().nullable(),
+      replyTo: z.string().nullable().default(null),
       attachments: z.array(attachmentSchema),
       createdAt: z.string(),
       author: z.object({

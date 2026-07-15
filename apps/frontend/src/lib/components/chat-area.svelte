@@ -28,6 +28,7 @@
   let scrollContainer = $state<HTMLDivElement | null>(null);
   let previousChannelId: string | null = null;
   let replyingTo = $state<Message | null>(null);
+  const messagesById = $derived(new Map(messages.map((message) => [message.id, message])));
 
   const typingText = $derived.by(() => {
     const typing = chat.currentTyping;
@@ -127,7 +128,7 @@
         <div>
           {#each messages as msg, i}
             {@const prev = messages[i - 1]}
-            {@const repliedMessage = messages.find((message) => message.id === msg.replyTo) ?? null}
+            {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
             {@const grouped =
               prev !== undefined &&
               prev.author.username === msg.author.username &&
