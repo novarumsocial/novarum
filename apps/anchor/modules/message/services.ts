@@ -175,10 +175,7 @@ export const message = new Elysia({ prefix: '/message' })
         };
       }
 
-      if (
-        replyTo &&
-        !(await db.orm.public.Message.where({ id: replyTo, channelId }).first())
-      ) {
+      if (replyTo && !(await db.orm.public.Message.where({ id: replyTo, channelId }).first())) {
         return status(400, { error: 'Invalid reply target' });
       }
 

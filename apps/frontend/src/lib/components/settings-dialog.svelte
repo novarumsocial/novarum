@@ -87,8 +87,14 @@
       <Dialog.Description>Manage your account, appearance, and preferences.</Dialog.Description>
     </Dialog.Header>
 
-    <Tabs.Root value="account" orientation="vertical" class="flex flex-col gap-4 sm:min-h-[360px] sm:flex-row sm:gap-0">
-      <div class="flex min-w-0 shrink-0 flex-col gap-2 sm:w-44 sm:border-r sm:border-border sm:pr-2">
+    <Tabs.Root
+      value="account"
+      orientation="vertical"
+      class="flex flex-col gap-4 sm:min-h-[360px] sm:flex-row sm:gap-0"
+    >
+      <div
+        class="flex min-w-0 shrink-0 flex-col gap-2 sm:w-44 sm:border-r sm:border-border sm:pr-2"
+      >
         <Tabs.List
           class="flex h-auto w-full items-stretch justify-start gap-0.5 overflow-x-auto bg-transparent p-0 sm:flex-col"
         >

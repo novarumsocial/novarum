@@ -98,12 +98,24 @@
 <div class="relative flex flex-1 flex-col bg-background">
   <!-- header -->
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
-    <Button variant="ghost" size="icon-lg" class="md:hidden" onclick={onOpenNavigation} aria-label="Open channels">
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      class="md:hidden"
+      onclick={onOpenNavigation}
+      aria-label="Open channels"
+    >
       <Menu class="size-5" />
     </Button>
     <Volume2 class="size-5 text-muted-foreground" />
     <span class="text-sm font-semibold text-foreground">{channel.name}</span>
-    <Button variant="ghost" size="icon-lg" class="ml-auto lg:hidden" onclick={onOpenMembers} aria-label="Open members">
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      class="ml-auto lg:hidden"
+      onclick={onOpenMembers}
+      aria-label="Open members"
+    >
       <Users class="size-5" />
     </Button>
   </div>
@@ -179,7 +191,9 @@
                   {#if state.selfDeafened}
                     <HeadphoneOff class="size-10" />
                   {:else}
-                  <div class="flex size-16 items-center justify-center rounded-full bg-black/20 sm:size-24">
+                    <div
+                      class="flex size-16 items-center justify-center rounded-full bg-black/20 sm:size-24"
+                    >
                       {initialsFor(name)}
                     </div>
                   {/if}
