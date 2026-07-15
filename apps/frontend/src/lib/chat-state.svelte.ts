@@ -28,6 +28,7 @@ type AddMessageInput = {
   channelId: string;
   content: string;
   createdAt: string | Date;
+  replyTo?: string | null;
   author: {
     username: string;
     avatar?: string | null;
@@ -106,8 +107,8 @@ function messageFromInput(message: AddMessageInput): Message {
     content: message.content,
     timestamp: new Date(message.createdAt),
     edited: false,
-    replies: 0,
     attachments: message.attachments ?? [],
+    replyTo: message.replyTo ?? null,
   };
 }
 
@@ -130,10 +131,10 @@ function channelTypeFor(type: string | undefined): Channel['type'] {
   return 'TEXT';
 }
 
-function guildPath(serverId?: string, channelId?: string) {
+function guildPath(serverId?: string, channelId?: string, messageId?: string) {
   if (!serverId) return '/guilds';
 
-  const path = [serverId, channelId]
+  const path = [serverId, channelId, messageId]
     .filter((part): part is string => Boolean(part))
     .map(encodeURIComponent)
     .join('/');
@@ -160,7 +161,7 @@ function sendToGuildsIfFederatedServerDown(error: unknown) {
 }
 
 function currentRoute(): ChatRoute {
-  const [first, second] = (page.params.path ?? '').split('/').filter(Boolean);
+  const [first, second, third] = (page.params.path ?? '').split('/').filter(Boolean);
 
   // will eventually be replaced by dms
   if (!first) return { kind: 'home' };
@@ -170,6 +171,7 @@ function currentRoute(): ChatRoute {
     kind: 'guild',
     serverId: first ?? null,
     channelId: second ?? null,
+    messageId: third ?? null,
   };
 }
 
@@ -187,6 +189,7 @@ class ChatState {
   route = $derived(currentRoute());
   activeServer = $derived(this.route.kind === 'guild' ? this.route.serverId : null);
   activeChannel = $derived(this.route.kind === 'guild' ? this.route.channelId : null);
+  activeMessage = $derived(this.route.kind === 'guild' ? this.route.messageId : null);
   activeDMUser = $derived(this.route.kind === 'dms' ? this.route.userId : null);
 
   get currentServer() {
@@ -232,6 +235,10 @@ class ChatState {
 
   selectChannel(id: string) {
     if (this.activeServer) return goto(guildPath(this.activeServer, id));
+  }
+
+  messagePath(id: string) {
+    return guildPath(this.activeServer ?? undefined, this.activeChannel ?? undefined, id);
   }
 
   selectDm(userId: string) {
@@ -418,7 +425,12 @@ class ChatState {
     };
   }
 
-  async sendMessage(channelId: string, content: string, files: File[] = []) {
+  async sendMessage(
+    channelId: string,
+    content: string,
+    files: File[] = [],
+    replyTo: string | null = null
+  ) {
     const nonce = messageNonce();
     const attachmentIds: string[] = [];
 
@@ -451,6 +463,7 @@ class ChatState {
       content,
       nonce,
       attachmentIds,
+      ...(replyTo ? { replyTo } : {}),
     });
 
     if (result.error || !result.data || 'error' in result.data) {

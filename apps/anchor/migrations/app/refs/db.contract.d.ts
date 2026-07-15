@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:28d29df53d9611f9ec50511126e930a304552e355a94ad45275761d145238fd1'>;
+  StorageHashBase<'sha256:9ab74198e40d6ea166f71e23a24bc88ea6354fd100d9b480e0dbfb56554deb35'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc'>;
 export type ProfileHash =
@@ -116,6 +116,7 @@ export type FieldOutputTypes = {
       readonly authorId: CodecTypes['pg/text@1']['output'];
       readonly content: CodecTypes['pg/text@1']['output'];
       readonly nonce: CodecTypes['pg/text@1']['output'];
+      readonly replyTo: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
@@ -212,6 +213,7 @@ export type FieldInputTypes = {
       readonly authorId: CodecTypes['pg/text@1']['input'];
       readonly content: CodecTypes['pg/text@1']['input'];
       readonly nonce: CodecTypes['pg/text@1']['input'];
+      readonly replyTo: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['input'] | null;
@@ -759,6 +761,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
                 };
+                readonly replyTo: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz@1';
@@ -934,6 +941,10 @@ type ContractBase = Omit<
     };
     readonly channel: { readonly namespace: 'public' & NamespaceId; readonly model: 'Channel' };
     readonly message: { readonly namespace: 'public' & NamespaceId; readonly model: 'Message' };
+    readonly attachment: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'Attachment';
+    };
     readonly guild_invite: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'GuildInvite';
@@ -945,10 +956,6 @@ type ContractBase = Omit<
     readonly federation_nonce: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'FederationNonce';
-    };
-    readonly attachment: {
-      readonly namespace: 'public' & NamespaceId;
-      readonly model: 'Attachment';
     };
   };
   readonly domain: {
@@ -1411,6 +1418,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly replyTo: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
@@ -1465,6 +1476,7 @@ type ContractBase = Omit<
                 readonly authorId: { readonly column: 'authorId' };
                 readonly content: { readonly column: 'content' };
                 readonly nonce: { readonly column: 'nonce' };
+                readonly replyTo: { readonly column: 'replyTo' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly deletedAt: { readonly column: 'deletedAt' };

@@ -34,6 +34,7 @@ export type RealtimeEvent =
         guildId: string;
         content: string;
         nonce: string;
+        replyTo: string | null;
         attachments: AttachmentPayload[];
         createdAt: string;
         author: {

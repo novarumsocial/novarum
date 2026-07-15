@@ -378,6 +378,7 @@
               },
               "id": { "nullable": false, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
               "nonce": { "nullable": false, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
+              "replyTo": { "nullable": true, "type": { "codecId": "pg/text@1", "kind": "scalar" } },
               "updatedAt": {
                 "nullable": false,
                 "type": { "codecId": "pg/timestamptz@1", "kind": "scalar" }
@@ -409,6 +410,7 @@
                 "deletedAt": { "column": "deletedAt" },
                 "id": { "column": "id" },
                 "nonce": { "column": "nonce" },
+                "replyTo": { "column": "replyTo" },
                 "updatedAt": { "column": "updatedAt" }
               },
               "namespaceId": "public",
@@ -869,6 +871,7 @@
                 },
                 "id": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
                 "nonce": { "codecId": "pg/text@1", "nativeType": "text", "nullable": false },
+                "replyTo": { "codecId": "pg/text@1", "nativeType": "text", "nullable": true },
                 "updatedAt": {
                   "codecId": "pg/timestamptz@1",
                   "nativeType": "timestamptz",
@@ -970,7 +973,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:28d29df53d9611f9ec50511126e930a304552e355a94ad45275761d145238fd1"
+    "storageHash": "sha256:9ab74198e40d6ea166f71e23a24bc88ea6354fd100d9b480e0dbfb56554deb35"
   },
   "target": "postgres",
   "targetFamily": "sql"

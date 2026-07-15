@@ -114,8 +114,7 @@
           class="min-h-20 w-full resize-none border border-input bg-transparent px-3 py-2 text-sm text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
           disabled
           placeholder="Add a description for your guild"
-          value={server.description ?? ''}
-        ></textarea>
+          value={server.description ?? ''}></textarea>
         <p class="text-[11px] text-muted-foreground">More guild settings are coming soon.</p>
       </div>
     </div>

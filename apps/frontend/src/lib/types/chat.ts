@@ -41,7 +41,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   edited: boolean;
-  replies: number;
+  replyTo: string | null;
   attachments: Attachment[];
 }
 
@@ -65,4 +65,9 @@ export interface VoiceUser {
 export type ChatRoute =
   | { kind: 'home' }
   | { kind: 'dms'; userId: string | null }
-  | { kind: 'guild'; serverId: string | null; channelId: string | null };
+  | {
+      kind: 'guild';
+      serverId: string | null;
+      channelId: string | null;
+      messageId: string | null;
+    };

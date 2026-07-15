@@ -254,14 +254,26 @@ export const federation = new Elysia({ prefix: '/federation' })
 
     const content = getObjectProperty(parsed.body, 'content');
     const nonce = getObjectProperty(parsed.body, 'nonce');
+    const replyTo = getObjectProperty(parsed.body, 'replyTo');
     const attachmentIdsResult = federationAttachmentIds(parsed.body);
-    if (typeof content !== 'string' || typeof nonce !== 'string') {
+    if (
+      typeof content !== 'string' ||
+      typeof nonce !== 'string' ||
+      (replyTo != null && typeof replyTo !== 'string')
+    ) {
       return status(400, { error: 'Invalid federation message' });
     }
     if (!attachmentIdsResult.ok) return status(400, { error: attachmentIdsResult.error });
 
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
+
+    if (
+      replyTo &&
+      !(await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first())
+    ) {
+      return status(400, { error: 'Invalid reply target' });
+    }
 
     const priorMsg = await db.orm.public.Message.where({
       authorId: access.user.id,
@@ -270,7 +282,11 @@ export const federation = new Elysia({ prefix: '/federation' })
       .include('attachments')
       .first();
     if (priorMsg) {
-      if (priorMsg.channelId !== params.id || priorMsg.content !== content) {
+      if (
+        priorMsg.channelId !== params.id ||
+        priorMsg.content !== content ||
+        priorMsg.replyTo !== (replyTo ?? null)
+      ) {
         return status(409, { error: 'Nonce already used for a different message' });
       }
 
@@ -290,6 +306,7 @@ export const federation = new Elysia({ prefix: '/federation' })
         channelId: params.id,
         authorId: access.user.id,
         content,
+        replyTo: replyTo ?? null,
         nonce,
       });
 
@@ -862,6 +879,7 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     guildId: channel.guildId,
     content: message.content,
     nonce: message.nonce,
+    replyTo: message.replyTo ?? null,
     attachments: Array.isArray(message.attachments)
       ? message.attachments.map(attachmentPayload)
       : [],

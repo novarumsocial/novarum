@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Message } from '$lib/types/chat';
+  import { chat } from '$lib/chat-state.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
   import {
     Download,
@@ -9,6 +10,7 @@
     Reply,
     Ellipsis,
     Trash2,
+    Link,
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
@@ -19,12 +21,16 @@
 
   let {
     message,
+    repliedMessage,
     grouped,
     onDelete,
+    onReply,
   }: {
     message: Message;
+    repliedMessage: Message | null;
     grouped: boolean;
     onDelete: (messageId: string) => void | Promise<void>;
+    onReply: () => void;
   } = $props();
 
   let shiftPressed = $state(false);
@@ -36,6 +42,15 @@
   let deleteFirstClick = $state(false);
 
   const dropdownItems = [
+    {
+      label: () => 'Message link',
+      icon: Link,
+      variant: 'default',
+      onclick: () => {
+        const url = chat.messagePath(message.id);
+        navigator.clipboard.writeText(`${window.location.origin}${url}`);
+      },
+    },
     {
       label: () => deleteText,
       icon: Trash2,
@@ -120,20 +135,21 @@
   }
 
   // i should probably put this elsewhere lmao im losong my sanity
-  // should also make variant and disabled optional but keeping it bc i forgot how to do a thing
   interface DropdownItems {
     label: () => string;
     icon: Component<LucideProps, {}, ''>;
-    variant: 'default' | 'destructive';
     onclick: () => void | Promise<void>;
-    disabled: () => boolean;
+    variant?: 'default' | 'destructive';
+    disabled?: () => boolean;
     closeOnSelect?: boolean;
   }
 </script>
 
 <div
-  class="relative flex gap-3 hover:bg-muted/30 py-0.5"
-  class:mt-1={grouped}
+  id={message.id}
+  class="relative flex gap-3 py-0.5 first:mt-0 hover:bg-muted/30 motion-reduce:animate-none"
+  class:animate-message-flash={chat.activeMessage === message.id}
+  class:mt-0.5={grouped}
   class:mt-4={!grouped}
   onmouseenter={() => (hovered = true)}
   onmouseleave={() => (hovered = false)}
@@ -156,6 +172,26 @@
       </div>
     {/if}
 
+    {#if message.replyTo}
+      <a
+        href={chat.messagePath(message.replyTo)}
+        class="mt-0.5 flex max-w-2xl min-w-0 items-start gap-1 border-l-2 border-primary/40 pl-1.5 text-[11px] leading-4 hover:border-primary hover:bg-muted/40"
+      >
+        <Reply class="size-3 shrink-0 text-primary/60" aria-hidden="true" />
+        {#if repliedMessage}
+          <span class="shrink-0 font-medium text-foreground/75">
+            {repliedMessage.author.displayName || repliedMessage.author.username}
+          </span>
+          <span class="text-muted-foreground/40">·</span>
+          <span class="min-w-0 break-words text-muted-foreground">
+            {repliedMessage.content ||
+              `${repliedMessage.attachments.length} attachment${repliedMessage.attachments.length === 1 ? '' : 's'}`}
+          </span>
+        {:else}
+          <span class="italic text-muted-foreground/70">Original message unavailable</span>
+        {/if}
+      </a>
+    {/if}
     <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
       {message.content}
     </div>
@@ -163,11 +199,18 @@
     {#if hovered || dropdownOpen}
       <div class="absolute top-0 right-0">
         <ButtonGroup.Root>
-          <Button variant="ghost" size="icon-xs" aria-label="Reply"><Reply /></Button>
+          <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
+            ><Reply class="size-3" /></Button
+          >
           {#if shiftPressed}
             {#each dropdownItems as item (item.label)}
-              <Button onclick={item.onclick} variant={item.variant} disabled={item.disabled()} size="icon-xs">
-                <item.icon />
+              <Button
+                onclick={item.onclick}
+                variant={item.variant}
+                disabled={item.disabled?.()}
+                size="icon-xs"
+              >
+                <item.icon class="size-3" />
               </Button>
             {/each}
           {:else}
@@ -175,7 +218,7 @@
               <DropdownMenu.Trigger>
                 {#snippet child({ props })}
                   <Button {...props} variant="ghost" size="icon-xs" aria-label="Message actions">
-                    <Ellipsis />
+                    <Ellipsis class="size-3" />
                   </Button>
                 {/snippet}
               </DropdownMenu.Trigger>
@@ -184,11 +227,11 @@
                   {#each dropdownItems as item (item.label)}
                     <DropdownMenu.Item
                       onclick={item.onclick}
-                      disabled={item.disabled()}
+                      disabled={item.disabled?.()}
                       variant={item.variant}
                       closeOnSelect={item.closeOnSelect ?? true}
                     >
-                      <item.icon class="size-4" />
+                      <item.icon class="size-3" />
                       {item.label()}
                     </DropdownMenu.Item>
                   {/each}

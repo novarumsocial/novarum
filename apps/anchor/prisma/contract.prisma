@@ -87,6 +87,8 @@ model Message {
   authorId  String
   content   String
   nonce     String
+  replyTo   String?   // replies to id, duh
+  
   createdAt DateTime  @default(now())
   updatedAt temporal.updatedAt()
   deletedAt DateTime?
