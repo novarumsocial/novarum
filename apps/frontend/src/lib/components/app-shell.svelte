@@ -29,7 +29,8 @@
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
 
   const voice = new Voice();
-  let joinedVoiceChannelId: string | null = null;
+  let joinedVoiceChannelId = $state<string | null>(null);
+  let dismissedVoiceChannelId = $state<string | null>(null);
 
   const voiceChannelName = $derived(
     Object.values(chat.channelsByServer)
@@ -47,7 +48,7 @@
       return;
     }
 
-    if (joinedVoiceChannelId !== channelId) {
+    if (joinedVoiceChannelId !== channelId && dismissedVoiceChannelId !== channelId) {
       joinedVoiceChannelId = channelId;
       void voice.join(channelId).catch(() => null);
     }
@@ -70,6 +71,7 @@
   }
 
   function leaveVoice() {
+    dismissedVoiceChannelId = voice.channelId;
     joinedVoiceChannelId = null;
     void voice.leave();
   }
@@ -79,6 +81,14 @@
   }
 
   function selectChannel(id: string) {
+    if (
+      currentCategories.some((category) =>
+        category.channels.some((channel) => channel.id === id && channel.type === 'VOICE')
+      )
+    ) {
+      dismissedVoiceChannelId = null;
+      joinedVoiceChannelId = null;
+    }
     chat.selectChannel(id);
     mobileNavigationOpen = false;
   }

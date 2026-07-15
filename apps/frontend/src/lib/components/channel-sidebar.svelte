@@ -108,16 +108,6 @@
   }
 
   function selectChannel(channel: Channel) {
-    if (channel.type === 'VOICE') {
-      if (voice?.channelId === channel.id && (voice.connected || voice.connecting)) {
-        onSelectChannel(channel.id);
-        return;
-      }
-
-      void voice?.join(channel.id).catch(() => null);
-      return;
-    }
-
     onSelectChannel(channel.id);
   }
 </script>

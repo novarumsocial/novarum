@@ -189,17 +189,17 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
 });
 
 function publishVoiceState(
-  ws: { publish(topic: string, data: string): void },
+  ws: { publish(topic: string, data: string): void; send(data: string): void },
   state: { guildId: string; channelId: string; userId: string; name: string | null },
   connected: boolean
 ) {
-  ws.publish(
-    `guildEvents:${state.guildId}`,
-    JSON.stringify({
-      type: 'voice.state.changed',
-      data: { ...state, connected },
-    })
-  );
+  const event = JSON.stringify({
+    type: 'voice.state.changed',
+    data: { ...state, connected },
+  });
+
+  ws.publish(`guildEvents:${state.guildId}`, event);
+  ws.send(event);
 }
 
 function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string) {
