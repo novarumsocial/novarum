@@ -14,7 +14,7 @@ export async function writeEmojis() {
   }
 
   const dbEmojis = emojis.map((emoji) => ({
-    name: emoji.name,
+    name: emoji.short_name,
     unicode: emoji.unified,
     url: emoji.has_img_apple
       ? `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@latest/img/apple/64/${emoji.image}`

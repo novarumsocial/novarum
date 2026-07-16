@@ -4,6 +4,7 @@ import { sessionCookieName, validateSessionToken, type SessionWithUser } from '.
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { searchEmojis } from '../../utils/emojiSearch';
 import {
   removeVoicePresence,
   setVoicePresence,
@@ -48,7 +49,8 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       type: t.Literal('voice.leave'),
     }),
     t.Object({
-      type: t.Literal('misc.ping'),
+      type: t.Literal('emoji.search'),
+      query: t.String(),
     }),
   ]),
   async open(ws) {
@@ -153,7 +155,15 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       return;
     }
 
-    if (message.type === 'misc.ping') return;
+    if (message.type === 'emoji.search') {
+      ws.send(
+        JSON.stringify({
+          type: 'emoji.search.results',
+          data: { query: message.query, emojis: await searchEmojis(message.query) },
+        })
+      );
+      return;
+    }
 
     const membership = await db.orm.public.GuildMember.where({
       guildId: message.guildId,

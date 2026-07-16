@@ -13,6 +13,20 @@ const attachmentSchema = z.object({
   url: z.string().url(),
 });
 
+const emojiSearchResultsSchema = z.object({
+  type: z.literal('emoji.search.results'),
+  data: z.object({
+    query: z.string(),
+    emojis: z.array(
+      z.object({
+        name: z.string(),
+        unicode: z.string(),
+        url: z.string().url(),
+      })
+    ),
+  }),
+});
+
 const channelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -146,8 +160,22 @@ function parseRealtimeEvent(data: unknown) {
   return null;
 }
 
+function parseEmojiSearchResults(data: unknown) {
+  const results = emojiSearchResultsSchema.safeParse(parseRealtimeData(data));
+  if (results.success) return results.data;
+
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrappedResults = emojiSearchResultsSchema.safeParse(parseRealtimeData(data.data));
+    if (wrappedResults.success) return wrappedResults.data;
+  }
+
+  return null;
+}
+
 class RealtimeState {
   connected = $state(false);
+  emojiQuery = $state('');
+  emojiResults = $state<z.infer<typeof emojiSearchResultsSchema>['data']['emojis']>([]);
   private socket: ReturnType<typeof anchor.client.realtime.subscribe> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -213,6 +241,13 @@ class RealtimeState {
     });
 
     socket.subscribe((message) => {
+      const emojiResults = parseEmojiSearchResults(message);
+      if (emojiResults) {
+        this.emojiQuery = emojiResults.data.query;
+        this.emojiResults = emojiResults.data.emojis;
+        return;
+      }
+
       const event = parseRealtimeEvent(message);
       if (!event) return;
 
@@ -278,6 +313,12 @@ class RealtimeState {
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'subscribe.guild', guildId });
+  }
+
+  searchEmojis(query: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'emoji.search', query });
   }
 
   joinVoice(channelId: string) {
