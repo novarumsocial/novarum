@@ -216,7 +216,7 @@
               <div>
                 <p class="text-xs font-medium">Circle icons</p>
                 <p class="text-[11px] text-muted-foreground">
-                  Replace default square icons by round ones!
+                  Replace default square icons with round ones
                 </p>
               </div>
               <Switch bind:checked={settings.value.circleIcons} />
