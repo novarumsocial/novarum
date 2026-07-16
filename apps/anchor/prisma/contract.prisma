@@ -180,7 +180,7 @@ model FederationNonce {
 model Emoji {
   id        Int      @id @default(autoincrement())
   name      String
-  unicode   String
+  unicode   String   @unique
   url       String
   createdAt DateTime @default(now())
   updatedAt temporal.updatedAt()

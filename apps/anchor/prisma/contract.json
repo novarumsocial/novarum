@@ -1631,7 +1631,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "unicode"
+                  ]
+                }
+              ]
             },
             "federation_nonce": {
               "columns": {
@@ -2292,7 +2298,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:ed91408944147c62129d0dcf6be920a09cf1a8d92d526814c8ca5416d212801c"
+    "storageHash": "sha256:bcd6979332ab5917176da598a1476624ae0a9da5677cce83c481ed28e14ecba0"
   },
   "execution": {
     "executionHash": "sha256:271c2714cb2be83db56c18de0ea2cd3a09185568f33d663715d3494f010cf549",
@@ -2389,7 +2395,8 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true
+      "returning": true,
+      "scalarList": true
     }
   },
   "extensionPacks": {},

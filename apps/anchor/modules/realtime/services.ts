@@ -5,6 +5,7 @@ import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/fede
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { searchEmojis } from '../../utils/emojiSearch';
+import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
 import {
   removeVoicePresence,
   setVoicePresence,
@@ -174,9 +175,15 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
 
     if (message.type === 'emoji.query') {
       const unicodes = [...new Set(message.unicodes.map((unicode) => unicode.toUpperCase()))];
-      const emojis = await db.orm.public.Emoji.where((emoji) => emoji.unicode.in(unicodes))
+      const qualified = unicodes.map(qualifyEmojiUnicode);
+      const matches = await db.orm.public.Emoji.where((emoji) => emoji.unicode.in(qualified))
         .select('name', 'unicode', 'url')
         .all();
+      const byUnicode = new Map(matches.map((emoji) => [emoji.unicode, emoji]));
+      const emojis = unicodes.flatMap((unicode) => {
+        const emoji = byUnicode.get(qualifyEmojiUnicode(unicode));
+        return emoji ? [{ ...emoji, unicode }] : [];
+      });
       ws.send(
         JSON.stringify({
           type: 'emoji.query.results',

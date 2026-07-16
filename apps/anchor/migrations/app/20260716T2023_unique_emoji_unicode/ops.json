@@ -39,39 +39,43 @@
     ]
   },
   {
-    "id": "index.local_credential.local_credential_userId_idx",
-    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "id": "unique.emojis.emojis_unicode_key",
+    "label": "Add unique constraint on \"emojis\" (unicode)",
     "operationClass": "additive",
     "target": {
       "id": "postgres",
       "details": {
         "schema": "public",
-        "objectType": "index",
-        "name": "local_credential_userId_idx",
-        "table": "local_credential"
+        "objectType": "unique",
+        "name": "emojis_unicode_key",
+        "table": "emojis"
       }
     },
     "precheck": [
       {
-        "description": "ensure index \"local_credential_userId_idx\" does not exist",
-        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "description": "ensure constraint \"emojis_unicode_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
         "params": [
-          "\"public\".\"local_credential_userId_idx\""
+          "emojis_unicode_key",
+          "public",
+          "\"public\".\"emojis\""
         ]
       }
     ],
     "execute": [
       {
-        "description": "create index \"local_credential_userId_idx\"",
-        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+        "description": "add unique constraint \"emojis_unicode_key\"",
+        "sql": "ALTER TABLE \"public\".\"emojis\" ADD CONSTRAINT \"emojis_unicode_key\" UNIQUE (\"unicode\")"
       }
     ],
     "postcheck": [
       {
-        "description": "verify index \"local_credential_userId_idx\" exists",
-        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "description": "verify constraint \"emojis_unicode_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
         "params": [
-          "\"public\".\"local_credential_userId_idx\""
+          "emojis_unicode_key",
+          "public",
+          "\"public\".\"emojis\""
         ]
       }
     ]

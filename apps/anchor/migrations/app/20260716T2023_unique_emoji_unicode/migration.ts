@@ -1,13 +1,13 @@
 #!/usr/bin/env -S node
+import type { Contract as End } from './end-contract';
+import endContract from './end-contract.json' with { type: 'json' };
+import type { Contract as Start } from './start-contract';
+import startContract from './start-contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, col, fn, primaryKey } from '@prisma-next/postgres/migration';
 
-export default class M extends Migration {
-  override describe() {
-    return {
-      from: 'sha256:30c84f1f4efbc25157d1c26286e580bf833e9ac5651f9ca7654ca2a575e18e7c',
-      to: 'sha256:8e6b5196f77d25705a0b842c25e0d5ab00de6fda55f945bb3a017ab93ac37b49',
-    };
-  }
+export default class M extends Migration<Start, End> {
+  override readonly startContractJson = startContract;
+  override readonly endContractJson = endContract;
 
   override get operations() {
     return [
@@ -27,14 +27,15 @@ export default class M extends Migration {
             notNull: true,
             codecRef: { codecId: 'pg/timestamptz@1' },
           }),
+          col('url', 'text', { notNull: true, codecRef: { codecId: 'pg/text@1' } }),
         ],
         constraints: [primaryKey(['id'])],
       }),
-      this.createIndex({
+      this.addUnique({
         schema: 'public',
-        table: 'local_credential',
-        index: 'local_credential_userId_idx',
-        columns: ['userId'],
+        table: 'emojis',
+        constraint: 'emojis_unicode_key',
+        columns: ['unicode'],
       }),
     ];
   }

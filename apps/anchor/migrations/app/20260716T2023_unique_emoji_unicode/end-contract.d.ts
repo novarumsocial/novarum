@@ -30,9 +30,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:30c84f1f4efbc25157d1c26286e580bf833e9ac5651f9ca7654ca2a575e18e7c'>;
+  StorageHashBase<'sha256:bcd6979332ab5917176da598a1476624ae0a9da5677cce83c481ed28e14ecba0'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:c885773d7019cabfa02030256d3f7321fccb6c1d07019a7b80cb75338b5471cc'>;
+  ExecutionHashBase<'sha256:271c2714cb2be83db56c18de0ea2cd3a09185568f33d663715d3494f010cf549'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -71,6 +71,14 @@ export type FieldOutputTypes = {
       readonly channelId: CodecTypes['pg/text@1']['output'];
       readonly lastReadCreatedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly lastReadMessageId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly Emoji: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly unicode: CodecTypes['pg/text@1']['output'];
+      readonly url: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
     readonly FederationNonce: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -175,6 +183,14 @@ export type FieldInputTypes = {
       readonly lastReadCreatedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly lastReadMessageId: CodecTypes['pg/text@1']['input'];
     };
+    readonly Emoji: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly unicode: CodecTypes['pg/text@1']['input'];
+      readonly url: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
     readonly FederationNonce: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly nonce: CodecTypes['pg/text@1']['input'];
@@ -249,11 +265,235 @@ export type FieldInputTypes = {
     };
   };
 };
+export type StorageColumnTypes = {
+  readonly public: {
+    readonly attachment: {
+      readonly channelId: CodecTypes['pg/text@1']['output'];
+      readonly contentType: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly filename: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly messageId: CodecTypes['pg/text@1']['output'] | null;
+      readonly objectKey: CodecTypes['pg/text@1']['output'];
+      readonly size: CodecTypes['pg/int4@1']['output'];
+      readonly status: CodecTypes['pg/text@1']['output'];
+      readonly uploaderId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly channel: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly guildId: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly position: CodecTypes['pg/int4@1']['output'];
+      readonly type: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly channel_read_state: {
+      readonly channelId: CodecTypes['pg/text@1']['output'];
+      readonly lastReadCreatedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly lastReadMessageId: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly emojis: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly unicode: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly url: CodecTypes['pg/text@1']['output'];
+    };
+    readonly federation_nonce: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly homeserver: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly nonce: CodecTypes['pg/text@1']['output'];
+    };
+    readonly guild: {
+      readonly avatarUrl: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly extAnchorDown: CodecTypes['pg/bool@1']['output'] | null;
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly ownerId: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly guild_invite: {
+      readonly code: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly creatorId: CodecTypes['pg/text@1']['output'];
+      readonly expiresAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+      readonly guildId: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+    };
+    readonly guild_member: {
+      readonly guildId: CodecTypes['pg/text@1']['output'];
+      readonly joinedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly role: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly homeserver_keys: {
+      readonly active: CodecTypes['pg/bool@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly homeserver: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly privateKeyFilename: CodecTypes['pg/text@1']['output'];
+      readonly publicKey: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly local_credential: {
+      readonly email: CodecTypes['pg/text@1']['output'];
+      readonly passwordHash: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly message: {
+      readonly authorId: CodecTypes['pg/text@1']['output'];
+      readonly channelId: CodecTypes['pg/text@1']['output'];
+      readonly content: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly deletedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly nonce: CodecTypes['pg/text@1']['output'];
+      readonly replyTo: CodecTypes['pg/text@1']['output'] | null;
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly session: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly secretHash: CodecTypes['pg/bytea@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly user: {
+      readonly avatarUrl: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly displayName: CodecTypes['pg/text@1']['output'] | null;
+      readonly homeserverName: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly isBot: CodecTypes['pg/bool@1']['output'];
+      readonly status: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly username: CodecTypes['pg/text@1']['output'];
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly public: {
+    readonly attachment: {
+      readonly channelId: CodecTypes['pg/text@1']['input'];
+      readonly contentType: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly filename: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly messageId: CodecTypes['pg/text@1']['input'] | null;
+      readonly objectKey: CodecTypes['pg/text@1']['input'];
+      readonly size: CodecTypes['pg/int4@1']['input'];
+      readonly status: CodecTypes['pg/text@1']['input'];
+      readonly uploaderId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly channel: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly guildId: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly position: CodecTypes['pg/int4@1']['input'];
+      readonly type: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly channel_read_state: {
+      readonly channelId: CodecTypes['pg/text@1']['input'];
+      readonly lastReadCreatedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly lastReadMessageId: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly emojis: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly unicode: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly url: CodecTypes['pg/text@1']['input'];
+    };
+    readonly federation_nonce: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly homeserver: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly nonce: CodecTypes['pg/text@1']['input'];
+    };
+    readonly guild: {
+      readonly avatarUrl: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly extAnchorDown: CodecTypes['pg/bool@1']['input'] | null;
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly ownerId: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly guild_invite: {
+      readonly code: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly creatorId: CodecTypes['pg/text@1']['input'];
+      readonly expiresAt: CodecTypes['pg/timestamptz@1']['input'] | null;
+      readonly guildId: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+    };
+    readonly guild_member: {
+      readonly guildId: CodecTypes['pg/text@1']['input'];
+      readonly joinedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly role: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly homeserver_keys: {
+      readonly active: CodecTypes['pg/bool@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly homeserver: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly privateKeyFilename: CodecTypes['pg/text@1']['input'];
+      readonly publicKey: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly local_credential: {
+      readonly email: CodecTypes['pg/text@1']['input'];
+      readonly passwordHash: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly message: {
+      readonly authorId: CodecTypes['pg/text@1']['input'];
+      readonly channelId: CodecTypes['pg/text@1']['input'];
+      readonly content: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly deletedAt: CodecTypes['pg/timestamptz@1']['input'] | null;
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly nonce: CodecTypes['pg/text@1']['input'];
+      readonly replyTo: CodecTypes['pg/text@1']['input'] | null;
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly session: {
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly secretHash: CodecTypes['pg/bytea@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly user: {
+      readonly avatarUrl: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly displayName: CodecTypes['pg/text@1']['input'] | null;
+      readonly homeserverName: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly isBot: CodecTypes['pg/bool@1']['input'];
+      readonly status: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly username: CodecTypes['pg/text@1']['input'];
+    };
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<
@@ -493,6 +733,49 @@ type ContractBase = Omit<
                   readonly index: true;
                 },
               ];
+            };
+            readonly emojis: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                };
+                readonly name: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly unicode: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly url: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['unicode'] }];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
             readonly federation_nonce: {
               columns: {
@@ -1030,6 +1313,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'FederationNonce';
     };
+    readonly emojis: { readonly namespace: 'public' & NamespaceId; readonly model: 'Emoji' };
   };
   readonly domain: {
     readonly namespaces: {
@@ -1233,6 +1517,47 @@ type ContractBase = Omit<
                 readonly channelId: { readonly column: 'channelId' };
                 readonly lastReadCreatedAt: { readonly column: 'lastReadCreatedAt' };
                 readonly lastReadMessageId: { readonly column: 'lastReadMessageId' };
+              };
+            };
+          };
+          readonly Emoji: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly unicode: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly url: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'emojis';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+                readonly unicode: { readonly column: 'unicode' };
+                readonly url: { readonly column: 'url' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
               };
             };
           };
@@ -1721,6 +2046,7 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
   readonly extensionPacks: {};
@@ -1732,6 +2058,15 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'public';
             readonly table: 'channel';
+            readonly column: 'updatedAt';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };
+          readonly onUpdate: { readonly kind: 'generator'; readonly id: 'timestampNow' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'emojis';
             readonly column: 'updatedAt';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };

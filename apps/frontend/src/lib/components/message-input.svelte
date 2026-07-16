@@ -39,6 +39,7 @@
       await onSend(trimmed, files);
       content = '';
       files = [];
+      closeEmojiSearch();
     } catch (error) {
       sendError = error instanceof Error ? error.message : 'Could not send message';
     } finally {
@@ -90,6 +91,10 @@
     emojiStart = cursor - emojiQuery.length - 1;
     selectedEmoji = 0;
     realtime.searchEmojis(emojiQuery);
+  }
+
+  function handleKeyup(e: KeyboardEvent) {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateEmojiSearch();
   }
 
   function closeEmojiSearch() {
@@ -277,6 +282,7 @@
       bind:value={content}
       bind:this={textarea}
       onkeydown={handleKeydown}
+      onkeyup={handleKeyup}
       oninput={updateEmojiSearch}
       onclick={updateEmojiSearch}
       {placeholder}

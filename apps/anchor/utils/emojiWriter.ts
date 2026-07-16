@@ -1,19 +1,30 @@
 import { db } from '../prisma/db';
 
+const qualifiedUnicodes = new Map<string, string>();
+
+export function qualifyEmojiUnicode(unicode: string) {
+  return qualifiedUnicodes.get(unicode) ?? unicode;
+}
+
 export async function writeEmojis() {
   const perf = performance.now();
   const emojis = (await (
     await fetch('https://cdn.jsdelivr.net/npm/emoji-datasource@latest/emoji.json')
   ).json()) as EmojiEntry[];
 
-  const currentData = await db.orm.public.Emoji.all();
-  const difference = emojis.filter((emoji) => !currentData.some((e) => e.name === emoji.short_name));
+  for (const emoji of emojis) {
+    if (emoji.non_qualified) qualifiedUnicodes.set(emoji.non_qualified, emoji.unified);
+  }
+
+  const currentData = await db.orm.public.Emoji.select('unicode').all();
+  const currentUnicodes = new Set(currentData.map((emoji) => emoji.unicode));
+  const difference = emojis.filter((emoji) => !currentUnicodes.has(emoji.unified));
   if (difference.length === 0) {
     console.log(`No new emojis to write in ${Math.round(performance.now() - perf)}ms`);
     return;
   }
 
-  const dbEmojis = emojis.map((emoji) => ({
+  const dbEmojis = difference.map((emoji) => ({
     name: emoji.short_name,
     unicode: emoji.unified,
     url: emoji.has_img_apple
@@ -21,7 +32,14 @@ export async function writeEmojis() {
       : `https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@latest/img/twitter/64/${emoji.image}`,
   }));
 
-  await db.orm.public.Emoji.createAll(dbEmojis);
+  try {
+    await db.orm.public.Emoji.createAll(dbEmojis);
+  } catch (error) {
+    const written = new Set(
+      (await db.orm.public.Emoji.select('unicode').all()).map((emoji) => emoji.unicode)
+    );
+    if (difference.some((emoji) => !written.has(emoji.unified))) throw error;
+  }
   console.log(`Wrote ${dbEmojis.length} emojis in ${Math.round(performance.now() - perf)}ms`);
 }
 
