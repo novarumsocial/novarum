@@ -12,8 +12,10 @@ import { federation } from '../modules/federation/services';
 import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
 import { configureStorageCors } from '../utils/services/storage';
+import { writeEmojis } from '../utils/emojiWriter';
 
 await configureStorageCors();
+await writeEmojis();
 
 const app = new Elysia()
   .use(cors({ credentials: true }))

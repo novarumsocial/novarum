@@ -1,0 +1,83 @@
+[
+  {
+    "id": "table.emojis",
+    "label": "Create table \"emojis\"",
+    "summary": "Creates table \"emojis\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "emojis"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"emojis\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"emojis\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"emojis\"",
+        "sql": "CREATE TABLE \"public\".\"emojis\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" SERIAL NOT NULL,\n  \"name\" text NOT NULL,\n  \"unicode\" text NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"url\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"emojis\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"emojis\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.emojis.emojis_unicode_key",
+    "label": "Add unique constraint on \"emojis\" (unicode)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "emojis_unicode_key",
+        "table": "emojis"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"emojis_unicode_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "emojis_unicode_key",
+          "public",
+          "\"public\".\"emojis\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"emojis_unicode_key\"",
+        "sql": "ALTER TABLE \"public\".\"emojis\" ADD CONSTRAINT \"emojis_unicode_key\" UNIQUE (\"unicode\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"emojis_unicode_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "emojis_unicode_key",
+          "public",
+          "\"public\".\"emojis\""
+        ]
+      }
+    ]
+  }
+]

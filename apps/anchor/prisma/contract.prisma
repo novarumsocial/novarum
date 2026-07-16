@@ -175,3 +175,15 @@ model FederationNonce {
   @@index([createdAt])
   @@map("federation_nonce")
 }
+
+// i wanted to make this an unlogged table but prisma kinda sucks sooo
+model Emoji {
+  id        Int      @id @default(autoincrement())
+  name      String
+  unicode   String   @unique
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
+
+  @@map("emojis")
+}

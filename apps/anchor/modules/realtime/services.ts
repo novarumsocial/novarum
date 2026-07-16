@@ -4,6 +4,8 @@ import { sessionCookieName, validateSessionToken, type SessionWithUser } from '.
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
+import { searchEmojis } from '../../utils/emojiSearch';
+import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
 import {
   removeVoicePresence,
   setVoicePresence,
@@ -48,7 +50,15 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       type: t.Literal('voice.leave'),
     }),
     t.Object({
-      type: t.Literal('misc.ping'),
+      type: t.Literal('emoji.search'),
+      query: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('emoji.query'),
+      unicodes: t.Array(t.String({ pattern: '^[0-9A-Fa-f]+(?:-[0-9A-Fa-f]+)*$' }), {
+        minItems: 1,
+        maxItems: 100,
+      }),
     }),
   ]),
   async open(ws) {
@@ -153,7 +163,35 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       return;
     }
 
-    if (message.type === 'misc.ping') return;
+    if (message.type === 'emoji.search') {
+      ws.send(
+        JSON.stringify({
+          type: 'emoji.search.results',
+          data: { query: message.query, emojis: await searchEmojis(message.query) },
+        })
+      );
+      return;
+    }
+
+    if (message.type === 'emoji.query') {
+      const unicodes = [...new Set(message.unicodes.map((unicode) => unicode.toUpperCase()))];
+      const qualified = unicodes.map(qualifyEmojiUnicode);
+      const matches = await db.orm.public.Emoji.where((emoji) => emoji.unicode.in(qualified))
+        .select('name', 'unicode', 'url')
+        .all();
+      const byUnicode = new Map(matches.map((emoji) => [emoji.unicode, emoji]));
+      const emojis = unicodes.flatMap((unicode) => {
+        const emoji = byUnicode.get(qualifyEmojiUnicode(unicode));
+        return emoji ? [{ ...emoji, unicode }] : [];
+      });
+      ws.send(
+        JSON.stringify({
+          type: 'emoji.query.results',
+          data: { unicodes, emojis },
+        })
+      );
+      return;
+    }
 
     const membership = await db.orm.public.GuildMember.where({
       guildId: message.guildId,

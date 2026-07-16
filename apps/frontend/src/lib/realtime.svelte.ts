@@ -13,6 +13,28 @@ const attachmentSchema = z.object({
   url: z.string().url(),
 });
 
+const emojiSchema = z.object({
+  name: z.string(),
+  unicode: z.string(),
+  url: z.string().url(),
+});
+
+const emojiSearchResultsSchema = z.object({
+  type: z.literal('emoji.search.results'),
+  data: z.object({
+    query: z.string(),
+    emojis: z.array(emojiSchema),
+  }),
+});
+
+const emojiQueryResultsSchema = z.object({
+  type: z.literal('emoji.query.results'),
+  data: z.object({
+    unicodes: z.array(z.string()),
+    emojis: z.array(emojiSchema),
+  }),
+});
+
 const channelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -146,8 +168,39 @@ function parseRealtimeEvent(data: unknown) {
   return null;
 }
 
+function parseEmojiSearchResults(data: unknown) {
+  const results = emojiSearchResultsSchema.safeParse(parseRealtimeData(data));
+  if (results.success) return results.data;
+
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrappedResults = emojiSearchResultsSchema.safeParse(parseRealtimeData(data.data));
+    if (wrappedResults.success) return wrappedResults.data;
+  }
+
+  return null;
+}
+
+function parseEmojiQueryResults(data: unknown) {
+  const results = emojiQueryResultsSchema.safeParse(parseRealtimeData(data));
+  if (results.success) return results.data;
+
+  if (data && typeof data === 'object' && 'data' in data) {
+    const wrappedResults = emojiQueryResultsSchema.safeParse(parseRealtimeData(data.data));
+    if (wrappedResults.success) return wrappedResults.data;
+  }
+
+  return null;
+}
+
 class RealtimeState {
   connected = $state(false);
+  emojiQuery = $state('');
+  emojiResults = $state<z.infer<typeof emojiSearchResultsSchema>['data']['emojis']>([]);
+  emojiUrls = $state<Record<string, string>>({});
+  private pendingEmojiUnicodes = new Set<string>();
+  private missingEmojiUnicodes = new Set<string>();
+  private queuedEmojiUnicodes = new Set<string>();
+  private emojiQueryTimer: ReturnType<typeof setTimeout> | null = null;
   private socket: ReturnType<typeof anchor.client.realtime.subscribe> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
@@ -208,11 +261,34 @@ class RealtimeState {
 
       this.socket = null;
       this.connected = false;
+      if (this.emojiQueryTimer) clearTimeout(this.emojiQueryTimer);
+      this.emojiQueryTimer = null;
+      this.queuedEmojiUnicodes.clear();
+      this.pendingEmojiUnicodes.clear();
       this.shouldRecover = true;
       this.scheduleReconnect();
     });
 
     socket.subscribe((message) => {
+      const emojiQueryResults = parseEmojiQueryResults(message);
+      if (emojiQueryResults) {
+        const found = new Set(emojiQueryResults.data.emojis.map((emoji) => emoji.unicode));
+        for (const emoji of emojiQueryResults.data.emojis)
+          this.emojiUrls[emoji.unicode] = emoji.url;
+        for (const unicode of emojiQueryResults.data.unicodes) {
+          this.pendingEmojiUnicodes.delete(unicode);
+          if (!found.has(unicode)) this.missingEmojiUnicodes.add(unicode);
+        }
+        return;
+      }
+
+      const emojiResults = parseEmojiSearchResults(message);
+      if (emojiResults) {
+        this.emojiQuery = emojiResults.data.query;
+        this.emojiResults = emojiResults.data.emojis;
+        return;
+      }
+
       const event = parseRealtimeEvent(message);
       if (!event) return;
 
@@ -278,6 +354,44 @@ class RealtimeState {
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'subscribe.guild', guildId });
+  }
+
+  searchEmojis(query: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.socket.send({ type: 'emoji.search', query });
+  }
+
+  queryEmojis(unicodes: string[]) {
+    if (!this.socket || !this.connected) return;
+
+    for (const unicode of unicodes.map((unicode) => unicode.toUpperCase())) {
+      if (
+        !this.emojiUrls[unicode] &&
+        !this.pendingEmojiUnicodes.has(unicode) &&
+        !this.missingEmojiUnicodes.has(unicode)
+      ) {
+        this.queuedEmojiUnicodes.add(unicode);
+        this.pendingEmojiUnicodes.add(unicode);
+      }
+    }
+
+    if (this.queuedEmojiUnicodes.size && !this.emojiQueryTimer) {
+      this.emojiQueryTimer = setTimeout(() => this.flushEmojiQuery(), 16);
+    }
+  }
+
+  private flushEmojiQuery() {
+    this.emojiQueryTimer = null;
+    const unicodes = [...this.queuedEmojiUnicodes].slice(0, 100);
+    unicodes.forEach((unicode) => this.queuedEmojiUnicodes.delete(unicode));
+
+    if (this.socket && this.connected) this.socket.send({ type: 'emoji.query', unicodes });
+    else unicodes.forEach((unicode) => this.pendingEmojiUnicodes.delete(unicode));
+
+    if (this.queuedEmojiUnicodes.size) {
+      this.emojiQueryTimer = setTimeout(() => this.flushEmojiQuery(), 16);
+    }
   }
 
   joinVoice(channelId: string) {
