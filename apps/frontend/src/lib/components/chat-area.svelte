@@ -27,13 +27,19 @@
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
   let previousChannelId: string | null = null;
+  let unreadBoundary = $state<{ channelId: string; lastReadMessageId: string | null } | null>(
+    null
+  );
   let replyingTo = $state<Message | null>(null);
   const messagesById = $derived(new Map(messages.map((message) => [message.id, message])));
   const firstUnreadIndex = $derived.by(() => {
-    if (!channel.lastReadMessageId) return channel.unread ? 0 : -1;
+    if (unreadBoundary?.channelId !== channel.id) return -1;
+    if (!unreadBoundary.lastReadMessageId) return 0;
 
-    const lastReadIndex = messages.findIndex((message) => message.id === channel.lastReadMessageId);
-    if (lastReadIndex < 0) return channel.unread ? 0 : -1;
+    const lastReadIndex = messages.findIndex(
+      (message) => message.id === unreadBoundary.lastReadMessageId
+    );
+    if (lastReadIndex < 0) return 0;
 
     return lastReadIndex < messages.length - 1 ? lastReadIndex + 1 : -1;
   });
@@ -54,6 +60,9 @@
 
     if (channelChanged) {
       previousChannelId = channel.id;
+      unreadBoundary = channel.unread
+        ? { channelId: channel.id, lastReadMessageId: channel.lastReadMessageId }
+        : null;
       replyingTo = null;
     }
 
