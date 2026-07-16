@@ -15,10 +15,10 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import Avatar from './avatar.svelte';
+  import EmojiText from './emoji-text.svelte';
   import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
   import type { LucideProps } from '@lucide/svelte';
   import type { Component } from 'svelte';
-  import { isUrl, urlPattern } from '$lib/utils';
 
   let {
     message,
@@ -185,8 +185,13 @@
           </span>
           <span class="text-muted-foreground/40">·</span>
           <span class="min-w-0 break-words text-muted-foreground">
-            {repliedMessage.content ||
-              `${repliedMessage.attachments.length} attachment${repliedMessage.attachments.length === 1 ? '' : 's'}`}
+            {#if repliedMessage.content}
+              <EmojiText content={repliedMessage.content} />
+            {:else}
+              {repliedMessage.attachments.length} attachment{repliedMessage.attachments.length === 1
+                ? ''
+                : 's'}
+            {/if}
           </span>
         {:else}
           <span class="italic text-muted-foreground/70">Original message unavailable</span>
@@ -195,19 +200,7 @@
     {/if}
 
     <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-      {#each message.content.split(urlPattern) as part, index (index)}
-        {#if isUrl(part)}
-          <a
-            href={part}
-            target="_blank"
-            rel="noreferrer"
-            class="text-primary underline underline-offset-2 transition-colors hover:text-primary/80"
-            >{part}</a
-          >
-        {:else}
-          {part}
-        {/if}
-      {/each}
+      <EmojiText content={message.content} links />
     </div>
 
     {#if hovered || dropdownOpen}

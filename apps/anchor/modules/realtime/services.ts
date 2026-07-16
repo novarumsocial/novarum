@@ -52,6 +52,13 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       type: t.Literal('emoji.search'),
       query: t.String(),
     }),
+    t.Object({
+      type: t.Literal('emoji.query'),
+      unicodes: t.Array(t.String({ pattern: '^[0-9A-Fa-f]+(?:-[0-9A-Fa-f]+)*$' }), {
+        minItems: 1,
+        maxItems: 100,
+      }),
+    }),
   ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
@@ -160,6 +167,20 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
         JSON.stringify({
           type: 'emoji.search.results',
           data: { query: message.query, emojis: await searchEmojis(message.query) },
+        })
+      );
+      return;
+    }
+
+    if (message.type === 'emoji.query') {
+      const unicodes = [...new Set(message.unicodes.map((unicode) => unicode.toUpperCase()))];
+      const emojis = await db.orm.public.Emoji.where((emoji) => emoji.unicode.in(unicodes))
+        .select('name', 'unicode', 'url')
+        .all();
+      ws.send(
+        JSON.stringify({
+          type: 'emoji.query.results',
+          data: { unicodes, emojis },
         })
       );
       return;
