@@ -8,6 +8,7 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
+import { mentionHandles } from '../../utils/mentions';
 
 export const message = new Elysia({ prefix: '/message' })
   .resolve(async ({ cookie, status }) => {
@@ -175,9 +176,19 @@ export const message = new Elysia({ prefix: '/message' })
         };
       }
 
-      if (replyTo && !(await db.orm.public.Message.where({ id: replyTo, channelId }).first())) {
+      const replyTarget = replyTo
+        ? await db.orm.public.Message.where({ id: replyTo, channelId }).first()
+        : null;
+      if (replyTo && !replyTarget) {
         return status(400, { error: 'Invalid reply target' });
       }
+
+      const pingRecipients = await getPingRecipients(
+        channel.guildId,
+        content,
+        replyTarget?.authorId,
+        session.userId
+      );
 
       const attachments = await verifyPendingAttachments(attachmentIds, session.userId, channelId);
       if (!attachments.ok) return status(400, { error: attachments.error });
@@ -203,6 +214,13 @@ export const message = new Elysia({ prefix: '/message' })
           if (!updated) throw new Error('Attachment was already claimed');
         }
 
+        for (const recipient of pingRecipients) {
+          await tx.orm.public.MessagePing.create({
+            messageId: created.id,
+            userId: recipient.userId,
+          });
+        }
+
         return created;
       });
       const responseAttachments = attachments.value.map(attachmentPayload);
@@ -217,6 +235,7 @@ export const message = new Elysia({ prefix: '/message' })
             content: message.content,
             nonce: message.nonce,
             replyTo: message.replyTo ?? null,
+            pingedHandles: pingRecipients.map((recipient) => recipient.handle),
             attachments: responseAttachments,
             createdAt:
               message.createdAt instanceof Date
@@ -231,7 +250,13 @@ export const message = new Elysia({ prefix: '/message' })
         });
       }
 
-      return { message: { ...message, attachments: responseAttachments } };
+      return {
+        message: {
+          ...message,
+          pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+          attachments: responseAttachments,
+        },
+      };
     },
     {
       body: t.Object({
@@ -287,7 +312,7 @@ export const message = new Elysia({ prefix: '/message' })
       await Promise.all(
         existing.attachments.map((attachment) =>
           storage
-            .file(attachment.objectKey)
+            .file(String(attachment.objectKey))
             .delete()
             .catch(() => {})
         )
@@ -354,4 +379,23 @@ export async function verifyPendingAttachments(
   }
 
   return { ok: true as const, value: attachments };
+}
+
+export async function getPingRecipients(
+  guildId: string,
+  content: string,
+  replyAuthorId: string | undefined,
+  authorId: string
+) {
+  const mentionedHandles = mentionHandles(content);
+  if (!mentionedHandles.size && !replyAuthorId) return [];
+
+  const members = await db.orm.public.GuildMember.where({ guildId }).include('user').all();
+  return members.flatMap((member) => {
+    const handle = `@${member.user.username}:${member.user.homeserver}`;
+    return member.userId !== authorId &&
+      (member.userId === replyAuthorId || mentionedHandles.has(handle.toLowerCase()))
+      ? [{ userId: member.userId, handle }]
+      : [];
+  });
 }

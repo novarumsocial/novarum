@@ -3,6 +3,8 @@
   import { realtime } from '$lib/realtime.svelte';
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
   import { device } from '$lib/device.svelte';
+  import { chat } from '$lib/chat-state.svelte';
+  import type { Author } from '$lib/types/chat';
 
   let content = $state('');
   let files = $state<File[]>([]);
@@ -15,9 +17,23 @@
   let emojiQuery = $state('');
   let emojiStart = $state<number | null>(null);
   let selectedEmoji = $state(0);
+  let mentionQuery = $state('');
+  let mentionStart = $state<number | null>(null);
+  let selectedMention = $state(0);
   const emojiResults = $derived(
     realtime.emojiQuery.trim() === emojiQuery.trim() ? realtime.emojiResults : []
   );
+  const mentionResults = $derived.by(() => {
+    if (mentionStart === null) return [];
+    const query = mentionQuery.toLowerCase();
+    return chat.members
+      .filter((member) =>
+        [member.username, member.displayName ?? '', memberHandle(member)].some((value) =>
+          value.toLowerCase().includes(query)
+        )
+      )
+      .slice(0, 8);
+  });
   const maxFiles = 5;
   const maxFileSize = 10 * 1024 * 1024;
   let {
@@ -41,6 +57,7 @@
       content = '';
       files = [];
       closeEmojiSearch();
+      closeMentionSearch();
     } catch (error) {
       sendError = error instanceof Error ? error.message : 'Could not send message';
     } finally {
@@ -49,6 +66,22 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (mentionStart !== null && mentionResults.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedMention =
+          (selectedMention + (e.key === 'ArrowDown' ? 1 : -1) + mentionResults.length) %
+          mentionResults.length;
+        return;
+      }
+
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(mentionResults[selectedMention]!);
+        return;
+      }
+    }
+
     if (emojiStart !== null && emojiResults.length) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -65,9 +98,10 @@
       }
     }
 
-    if (e.key === 'Escape' && emojiStart !== null) {
+    if (e.key === 'Escape' && (emojiStart !== null || mentionStart !== null)) {
       e.preventDefault();
       closeEmojiSearch();
+      closeMentionSearch();
       return;
     }
 
@@ -80,8 +114,18 @@
     if (content.trim() || e.key.length === 1) onTyping();
   }
 
-  function updateEmojiSearch() {
+  function updateSearch() {
     const cursor = textarea.selectionStart;
+    const mentionMatch = textarea.value.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9._:-]*)$/);
+    if (mentionMatch) {
+      mentionQuery = mentionMatch[1] ?? '';
+      mentionStart = cursor - mentionQuery.length - 1;
+      selectedMention = 0;
+      closeEmojiSearch();
+      return;
+    }
+    closeMentionSearch();
+
     const match = textarea.value.slice(0, cursor).match(/(?:^|\s):([\w+-]*)$/);
     if (!match) {
       closeEmojiSearch();
@@ -95,12 +139,35 @@
   }
 
   function handleKeyup(e: KeyboardEvent) {
-    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateEmojiSearch();
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateSearch();
   }
 
   function closeEmojiSearch() {
     emojiStart = null;
     emojiQuery = '';
+  }
+
+  function closeMentionSearch() {
+    mentionStart = null;
+    mentionQuery = '';
+  }
+
+  function memberHandle(member: Author) {
+    return `${member.username}:${member.server}`;
+  }
+
+  function insertMention(member: Author) {
+    if (mentionStart === null) return;
+
+    const cursor = textarea.selectionStart;
+    const mention = `@${memberHandle(member)}`;
+    const nextCursor = mentionStart + mention.length + 1;
+    content = `${content.slice(0, mentionStart)}${mention} ${content.slice(cursor)}`;
+    closeMentionSearch();
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
   }
 
   function insertEmoji(emoji: (typeof realtime.emojiResults)[number]) {
@@ -225,6 +292,35 @@
     </div>
   {/if}
 
+  {#if mentionStart !== null}
+    <div
+      id="mention-search-results"
+      role="listbox"
+      aria-label="Member search results"
+      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
+    >
+      {#if mentionResults.length}
+        {#each mentionResults as member, index (member.userId)}
+          <button
+            id={`mention-result-${index}`}
+            type="button"
+            role="option"
+            aria-selected={selectedMention === index}
+            class={`flex w-full min-w-0 items-center gap-2 px-2 py-1.5 text-left text-xs transition-colors ${selectedMention === index ? 'bg-primary text-primary-foreground' : 'text-popover-foreground hover:bg-muted'}`}
+            onmousedown={(event) => event.preventDefault()}
+            onmouseenter={() => (selectedMention = index)}
+            onclick={() => insertMention(member)}
+          >
+            <span class="truncate font-medium">{member.displayName || member.username}</span>
+            <span class="ml-auto truncate opacity-70">@{memberHandle(member)}</span>
+          </button>
+        {/each}
+      {:else}
+        <p class="px-2 py-3 text-center text-xs text-muted-foreground">No members found</p>
+      {/if}
+    </div>
+  {/if}
+
   {#if files.length > 0}
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
       {#each files as file (`${file.name}:${file.size}:${file.lastModified}`)}
@@ -284,16 +380,18 @@
       bind:this={textarea}
       onkeydown={handleKeydown}
       onkeyup={handleKeyup}
-      oninput={updateEmojiSearch}
-      onclick={updateEmojiSearch}
+      oninput={updateSearch}
+      onclick={updateSearch}
       {placeholder}
       role="combobox"
       aria-autocomplete="list"
-      aria-expanded={emojiStart !== null}
-      aria-controls="emoji-search-results"
-      aria-activedescendant={emojiStart !== null && emojiResults.length
-        ? `emoji-result-${selectedEmoji}`
-        : undefined}
+      aria-expanded={emojiStart !== null || mentionStart !== null}
+      aria-controls={mentionStart !== null ? 'mention-search-results' : 'emoji-search-results'}
+      aria-activedescendant={mentionStart !== null && mentionResults.length
+        ? `mention-result-${selectedMention}`
+        : emojiStart !== null && emojiResults.length
+          ? `emoji-result-${selectedEmoji}`
+          : undefined}
       rows="1"
       class="min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
     ></textarea>

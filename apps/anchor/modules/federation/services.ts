@@ -19,7 +19,7 @@ import {
   maxAttachmentCount,
 } from '../../utils/attachments';
 import { createPendingAttachment } from '../upload/services';
-import { verifyPendingAttachments } from '../message/services';
+import { getPingRecipients, verifyPendingAttachments } from '../message/services';
 import { storage } from '../../utils/services/storage';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
@@ -268,10 +268,10 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    if (
-      replyTo &&
-      !(await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first())
-    ) {
+    const replyTarget = replyTo
+      ? await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first()
+      : null;
+    if (replyTo && !replyTarget) {
       return status(400, { error: 'Invalid reply target' });
     }
 
@@ -299,6 +299,12 @@ export const federation = new Elysia({ prefix: '/federation' })
       params.id
     );
     if (!attachments.ok) return status(400, { error: attachments.error });
+    const pingRecipients = await getPingRecipients(
+      access.channel.guildId,
+      content,
+      replyTarget?.authorId,
+      access.user.id
+    );
 
     const message = await db.transaction(async (tx) => {
       const created = await tx.orm.public.Message.create({
@@ -318,7 +324,18 @@ export const federation = new Elysia({ prefix: '/federation' })
         if (!updated) throw new Error('Attachment was already claimed');
       }
 
-      return { ...created, attachments: attachments.value };
+      for (const recipient of pingRecipients) {
+        await tx.orm.public.MessagePing.create({
+          messageId: created.id,
+          userId: recipient.userId,
+        });
+      }
+
+      return {
+        ...created,
+        attachments: attachments.value,
+        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+      };
     });
 
     const responseMessage = federatedMessageResponse(message, access.channel, access.user);
@@ -357,7 +374,7 @@ export const federation = new Elysia({ prefix: '/federation' })
     await Promise.all(
       existing.attachments.map((attachment) =>
         storage
-          .file(attachment.objectKey)
+          .file(String(attachment.objectKey))
           .delete()
           .catch(() => {})
       )
@@ -880,6 +897,7 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     content: message.content,
     nonce: message.nonce,
     replyTo: message.replyTo ?? null,
+    pingedHandles: Array.isArray(message.pingedHandles) ? message.pingedHandles : [],
     attachments: Array.isArray(message.attachments)
       ? message.attachments.map(attachmentPayload)
       : [],

@@ -141,6 +141,27 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       .all();
     const readStates = await db.orm.public.ChannelReadState.where({ userId: session.userId }).all();
     const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
+    const pings = await db.orm.public.MessagePing.where({ userId: session.userId }).all();
+    const unreadPingsByChannel = new Map<string, number>();
+
+    for (const ping of pings) {
+      const message = await db.orm.public.Message.where({ id: ping.messageId }).first();
+      if (!message) continue;
+
+      const readState = readStateByChannel.get(message.channelId);
+      if (
+        readState &&
+        isMessageAfter(
+          { createdAt: message.createdAt, id: message.id },
+          { createdAt: readState.lastReadCreatedAt, id: readState.lastReadMessageId }
+        )
+      ) {
+        unreadPingsByChannel.set(
+          message.channelId,
+          (unreadPingsByChannel.get(message.channelId) ?? 0) + 1
+        );
+      }
+    }
 
     const guilds = [];
 
@@ -193,6 +214,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
                   }
                 )
               ),
+              mention: unreadPingsByChannel.get(channel.id) ?? 0,
             };
           })
         ),

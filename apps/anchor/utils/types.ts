@@ -35,6 +35,7 @@ export type RealtimeEvent =
         content: string;
         nonce: string;
         replyTo: string | null;
+        pingedHandles: string[];
         attachments: AttachmentPayload[];
         createdAt: string;
         author: {

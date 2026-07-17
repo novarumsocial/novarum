@@ -23,6 +23,7 @@ type AddChannelInput = {
   topic?: string;
   unread?: boolean;
   lastReadMessageId?: string | null;
+  mention?: number;
 };
 
 type AddMessageInput = {
@@ -31,6 +32,7 @@ type AddMessageInput = {
   content: string;
   createdAt: string | Date;
   replyTo?: string | null;
+  pingedHandles?: string[];
   author: {
     username: string;
     avatar?: string | null;
@@ -111,6 +113,7 @@ function messageFromInput(message: AddMessageInput): Message {
     edited: false,
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
+    pingedHandles: message.pingedHandles ?? [],
   };
 }
 
@@ -309,7 +312,8 @@ class ChatState {
       this.setChannelUnread(
         channel.id,
         channel.unread ?? existingChannel.unread,
-        channel.lastReadMessageId
+        channel.lastReadMessageId,
+        channel.mention
       );
       return existingChannel;
     }
@@ -320,7 +324,7 @@ class ChatState {
       topic: channel.topic,
       unread: channel.unread ?? false,
       lastReadMessageId: channel.lastReadMessageId ?? null,
-      mention: 0,
+      mention: channel.mention ?? 0,
       type: channelTypeFor(channel.type),
     };
 
@@ -356,7 +360,14 @@ class ChatState {
     this.setChannelMessages(message.channelId, [...channelMessages, messageFromInput(message)]);
 
     if (this.activeChannel !== message.channelId) {
+      const handle = useSession().user?.handle.toLowerCase();
+      const pinged = handle
+        ? message.pingedHandles?.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
+        : false;
       this.setChannelUnread(message.channelId, true);
+      if (pinged) this.incrementChannelMention(message.channelId);
+    } else {
+      void this.markRead(message.channelId, message.id, message.createdAt);
     }
   }
 
@@ -605,7 +616,12 @@ class ChatState {
     this.members = result.data.users.map(memberFromInput);
   }
 
-  private setChannelUnread(channelId: string, unread: boolean, lastReadMessageId?: string | null) {
+  private setChannelUnread(
+    channelId: string,
+    unread: boolean,
+    lastReadMessageId?: string | null,
+    mention?: number
+  ) {
     let changed = false;
     const nextChannelsByServer: Record<string, ChannelCategory[]> = {};
 
@@ -616,7 +632,9 @@ class ChatState {
           if (
             channel.id !== channelId ||
             (channel.unread === unread &&
-              (lastReadMessageId === undefined || channel.lastReadMessageId === lastReadMessageId))
+              (lastReadMessageId === undefined ||
+                channel.lastReadMessageId === lastReadMessageId) &&
+              (mention === undefined || channel.mention === mention))
           )
             return channel;
 
@@ -624,6 +642,7 @@ class ChatState {
           return {
             ...channel,
             unread,
+            mention: mention ?? channel.mention,
             lastReadMessageId:
               lastReadMessageId === undefined ? channel.lastReadMessageId : lastReadMessageId,
           };
@@ -633,6 +652,25 @@ class ChatState {
 
     if (changed) {
       this.channelsByServer = nextChannelsByServer;
+    }
+  }
+
+  private incrementChannelMention(channelId: string) {
+    for (const categories of Object.values(this.channelsByServer)) {
+      for (const category of categories) {
+        const channel = category.channels.find((item) => item.id === channelId);
+        if (channel) return this.setChannelUnread(channelId, true, undefined, channel.mention + 1);
+      }
+    }
+  }
+
+  private async markRead(channelId: string, messageId: string, createdAt: string | Date) {
+    const result = await anchor.client.channel({ id: channelId }).read.post({
+      messageId,
+      createdAt: new Date(createdAt).toISOString(),
+    });
+    if (!result.error && result.data && !('error' in result.data)) {
+      this.setChannelUnread(channelId, false, messageId, 0);
     }
   }
 
@@ -735,17 +773,11 @@ class ChatState {
       this.loadMembers(channelId),
     ]);
     if (!lastMessage) {
-      this.setChannelUnread(channelId, false);
+      this.setChannelUnread(channelId, false, undefined, 0);
       return;
     }
 
-    const result = await anchor.client.channel({ id: channelId }).read.post({
-      messageId: lastMessage.id,
-      createdAt: new Date(lastMessage.createdAt).toISOString(),
-    });
-    if (!result.error && result.data && !('error' in result.data)) {
-      this.setChannelUnread(channelId, false);
-    }
+    await this.markRead(channelId, lastMessage.id, lastMessage.createdAt);
   }
 
   private firstChannelForServer(serverId?: string) {
