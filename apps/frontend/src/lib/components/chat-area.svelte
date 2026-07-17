@@ -31,11 +31,12 @@
   let replyingTo = $state<Message | null>(null);
   const messagesById = $derived(new Map(messages.map((message) => [message.id, message])));
   const firstUnreadIndex = $derived.by(() => {
-    if (unreadBoundary?.channelId !== channel.id) return -1;
-    if (!unreadBoundary.lastReadMessageId) return 0;
+    const boundary = unreadBoundary;
+    if (boundary?.channelId !== channel.id) return -1;
+    if (!boundary.lastReadMessageId) return 0;
 
     const lastReadIndex = messages.findIndex(
-      (message) => message.id === unreadBoundary.lastReadMessageId
+      (message) => message.id === boundary.lastReadMessageId
     );
     if (lastReadIndex < 0) return 0;
 
@@ -83,9 +84,12 @@
 
   async function sendMessage(content: string, files: File[]) {
     await onSend?.(content, files, replyingTo?.id ?? null);
+    unreadBoundary = null;
     replyingTo = null;
   }
 </script>
+
+<svelte:window onkeydown={(event) => event.key === 'Escape' && (unreadBoundary = null)} />
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
