@@ -48,10 +48,6 @@
       "model": "Message",
       "namespace": "public"
     },
-    "message_ping": {
-      "model": "MessagePing",
-      "namespace": "public"
-    },
     "session": {
       "model": "Session",
       "namespace": "public"
@@ -142,8 +138,12 @@
               "channel": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["channelId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "channelId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Channel",
@@ -153,8 +153,12 @@
               "message": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["messageId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "messageId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Message",
@@ -164,8 +168,12 @@
               "uploader": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["uploaderId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "uploaderId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -266,8 +274,12 @@
               "guild": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["guildId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "guildId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Guild",
@@ -338,8 +350,12 @@
               "channel": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["channelId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "channelId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Channel",
@@ -349,8 +365,12 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -562,8 +582,12 @@
               "owner": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["ownerId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "ownerId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -651,8 +675,12 @@
               "creator": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["creatorId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "creatorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -662,8 +690,12 @@
               "guild": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["guildId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "guildId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Guild",
@@ -731,8 +763,12 @@
               "guild": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["guildId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "guildId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Guild",
@@ -742,8 +778,12 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -879,8 +919,12 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -974,8 +1018,12 @@
               "attachments": {
                 "cardinality": "1:N",
                 "on": {
-                  "localFields": ["id"],
-                  "targetFields": ["messageId"]
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "messageId"
+                  ]
                 },
                 "to": {
                   "model": "Attachment",
@@ -985,8 +1033,12 @@
               "author": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["authorId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -996,8 +1048,12 @@
               "channel": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["channelId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "channelId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "Channel",
@@ -1039,60 +1095,6 @@
               "table": "message"
             }
           },
-          "MessagePing": {
-            "fields": {
-              "messageId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "userId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "message": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": ["messageId"],
-                  "targetFields": ["id"]
-                },
-                "to": {
-                  "model": "Message",
-                  "namespace": "public"
-                }
-              },
-              "user": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
-                },
-                "to": {
-                  "model": "User",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "messageId": {
-                  "column": "messageId"
-                },
-                "userId": {
-                  "column": "userId"
-                }
-              },
-              "namespaceId": "public",
-              "table": "message_ping"
-            }
-          },
           "Session": {
             "fields": {
               "createdAt": {
@@ -1128,8 +1130,12 @@
               "user": {
                 "cardinality": "N:1",
                 "on": {
-                  "localFields": ["userId"],
-                  "targetFields": ["id"]
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
                 },
                 "to": {
                   "model": "User",
@@ -1332,12 +1338,16 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": ["uploaderId"],
+                    "columns": [
+                      "uploaderId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "attachment"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1347,12 +1357,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["channelId"],
+                    "columns": [
+                      "channelId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "attachment"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel"
                   }
@@ -1362,12 +1376,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["messageId"],
+                    "columns": [
+                      "messageId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "attachment"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "message"
                   }
@@ -1375,21 +1393,32 @@
               ],
               "indexes": [
                 {
-                  "columns": ["uploaderId", "status"]
+                  "columns": [
+                    "uploaderId",
+                    "status"
+                  ]
                 },
                 {
-                  "columns": ["channelId"]
+                  "columns": [
+                    "channelId"
+                  ]
                 },
                 {
-                  "columns": ["messageId"]
+                  "columns": [
+                    "messageId"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["objectKey"]
+                  "columns": [
+                    "objectKey"
+                  ]
                 }
               ]
             },
@@ -1445,12 +1474,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["guildId"],
+                    "columns": [
+                      "guildId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild"
                   }
@@ -1458,15 +1491,23 @@
               ],
               "indexes": [
                 {
-                  "columns": ["guildId", "position"]
+                  "columns": [
+                    "guildId",
+                    "position"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["guildId", "name"]
+                  "columns": [
+                    "guildId",
+                    "name"
+                  ]
                 }
               ]
             },
@@ -1499,12 +1540,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["userId"],
+                    "columns": [
+                      "userId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel_read_state"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1514,12 +1559,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["channelId"],
+                    "columns": [
+                      "channelId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel_read_state"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel"
                   }
@@ -1527,7 +1576,10 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": ["userId", "channelId"]
+                "columns": [
+                  "userId",
+                  "channelId"
+                ]
               },
               "uniques": []
             },
@@ -1575,13 +1627,11 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
-              "uniques": [
-                {
-                  "columns": ["unicode"]
-                }
-              ]
+              "uniques": []
             },
             "federation_nonce": {
               "columns": {
@@ -1613,15 +1663,21 @@
               "foreignKeys": [],
               "indexes": [
                 {
-                  "columns": ["createdAt"]
+                  "columns": [
+                    "createdAt"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["nonce"]
+                  "columns": [
+                    "nonce"
+                  ]
                 }
               ]
             },
@@ -1677,12 +1733,16 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": ["ownerId"],
+                    "columns": [
+                      "ownerId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1690,11 +1750,15 @@
               ],
               "indexes": [
                 {
-                  "columns": ["ownerId"]
+                  "columns": [
+                    "ownerId"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": []
             },
@@ -1740,12 +1804,16 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": ["creatorId"],
+                    "columns": [
+                      "creatorId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild_invite"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1755,12 +1823,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["guildId"],
+                    "columns": [
+                      "guildId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild_invite"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild"
                   }
@@ -1768,15 +1840,21 @@
               ],
               "indexes": [
                 {
-                  "columns": ["guildId"]
+                  "columns": [
+                    "guildId"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["code"]
+                  "columns": [
+                    "code"
+                  ]
                 }
               ]
             },
@@ -1817,12 +1895,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["guildId"],
+                    "columns": [
+                      "guildId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild_member"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild"
                   }
@@ -1832,12 +1914,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["userId"],
+                    "columns": [
+                      "userId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "guild_member"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1845,11 +1931,16 @@
               ],
               "indexes": [
                 {
-                  "columns": ["userId"]
+                  "columns": [
+                    "userId"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["guildId", "userId"]
+                "columns": [
+                  "guildId",
+                  "userId"
+                ]
               },
               "uniques": []
             },
@@ -1902,7 +1993,9 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": []
             },
@@ -1930,12 +2023,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["userId"],
+                    "columns": [
+                      "userId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "local_credential"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -1943,11 +2040,15 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": ["userId"]
+                "columns": [
+                  "userId"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["email"]
+                  "columns": [
+                    "email"
+                  ]
                 }
               ]
             },
@@ -2009,12 +2110,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["channelId"],
+                    "columns": [
+                      "channelId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "message"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "channel"
                   }
@@ -2023,12 +2128,16 @@
                   "constraint": true,
                   "index": true,
                   "source": {
-                    "columns": ["authorId"],
+                    "columns": [
+                      "authorId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "message"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -2036,72 +2145,26 @@
               ],
               "indexes": [
                 {
-                  "columns": ["channelId", "createdAt", "id"]
+                  "columns": [
+                    "channelId",
+                    "createdAt",
+                    "id"
+                  ]
                 }
               ],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["authorId", "nonce"]
+                  "columns": [
+                    "authorId",
+                    "nonce"
+                  ]
                 }
               ]
-            },
-            "message_ping": {
-              "columns": {
-                "messageId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "userId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [
-                {
-                  "constraint": true,
-                  "index": true,
-                  "onDelete": "cascade",
-                  "source": {
-                    "columns": ["messageId"],
-                    "namespaceId": "public",
-                    "tableName": "message_ping"
-                  },
-                  "target": {
-                    "columns": ["id"],
-                    "namespaceId": "public",
-                    "tableName": "message"
-                  }
-                },
-                {
-                  "constraint": true,
-                  "index": true,
-                  "onDelete": "cascade",
-                  "source": {
-                    "columns": ["userId"],
-                    "namespaceId": "public",
-                    "tableName": "message_ping"
-                  },
-                  "target": {
-                    "columns": ["id"],
-                    "namespaceId": "public",
-                    "tableName": "user"
-                  }
-                }
-              ],
-              "indexes": [
-                {
-                  "columns": ["userId"]
-                }
-              ],
-              "primaryKey": {
-                "columns": ["messageId", "userId"]
-              },
-              "uniques": []
             },
             "session": {
               "columns": {
@@ -2132,12 +2195,16 @@
                   "index": true,
                   "onDelete": "cascade",
                   "source": {
-                    "columns": ["userId"],
+                    "columns": [
+                      "userId"
+                    ],
                     "namespaceId": "public",
                     "tableName": "session"
                   },
                   "target": {
-                    "columns": ["id"],
+                    "columns": [
+                      "id"
+                    ],
                     "namespaceId": "public",
                     "tableName": "user"
                   }
@@ -2145,7 +2212,9 @@
               ],
               "indexes": [],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": []
             },
@@ -2204,11 +2273,16 @@
               "foreignKeys": [],
               "indexes": [],
               "primaryKey": {
-                "columns": ["id"]
+                "columns": [
+                  "id"
+                ]
               },
               "uniques": [
                 {
-                  "columns": ["username", "homeserverName"]
+                  "columns": [
+                    "username",
+                    "homeserverName"
+                  ]
                 }
               ]
             }
@@ -2218,7 +2292,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:c60ad1608f13a83d02c41ffae2458d4533694ee26126a0b0968859de884bf6c7"
+    "storageHash": "sha256:ed91408944147c62129d0dcf6be920a09cf1a8d92d526814c8ca5416d212801c"
   },
   "execution": {
     "executionHash": "sha256:271c2714cb2be83db56c18de0ea2cd3a09185568f33d663715d3494f010cf549",
@@ -2315,8 +2389,7 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true,
-      "scalarList": true
+      "returning": true
     }
   },
   "extensionPacks": {},

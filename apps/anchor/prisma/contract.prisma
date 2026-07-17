@@ -102,6 +102,18 @@ model Message {
   @@map("message")
 }
 
+model MessagePing {
+  messageId String
+  userId    String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
+  @@map("message_ping")
+}
+
 model ChannelReadState {
   userId            String
   channelId         String
