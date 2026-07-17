@@ -8,11 +8,13 @@
   let {
     servers,
     activeId,
+    mentions,
     onSelect,
     onCreateServer,
   }: {
     servers: Server[];
     activeId: string | null;
+    mentions: Record<string, number>;
     onSelect: (id?: string) => void;
     onCreateServer?: (server: Server) => void;
   } = $props();
@@ -38,7 +40,7 @@
     {#if server.id !== 'home'}
       <button
         onclick={() => onSelect(server.id)}
-        class="flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
+        class="relative flex size-10 items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
           ? 'bg-destructive'
           : 'bg-primary'}"
         class:ring-2={activeId === server.id}
@@ -50,7 +52,9 @@
         class:cursor-not-allowed={server.down}
         class:rounded-full={settings.value.circleIcons}
         disabled={server.down}
-        aria-label={server.name}
+        aria-label={mentions[server.id]
+          ? `${server.name}, ${mentions[server.id]} unread mention${mentions[server.id] === 1 ? '' : 's'}`
+          : server.name}
       >
         <Avatar
           src={server.avatarUrl}
@@ -59,6 +63,14 @@
           class="size-full bg-transparent text-xs text-primary-foreground"
           focused={activeId === server.id}
         />
+        {#if mentions[server.id] > 0}
+          <span
+            class="absolute -right-1.5 -bottom-1 flex min-w-4.5 h-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
+            class:rounded-full={settings.value.circleIcons}
+          >
+            {mentions[server.id] > 99 ? '99+' : mentions[server.id]}
+          </span>
+        {/if}
       </button>
     {/if}
   {/each}

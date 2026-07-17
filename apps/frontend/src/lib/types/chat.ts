@@ -43,6 +43,7 @@ export interface Message {
   timestamp: Date;
   edited: boolean;
   replyTo: string | null;
+  pingedHandles: string[];
   attachments: Attachment[];
 }
 

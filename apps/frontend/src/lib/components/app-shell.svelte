@@ -27,6 +27,16 @@
   const currentChannel = $derived(chat.currentChannel);
   const currentMessages = $derived(chat.currentMessages);
   const currentMessagesLoading = $derived(chat.currentMessagesLoading);
+  const guildMentions = $derived(
+    Object.fromEntries(
+      Object.entries(chat.channelsByServer).map(([guildId, categories]) => [
+        guildId,
+        categories
+          .flatMap((category) => category.channels)
+          .reduce((sum, channel) => sum + channel.mention, 0),
+      ])
+    )
+  );
 
   const voice = new Voice();
   let joinedVoiceChannelId = $state<string | null>(null);
@@ -76,7 +86,7 @@
     void voice.leave();
   }
 
-  function selectServer(id: string) {
+  function selectServer(id?: string) {
     chat.selectServer(id);
   }
 
@@ -133,6 +143,7 @@
         <ServerSidebar
           servers={chat.servers}
           activeId={chat.activeServer}
+          mentions={guildMentions}
           onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}
         />

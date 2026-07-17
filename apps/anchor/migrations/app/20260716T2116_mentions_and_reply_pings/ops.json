@@ -1,0 +1,173 @@
+[
+  {
+    "id": "table.message_ping",
+    "label": "Create table \"message_ping\"",
+    "summary": "Creates table \"message_ping\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "message_ping"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"message_ping\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"message_ping\"",
+        "sql": "CREATE TABLE \"public\".\"message_ping\" (\n  \"messageId\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"messageId\", \"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"message_ping\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping\""]
+      }
+    ]
+  },
+  {
+    "id": "index.message_ping.message_ping_userId_idx",
+    "label": "Create index \"message_ping_userId_idx\" on \"message_ping\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "message_ping_userId_idx",
+        "table": "message_ping"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"message_ping_userId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping_userId_idx\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"message_ping_userId_idx\"",
+        "sql": "CREATE INDEX \"message_ping_userId_idx\" ON \"public\".\"message_ping\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"message_ping_userId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping_userId_idx\""]
+      }
+    ]
+  },
+  {
+    "id": "index.message_ping.message_ping_messageId_idx",
+    "label": "Create index \"message_ping_messageId_idx\" on \"message_ping\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "message_ping_messageId_idx",
+        "table": "message_ping"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"message_ping_messageId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping_messageId_idx\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"message_ping_messageId_idx\"",
+        "sql": "CREATE INDEX \"message_ping_messageId_idx\" ON \"public\".\"message_ping\" (\"messageId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"message_ping_messageId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"message_ping_messageId_idx\""]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.message_ping.message_ping_messageId_fkey",
+    "label": "Add foreign key \"message_ping_messageId_fkey\" on \"message_ping\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "message_ping_messageId_fkey",
+        "table": "message_ping"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"message_ping_messageId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["message_ping_messageId_fkey", "public", "\"public\".\"message_ping\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"message_ping_messageId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"message_ping\"\nADD CONSTRAINT \"message_ping_messageId_fkey\"\nFOREIGN KEY (\"messageId\")\nREFERENCES \"public\".\"message\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"message_ping_messageId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["message_ping_messageId_fkey", "public", "\"public\".\"message_ping\""]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.message_ping.message_ping_userId_fkey",
+    "label": "Add foreign key \"message_ping_userId_fkey\" on \"message_ping\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "message_ping_userId_fkey",
+        "table": "message_ping"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"message_ping_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["message_ping_userId_fkey", "public", "\"public\".\"message_ping\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"message_ping_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"message_ping\"\nADD CONSTRAINT \"message_ping_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"message_ping_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": ["message_ping_userId_fkey", "public", "\"public\".\"message_ping\""]
+      }
+    ]
+  }
+]

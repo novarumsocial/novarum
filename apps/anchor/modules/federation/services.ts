@@ -19,12 +19,27 @@ import {
   maxAttachmentCount,
 } from '../../utils/attachments';
 import { createPendingAttachment } from '../upload/services';
-import { verifyPendingAttachments } from '../message/services';
+import { getPingRecipients, verifyPendingAttachments } from '../message/services';
 import { storage } from '../../utils/services/storage';
+import { z } from 'zod';
+import { isMessageAfter } from '../../utils/messageCursor';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
 const federatedMessagePageSize = 50;
 const maxFederatedMessagePageSize = 100;
+const unreadMentionChannelsSchema = z
+  .array(
+    z.object({
+      id: z.string().min(1),
+      cursor: z
+        .object({
+          createdAt: z.iso.datetime(),
+          id: z.string().min(1),
+        })
+        .nullable(),
+    })
+  )
+  .max(1000);
 
 type FederationUserPayload = {
   username: string;
@@ -33,6 +48,7 @@ type FederationUserPayload = {
   avatarUrl: string | null;
   isBot: boolean;
 };
+type PingMessage = { id: string; channelId: string; createdAt: Date | string };
 
 async function verifyFederationRequest(
   request: Request,
@@ -163,6 +179,57 @@ export const federation = new Elysia({ prefix: '/federation' })
       },
     };
   })
+  .post('/unread-mentions', async ({ request, status }) => {
+    const parsed = await verifiedFederationJsonBody(request);
+    if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+    const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+    if (!userPayload) return status(400, { error: 'Invalid federation user' });
+    if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+      return status(401, { error: 'Federation user homeserver mismatch' });
+    }
+
+    const input = unreadMentionChannelsSchema.safeParse(getObjectProperty(parsed.body, 'channels'));
+    if (!input.success) return status(400, { error: 'Invalid channels' });
+
+    const user = await db.orm.public.User.where({
+      username: userPayload.username,
+      homeserver: userPayload.homeserver,
+    }).first();
+    if (!user) return status(403, { error: 'Forbidden' });
+
+    const channelIds = [...new Set(input.data.map((channel) => channel.id))];
+    const [memberships, channels, pings] = await Promise.all([
+      db.orm.public.GuildMember.where({ userId: user.id }).all(),
+      channelIds.length
+        ? db.orm.public.Channel.where((channel) => channel.id.in(channelIds)).all()
+        : [],
+      db.orm.public.MessagePing.where({ userId: user.id }).include('message').all(),
+    ]);
+    const guildIds = new Set(memberships.map((membership) => membership.guildId));
+    if (
+      channels.length !== channelIds.length ||
+      channels.some((channel) => !guildIds.has(channel.guildId))
+    ) {
+      return status(403, { error: 'Forbidden' });
+    }
+
+    const cursorByChannel = new Map(input.data.map((channel) => [channel.id, channel.cursor]));
+    const counts = new Map(channelIds.map((channelId) => [channelId, 0]));
+    for (const ping of pings) {
+      const message = ping.message as PingMessage;
+      if (
+        counts.has(message.channelId) &&
+        isMessageAfter(message, cursorByChannel.get(message.channelId) ?? undefined)
+      ) {
+        counts.set(message.channelId, counts.get(message.channelId)! + 1);
+      }
+    }
+
+    return {
+      channels: channelIds.map((id) => ({ id, mention: counts.get(id)! })),
+    };
+  })
   .post('/invites/:code/accept', async ({ params, request, server, status }) => {
     const parsed = await verifiedFederationJsonBody(request);
     if (!parsed.ok) return status(parsed.status, { error: parsed.error });
@@ -268,10 +335,10 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    if (
-      replyTo &&
-      !(await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first())
-    ) {
+    const replyTarget = replyTo
+      ? await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first()
+      : null;
+    if (replyTo && !replyTarget) {
       return status(400, { error: 'Invalid reply target' });
     }
 
@@ -299,6 +366,12 @@ export const federation = new Elysia({ prefix: '/federation' })
       params.id
     );
     if (!attachments.ok) return status(400, { error: attachments.error });
+    const pingRecipients = await getPingRecipients(
+      access.channel.guildId,
+      content,
+      replyTarget?.authorId,
+      access.user.id
+    );
 
     const message = await db.transaction(async (tx) => {
       const created = await tx.orm.public.Message.create({
@@ -318,7 +391,18 @@ export const federation = new Elysia({ prefix: '/federation' })
         if (!updated) throw new Error('Attachment was already claimed');
       }
 
-      return { ...created, attachments: attachments.value };
+      for (const recipient of pingRecipients) {
+        await tx.orm.public.MessagePing.create({
+          messageId: created.id,
+          userId: recipient.userId,
+        });
+      }
+
+      return {
+        ...created,
+        attachments: attachments.value,
+        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+      };
     });
 
     const responseMessage = federatedMessageResponse(message, access.channel, access.user);
@@ -357,7 +441,7 @@ export const federation = new Elysia({ prefix: '/federation' })
     await Promise.all(
       existing.attachments.map((attachment) =>
         storage
-          .file(attachment.objectKey)
+          .file(String(attachment.objectKey))
           .delete()
           .catch(() => {})
       )
@@ -880,6 +964,7 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     content: message.content,
     nonce: message.nonce,
     replyTo: message.replyTo ?? null,
+    pingedHandles: Array.isArray(message.pingedHandles) ? message.pingedHandles : [],
     attachments: Array.isArray(message.attachments)
       ? message.attachments.map(attachmentPayload)
       : [],

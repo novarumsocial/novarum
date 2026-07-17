@@ -3,14 +3,30 @@ import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
-import { parseFederatedGuildId } from '../../utils/federationIds';
+import {
+  makeFederatedChannelId,
+  parseFederatedChannelId,
+  parseFederatedGuildId,
+} from '../../utils/federationIds';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 import { storage } from '../../utils/services/storage';
 import { getConfig } from '../../utils/config';
 import { randomInt } from 'node:crypto';
+import { postSignedFederationJson } from '../../utils/discovery';
+import { federationUserPayload } from '../../utils/federationPayload';
+import { z } from 'zod';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
+const unreadMentionsResponseSchema = z.object({
+  channels: z.array(
+    z.object({
+      id: z.string(),
+      mention: z.number().int().nonnegative(),
+    })
+  ),
+});
+type PingMessage = { id: string; channelId: string; createdAt: Date | string };
 
 export const guilds = new Elysia({ prefix: '/guilds' })
   .get('/avatar/:id', async ({ params, query, status }) => {
@@ -136,20 +152,91 @@ export const guilds = new Elysia({ prefix: '/guilds' })
     }
   )
   .get('/list', async ({ server, session }) => {
-    const memberships = await db.orm.public.GuildMember.where({ userId: session.userId })
-      .include('guild')
-      .all();
-    const readStates = await db.orm.public.ChannelReadState.where({ userId: session.userId }).all();
+    const [memberships, readStates, pings] = await Promise.all([
+      db.orm.public.GuildMember.where({ userId: session.userId }).include('guild').all(),
+      db.orm.public.ChannelReadState.where({ userId: session.userId }).all(),
+      db.orm.public.MessagePing.where({ userId: session.userId }).include('message').all(),
+    ]);
     const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
+    const unreadPingsByChannel = new Map<string, number>();
+
+    for (const ping of pings) {
+      const message = ping.message as PingMessage;
+      const readState = readStateByChannel.get(message.channelId);
+      if (
+        readState &&
+        isMessageAfter(
+          { createdAt: message.createdAt, id: message.id },
+          { createdAt: readState.lastReadCreatedAt, id: readState.lastReadMessageId }
+        )
+      ) {
+        unreadPingsByChannel.set(
+          message.channelId,
+          (unreadPingsByChannel.get(message.channelId) ?? 0) + 1
+        );
+      }
+    }
+
+    const guildChannels = await Promise.all(
+      memberships.map(async ({ guild }) => {
+        const id = guild.id as string;
+        return {
+          id,
+          guild,
+          channels: await db.orm.public.Channel.where({ guildId: id })
+            .orderBy((channel) => channel.position.asc())
+            .all(),
+        };
+      })
+    );
+    const federatedChannelsByHomeserver = new Map<
+      string,
+      { id: string; cursor: { createdAt: string; id: string } | null }[]
+    >();
+
+    for (const { id, channels } of guildChannels) {
+      const federatedGuild = parseFederatedGuildId(id);
+      if (!federatedGuild) continue;
+
+      const remoteChannels = federatedChannelsByHomeserver.get(federatedGuild.homeserver) ?? [];
+      for (const channel of channels) {
+        const remoteChannel = parseFederatedChannelId(channel.id);
+        if (!remoteChannel || remoteChannel.homeserver !== federatedGuild.homeserver) continue;
+
+        const readState = readStateByChannel.get(channel.id);
+        remoteChannels.push({
+          id: remoteChannel.id,
+          cursor: readState
+            ? {
+                createdAt: new Date(readState.lastReadCreatedAt).toISOString(),
+                id: readState.lastReadMessageId,
+              }
+            : null,
+        });
+      }
+      federatedChannelsByHomeserver.set(federatedGuild.homeserver, remoteChannels);
+    }
+
+    await Promise.all(
+      [...federatedChannelsByHomeserver].map(async ([homeserver, channels]) => {
+        const result = await postSignedFederationJson(homeserver, '/federation/unread-mentions', {
+          user: federationUserPayload(session),
+          channels,
+        }).catch(() => null);
+        if (!result?.response.ok) return;
+
+        const response = unreadMentionsResponseSchema.safeParse(result.data);
+        if (!response.success) return;
+
+        for (const channel of response.data.channels) {
+          unreadPingsByChannel.set(makeFederatedChannelId(homeserver, channel.id), channel.mention);
+        }
+      })
+    );
 
     const guilds = [];
 
-    for (const { guild } of memberships) {
-      const id = guild.id as string;
-      const channels = await db.orm.public.Channel.where({ guildId: id })
-        .orderBy((channel) => channel.position.asc())
-        .all();
-
+    for (const { id, guild, channels } of guildChannels) {
       guilds.push({
         id,
         name: guild.name as string,
@@ -193,6 +280,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
                   }
                 )
               ),
+              mention: unreadPingsByChannel.get(channel.id) ?? 0,
             };
           })
         ),

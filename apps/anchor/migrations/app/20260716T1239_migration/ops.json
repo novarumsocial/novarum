@@ -1,0 +1,71 @@
+[
+  {
+    "id": "table.emojis",
+    "label": "Create table \"emojis\"",
+    "summary": "Creates table \"emojis\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "emojis"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"emojis\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"emojis\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"emojis\"",
+        "sql": "CREATE TABLE \"public\".\"emojis\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" SERIAL NOT NULL,\n  \"name\" text NOT NULL,\n  \"unicode\" text NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"url\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"emojis\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"emojis\""]
+      }
+    ]
+  },
+  {
+    "id": "index.local_credential.local_credential_userId_idx",
+    "label": "Create index \"local_credential_userId_idx\" on \"local_credential\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "local_credential_userId_idx",
+        "table": "local_credential"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"local_credential_userId_idx\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": ["\"public\".\"local_credential_userId_idx\""]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"local_credential_userId_idx\"",
+        "sql": "CREATE INDEX \"local_credential_userId_idx\" ON \"public\".\"local_credential\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"local_credential_userId_idx\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": ["\"public\".\"local_credential_userId_idx\""]
+      }
+    ]
+  }
+]

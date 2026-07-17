@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:c60ad1608f13a83d02c41ffae2458d4533694ee26126a0b0968859de884bf6c7'>;
+  StorageHashBase<'sha256:bcd6979332ab5917176da598a1476624ae0a9da5677cce83c481ed28e14ecba0'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:271c2714cb2be83db56c18de0ea2cd3a09185568f33d663715d3494f010cf549'>;
 export type ProfileHash =
@@ -134,10 +134,6 @@ export type FieldOutputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['output'] | null;
-    };
-    readonly MessagePing: {
-      readonly messageId: CodecTypes['pg/text@1']['output'];
-      readonly userId: CodecTypes['pg/text@1']['output'];
     };
     readonly Session: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -250,10 +246,6 @@ export type FieldInputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly deletedAt: CodecTypes['pg/timestamptz@1']['input'] | null;
     };
-    readonly MessagePing: {
-      readonly messageId: CodecTypes['pg/text@1']['input'];
-      readonly userId: CodecTypes['pg/text@1']['input'];
-    };
     readonly Session: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly userId: CodecTypes['pg/text@1']['input'];
@@ -365,10 +357,6 @@ export type StorageColumnTypes = {
       readonly replyTo: CodecTypes['pg/text@1']['output'] | null;
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
-    readonly message_ping: {
-      readonly messageId: CodecTypes['pg/text@1']['output'];
-      readonly userId: CodecTypes['pg/text@1']['output'];
-    };
     readonly session: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -479,10 +467,6 @@ export type StorageColumnInputTypes = {
       readonly nonce: CodecTypes['pg/text@1']['input'];
       readonly replyTo: CodecTypes['pg/text@1']['input'] | null;
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
-    };
-    readonly message_ping: {
-      readonly messageId: CodecTypes['pg/text@1']['input'];
-      readonly userId: CodecTypes['pg/text@1']['input'];
     };
     readonly session: {
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
@@ -1185,53 +1169,6 @@ type ContractBase = Omit<
                 },
               ];
             };
-            readonly message_ping: {
-              columns: {
-                readonly messageId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly userId: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-              };
-              primaryKey: { readonly columns: readonly ['messageId', 'userId'] };
-              uniques: readonly [];
-              indexes: readonly [{ readonly columns: readonly ['userId'] }];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'message_ping';
-                    readonly columns: readonly ['messageId'];
-                  };
-                  readonly target: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'message';
-                    readonly columns: readonly ['id'];
-                  };
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-                {
-                  readonly source: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'message_ping';
-                    readonly columns: readonly ['userId'];
-                  };
-                  readonly target: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'user';
-                    readonly columns: readonly ['id'];
-                  };
-                  readonly constraint: true;
-                  readonly index: true;
-                },
-              ];
-            };
             readonly session: {
               columns: {
                 readonly id: {
@@ -1356,10 +1293,6 @@ type ContractBase = Omit<
     };
     readonly channel: { readonly namespace: 'public' & NamespaceId; readonly model: 'Channel' };
     readonly message: { readonly namespace: 'public' & NamespaceId; readonly model: 'Message' };
-    readonly message_ping: {
-      readonly namespace: 'public' & NamespaceId;
-      readonly model: 'MessagePing';
-    };
     readonly channel_read_state: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'ChannelReadState';
@@ -1996,47 +1929,6 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly deletedAt: { readonly column: 'deletedAt' };
-              };
-            };
-          };
-          readonly MessagePing: {
-            readonly fields: {
-              readonly messageId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly userId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-            };
-            readonly relations: {
-              readonly message: {
-                readonly to: {
-                  readonly namespace: 'public' & NamespaceId;
-                  readonly model: 'Message';
-                };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['messageId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-              readonly user: {
-                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['userId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-            };
-            readonly storage: {
-              readonly table: 'message_ping';
-              readonly namespaceId: 'public';
-              readonly fields: {
-                readonly messageId: { readonly column: 'messageId' };
-                readonly userId: { readonly column: 'userId' };
               };
             };
           };
