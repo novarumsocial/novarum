@@ -16,9 +16,7 @@
       {
         "description": "ensure table \"message_ping\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["\"public\".\"message_ping\""]
       }
     ],
     "execute": [
@@ -32,9 +30,7 @@
       {
         "description": "verify table \"message_ping\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["\"public\".\"message_ping\""]
       }
     ]
   },
@@ -55,9 +51,7 @@
       {
         "description": "ensure index \"message_ping_userId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping_userId_idx\""
-        ]
+        "params": ["\"public\".\"message_ping_userId_idx\""]
       }
     ],
     "execute": [
@@ -70,9 +64,7 @@
       {
         "description": "verify index \"message_ping_userId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping_userId_idx\""
-        ]
+        "params": ["\"public\".\"message_ping_userId_idx\""]
       }
     ]
   },
@@ -93,9 +85,7 @@
       {
         "description": "ensure index \"message_ping_messageId_idx\" does not exist",
         "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping_messageId_idx\""
-        ]
+        "params": ["\"public\".\"message_ping_messageId_idx\""]
       }
     ],
     "execute": [
@@ -108,9 +98,7 @@
       {
         "description": "verify index \"message_ping_messageId_idx\" exists",
         "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
-        "params": [
-          "\"public\".\"message_ping_messageId_idx\""
-        ]
+        "params": ["\"public\".\"message_ping_messageId_idx\""]
       }
     ]
   },
@@ -131,11 +119,7 @@
       {
         "description": "ensure FK \"message_ping_messageId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_ping_messageId_fkey",
-          "public",
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["message_ping_messageId_fkey", "public", "\"public\".\"message_ping\""]
       }
     ],
     "execute": [
@@ -148,11 +132,7 @@
       {
         "description": "verify FK \"message_ping_messageId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_ping_messageId_fkey",
-          "public",
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["message_ping_messageId_fkey", "public", "\"public\".\"message_ping\""]
       }
     ]
   },
@@ -173,11 +153,7 @@
       {
         "description": "ensure FK \"message_ping_userId_fkey\" does not exist",
         "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_ping_userId_fkey",
-          "public",
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["message_ping_userId_fkey", "public", "\"public\".\"message_ping\""]
       }
     ],
     "execute": [
@@ -190,11 +166,7 @@
       {
         "description": "verify FK \"message_ping_userId_fkey\" exists",
         "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
-        "params": [
-          "message_ping_userId_fkey",
-          "public",
-          "\"public\".\"message_ping\""
-        ]
+        "params": ["message_ping_userId_fkey", "public", "\"public\".\"message_ping\""]
       }
     ]
   }

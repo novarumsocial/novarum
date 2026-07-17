@@ -45,7 +45,11 @@
       >{part.text}</a
     >
   {:else if part.mention}
-    <span class="{part.text === `@${session.user!.username}:${session.user!.homeserver}` ? 'bg-amber-300/70' : 'bg-primary/15'} px-0.5 font-medium text-primary">{part.text}</span>
+    <span
+      class="{part.text === `@${session.user!.username}:${session.user!.homeserver}`
+        ? 'bg-amber-300/70'
+        : 'bg-primary/15'} px-0.5 font-medium text-primary">{part.text}</span
+    >
   {:else if part.unicode && realtime.emojiUrls[part.unicode]}
     <img
       src={realtime.emojiUrls[part.unicode]}
