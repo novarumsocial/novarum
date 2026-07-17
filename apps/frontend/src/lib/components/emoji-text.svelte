@@ -1,8 +1,10 @@
 <script lang="ts">
   import { realtime } from '$lib/realtime.svelte';
+  import { useSession } from '$lib/session.svelte';
   import { isUrl, urlPattern } from '$lib/utils';
 
   let { content, links = false }: { content: string; links?: boolean } = $props();
+  let session = useSession();
 
   type Part = { text: string; url?: boolean; mention?: boolean; unicode?: string };
 
@@ -43,7 +45,7 @@
       >{part.text}</a
     >
   {:else if part.mention}
-    <span class="bg-primary/15 px-0.5 font-medium text-primary">{part.text}</span>
+    <span class="{part.text === `@${session.user!.username}:${session.user!.homeserver}` ? 'bg-amber-300/70' : 'bg-primary/15'} px-0.5 font-medium text-primary">{part.text}</span>
   {:else if part.unicode && realtime.emojiUrls[part.unicode]}
     <img
       src={realtime.emojiUrls[part.unicode]}
