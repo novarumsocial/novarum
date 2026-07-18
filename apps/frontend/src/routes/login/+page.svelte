@@ -13,6 +13,7 @@
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { MessagesSquare, Server, AtSign, Lock, ArrowRight, LoaderCircle } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
+  import { safeRedirect } from '$lib/safeRedirect';
 
   const loginSchema = z.object({
     homeServer: z
@@ -37,17 +38,12 @@
   let loading = $state(false);
   let submitError = $state('');
   const session = useSession();
-
-  function safeRedirect(value: string | null) {
-    if (!value || !value.startsWith('/') || value.startsWith('//')) return '/guilds';
-
-    return value;
-  }
+  const redirectParam = page.url.searchParams.get('redirect') 
 
   onMount(() => {
     void session.refresh().then(async (user) => {
       if (user) {
-        await goto(safeRedirect(page.url.searchParams.get('redirect')));
+        await goto(safeRedirect(redirectParam));
       }
     });
   });
@@ -81,7 +77,7 @@
         return;
       }
 
-      await goto(safeRedirect(page.url.searchParams.get('redirect')));
+      await goto(safeRedirect(redirectParam));
     },
   });
 
@@ -230,7 +226,7 @@
       <Card.Footer class="justify-center text-xs text-muted-foreground">
         <span>Don't have an account?</span>
         <a
-          href="/register"
+          href={`/register?redirect=${safeRedirect(redirectParam)}`}
           class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
           >Register</a
         >

@@ -23,6 +23,10 @@
     CircleCheck,
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
+  import { page } from '$app/state';
+  import { safeRedirect } from '$lib/safeRedirect';
+
+  const redirectParam = page.url.searchParams.get('redirect');
 
   const registerSchema = z
     .object({
@@ -87,7 +91,7 @@
         return;
       }
 
-      await goto('/guilds');
+      await goto(redirectParam ? safeRedirect(redirectParam) : '/guilds');
     },
   });
 

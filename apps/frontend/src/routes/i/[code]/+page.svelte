@@ -16,6 +16,7 @@
     ArrowRight,
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
+  import { useSession } from '$lib/session.svelte';
 
   type InviteState = {
     invite: {
@@ -35,6 +36,7 @@
     };
   };
 
+  const session = useSession();
   const raw = $derived(decodeInviteParam(page.params.code ?? ''));
   const atIdx = $derived(raw.lastIndexOf('@'));
   const rawInviteCode = $derived(atIdx !== -1 ? raw.slice(0, atIdx) : raw);
@@ -86,6 +88,11 @@
     error = '';
     const remoteInvite = normalizedHomeServer !== userHomeServer;
 
+    if (!session.user) {
+      goto(`/login?redirect=${encodeURIComponent(`/i/${raw}`)}`);
+      return;
+    }
+    
     if (remoteInvite) {
       try {
         await anchor.setHomeServer(userHomeServer);
