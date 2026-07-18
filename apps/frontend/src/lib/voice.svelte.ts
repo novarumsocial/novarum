@@ -1,9 +1,10 @@
 import { ConnectionState, Participant, Room, RoomEvent, Track, TrackEvent } from 'livekit-client';
-import type { RemoteTrack } from 'livekit-client';
+import { LocalAudioTrack, type RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { Sound } from 'svelte-sound';
+import { DeepFilterNoiseFilterProcessor } from 'deepfilternet3-noise-filter';
 import JoinEffect from './sounds/join.opus?url';
 import Leave from './sounds/leave.opus?url';
 import Mute from './sounds/mute.opus?url';
@@ -48,6 +49,11 @@ export class Voice {
 
   connected = $derived(this.connectionState === ConnectionState.Connected);
   connecting = $derived(this.connectionState === ConnectionState.Connecting);
+
+  noiseCancellationEnabled = $state<boolean>(true);
+  private noiseProcessor: DeepFilterNoiseFilterProcessor | null = null;
+  private processedMicTrack: LocalAudioTrack | null = null;
+  private noiseProcessorOperation: Promise<void> = Promise.resolve();
 
   get participantCount() {
     return this.voiceStates.size;
@@ -134,6 +140,7 @@ export class Voice {
 
     const room = this.room;
     const channelId = this.channelId;
+    await this.removeNoiseCancellation();
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
@@ -257,11 +264,110 @@ export class Voice {
     const enabled = !this.selfMuted && !this.selfDeafened;
 
     try {
-      await room.localParticipant.setMicrophoneEnabled(enabled);
+      await room.localParticipant.setMicrophoneEnabled(enabled, {
+        echoCancellation: true,
+        autoGainControl: true,
+        noiseSuppression: false,
+        channelCount: 1,
+        sampleRate: 48000,
+      });
     } catch {
       if (this.room === room && enabled) {
         this.selfMuted = true;
       }
+      return;
+    }
+
+    if (enabled && this.noiseCancellationEnabled) await this.setNoiseCancellation(true);
+  }
+
+  private async ensureNoiseCancellation(room: Room) {
+    if (this.room !== room || !this.noiseCancellationEnabled) return;
+
+    const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+
+    // funny livekit doing strange typing stuff
+    const track = publication?.track as LocalAudioTrack | undefined;
+
+    // don't ask, 5.6 sol asked me to do that
+    if (!(track instanceof LocalAudioTrack)) throw new Error('Local microphone track is unavailable');
+
+    if (this.processedMicTrack === track && this.noiseProcessor) {
+      await this.noiseProcessor.setEnabled(true);
+      return;
+    }
+
+    // remove any previous noise cancellation from previous tracks
+    await this.removeNoiseCancellation();
+
+    if (this.room !== room || !this.noiseCancellationEnabled) return;
+
+    const processor = new DeepFilterNoiseFilterProcessor({
+      sampleRate: 48_000,
+      noiseReductionLevel: 60,
+      enabled: true,
+      assetConfig: {
+        cdnUrl: 'https://dfn3.srizan.dev',
+      }
+    });
+
+    try {
+      await track.setProcessor(processor);
+
+      if (this.room !== room || !this.noiseCancellationEnabled) {
+        await track.stopProcessor().catch(() => undefined);
+        return;
+      }
+
+      this.noiseProcessor = processor;
+      this.processedMicTrack = track;
+    } catch (error) {
+      processor.setEnabled(false);
+      throw error;
+    }
+  }
+
+  async setNoiseCancellation(enabled: boolean) {
+    this.noiseCancellationEnabled = enabled;
+
+    const room = this.room;
+    if (!room) return;
+
+    // queuing the operation to avoid race conditions :3333
+    this.noiseProcessorOperation = this.noiseProcessorOperation
+      .catch(() => undefined)
+      .then(async () => {
+        if (this.room !== room) return;
+
+        if (enabled) {
+          await this.ensureNoiseCancellation(room);
+        } else {
+          await this.removeNoiseCancellation();
+        }
+      });
+
+    try {
+      await this.noiseProcessorOperation;
+    } catch (error) {
+      console.error('could not change noise cancellation', error);
+
+      if (enabled) {
+        this.noiseCancellationEnabled = false;
+        await this.removeNoiseCancellation();
+      }
+    }
+  }
+
+  private async removeNoiseCancellation() {
+    const track = this.processedMicTrack;
+
+    this.noiseProcessor?.setEnabled(false);
+    this.noiseProcessor = null;
+    this.processedMicTrack = null;
+
+    if (track) {
+      // idk why we are catching but copilot does its thing i guess
+      await track.stopProcessor().catch(() => undefined);
     }
   }
 
@@ -272,6 +378,10 @@ export class Voice {
       })
       .on(RoomEvent.Disconnected, () => {
         if (this.room !== room) return;
+
+        this.noiseProcessor?.setEnabled(false);
+        this.noiseProcessor = null;
+        this.processedMicTrack = null;
 
         this.room = null;
         this.channelId = null;

@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    AudioWaveform,
     Mic,
     MicOff,
     Headphones,
@@ -57,6 +58,24 @@
             {voiceChannelName ?? 'Voice channel'}
           </p>
         </div>
+        <button
+          class={cn(
+            'flex size-7 items-center justify-center transition-colors',
+            voice.noiseCancellationEnabled
+              ? 'text-primary hover:text-primary/80'
+              : 'text-muted-foreground hover:text-sidebar-foreground'
+          )}
+          onclick={() => voice.setNoiseCancellation(!voice.noiseCancellationEnabled)}
+          aria-label={voice.noiseCancellationEnabled
+            ? 'Disable noise cancellation'
+            : 'Enable noise cancellation'}
+          aria-pressed={voice.noiseCancellationEnabled}
+          title={voice.noiseCancellationEnabled
+            ? 'Disable noise cancellation'
+            : 'Enable noise cancellation'}
+        >
+          <AudioWaveform class="size-4" />
+        </button>
         <button
           class="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-300"
           onclick={onLeaveVoice}

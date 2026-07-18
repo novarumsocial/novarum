@@ -58,6 +58,7 @@
         "@tailwindcss/vite": "^4.3.0",
         "bits-ui": "^2.16.3",
         "clsx": "^2.1.1",
+        "deepfilternet3-noise-filter": "^1.3.0",
         "embla-carousel-svelte": "^8.6.0",
         "formsnap": "^2.0.1",
         "shadcn-svelte": "^1.3.0",
@@ -722,6 +723,8 @@
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 
     "decode-named-character-reference": ["decode-named-character-reference@1.3.0", "", { "dependencies": { "character-entities": "^2.0.0" } }, "sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q=="],
+
+    "deepfilternet3-noise-filter": ["deepfilternet3-noise-filter@1.3.0", "", { "peerDependencies": { "livekit-client": "^2.0.0" } }, "sha512-yYFUlPuvPguqcd/R6/OSsr0noGqlqOE50JkCWYHogk+PjLj9qrNgwTt5zKraVkKnw0l4+eXJagkz2SUWtUl4sQ=="],
 
     "deepmerge": ["deepmerge@4.3.1", "", {}, "sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A=="],
 
