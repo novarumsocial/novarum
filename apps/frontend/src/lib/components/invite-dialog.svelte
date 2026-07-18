@@ -61,6 +61,7 @@
   function handleOpenChange() {
     if (!open) {
       copied = false;
+      code = '';
     }
   }
 </script>
