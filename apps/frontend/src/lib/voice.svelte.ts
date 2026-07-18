@@ -42,6 +42,7 @@ export class Voice {
   audioPlaybackBlocked = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
+  private participantAudio = new SvelteMap<string, { volume: number; muted: boolean }>();
   private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
   private endedTrackListeners = new WeakSet<VoiceVideoTrack>();
 
@@ -78,7 +79,7 @@ export class Voice {
       throw error;
     }
 
-    const room = new Room();
+    const room = new Room({ webAudioMix: true });
     this.room = room;
     this.bindRoomEvents(room, channelId);
 
@@ -123,7 +124,7 @@ export class Voice {
     for (const participant of room.remoteParticipants.values()) {
       this.syncParticipant(participant, channelId);
       for (const publication of participant.trackPublications.values()) {
-        if (publication.track) this.attachRemoteAudio(publication.track);
+        if (publication.track) this.attachRemoteAudio(publication.track, participant.identity);
       }
     }
   }
@@ -191,6 +192,27 @@ export class Voice {
 
     await this.room.startAudio();
     this.audioPlaybackBlocked = !this.room.canPlaybackAudio;
+  }
+
+  participantVolume(identity: string) {
+    return this.participantAudio.get(identity)?.volume ?? 1;
+  }
+
+  participantMuted(identity: string) {
+    return this.participantAudio.get(identity)?.muted ?? false;
+  }
+
+  setParticipantVolume(identity: string, volume: number) {
+    this.participantAudio.set(identity, {
+      volume: Math.max(0, Math.min(3, volume)),
+      muted: this.participantMuted(identity),
+    });
+    this.updateParticipantAudio(identity);
+  }
+
+  setParticipantMuted(identity: string, muted: boolean) {
+    this.participantAudio.set(identity, { volume: this.participantVolume(identity), muted });
+    this.updateParticipantAudio(identity);
   }
 
   async setCamera(enabled: boolean) {
@@ -285,7 +307,7 @@ export class Voice {
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        this.attachRemoteAudio(track);
+        this.attachRemoteAudio(track, participant.identity);
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
@@ -379,7 +401,7 @@ export class Voice {
     });
   }
 
-  private attachRemoteAudio(track: RemoteTrack) {
+  private attachRemoteAudio(track: RemoteTrack, identity: string) {
     if (track.kind !== Track.Kind.Audio) return;
     if (this.remoteAudioElements.has(track)) return;
 
@@ -389,6 +411,13 @@ export class Voice {
     element.style.display = 'none';
     document.body.appendChild(element);
     this.remoteAudioElements.set(track, element);
+    this.updateParticipantAudio(identity);
+  }
+
+  private updateParticipantAudio(identity: string) {
+    this.room?.remoteParticipants
+      .get(identity)
+      ?.setVolume(this.participantMuted(identity) ? 0 : this.participantVolume(identity));
   }
 
   private detachRemoteAudio(track?: RemoteTrack) {

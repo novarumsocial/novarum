@@ -18,6 +18,8 @@
   import GuildSettingsDialog from './guild-settings-dialog.svelte';
   import Avatar from './avatar.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
+  import { Slider } from '$lib/components/ui/slider/index.js';
 
   let {
     server,
@@ -216,29 +218,78 @@
             <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
               {#each connectedVoiceUsers as state (state.userId)}
                 {@const name = state.name || nameFor(state.userId)}
-                <button
-                  onclick={() => selectChannel(ch)}
-                  class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
-                >
-                  <Avatar
-                    src={avatarFor(state.userId)}
-                    {name}
-                    fallback={initialsFor(name)}
-                    class={cn(
-                      'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
-                      avatarBg(state.userId),
-                      voice?.channelId === ch.id &&
-                        voice.voiceStates.get(state.userId)?.speaking &&
-                        'ring-2 ring-emerald-400'
-                    )}
-                  />
-                  <span class="min-w-0 flex-1 truncate">
-                    {name}
-                  </span>
-                  {#if voice?.channelId === ch.id && (voice.voiceStates.get(state.userId)?.selfMuted || voice.voiceStates.get(state.userId)?.selfDeafened)}
-                    <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                  {/if}
-                </button>
+                {@const voiceState = voice?.voiceStates.get(state.userId)}
+                <ContextMenu.Root>
+                  <ContextMenu.Trigger>
+                    <button
+                      onclick={() => selectChannel(ch)}
+                      class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
+                    >
+                      <Avatar
+                        src={avatarFor(state.userId)}
+                        {name}
+                        fallback={initialsFor(name)}
+                        class={cn(
+                          'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
+                          avatarBg(state.userId),
+                          voice?.channelId === ch.id &&
+                            voiceState?.speaking &&
+                            'ring-2 ring-emerald-400'
+                        )}
+                      />
+                      <span class="min-w-0 flex-1 truncate">
+                        {name}
+                      </span>
+                      {#if voice?.channelId === ch.id && (voiceState?.selfMuted || voiceState?.selfDeafened)}
+                        <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                      {/if}
+                    </button>
+                  </ContextMenu.Trigger>
+                  <ContextMenu.Content class="overflow-y-hidden">
+                    {#if state.userId === voice?.localIdentity}
+                      <ContextMenu.CheckboxItem
+                        closeOnSelect={false}
+                        checked={voice.selfMuted}
+                        onCheckedChange={(muted) => voice?.setMuted(muted)}
+                        >Mute</ContextMenu.CheckboxItem
+                      >
+                    {:else}
+                      <ContextMenu.CheckboxItem
+                        closeOnSelect={false}
+                        checked={voice?.participantMuted(state.userId) ?? false}
+                        onCheckedChange={(muted) => voice?.setParticipantMuted(state.userId, muted)}
+                        >Local mute</ContextMenu.CheckboxItem
+                      >
+                      <ContextMenu.Item
+                        closeOnSelect={false}
+                        class="w-48 flex-col items-start gap-2"
+                      >
+                        <p class="flex w-full justify-between">
+                          <span>Volume</span>
+                          <span
+                            >{Math.round(
+                              (voice?.participantVolume(state.userId) ?? 1) * 100
+                            )}%</span
+                          >
+                        </p>
+                        <Slider
+                          type="single"
+                          aria-label={`Volume for ${name}`}
+                          min={0}
+                          max={300}
+                          step={1}
+                          value={(voice?.participantVolume(state.userId) ?? 1) * 100}
+                          onValueChange={(volume) =>
+                            voice?.setParticipantVolume(state.userId, volume / 100)}
+                          onThumbDblClick={() => {
+                            // til 1 is 100 and 3 is 300...
+                            voice?.setParticipantVolume(state.userId, 1);
+                          }}
+                        />
+                      </ContextMenu.Item>
+                    {/if}
+                  </ContextMenu.Content>
+                </ContextMenu.Root>
               {/each}
             </div>
           {/if}
