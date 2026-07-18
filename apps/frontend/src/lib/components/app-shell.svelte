@@ -175,7 +175,7 @@
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
       />
-    {:else if currentChannel && currentChannel.type === 'VOICE'}
+    {:else if currentChannel && currentChannel.type === 'VOICE' && (voice.connected || voice.connecting)}
       <VoiceArea
         channel={currentChannel}
         {voice}
