@@ -21,7 +21,7 @@ const defaults: Settings = {
   circleIcons: false,
   noiseCancellation: true,
   voiceEchoCancellation: false,
-  voiceAutoGainControl: false,
+  voiceAutoGainControl: true,
 };
 
 function load(): Settings {
