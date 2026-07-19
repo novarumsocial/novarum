@@ -6,6 +6,8 @@ type Settings = {
   compactMode: boolean;
   showMemberList: boolean;
   circleIcons: boolean;
+  noiseCancellation: boolean;
+  noiseCancellationLevel: number;
 };
 
 const defaults: Settings = {
@@ -16,6 +18,8 @@ const defaults: Settings = {
   compactMode: false,
   showMemberList: true,
   circleIcons: false,
+  noiseCancellation: true,
+  noiseCancellationLevel: 60,
 };
 
 function load(): Settings {

@@ -7,9 +7,13 @@
 		value = $bindable(),
 		orientation = "horizontal",
 		class: className,
+		children,
 		onThumbDblClick,
 		...restProps
-	}: WithoutChildrenOrChild<SliderPrimitive.RootProps> & { onThumbDblClick?: () => void } = $props();
+	}: WithoutChildrenOrChild<SliderPrimitive.RootProps> & {
+		children?: SliderPrimitive.RootProps["children"];
+		onThumbDblClick?: () => void;
+	} = $props();
 </script>
 
 <!--
@@ -27,7 +31,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 	)}
 	{...restProps}
 >
-	{#snippet children({ thumbItems })}
+	{#snippet children({ thumbItems, tickItems, thumbs, ticks })}
 		<span
 			data-slot="slider-track"
 			data-orientation={orientation}
@@ -50,5 +54,6 @@ get along, so we shut typescript up by casting `value` to `never`.
 				ondblclick={onThumbDblClick}
 			/>
 		{/each}
+		{@render children?.({ thumbItems, tickItems, thumbs, ticks })}
 	{/snippet}
 </SliderPrimitive.Root>

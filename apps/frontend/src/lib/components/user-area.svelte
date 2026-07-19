@@ -13,6 +13,11 @@
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
   import Avatar from './avatar.svelte';
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import Switch from './ui/switch/switch.svelte';
+  import Label from './ui/label/label.svelte';
+  import * as Slider from '$lib/components/ui/slider/index.js';
+  import { Button } from '$lib/components/ui/button/index.js';
 
   type UserAreaUser = {
     username: string;
@@ -33,6 +38,21 @@
     onLeaveVoice: () => void;
   } = $props();
   let settingsOpen = $state(false);
+  let loopbackPending = $state(false);
+  let loopbackError = $state<string | null>(null);
+
+  async function toggleAudioLoopback() {
+    loopbackPending = true;
+    loopbackError = null;
+
+    try {
+      await voice.setAudioLoopbackTesting(!voice.audioLoopbackTesting);
+    } catch (error) {
+      loopbackError = error instanceof Error ? error.message : 'Unknown playback error';
+    } finally {
+      loopbackPending = false;
+    }
+  }
 </script>
 
 <div class="w-74 shrink-0 border-t border-border bg-sidebar-accent/30">
@@ -58,24 +78,97 @@
             {voiceChannelName ?? 'Voice channel'}
           </p>
         </div>
-        <button
-          class={cn(
-            'flex size-7 items-center justify-center transition-colors',
-            voice.noiseCancellationEnabled
-              ? 'text-primary hover:text-primary/80'
-              : 'text-muted-foreground hover:text-sidebar-foreground'
-          )}
-          onclick={() => voice.setNoiseCancellation(!voice.noiseCancellationEnabled)}
-          aria-label={voice.noiseCancellationEnabled
-            ? 'Disable noise cancellation'
-            : 'Enable noise cancellation'}
-          aria-pressed={voice.noiseCancellationEnabled}
-          title={voice.noiseCancellationEnabled
-            ? 'Disable noise cancellation'
-            : 'Enable noise cancellation'}
+        <Popover.Root
+          onOpenChange={(open) => {
+            if (!open) void voice.setAudioLoopbackTesting(false);
+          }}
         >
-          <AudioWaveform class="size-4" />
-        </button>
+          <Popover.Trigger
+            class={cn(
+              'flex size-7 items-center justify-center transition-colors',
+              voice.noiseCancellationEnabled
+                ? 'text-primary hover:text-primary/80'
+                : 'text-muted-foreground hover:text-sidebar-foreground'
+            )}
+            aria-label={voice.noiseCancellationEnabled
+              ? 'Disable noise cancellation'
+              : 'Enable noise cancellation'}
+            aria-pressed={voice.noiseCancellationEnabled}
+            title={voice.noiseCancellationEnabled
+              ? 'Disable noise cancellation'
+              : 'Enable noise cancellation'}
+          >
+            <AudioWaveform class="size-4" />
+          </Popover.Trigger>
+          <Popover.Content side="top">
+            <div class="flex items-center space-x-2">
+              <Label for="noise-cancellation-switch">Noise cancellation</Label>
+              <Switch
+                id="noise-cancellation-switch"
+                checked={voice.noiseCancellationEnabled}
+                disabled={voice.audioLoopbackTesting}
+                onCheckedChange={(e) => voice.setNoiseCancellation(e)}
+              />
+            </div>
+            <div class="mt-2 text-xs text-muted-foreground">
+              <p class="text-popover-foreground">Level</p>
+              Higher levels may reduce voice quality. Lower if issues occur.
+              <Slider.Root
+                type="single"
+                class="mt-3 mb-4"
+                min={10}
+                max={100}
+                step={10}
+                disabled={voice.audioLoopbackTesting}
+                value={voice.noiseCancellationLevel}
+                onValueCommit={(e) => voice.setNoiseCancellationLevel(e)}
+              >
+                {#snippet children({ tickItems })}
+                  {#each tickItems as { value, index } (index)}
+                    <Slider.Tick {index} />
+                    <Slider.TickLabel {index} position="bottom">
+                      {value}
+                    </Slider.TickLabel>
+                  {/each}
+                {/snippet}
+              </Slider.Root>
+            </div>
+
+            <div class="mt-3 border-t border-border pt-3">
+              <p class="text-xs font-medium text-popover-foreground">Mic test</p>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">
+                Hear your microphone with the current noise cancellation.
+              </p>
+              <Button
+                class="mt-2 w-full"
+                size="sm"
+                variant={voice.audioLoopbackTesting ? 'destructive' : 'outline'}
+                disabled={loopbackPending}
+                aria-pressed={voice.audioLoopbackTesting}
+                onclick={toggleAudioLoopback}
+              >
+                <AudioWaveform data-icon="inline-start" />
+                {loopbackPending
+                  ? voice.audioLoopbackTesting
+                    ? 'Starting...'
+                    : 'Stopping...'
+                  : voice.audioLoopbackTesting
+                    ? 'Stop test'
+                    : 'Start test'}
+              </Button>
+              {#if loopbackError}
+                <p class="mt-1.5 text-[11px] text-destructive">
+                  {loopbackError}
+                </p>
+              {:else if voice.audioLoopbackTesting}
+                <p class="mt-1.5 text-[11px] text-muted-foreground">
+                  Deafen is locked on while testing.
+                </p>
+              {/if}
+            </div>
+          </Popover.Content>
+        </Popover.Root>
+
         <button
           class="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-300"
           onclick={onLeaveVoice}
@@ -125,6 +218,7 @@
             : 'text-muted-foreground hover:text-sidebar-foreground'
         )}
         onclick={() => voice.setDeafened(!voice.selfDeafened)}
+        disabled={voice.audioLoopbackTesting}
         aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
       >
         {#if voice.selfDeafened}

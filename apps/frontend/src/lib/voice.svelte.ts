@@ -1,4 +1,12 @@
-import { ConnectionState, Participant, Room, RoomEvent, Track, TrackEvent } from 'livekit-client';
+import {
+  ConnectionState,
+  createLocalAudioTrack,
+  Participant,
+  Room,
+  RoomEvent,
+  Track,
+  TrackEvent,
+} from 'livekit-client';
 import { LocalAudioTrack, type RemoteTrack } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
@@ -15,6 +23,7 @@ import Camera from './sounds/camera.opus?url';
 import CameraOff from './sounds/camera-off.opus?url';
 import Screen from './sounds/screen.opus?url';
 import ScreenOff from './sounds/screen-off.opus?url';
+import { settings } from './settings.svelte';
 
 const livekitConnectionTimeoutMs = 15_000;
 
@@ -50,10 +59,18 @@ export class Voice {
   connected = $derived(this.connectionState === ConnectionState.Connected);
   connecting = $derived(this.connectionState === ConnectionState.Connecting);
 
-  noiseCancellationEnabled = $state<boolean>(true);
+  noiseCancellationEnabled = $state<boolean>(settings.value.noiseCancellation);
+  noiseCancellationLevel = $state<number>(settings.value.noiseCancellationLevel);
+  audioLoopbackTesting = $state(false);
   private noiseProcessor: DeepFilterNoiseFilterProcessor | null = null;
   private processedMicTrack: LocalAudioTrack | null = null;
   private noiseProcessorOperation: Promise<void> = Promise.resolve();
+  private audioLoopbackTrack: LocalAudioTrack | null = null;
+  private audioLoopbackElement: HTMLMediaElement | null = null;
+  private audioLoopbackContext: AudioContext | null = null;
+  private audioLoopbackDeafenedBefore = false;
+  private audioLoopbackSuspendedNoiseProcessor = false;
+  private audioLoopbackOperation: Promise<void> = Promise.resolve();
 
   get participantCount() {
     return this.voiceStates.size;
@@ -140,6 +157,7 @@ export class Voice {
 
     const room = this.room;
     const channelId = this.channelId;
+    await this.setAudioLoopbackTesting(false);
     await this.removeNoiseCancellation();
     this.room = null;
     this.channelId = null;
@@ -199,6 +217,95 @@ export class Voice {
 
     await this.room.startAudio();
     this.audioPlaybackBlocked = !this.room.canPlaybackAudio;
+  }
+
+  async setAudioLoopbackTesting(testing: boolean) {
+    if (this.audioLoopbackTesting === testing) return this.audioLoopbackOperation;
+
+    this.audioLoopbackTesting = testing;
+    this.audioLoopbackOperation = this.audioLoopbackOperation
+      .catch(() => undefined)
+      .then(() => (this.audioLoopbackTesting ? this.startAudioLoopback() : this.stopAudioLoopback()));
+
+    return this.audioLoopbackOperation;
+  }
+
+  private async startAudioLoopback() {
+    const room = this.room;
+    if (!room) {
+      this.audioLoopbackTesting = false;
+      return;
+    }
+
+    this.audioLoopbackDeafenedBefore = this.selfDeafened;
+    if (!this.selfDeafened) await this.setDeafened(true);
+
+    try {
+      if (this.noiseProcessor) {
+        await this.noiseProcessor.suspend();
+        this.audioLoopbackSuspendedNoiseProcessor = true;
+      }
+
+      const track = await createLocalAudioTrack({
+        echoCancellation: true,
+        autoGainControl: true,
+        noiseSuppression: false,
+        channelCount: 1,
+        sampleRate: 48000,
+      });
+      this.audioLoopbackTrack = track;
+
+      if (this.noiseCancellationEnabled) {
+        const audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+        this.audioLoopbackContext = audioContext;
+        track.setAudioContext(audioContext);
+        await audioContext.resume();
+        await track.setProcessor(this.createNoiseProcessor());
+      }
+
+      if (!this.audioLoopbackTesting || this.room !== room) {
+        await this.stopAudioLoopback();
+        return;
+      }
+
+      const element = document.createElement('audio');
+      element.autoplay = true;
+      element.srcObject = new MediaStream([track.mediaStreamTrack]);
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      this.audioLoopbackElement = element;
+      await element.play();
+    } catch (error) {
+      console.error('could not start microphone test', error);
+      this.audioLoopbackTesting = false;
+      await this.stopAudioLoopback();
+      throw error;
+    }
+  }
+
+  private async stopAudioLoopback() {
+    const track = this.audioLoopbackTrack;
+    const audioContext = this.audioLoopbackContext;
+    this.audioLoopbackTrack = null;
+    this.audioLoopbackContext = null;
+    if (this.audioLoopbackElement) {
+      this.audioLoopbackElement.srcObject = null;
+      this.audioLoopbackElement.remove();
+    }
+    this.audioLoopbackElement = null;
+
+    if (track) {
+      await track.stopProcessor().catch(() => undefined);
+      track.stop();
+    }
+    await audioContext?.close().catch(() => undefined);
+
+    if (this.audioLoopbackSuspendedNoiseProcessor) {
+      await this.noiseProcessor?.resume();
+      this.audioLoopbackSuspendedNoiseProcessor = false;
+    }
+
+    if (!this.audioLoopbackDeafenedBefore && this.selfDeafened) await this.setDeafened(false);
   }
 
   participantVolume(identity: string) {
@@ -302,14 +409,7 @@ export class Voice {
 
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
-    const processor = new DeepFilterNoiseFilterProcessor({
-      sampleRate: 48_000,
-      noiseReductionLevel: 60,
-      enabled: true,
-      assetConfig: {
-        cdnUrl: 'https://dfn3.srizan.dev',
-      }
-    });
+    const processor = this.createNoiseProcessor();
 
     try {
       await track.setProcessor(processor);
@@ -327,13 +427,25 @@ export class Voice {
     }
   }
 
+  private createNoiseProcessor() {
+    return new DeepFilterNoiseFilterProcessor({
+      sampleRate: 48_000,
+      noiseReductionLevel: this.noiseCancellationLevel,
+      enabled: true,
+      assetConfig: {
+        cdnUrl: 'https://dfn3.srizan.dev',
+      }
+    });
+  }
+
   async setNoiseCancellation(enabled: boolean) {
+    settings.value.noiseCancellation = enabled;
     this.noiseCancellationEnabled = enabled;
 
     const room = this.room;
     if (!room) return;
 
-    // queuing the operation to avoid race conditions :3333
+    // queuing the operation to avoid race conditions :3
     this.noiseProcessorOperation = this.noiseProcessorOperation
       .catch(() => undefined)
       .then(async () => {
@@ -358,6 +470,33 @@ export class Voice {
     }
   }
 
+  async setNoiseCancellationLevel(level: number) {
+    settings.value.noiseCancellationLevel = level;
+    this.noiseCancellationLevel = level;
+
+    const room = this.room;
+    if (!room) return;
+
+    // this does not need to be queued because it's a synchronous operation, but we
+    // still need to do this to maintain consistency
+    this.noiseProcessorOperation = this.noiseProcessorOperation
+      .catch(() => undefined)
+      .then(() => {
+        if (this.room !== room) return;
+
+        if (this.noiseProcessor) {
+          console.log(`setting suppression level to ${level}`)
+          this.noiseProcessor.setSuppressionLevel(level);
+        }
+      });
+
+    try {
+      await this.noiseProcessorOperation;
+    } catch (error) {
+      console.error('could not change noise cancellation level', error);
+    }
+  }
+
   private async removeNoiseCancellation() {
     const track = this.processedMicTrack;
 
@@ -379,6 +518,7 @@ export class Voice {
       .on(RoomEvent.Disconnected, () => {
         if (this.room !== room) return;
 
+        void this.setAudioLoopbackTesting(false);
         this.noiseProcessor?.setEnabled(false);
         this.noiseProcessor = null;
         this.processedMicTrack = null;
