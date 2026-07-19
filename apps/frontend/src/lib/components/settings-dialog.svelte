@@ -79,6 +79,19 @@
       await goto('/login');
     }
   }
+
+  let css = $state(localStorage.getItem("quickcss") ?? "");
+
+  $effect(() => {
+    let tag = document.getElementById("quickcss") as HTMLStyleElement;
+    if (!tag) {
+      tag = document.createElement("style");
+      tag.id = "quickcss";
+      document.head.appendChild(tag);
+    }
+    tag.textContent = css;
+    localStorage.setItem("quickcss", css);
+  });
 </script>
 
 <Dialog.Root bind:open>
@@ -194,9 +207,21 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium">Dark Mode</p>
-                <p class="text-[11px] text-muted-foreground">Currently enabled</p>
+                {#if settings.value.darkMode}
+                  <p class="text-[11px] text-muted-foreground">It's good for your eyes!</p>
+                  {:else}
+                  <p class="text-[11px] text-muted-foreground">Trust me, it's good for your eyes!!! Turn me back on :)</p>
+                {/if}
               </div>
-              <Switch checked disabled />
+              <Switch bind:checked={settings.value.darkMode} />
+            </div>
+            <div class="items-center justify-between">
+              <p class="text-xs font-medium">QuickCSS</p>
+              <textarea
+                  bind:value={css}
+                  class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-background p-2"
+                  placeholder="whatever CSS you type here will update in real time! (e.g. paste whatever shadcn-ui theme's layout.css you like here :3c)"
+              ></textarea>
             </div>
             <div class="flex items-center justify-between">
               <div>

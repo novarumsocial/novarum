@@ -107,7 +107,7 @@
 {#if booting}
   <InitialLoader />
 {:else if currentUser}
-  <div class="dark flex h-svh overflow-hidden bg-background">
+  <div class="flex h-svh overflow-hidden bg-background">
     {#if mobileNavigationOpen}
       <button
         class="fixed inset-0 z-30 bg-black/60 md:hidden"

@@ -6,6 +6,7 @@ type Settings = {
   compactMode: boolean;
   showMemberList: boolean;
   circleIcons: boolean;
+  darkMode: boolean;
 };
 
 const defaults: Settings = {
@@ -16,6 +17,7 @@ const defaults: Settings = {
   compactMode: false,
   showMemberList: true,
   circleIcons: false,
+  darkMode: true,
 };
 
 function load(): Settings {
