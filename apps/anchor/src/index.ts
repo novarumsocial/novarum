@@ -13,9 +13,11 @@ import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
 import { configureStorageCors } from '../utils/services/storage';
 import { writeEmojis } from '../utils/emojiWriter';
+import { clearOnlineUsers } from '../utils/clearOnlineUsers';
 
 await configureStorageCors();
 await writeEmojis();
+await clearOnlineUsers();
 
 const app = new Elysia()
   .use(cors({ credentials: true }))
