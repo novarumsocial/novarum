@@ -24,7 +24,7 @@
 <nav class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3">
   <button
     onclick={() => onSelect(undefined)}
-    class="flex size-10 items-center justify-center text-base font-bold text-primary-foreground transition-opacity hover:opacity-80"
+    class="flex size-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
     class:opacity-70={activeId !== null}
     class:ring-2={activeId === null}
     class:ring-primary={activeId === null}

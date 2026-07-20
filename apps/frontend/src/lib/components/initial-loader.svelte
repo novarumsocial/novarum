@@ -4,7 +4,7 @@
 
 <main
   transition:fade={{ duration: 100 }}
-  class="dark flex h-svh items-center justify-center overflow-hidden bg-background text-foreground"
+  class="flex h-svh items-center justify-center overflow-hidden bg-background text-foreground"
 >
   <!-- Radial gradient background layers -->
   <div

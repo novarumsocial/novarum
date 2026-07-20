@@ -6,6 +6,7 @@ type Settings = {
   compactMode: boolean;
   showMemberList: boolean;
   circleIcons: boolean;
+  darkMode: boolean;
   noiseCancellation: boolean;
   voiceEchoCancellation: boolean;
   voiceAutoGainControl: boolean;
@@ -19,6 +20,7 @@ const defaults: Settings = {
   compactMode: false,
   showMemberList: true,
   circleIcons: false,
+  darkMode: true,
   noiseCancellation: true,
   voiceEchoCancellation: false,
   voiceAutoGainControl: true,
