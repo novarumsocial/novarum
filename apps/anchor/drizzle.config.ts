@@ -9,4 +9,9 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL || getConfig().server.database_url,
   },
+
+  schemaFilter: ['public'],
+
+  // verbose: true,
+  strict: true,
 });
