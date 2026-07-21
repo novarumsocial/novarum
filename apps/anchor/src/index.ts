@@ -14,10 +14,22 @@ import { user } from '../modules/user/services';
 import { configureStorageCors } from '../utils/services/storage';
 import { writeEmojis } from '../utils/emojiWriter';
 import { clearOnlineUsers } from '../utils/clearOnlineUsers';
+import { migrate } from 'drizzle-orm/bun-sql/migrator';
+import { db } from './db';
+import { exit } from 'process';
 
 await configureStorageCors();
 await writeEmojis();
 await clearOnlineUsers();
+
+console.log('[DB] Running migrations...');
+await migrate(db, {
+  migrationsFolder: './drizzle',
+}).catch((e) => {
+  console.log(`[DB] Error when migrating:\n${e}`);
+  exit(1);
+});
+console.log('[DB] Migrations complete!');
 
 const app = new Elysia()
   .use(cors({ credentials: true }))
