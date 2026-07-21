@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import {
   createBlankSessionCookie,
@@ -10,6 +9,7 @@ import {
   validateSessionToken,
 } from './provider';
 import { getConfig } from '../../utils/config';
+import { db, localCredentials, users } from '../../src/db';
 
 export const auth = new Elysia({ prefix: '/auth' })
   .post(
@@ -19,28 +19,43 @@ export const auth = new Elysia({ prefix: '/auth' })
       const homeserver = getConfig().server.homeserver;
       const now = new Date();
 
-      const existingCredential = await db.orm.public.LocalCredential.where({ email }).first();
+      const existingCredential = await db.query.localCredentials.findFirst({
+        where: {
+          email,
+        },
+      });
       if (existingCredential) {
         return status(409, { error: 'User already exists' });
       }
 
-      const existingUsername = await db.orm.public.User.where({ username, homeserver }).first();
+      const existingUsername = await db.query.users.findFirst({
+        where: {
+          username,
+          homeserver,
+        },
+      });
       if (existingUsername) {
         return status(409, { error: 'Username is already taken' });
       }
 
-      const user = await db.orm.public.User.create({
-        id: randomString(),
-        username,
-        homeserver,
-        displayName: displayName || null,
-        avatarUrl: null,
-        isBot: false,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const [user] = await db
+        .insert(users)
+        .values({
+          id: randomString(),
+          username,
+          homeserver,
+          displayName: displayName || null,
+          avatarUrl: null,
+          isBot: false,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      if (!user) {
+        return status(500, { error: 'Failed to create user' });
+      }
 
-      await db.orm.public.LocalCredential.create({
+      await db.insert(localCredentials).values({
         userId: user.id,
         email,
         passwordHash: await Bun.password.hash(password),
@@ -73,12 +88,21 @@ export const auth = new Elysia({ prefix: '/auth' })
       const { username, password } = body;
       const homeserver = getConfig().server.homeserver;
 
-      const user = await db.orm.public.User.where({ username, homeserver }).first();
+      const user = await db.query.users.findFirst({
+        where: {
+          username,
+          homeserver,
+        },
+      });
       if (!user) {
         return status(401, { error: 'Invalid username or password' });
       }
 
-      const credential = await db.orm.public.LocalCredential.where({ userId: user.id }).first();
+      const credential = await db.query.localCredentials.findFirst({
+        where: {
+          userId: user.id,
+        },
+      });
       if (!credential) {
         return status(401, { error: 'Invalid username or password' });
       }
@@ -139,12 +163,20 @@ export const auth = new Elysia({ prefix: '/auth' })
       return status(401, { user: null });
     }
 
-    const user = await db.orm.public.User.where({ id: session.userId }).first();
+    const user = await db.query.users.findFirst({
+      where: {
+        id: session.userId,
+      },
+    });
     if (!user) {
       return status(401, { user: null });
     }
 
-    const credential = await db.orm.public.LocalCredential.where({ userId: user.id }).first();
+    const credential = await db.query.localCredentials.findFirst({
+      where: {
+        userId: user.id,
+      },
+    });
 
     return {
       user: userResponse(user, credential?.email ?? null),

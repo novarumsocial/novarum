@@ -1,7 +1,6 @@
-import type { DefaultModelRow } from '@prisma-next/sql-orm-client';
 import { randomString } from '../../utils/randomString';
-import type { Contract } from '../../prisma/contract.d';
-import { db } from '../../prisma/db';
+import { db, sessions, users } from '../../src/db';
+import { eq } from 'drizzle-orm';
 
 export const sessionCookieName = 'session_token';
 export const sessionExpiresInSeconds = 60 * 60 * 24 * 30;
@@ -13,6 +12,7 @@ export async function createSession(userId: string): Promise<SessionWithToken> {
   const id = randomString();
   const secret = randomString();
   const secretHash = await hashSecret(secret);
+  const expiresAt = new Date(now.getTime() + sessionExpiresInMilliseconds);
 
   const token = id + '.' + secret;
 
@@ -21,10 +21,20 @@ export async function createSession(userId: string): Promise<SessionWithToken> {
     userId,
     secretHash,
     createdAt: now,
+    expiresAt,
     token,
   };
 
-  await db.orm.public.Session.create({ id, userId, secretHash, createdAt: now });
+  await db
+    .insert(sessions)
+    .values({
+      id,
+      userId,
+      secretHash,
+      createdAt: now,
+      expiresAt,
+    })
+    .execute();
 
   return session;
 }
@@ -66,12 +76,17 @@ export async function deleteSessionToken(token: string): Promise<void> {
   await deleteSession(tokenParts.sessionId);
 }
 
-export async function getSession(sessionId: string): Promise<SessionWithUser | null> {
+export async function getSession(sessionId: string) {
   const now = new Date();
 
-  const session = (await db.orm.public.Session.where({ id: sessionId })
-    .include('user')
-    .first()) as SessionWithUser | null;
+  const session = await db.query.sessions.findFirst({
+    where: {
+      id: sessionId,
+    },
+    with: {
+      user: true,
+    },
+  });
   if (!session) {
     return null;
   }
@@ -85,7 +100,7 @@ export async function getSession(sessionId: string): Promise<SessionWithUser | n
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  await db.orm.public.Session.where({ id: sessionId }).delete();
+  await db.delete(sessions).where(eq(sessions.id, sessionId));
 }
 
 export function createSessionCookie(token: string, request?: Request): SessionCookie {
@@ -119,10 +134,10 @@ function sessionCookieAttributes(maxAge: number, request?: Request): SessionCook
   };
 }
 
-export async function hashSecret(secret: string): Promise<Uint8Array> {
+export async function hashSecret(secret: string): Promise<Buffer> {
   const secretBytes = new TextEncoder().encode(secret);
   const secretHashBuffer = await crypto.subtle.digest('SHA-256', secretBytes);
-  return new Uint8Array(secretHashBuffer);
+  return Buffer.from(secretHashBuffer);
 }
 
 function parseSessionToken(token: string): SessionTokenParts | null {
@@ -135,7 +150,7 @@ function parseSessionToken(token: string): SessionTokenParts | null {
 }
 
 function isSessionExpired(session: Session, now = new Date()): boolean {
-  return now.getTime() - session.createdAt.getTime() >= sessionExpiresInMilliseconds;
+  return now >= session.expiresAt;
 }
 
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
@@ -151,8 +166,8 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
-export type Session = DefaultModelRow<Contract, 'Session'>;
-export type User = DefaultModelRow<Contract, 'User'>;
+export type Session = typeof sessions.$inferSelect;
+export type User = typeof users.$inferSelect;
 export type SessionWithUser = Session & { user: User };
 
 export interface SessionWithToken extends Session {
