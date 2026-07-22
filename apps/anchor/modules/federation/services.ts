@@ -3,7 +3,6 @@ import { discoverRemoteAnchor } from '../../utils/discovery';
 import { isNonceUsed, storeNonce, verifyMessage } from '../../utils/keys';
 import { getConfig } from '../../utils/config';
 import crypto from 'node:crypto';
-import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { AccessToken } from 'livekit-server-sdk';
@@ -23,6 +22,15 @@ import { getPingRecipients, verifyPendingAttachments } from '../message/services
 import { storage } from '../../utils/services/storage';
 import { z } from 'zod';
 import { isMessageAfter } from '../../utils/messageCursor';
+import {
+  db,
+  guildMembers,
+  messages,
+  attachments as dbAttachments,
+  messagePings,
+  users,
+} from '../../src/db';
+import { and, eq } from 'drizzle-orm';
 
 const usernamePattern = /^[a-zA-Z0-9._]+$/;
 const federatedMessagePageSize = 50;
@@ -132,10 +140,12 @@ export const federation = new Elysia({ prefix: '/federation' })
       return status(400, { error: 'Missing username' });
     }
 
-    const user = await db.orm.public.User.where({
-      username,
-      homeserver: getConfig().server.homeserver,
-    }).first();
+    const user = await db.query.users.findFirst({
+      where: {
+        username,
+        homeserver: getConfig().server.homeserver,
+      },
+    });
     if (!user) {
       return status(404, { error: 'User not found' });
     }
@@ -152,17 +162,26 @@ export const federation = new Elysia({ prefix: '/federation' })
     };
   })
   .get('/invites/:code', async ({ params, status }) => {
-    const invite = await db.orm.public.GuildInvite.where({ code: params.code }).first();
+    const invite = await db.query.guildInvites.findFirst({
+      where: {
+        code: params.code,
+      },
+    });
     if (!invite || isExpired(invite.expiresAt)) {
       return status(404, { error: 'Invite not found' });
     }
 
-    const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
+    const guild = await db.query.guilds.findFirst({
+      where: { id: invite.guildId },
+    });
+
     if (!guild) {
       return status(404, { error: 'Guild not found' });
     }
 
-    const members = await db.orm.public.GuildMember.where({ guildId: guild.id }).all();
+    const members = await db.query.guildMembers.findMany({
+      where: { guildId: guild.id },
+    });
 
     return {
       invite: {
@@ -192,19 +211,28 @@ export const federation = new Elysia({ prefix: '/federation' })
     const input = unreadMentionChannelsSchema.safeParse(getObjectProperty(parsed.body, 'channels'));
     if (!input.success) return status(400, { error: 'Invalid channels' });
 
-    const user = await db.orm.public.User.where({
-      username: userPayload.username,
-      homeserver: userPayload.homeserver,
-    }).first();
+    const user = await db.query.users.findFirst({
+      where: {
+        username: userPayload.username,
+        homeserver: userPayload.homeserver,
+      },
+    });
     if (!user) return status(403, { error: 'Forbidden' });
 
     const channelIds = [...new Set(input.data.map((channel) => channel.id))];
+    // TODO: holy moly i really have to refactor this code
     const [memberships, channels, pings] = await Promise.all([
-      db.orm.public.GuildMember.where({ userId: user.id }).all(),
+      db.query.guildMembers.findMany({ where: { userId: user.id } }),
       channelIds.length
-        ? db.orm.public.Channel.where((channel) => channel.id.in(channelIds)).all()
+        ? await db.query.channels.findMany({
+            where: {
+              id: {
+                in: channelIds,
+              },
+            },
+          })
         : [],
-      db.orm.public.MessagePing.where({ userId: user.id }).include('message').all(),
+      db.query.messagePings.findMany({ where: { userId: user.id }, with: { message: true } }),
     ]);
     const guildIds = new Set(memberships.map((membership) => membership.guildId));
     if (
@@ -245,25 +273,31 @@ export const federation = new Elysia({ prefix: '/federation' })
       return status(400, { error: 'Use local invite accept for local users' });
     }
 
-    const invite = await db.orm.public.GuildInvite.where({ code: params.code }).first();
+    const invite = await db.query.guildInvites.findFirst({
+      where: { code: params.code },
+    });
     if (!invite || isExpired(invite.expiresAt)) {
       return status(404, { error: 'Invite not found' });
     }
 
-    const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
+    const guild = await db.query.guilds.findFirst({
+      where: { id: invite.guildId },
+    });
     if (!guild) {
       return status(404, { error: 'Guild not found' });
     }
 
     const user = await upsertFederatedUser(userPayload);
+    if (!user) {
+      return status(500, { error: 'Failed to upsert user' });
+    }
 
-    const membership = await db.orm.public.GuildMember.where({
-      guildId: guild.id,
-      userId: user.id,
-    }).first();
+    const membership = await db.query.guildMembers.findFirst({
+      where: { guildId: guild.id, userId: user.id },
+    });
 
     if (!membership) {
-      await db.orm.public.GuildMember.create({
+      await db.insert(guildMembers).values({
         guildId: guild.id,
         userId: user.id,
         role: 'MEMBER',
@@ -288,9 +322,10 @@ export const federation = new Elysia({ prefix: '/federation' })
       }
     }
 
-    const channels = await db.orm.public.Channel.where({ guildId: guild.id })
-      .orderBy((channel) => channel.position.asc())
-      .all();
+    const channels = await db.query.channels.findMany({
+      where: { guildId: guild.id },
+      orderBy: { position: 'asc' },
+    });
 
     return {
       guild: {
@@ -336,18 +371,21 @@ export const federation = new Elysia({ prefix: '/federation' })
     if (!access.ok) return status(access.status, { error: access.error });
 
     const replyTarget = replyTo
-      ? await db.orm.public.Message.where({ id: replyTo, channelId: params.id }).first()
+      ? await db.query.messages.findFirst({
+          where: { id: replyTo, channelId: params.id },
+        })
       : null;
     if (replyTo && !replyTarget) {
       return status(400, { error: 'Invalid reply target' });
     }
 
-    const priorMsg = await db.orm.public.Message.where({
-      authorId: access.user.id,
-      nonce,
-    })
-      .include('attachments')
-      .first();
+    const priorMsg = await db.query.messages.findFirst({
+      where: {
+        authorId: access.user.id,
+        nonce,
+      },
+      with: { attachments: true },
+    });
     if (priorMsg) {
       if (
         priorMsg.channelId !== params.id ||
@@ -374,25 +412,32 @@ export const federation = new Elysia({ prefix: '/federation' })
     );
 
     const message = await db.transaction(async (tx) => {
-      const created = await tx.orm.public.Message.create({
-        id: randomString(),
-        channelId: params.id,
-        authorId: access.user.id,
-        content,
-        replyTo: replyTo ?? null,
-        nonce,
-      });
+      const [created] = await tx
+        .insert(messages)
+        .values({
+          id: randomString(),
+          channelId: params.id,
+          authorId: access.user.id,
+          content,
+          replyTo: replyTo ?? null,
+          nonce,
+        })
+        .returning();
+      if (!created) throw new Error('Failed to create message');
 
       for (const attachment of attachments.value) {
-        const updated = await tx.orm.public.Attachment.where({
-          id: attachment.id,
-          status: 'PENDING',
-        }).update({ messageId: created.id, status: 'ATTACHED' });
+        const updated = await db
+          .update(dbAttachments)
+          .set({
+            messageId: created.id,
+            status: 'ATTACHED',
+          })
+          .where(and(eq(dbAttachments.id, attachment.id), eq(dbAttachments.status, 'PENDING')));
         if (!updated) throw new Error('Attachment was already claimed');
       }
 
       for (const recipient of pingRecipients) {
-        await tx.orm.public.MessagePing.create({
+        await tx.insert(messagePings).values({
           messageId: created.id,
           userId: recipient.userId,
         });
@@ -431,13 +476,14 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    const existing = await db.orm.public.Message.where({ id: messageId, channelId: params.id })
-      .include('attachments')
-      .first();
+    const existing = await db.query.messages.findFirst({
+      where: { id: messageId, channelId: params.id },
+      with: { attachments: true },
+    });
     if (!existing) return status(404, { error: 'Message not found' });
     if (existing.authorId !== access.user.id) return status(403, { error: 'Forbidden' });
 
-    await db.orm.public.Message.where({ id: messageId }).delete();
+    await db.delete(messages).where(eq(messages.id, messageId));
     await Promise.all(
       existing.attachments.map((attachment) =>
         storage
@@ -533,11 +579,14 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedChannelAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    const members = await db.orm.public.GuildMember.where({ guildId: access.channel.guildId })
-      .include('user')
-      .all();
+    const members = await db.query.guildMembers.findMany({
+      where: { guildId: access.channel.guildId },
+      with: { user: true },
+    });
 
     return {
+      // TODO: cba removing typings now that we have moved to drizzle
+      // ...except for those enums, of course.
       users: members.map((member) => ({
         userId: member.user.id as string,
         username: member.user.username as string,
@@ -673,13 +722,16 @@ export const federation = new Elysia({ prefix: '/federation' })
     const access = await getFederatedGuildAccess(params.id, userPayload);
     if (!access.ok) return status(access.status, { error: access.error });
 
-    await db.orm.public.User.where({ id: access.user.id }).update({
-      displayName: userPayload.displayName,
-      avatarUrl: userPayload.avatarUrl,
-      isBot: userPayload.isBot,
-      status: nextStatus,
-      updatedAt: new Date(),
-    });
+    await db
+      .update(users)
+      .set({
+        displayName: userPayload.displayName,
+        avatarUrl: userPayload.avatarUrl,
+        isBot: userPayload.isBot,
+        status: nextStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, access.user.id));
 
     if (server) {
       publishRealtime(server, `guildEvents:${params.id}`, {
@@ -720,9 +772,10 @@ export const federation = new Elysia({ prefix: '/federation' })
         return;
       }
 
-      const members = await db.orm.public.GuildMember.where({ guildId: ws.data.params.id })
-        .include('user')
-        .all();
+      const members = await db.query.guildMembers.findMany({
+        where: { guildId: ws.data.params.id },
+        with: { user: true },
+      });
       const hasAccess = members.some(
         (member) => member.user.homeserver === verification.origin.homeserver
       );
@@ -743,7 +796,7 @@ export const federation = new Elysia({ prefix: '/federation' })
       );
     },
     message() {
-      // Server-to-server realtime is publish-only for now.
+      // server-to-server realtime is publish-only for now.
     },
   });
 
@@ -846,48 +899,69 @@ function encodeFederatedMessageCursor(message: { createdAt: Date | string; id: s
   return Buffer.from(JSON.stringify({ createdAt, id: message.id }), 'utf8').toString('base64url');
 }
 
+// this function was made quite a bit more long and complicated after moving to drizzle,
+// but oh well... i like drizzle more now :)
 async function fetchFederatedMessagePage(
   channelId: string,
   limit: number,
   cursor: { createdAt: Date; id: string } | null
 ) {
-  const query = db.orm.public.Message.where({ channelId })
-    .include('author')
-    .include('attachments')
-    .orderBy([(message) => message.createdAt.asc(), (message) => message.id.asc()])
-    .take(limit + 1);
-
-  if (!cursor) return await query.all();
-
-  return await query.cursor(cursor).all();
+  return db.query.messages.findMany({
+    where: cursor
+      ? {
+          channelId,
+          OR: [
+            { createdAt: { gt: cursor.createdAt } },
+            { createdAt: { eq: cursor.createdAt }, id: { gt: cursor.id } },
+          ],
+        }
+      : { channelId },
+    with: {
+      author: true,
+      attachments: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+      id: 'asc',
+    },
+    limit: limit + 1,
+  });
 }
-
 async function upsertFederatedUser(input: FederationUserPayload) {
   const now = new Date();
-  const existingUser = await db.orm.public.User.where({
-    username: input.username,
-    homeserver: input.homeserver,
-  }).first();
-
-  if (!existingUser) {
-    return await db.orm.public.User.create({
-      id: randomString(),
+  const existingUser = await db.query.users.findFirst({
+    where: {
       username: input.username,
       homeserver: input.homeserver,
+    },
+  });
+
+  if (!existingUser) {
+    return await db
+      .insert(users)
+      .values({
+        id: randomString(),
+        username: input.username,
+        homeserver: input.homeserver,
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl,
+        isBot: input.isBot,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning()
+      .then((res) => res[0]);
+  }
+
+  await db
+    .update(users)
+    .set({
       displayName: input.displayName,
       avatarUrl: input.avatarUrl,
       isBot: input.isBot,
-      createdAt: now,
       updatedAt: now,
-    });
-  }
-
-  await db.orm.public.User.where({ id: existingUser.id }).update({
-    displayName: input.displayName,
-    avatarUrl: input.avatarUrl,
-    isBot: input.isBot,
-    updatedAt: now,
-  });
+    })
+    .where(eq(users.id, existingUser.id));
 
   return {
     ...existingUser,
@@ -899,26 +973,35 @@ async function upsertFederatedUser(input: FederationUserPayload) {
 }
 
 async function getFederatedChannelAccess(channelId: string, userPayload: FederationUserPayload) {
-  const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+  const channel = await db.query.channels.findFirst({
+    where: { id: channelId },
+  });
   if (!channel) return { ok: false as const, status: 404 as const, error: 'Channel not found' };
 
-  const user = await db.orm.public.User.where({
-    username: userPayload.username,
-    homeserver: userPayload.homeserver,
-  }).first();
+  const user = await db.query.users.findFirst({
+    where: {
+      username: userPayload.username,
+      homeserver: userPayload.homeserver,
+    },
+  });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
-  await db.orm.public.User.where({ id: user.id }).update({
-    displayName: userPayload.displayName,
-    avatarUrl: userPayload.avatarUrl,
-    isBot: userPayload.isBot,
-    updatedAt: new Date(),
-  });
+  await db
+    .update(users)
+    .set({
+      displayName: userPayload.displayName,
+      avatarUrl: userPayload.avatarUrl,
+      isBot: userPayload.isBot,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
 
-  const membership = await db.orm.public.GuildMember.where({
-    guildId: channel.guildId,
-    userId: user.id,
-  }).first();
+  const membership = await db.query.guildMembers.findFirst({
+    where: {
+      guildId: channel.guildId,
+      userId: user.id,
+    },
+  });
   if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
   return {
@@ -934,19 +1017,25 @@ async function getFederatedChannelAccess(channelId: string, userPayload: Federat
 }
 
 async function getFederatedGuildAccess(guildId: string, userPayload: FederationUserPayload) {
-  const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+  const guild = await db.query.guilds.findFirst({
+    where: { id: guildId },
+  });
   if (!guild) return { ok: false as const, status: 404 as const, error: 'Guild not found' };
 
-  const user = await db.orm.public.User.where({
-    username: userPayload.username,
-    homeserver: userPayload.homeserver,
-  }).first();
+  const user = await db.query.users.findFirst({
+    where: {
+      username: userPayload.username,
+      homeserver: userPayload.homeserver,
+    },
+  });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
-  const membership = await db.orm.public.GuildMember.where({
-    guildId,
-    userId: user.id,
-  }).first();
+  const membership = await db.query.guildMembers.findFirst({
+    where: {
+      guildId,
+      userId: user.id,
+    },
+  });
   if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
   return {
