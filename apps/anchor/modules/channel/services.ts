@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
@@ -19,11 +18,13 @@ import {
 import { z } from 'zod';
 import { parseJson } from '../../utils/parseJson';
 import { isMessageAfter } from '../../utils/messageCursor';
+import { channelReadStates, channels, db } from '../../src/db';
 
 const remoteErrorSchema = z.object({ error: z.string() });
 const callTokenResponseSchema = z.object({ serverUrl: z.string(), token: z.string() });
 const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 
+// TODO: probably refactor the repeated code and put it in the .resolve()
 export const channel = new Elysia({ prefix: '/channel' })
   .resolve(async ({ cookie, status, request }) => {
     // this has its own auth
@@ -43,30 +44,40 @@ export const channel = new Elysia({ prefix: '/channel' })
     async ({ params, body, session, status }) => {
       if (!session) return status(401, { error: 'Unauthorized' });
 
-      const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+      const channel = await db.query.channels.findFirst({
+        where: {
+          id: params.id,
+        },
+      });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        },
+      });
       if (!membership) return status(403, { error: 'Forbidden' });
 
       const createdAt = new Date(body.createdAt);
       if (!parseFederatedChannelId(params.id)) {
-        const message = await db.orm.public.Message.where({
-          id: body.messageId,
-          channelId: params.id,
-        }).first();
+        const message = await db.query.messages.findFirst({
+          where: {
+            id: body.messageId,
+            channelId: params.id,
+          },
+        });
         if (!message || new Date(message.createdAt).getTime() !== createdAt.getTime()) {
           return status(400, { error: 'Invalid read cursor' });
         }
       }
 
-      const existing = await db.orm.public.ChannelReadState.where({
-        userId: session.userId,
-        channelId: params.id,
-      }).first();
+      const existing = await db.query.channelReadStates.findFirst({
+        where: {
+          userId: session.userId,
+          channelId: params.id,
+        },
+      });
       if (
         isMessageAfter(
           { createdAt, id: body.messageId },
@@ -75,18 +86,22 @@ export const channel = new Elysia({ prefix: '/channel' })
             : undefined
         )
       ) {
-        await db.orm.public.ChannelReadState.upsert({
-          create: {
+        // apparently this is the drizzle way of doing upsert: https://orm.drizzle.team/docs/guides/upsert
+        await db
+          .insert(channelReadStates)
+          .values({
             userId: session.userId,
             channelId: params.id,
             lastReadCreatedAt: createdAt,
             lastReadMessageId: body.messageId,
-          },
-          update: {
-            lastReadCreatedAt: createdAt,
-            lastReadMessageId: body.messageId,
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: [channelReadStates.userId, channelReadStates.channelId],
+            set: {
+              lastReadCreatedAt: createdAt,
+              lastReadMessageId: body.messageId,
+            },
+          });
       }
 
       return { success: true };
@@ -107,7 +122,11 @@ export const channel = new Elysia({ prefix: '/channel' })
         return status(400, { error: 'Cannot create channels on a federated guild' });
       }
 
-      const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+      const guild = await db.query.guilds.findFirst({
+        where: {
+          id: guildId,
+        },
+      });
       if (!guild) {
         return { error: 'Guild not found' };
       }
@@ -115,13 +134,20 @@ export const channel = new Elysia({ prefix: '/channel' })
         return { error: 'Unauthorized' };
       }
 
-      const channel = await db.orm.public.Channel.create({
-        id: randomString(),
-        name,
-        type,
-        position: 0,
-        guildId,
-      });
+      const [channel] = await db
+        .insert(channels)
+        .values({
+          id: randomString(),
+          name,
+          type,
+          position: 0,
+          guildId,
+        })
+        .returning();
+
+      if (!channel) {
+        return { error: 'Channel not created on the database' }
+      }
 
       if (server) {
         publishRealtime(server, `guildEvents:${guildId}`, {
@@ -151,15 +177,21 @@ export const channel = new Elysia({ prefix: '/channel' })
     async ({ params, session, status }) => {
       if (!session) return status(401, { error: 'Unauthorized' });
 
-      const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+      const channel = await db.query.channels.findFirst({
+        where: {
+          id: params.id,
+        }
+      });
       if (!channel) {
         return status(404, { error: 'Channel not found' });
       }
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        }
+      });
       if (!membership) {
         return status(401, { error: 'Unauthorized' });
       }
@@ -195,20 +227,25 @@ export const channel = new Elysia({ prefix: '/channel' })
         return result.data as ChannelUsersResponse;
       }
 
-      const members = (await db.orm.public.GuildMember.where({ guildId: channel.guildId })
-        .include('user')
-        .all()) as ActuallyTypedMembers[];
+      const members = await db.query.guildMembers.findMany({
+        where: {
+          guildId: channel.guildId,
+        },
+        with: {
+          user: true,
+        }
+      });
 
       const users = members.map((member) => ({
-        userId: member.user.id as string,
-        username: member.user.username as string,
-        displayName: member.user.displayName as string | null,
-        homeserver: member.user.homeserver as string,
-        avatarUrl: (member.user.avatarUrl as string | null) ?? undefined,
-        isBot: member.user.isBot as boolean,
+        userId: member.user.id,
+        username: member.user.username,
+        displayName: member.user.displayName,
+        homeserver: member.user.homeserver,
+        avatarUrl: member.user.avatarUrl ?? undefined,
+        isBot: member.user.isBot,
         status: member.user.status as 'ONLINE' | 'OFFLINE',
         role: member.role as 'OWNER' | 'ADMIN' | 'MEMBER',
-        joinedAt: member.joinedAt as Date,
+        joinedAt: member.joinedAt,
       }));
 
       return { users };
@@ -273,15 +310,21 @@ export const channel = new Elysia({ prefix: '/channel' })
       return callToken.data;
     }
 
-    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    const channel = await db.query.channels.findFirst({
+      where: {
+        id: params.id,
+      }
+    });
     if (!channel || channel.type !== 'VOICE') {
       return status(404, { error: 'Channel not right' });
     }
 
-    const membership = await db.orm.public.GuildMember.where({
-      guildId: channel.guildId,
-      userId: session.userId,
-    }).first();
+    const membership = await db.query.guildMembers.findFirst({
+      where: {
+        guildId: channel.guildId,
+        userId: session.userId,
+      }
+    });
     if (!membership) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -312,15 +355,21 @@ export const channel = new Elysia({ prefix: '/channel' })
   })
   .post('/:id/typing', async ({ params, session, status, server }) => {
     if (!session) return status(401, { error: 'Unauthorized' });
-    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    const channel = await db.query.channels.findFirst({
+      where: {
+        id: params.id,
+      }
+    });
     if (!channel) {
       return status(404, { error: 'Channel not found' });
     }
 
-    const channelMembership = await db.orm.public.GuildMember.where({
-      guildId: channel.guildId,
-      userId: session.userId,
-    }).first();
+    const channelMembership = await db.query.guildMembers.findFirst({
+      where: {
+        guildId: channel.guildId,
+        userId: session.userId,
+      }
+    });
     if (!channelMembership) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -357,15 +406,21 @@ export const channel = new Elysia({ prefix: '/channel' })
   })
   .get('/:id/call/participants', async ({ params, session, status }) => {
     if (!session) return status(401, { error: 'Unauthorized' });
-    const channel = await db.orm.public.Channel.where({ id: params.id }).first();
+    const channel = await db.query.channels.findFirst({
+      where: {
+        id: params.id,
+      }
+    });
     if (!channel || channel.type !== 'VOICE') {
       return status(404, { error: 'Channel not right' });
     }
 
-    const channelMembership = await db.orm.public.GuildMember.where({
-      guildId: channel.guildId,
-      userId: session.userId,
-    }).first();
+    const channelMembership = await db.query.guildMembers.findFirst({
+      where: {
+        guildId: channel.guildId,
+        userId: session.userId,
+      }
+    });
     if (!channelMembership) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -410,7 +465,11 @@ export const channel = new Elysia({ prefix: '/channel' })
       (metadata.success ? metadata.data.channelId : undefined) ??
       event.room?.name?.replace(/^voice:/, '');
 
-    const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+    const channel = await db.query.channels.findFirst({
+      where: {
+        id: channelId,
+      }
+    });
     if (!channel) return { ok: true };
 
     const state = {
