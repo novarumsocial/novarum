@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
@@ -12,6 +11,8 @@ import {
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
+import { db, users } from '../../src/db';
+import { eq } from 'drizzle-orm';
 
 const activeRealtimeConnections = new Map<string, number>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
@@ -82,7 +83,9 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     // @ts-ignore fuh ts
     ws.data.session = session;
 
-    const memberships = await db.orm.public.GuildMember.where({ userId: session.userId }).all();
+    const memberships = await db.query.guildMembers.findMany({
+      where: { userId: session.userId },
+    });
 
     ws.subscribe(`userEvents:${session.userId}`);
     for (const membership of memberships) {
@@ -100,7 +103,7 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     const becameOnline = addUserConnection(session.userId);
     if (!becameOnline) return;
 
-    await db.orm.public.User.where({ id: session.userId }).update({ status: 'ONLINE' });
+    await db.update(users).set({ status: 'ONLINE' }).where(eq(users.id, session.userId));
 
     await publishUserStatus(ws, session, memberships, 'ONLINE');
 
@@ -150,13 +153,14 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
 
       leaveFederatedVoice(session);
 
-      const channel = await db.orm.public.Channel.where({ id: message.channelId }).first();
+      const channel = await db.query.channels.findFirst({
+        where: { id: message.channelId },
+      });
       if (!channel || channel.type !== 'VOICE') return;
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: { guildId: channel.guildId, userId: session.userId },
+      });
       if (!membership) return;
 
       const previous = removeVoicePresence(session.userId);
@@ -186,9 +190,10 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     if (message.type === 'emoji.query') {
       const unicodes = [...new Set(message.unicodes.map((unicode) => unicode.toUpperCase()))];
       const qualified = unicodes.map(qualifyEmojiUnicode);
-      const matches = await db.orm.public.Emoji.where((emoji) => emoji.unicode.in(qualified))
-        .select('name', 'unicode', 'url')
-        .all();
+      const matches = await db.query.emojis.findMany({
+        where: { unicode: { in: qualified } },
+        columns: { name: true, unicode: true, url: true },
+      })
       const byUnicode = new Map(matches.map((emoji) => [emoji.unicode, emoji]));
       const emojis = unicodes.flatMap((unicode) => {
         const emoji = byUnicode.get(qualifyEmojiUnicode(unicode));
@@ -203,10 +208,9 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
       return;
     }
 
-    const membership = await db.orm.public.GuildMember.where({
-      guildId: message.guildId,
-      userId: session.userId,
-    }).first();
+    const membership = await db.query.guildMembers.findFirst({
+      where: { guildId: message.guildId, userId: session.userId },
+    });
     if (!membership) return;
 
     ws.subscribe(`guildEvents:${message.guildId}`);
@@ -229,9 +233,11 @@ export const realtime = new Elysia({ prefix: '/realtime' }).ws('/', {
     const becameOffline = removeUserConnection(session.userId);
     if (!becameOffline) return;
 
-    await db.orm.public.User.where({ id: session.userId }).update({ status: 'OFFLINE' });
+    await db.update(users).set({ status: 'OFFLINE' }).where(eq(users.id, session.userId));
 
-    const memberships = await db.orm.public.GuildMember.where({ userId: session.userId }).all();
+    const memberships = await db.query.guildMembers.findMany({
+      where: { userId: session.userId },
+    });
     await publishUserStatus(ws, session, memberships, 'OFFLINE');
   },
 });
