@@ -1,15 +1,18 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { storage } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { getConfig } from '../../utils/config';
 import { userResponse } from '../auth/services';
+import { db, users } from '../../src/db';
+import { eq } from 'drizzle-orm';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 
 export const user = new Elysia({ prefix: '/user' })
   .get('/avatar/:userId', async ({ params, status }) => {
-    const user = await db.orm.public.User.where({ id: params.userId }).first();
+    const user = await db.query.users.findFirst({
+      where: { id: params.userId },
+    });
     if (!user?.avatarUrl) return status(404, { error: 'Avatar not found' });
 
     const url = storage.presign(`avatars/${user.id}`, {
@@ -41,11 +44,16 @@ export const user = new Elysia({ prefix: '/user' })
         `/user/avatar/${encodeURIComponent(session.userId)}?v=${version}`,
         getConfig().server.baseUrl
       ).toString();
-      await db.orm.public.User.where({ id: session.userId }).update({
-        avatarUrl,
-        updatedAt: new Date(),
+      await db
+        .update(users)
+        .set({
+          avatarUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, session.id));
+      const user = await db.query.users.findFirst({
+        where: { id: session.userId },
       });
-      const user = await db.orm.public.User.where({ id: session.userId }).first();
       if (!user) return status(404, { error: 'User not found' });
 
       return { user: userResponse(user) };
