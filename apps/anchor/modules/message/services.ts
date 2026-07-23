@@ -1,7 +1,6 @@
 import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
-import { db } from '../../prisma/db';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
@@ -9,6 +8,8 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles } from '../../utils/mentions';
+import { db, messages, attachments as dbAttachment, messagePings } from '../../src/db';
+import { and, eq } from 'drizzle-orm';
 
 export const message = new Elysia({ prefix: '/message' })
   .resolve(async ({ cookie, status }) => {
@@ -24,15 +25,19 @@ export const message = new Elysia({ prefix: '/message' })
     async ({ query, session, status }) => {
       const { channelId } = query;
 
-      const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+      const channel = await db.query.channels.findFirst({
+        where: { id: channelId },
+      });
       if (!channel) {
         return status(404, { error: 'Channel not found' });
       }
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        },
+      });
       if (!membership) {
         return status(403, { error: 'Forbidden' });
       }
@@ -64,11 +69,14 @@ export const message = new Elysia({ prefix: '/message' })
         };
       }
 
-      const messages = await db.orm.public.Message.where({ channelId })
-        .include('author')
-        .include('attachments')
-        .orderBy((message) => message.createdAt.asc())
-        .all();
+      const messages = await db.query.messages.findMany({
+        where: { channelId },
+        orderBy: { createdAt: 'asc' },
+        with: {
+          author: true,
+          attachments: true,
+        },
+      });
 
       return {
         messages: messages.map((message) => ({
@@ -102,15 +110,19 @@ export const message = new Elysia({ prefix: '/message' })
     async ({ body, session, status, server }) => {
       const { channelId, content, nonce, replyTo, attachmentIds = [] } = body;
 
-      const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+      const channel = await db.query.channels.findFirst({
+        where: { id: channelId },
+      });
       if (!channel) {
         return status(404, { error: 'Channel not found' });
       }
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        },
+      });
       if (!membership) {
         return status(403, { error: 'Forbidden' });
       }
@@ -151,12 +163,15 @@ export const message = new Elysia({ prefix: '/message' })
         return { message: mappedMessage };
       }
 
-      const priorMsg = await db.orm.public.Message.where({
-        authorId: session.userId,
-        nonce,
-      })
-        .include('attachments')
-        .first();
+      const priorMsg = await db.query.messages.findFirst({
+        where: {
+          authorId: session.userId,
+          nonce,
+        },
+        with: {
+          attachments: true,
+        },
+      });
       if (priorMsg) {
         if (
           priorMsg.channelId !== channelId ||
@@ -177,7 +192,7 @@ export const message = new Elysia({ prefix: '/message' })
       }
 
       const replyTarget = replyTo
-        ? await db.orm.public.Message.where({ id: replyTo, channelId }).first()
+        ? await db.query.messages.findFirst({ where: { id: replyTo, channelId } })
         : null;
       if (replyTo && !replyTarget) {
         return status(400, { error: 'Invalid reply target' });
@@ -194,28 +209,32 @@ export const message = new Elysia({ prefix: '/message' })
       if (!attachments.ok) return status(400, { error: attachments.error });
 
       const message = await db.transaction(async (tx) => {
-        const created = await tx.orm.public.Message.create({
-          id: randomString(),
-          channelId,
-          authorId: session.userId,
-          content,
-          replyTo: replyTo ?? null,
-          nonce,
-        });
+        const [created] = await tx
+          .insert(messages)
+          .values({
+            id: randomString(),
+            channelId,
+            authorId: session.userId,
+            content,
+            replyTo: replyTo ?? null,
+            nonce,
+          })
+          .returning();
+        if (!created) throw new Error('message creation shit the bed');
 
         for (const attachment of attachments.value) {
-          const updated = await tx.orm.public.Attachment.where({
-            id: attachment.id,
-            status: 'PENDING',
-          }).update({
-            messageId: created.id,
-            status: 'ATTACHED',
-          });
+          const updated = await tx
+            .update(dbAttachment)
+            .set({
+              messageId: created.id,
+              status: 'ATTACHED',
+            })
+            .where(and(eq(dbAttachment.id, attachment.id), eq(dbAttachment.status, 'PENDING')));
           if (!updated) throw new Error('Attachment was already claimed');
         }
 
         for (const recipient of pingRecipients) {
-          await tx.orm.public.MessagePing.create({
+          await tx.insert(messagePings).values({
             messageId: created.id,
             userId: recipient.userId,
           });
@@ -274,13 +293,17 @@ export const message = new Elysia({ prefix: '/message' })
     '/delete',
     async ({ body, session, status, server }) => {
       const { channelId, messageId } = body;
-      const channel = await db.orm.public.Channel.where({ id: channelId }).first();
+      const channel = await db.query.channels.findFirst({
+        where: { id: channelId },
+      });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        },
+      });
       if (!membership) return status(403, { error: 'Forbidden' });
 
       const federatedChannel = parseFederatedChannelId(channelId);
@@ -299,16 +322,14 @@ export const message = new Elysia({ prefix: '/message' })
         return { success: true };
       }
 
-      const existing = await db.orm.public.Message.where({
-        id: messageId,
-        channelId,
-      })
-        .include('attachments')
-        .first();
+      const existing = await db.query.messages.findFirst({
+        where: { id: messageId, channelId },
+        with: { attachments: true },
+      });
       if (!existing) return status(404, { error: 'Message not found' });
       if (existing.authorId !== session.userId) return status(403, { error: 'Forbidden' });
 
-      await db.orm.public.Message.where({ id: messageId }).delete();
+      await db.delete(messages).where(eq(messages.id, messageId));
       await Promise.all(
         existing.attachments.map((attachment) =>
           storage
@@ -351,12 +372,14 @@ export async function verifyPendingAttachments(
   const attachments = [];
 
   for (const id of attachmentIds) {
-    const attachment = await db.orm.public.Attachment.where({
-      id,
-      uploaderId,
-      channelId,
-      status: 'PENDING',
-    }).first();
+    const attachment = await db.query.attachments.findFirst({
+      where: {
+        id,
+        uploaderId,
+        channelId,
+        status: 'PENDING',
+      },
+    });
     if (!attachment) return { ok: false as const, error: 'Invalid attachment' };
 
     try {
@@ -390,7 +413,10 @@ export async function getPingRecipients(
   const mentionedHandles = mentionHandles(content);
   if (!mentionedHandles.size && !replyAuthorId) return [];
 
-  const members = await db.orm.public.GuildMember.where({ guildId }).include('user').all();
+  const members = await db.query.guildMembers.findMany({
+    where: { guildId },
+    with: { user: true },
+  });
   return members.flatMap((member) => {
     const handle = `@${member.user.username}:${member.user.homeserver}`;
     return member.userId !== authorId &&
