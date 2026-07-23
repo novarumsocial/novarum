@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
@@ -16,6 +15,15 @@ import { randomInt } from 'node:crypto';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { z } from 'zod';
+import {
+  channelReadStates,
+  channels,
+  db,
+  guilds as dbGuilds,
+  guildInvites,
+  guildMembers,
+} from '../../src/db';
+import { and, eq } from 'drizzle-orm';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const unreadMentionsResponseSchema = z.object({
@@ -30,7 +38,9 @@ type PingMessage = { id: string; channelId: string; createdAt: Date | string };
 
 export const guilds = new Elysia({ prefix: '/guilds' })
   .get('/avatar/:id', async ({ params, query, status }) => {
-    const guild = await db.orm.public.Guild.where({ id: params.id }).first();
+    const guild = await db.query.guilds.findFirst({
+      where: { id: params.id },
+    });
     if (!guild?.avatarUrl) return status(404, { error: 'Guild picture not found' });
 
     const format = query.format === 'gif' ? 'gif' : 'png';
@@ -59,7 +69,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         return status(400, { error: 'Cannot manage a federated guild' });
       }
 
-      const guild = await db.orm.public.Guild.where({ id: params.id }).first();
+      const guild = await db.query.guilds.findFirst({
+        where: { id: params.id },
+      });
       if (!guild) return status(404, { error: 'Guild not found' });
       if (guild.ownerId !== session.userId) return status(403, { error: 'Forbidden' });
       if (body.avatar.type !== 'image/png' && body.avatar.type !== 'image/gif') {
@@ -78,7 +90,7 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         `/guilds/avatar/${encodeURIComponent(guild.id)}?format=${format}&v=${Date.now()}`,
         getConfig().server.baseUrl
       ).toString();
-      await db.orm.public.Guild.where({ id: guild.id }).update({ avatarUrl });
+      await db.update(dbGuilds).set({ avatarUrl }).where(eq(dbGuilds.id, guild.id));
 
       return { avatarUrl };
     },
@@ -94,32 +106,41 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       const { name } = body;
 
       const transaction = await db.transaction(async (tx) => {
-        const guild = await tx.orm.public.Guild.create({
-          id: randomString(),
-          name,
-          ownerId: session.userId,
-          extAnchorDown: false,
-        });
+        const [guild] = await tx
+          .insert(dbGuilds)
+          .values({
+            id: randomString(),
+            name,
+            ownerId: session.userId,
+            extAnchorDown: false,
+          })
+          .returning();
+        if (!guild) throw new Error('guild creation shit the bed');
 
-        await tx.orm.public.GuildMember.create({
+        await tx.insert(guildMembers).values({
           guildId: guild.id,
           userId: session.userId,
           role: 'OWNER',
         });
 
         // default general channel for the guild
-        const defChannel = await tx.orm.public.Channel.create({
-          // todo: this is probably no good and need to come up with a better way to generate channel ids
-          id: randomString(),
-          name: 'general',
-          position: 0,
-          guildId: guild.id,
-        });
+        const [defChannel] = await tx
+          .insert(channels)
+          .values({
+            // todo: this is probably no good and need to come up with a better way to generate channel ids
+            id: randomString(),
+            name: 'general',
+            position: 0,
+            guildId: guild.id,
+          })
+          .returning();
 
         return { guild, channel: defChannel };
       });
 
       const { guild, channel } = transaction;
+      if (!channel)
+        throw new Error('channel creation failed for some reason (this should never happen????)');
 
       if (server) {
         publishRealtime(server, `userEvents:${session.userId}`, {
@@ -153,9 +174,17 @@ export const guilds = new Elysia({ prefix: '/guilds' })
   )
   .get('/list', async ({ server, session }) => {
     const [memberships, readStates, pings] = await Promise.all([
-      db.orm.public.GuildMember.where({ userId: session.userId }).include('guild').all(),
-      db.orm.public.ChannelReadState.where({ userId: session.userId }).all(),
-      db.orm.public.MessagePing.where({ userId: session.userId }).include('message').all(),
+      db.query.guildMembers.findMany({
+        where: { userId: session.userId },
+        with: { guild: true },
+      }),
+      db.query.channelReadStates.findMany({
+        where: { userId: session.userId },
+      }),
+      db.query.messagePings.findMany({
+        where: { userId: session.userId },
+        with: { message: true },
+      }),
     ]);
     const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
     const unreadPingsByChannel = new Map<string, number>();
@@ -183,9 +212,10 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         return {
           id,
           guild,
-          channels: await db.orm.public.Channel.where({ guildId: id })
-            .orderBy((channel) => channel.position.asc())
-            .all(),
+          channels: await db.query.channels.findMany({
+            where: { guildId: id },
+            orderBy: { position: 'asc' },
+          }),
         };
       })
     );
@@ -245,21 +275,25 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         description: guild.description as string | null,
         channels: await Promise.all(
           channels.map(async (channel) => {
-            const latestMessage = await db.orm.public.Message.where({ channelId: channel.id })
-              .orderBy([(message) => message.createdAt.desc(), (message) => message.id.desc()])
-              .first();
+            const latestMessage = await db.query.messages.findFirst({
+              where: { channelId: channel.id },
+              orderBy: {
+                createdAt: 'desc',
+                id: 'desc',
+              },
+            });
             const readState = readStateByChannel.get(channel.id);
 
             if (latestMessage && !readState) {
-              await db.orm.public.ChannelReadState.upsert({
-                create: {
+              await db
+                .insert(channelReadStates)
+                .values({
                   userId: session.userId,
                   channelId: channel.id,
                   lastReadCreatedAt: latestMessage.createdAt,
                   lastReadMessageId: latestMessage.id,
-                },
-                update: {},
-              });
+                })
+                .onConflictDoNothing();
             }
 
             return {
@@ -303,7 +337,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       return status(400, { error: 'Cannot manage invites on a federated guild' });
     }
 
-    const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+    const guild = await db.query.guilds.findFirst({
+      where: { id: guildId },
+    });
     if (!guild) {
       return status(404, { error: 'Guild not found' });
     }
@@ -311,10 +347,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       return status(401, { error: 'Unauthorized' });
     }
 
-    const invite = await db.orm.public.GuildInvite.where({ guildId })
-      .where({ creatorId: session.userId })
-      // there should only be one but okay
-      .first();
+    const invite = await db.query.guildInvites.findFirst({
+      where: { creatorId: session.userId },
+    });
 
     if (!invite) {
       return status(404, { error: 'No invite found for this guild' });
@@ -330,7 +365,9 @@ export const guilds = new Elysia({ prefix: '/guilds' })
         return { error: 'Cannot manage invites on a federated guild' };
       }
 
-      const guild = await db.orm.public.Guild.where({ id: guildId }).first();
+      const guild = await db.query.guilds.findFirst({
+        where: { id: guildId },
+      });
       if (!guild) {
         return { error: 'Guild not found' };
       }
@@ -339,17 +376,21 @@ export const guilds = new Elysia({ prefix: '/guilds' })
       }
 
       // deletes prior invite (if any)
-      await db.orm.public.GuildInvite.where({ guildId })
-        .where({ creatorId: session.userId })
-        .delete();
-
-      const invite = await db.orm.public.GuildInvite.create({
-        id: randomString(),
-        code: randomAlphanumericString(8),
-        guildId,
-        creatorId: session.userId,
-        // expiresAt: body?.expiresAt ? new Date(body.expiresAt) : null,
-      });
+      await db
+        .delete(guildInvites)
+        .where(and(eq(guildInvites.guildId, guildId), eq(guildInvites.creatorId, session.userId)));
+      const [invite] = await db
+        .insert(guildInvites)
+        .values({
+          id: randomString(),
+          code: randomAlphanumericString(8),
+          guildId,
+          creatorId: session.userId,
+        })
+        .returning();
+      if (!invite) {
+        return { error: 'Failed to create invite' };
+      }
 
       return { invite };
     },
