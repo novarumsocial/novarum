@@ -1,4 +1,4 @@
-import { db } from '../prisma/db';
+import { db, emojis as dbEmojis } from '../src/db';
 
 const qualifiedUnicodes = new Map<string, string>();
 
@@ -16,7 +16,9 @@ export async function writeEmojis() {
     if (emoji.non_qualified) qualifiedUnicodes.set(emoji.non_qualified, emoji.unified);
   }
 
-  const currentData = await db.orm.public.Emoji.select('unicode').all();
+  const currentData = await db.query.emojis.findMany({
+    columns: { unicode: true },
+  });
   const currentUnicodes = new Set(currentData.map((emoji) => emoji.unicode));
   const difference = emojis.filter((emoji) => !currentUnicodes.has(emoji.unified));
   if (difference.length === 0) {
@@ -24,7 +26,7 @@ export async function writeEmojis() {
     return;
   }
 
-  const dbEmojis = difference.map((emoji) => ({
+  const emojiData = difference.map((emoji) => ({
     name: emoji.short_name,
     unicode: emoji.unified,
     url: emoji.has_img_apple
@@ -33,14 +35,18 @@ export async function writeEmojis() {
   }));
 
   try {
-    await db.orm.public.Emoji.createAll(dbEmojis);
+    await db.insert(dbEmojis).values(emojiData);
   } catch (error) {
     const written = new Set(
-      (await db.orm.public.Emoji.select('unicode').all()).map((emoji) => emoji.unicode)
+      (
+        await db.query.emojis.findMany({
+          columns: { unicode: true },
+        })
+      ).map((emoji) => emoji.unicode)
     );
     if (difference.some((emoji) => !written.has(emoji.unified))) throw error;
   }
-  console.log(`Wrote ${dbEmojis.length} emojis in ${Math.round(performance.now() - perf)}ms`);
+  console.log(`Wrote ${emojiData.length} emojis in ${Math.round(performance.now() - perf)}ms`);
 }
 
 type EmojiEntry = {

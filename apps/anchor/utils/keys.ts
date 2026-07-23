@@ -1,8 +1,9 @@
 import crypto from 'node:crypto';
-import { db } from '../prisma/db';
 import { getConfig } from './config';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { db, federationNonces, homeserverKeys } from '../src/db';
+import { eq, lt } from 'drizzle-orm';
 
 type KeyMaterial = {
   publicKey: string;
@@ -33,8 +34,11 @@ export async function generateKeys(keyDir: string) {
   await Bun.write(path.join(keyDir, privateKeyFilename), privateKeyBase64);
 
   await db.transaction(async (tx) => {
-    await tx.orm.public.HomeserverKeys.where({ homeserver }).update({ active: false });
-    await tx.orm.public.HomeserverKeys.create({
+    await tx
+      .update(homeserverKeys)
+      .set({ active: false })
+      .where(eq(homeserverKeys.homeserver, homeserver));
+    await tx.insert(homeserverKeys).values({
       id,
       homeserver,
       publicKey: publicKeyBase64,
@@ -63,12 +67,13 @@ export async function getKeys() {
 }
 
 async function loadKeys(): Promise<KeyMaterial> {
-  const activeKey = await db.orm.public.HomeserverKeys.where({
-    active: true,
-    homeserver: getConfig().server.homeserver,
-  })
-    .orderBy((key) => key.createdAt.desc())
-    .first();
+  const activeKey = await db.query.homeserverKeys.findFirst({
+    where: {
+      active: true,
+      homeserver: getConfig().server.homeserver,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
   if (!activeKey) {
     console.log('No active keys found for the homeserver, generating new keys...');
@@ -136,12 +141,7 @@ function federationNonceMaxAgeMs() {
 
 async function deleteExpiredFederationNonces() {
   const cutoff = new Date(Date.now() - federationNonceMaxAgeMs());
-  const plan = db.sql.public.federation_nonce
-    .delete()
-    .where((nonce, fns) => fns.lt(nonce.createdAt, cutoff))
-    .build();
-
-  await db.runtime().execute(plan);
+  await db.delete(federationNonces).where(lt(federationNonces.createdAt, cutoff));
 }
 
 async function maybeDeleteExpiredFederationNonces() {
@@ -160,11 +160,13 @@ async function maybeDeleteExpiredFederationNonces() {
 export async function storeNonce(nonce: string, homeserver: string) {
   await maybeDeleteExpiredFederationNonces();
 
-  const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
+  const existingNonce = await db.query.federationNonces.findFirst({
+    where: { nonce },
+  });
   if (existingNonce) return false;
 
   try {
-    await db.orm.public.FederationNonce.create({
+    await db.insert(federationNonces).values({
       id: crypto.randomUUID(),
       nonce,
       homeserver,
@@ -179,6 +181,8 @@ export async function storeNonce(nonce: string, homeserver: string) {
 export async function isNonceUsed(nonce: string, _homeserver?: string) {
   await maybeDeleteExpiredFederationNonces();
 
-  const existingNonce = await db.orm.public.FederationNonce.where({ nonce }).first();
+  const existingNonce = await db.query.federationNonces.findFirst({
+    where: { nonce },
+  });
   return !!existingNonce;
 }

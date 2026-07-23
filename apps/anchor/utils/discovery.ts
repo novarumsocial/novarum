@@ -4,7 +4,8 @@ import net from 'node:net';
 import { randomString } from './randomString';
 import { getKeys, signMessage } from './keys';
 import { getConfig } from './config';
-import { db } from '../prisma/db';
+import { db, guilds } from '../src/db';
+import { like } from 'drizzle-orm';
 
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 const discoveryCacheTtlMs = 5 * 60 * 1000;
@@ -273,11 +274,10 @@ function isPrivateIp(address: string) {
 }
 
 async function markHomeserverGuildStatus(homeserver: string, up = true) {
-  await db.orm.public.Guild.where((guild) =>
-    guild.id.like(`fed:guild:${encodeURIComponent(homeserver)}:%`)
-  ).update({
-    extAnchorDown: !up,
-  });
+  return db
+    .update(guilds)
+    .set({ extAnchorDown: !up })
+    .where(like(guilds.id, `fed:guild:${encodeURIComponent(homeserver)}:%`));
 }
 
 interface SignedRequestData {
