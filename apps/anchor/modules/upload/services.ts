@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import {
   isAllowedAttachmentType,
   maxAttachmentSize,
@@ -12,13 +11,13 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { randomString } from '../../utils/randomString';
 import { storage } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { attachments, db } from '../../src/db';
 
 export const upload = new Elysia()
   .get('/attachment/:id', async ({ params, status }) => {
-    const attachment = await db.orm.public.Attachment.where({
-      id: params.id,
-      status: 'ATTACHED',
-    }).first();
+    const attachment = await db.query.attachments.findFirst({
+      where: { id: params.id, status: 'ATTACHED' },
+    });
     if (!attachment) return status(404, { error: 'Attachment not found' });
 
     const url = storage.presign(attachment.objectKey, {
@@ -39,13 +38,14 @@ export const upload = new Elysia()
         return status(415, { error: 'Unsupported file type' });
       }
 
-      const channel = await db.orm.public.Channel.where({ id: body.channelId }).first();
+      const channel = await db.query.channels.findFirst({
+        where: { id: body.channelId },
+      });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: channel.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: { guildId: channel.guildId, userId: session.userId },
+      });
       if (!membership) return status(403, { error: 'Forbidden' });
 
       const federatedChannel = parseFederatedChannelId(body.channelId);
@@ -103,7 +103,7 @@ export async function createPendingAttachment(input: {
   const objectKey = `attachments/${input.guildId}/${input.channelId}/${attachmentId}`;
   const filename = safeAttachmentFilename(input.filename);
 
-  await db.orm.public.Attachment.create({
+  await db.insert(attachments).values({
     id: attachmentId,
     objectKey,
     filename,
