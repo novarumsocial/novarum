@@ -1,5 +1,4 @@
 import Elysia, { t } from 'elysia';
-import { db } from '../../prisma/db';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { getConfig } from '../../utils/config';
@@ -7,22 +6,31 @@ import { makeFederatedChannelId, makeFederatedGuildId } from '../../utils/federa
 import { federationUserPayload } from '../../utils/federationPayload';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
+import { db, guildMembers, guilds, channels as dbChannels } from '../../src/db';
+import { eq } from 'drizzle-orm';
 
 export const invite = new Elysia({ prefix: '/invite' })
   .get('/:code', async ({ params, status }) => {
     const { code } = params;
 
-    const invite = await db.orm.public.GuildInvite.where({ code }).include('creator').first();
+    const invite = await db.query.guildInvites.findFirst({
+      where: { code },
+      with: { creator: true },
+    });
     if (!invite || isExpired(invite.expiresAt)) {
       return status(404, { error: 'Invite not found' });
     }
 
-    const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
+    const guild = await db.query.guilds.findFirst({
+      where: { id: invite.guildId },
+    });
     if (!guild) {
       return status(404, { error: 'Guild not found' });
     }
 
-    const members = await db.orm.public.GuildMember.where({ guildId: guild.id }).all();
+    const members = await db.query.guildMembers.findMany({
+      where: { guildId: guild.id },
+    });
 
     return {
       invite,
@@ -89,22 +97,25 @@ export const invite = new Elysia({ prefix: '/invite' })
         return federatedInvite;
       }
 
-      const invite = await db.orm.public.GuildInvite.where({ code: body.code }).first();
+      const invite = await db.query.guildInvites.findFirst({
+        where: { code: body.code },
+      });
       if (!invite || isExpired(invite.expiresAt)) {
         return status(404, { error: 'Invite not found' });
       }
 
-      const guild = await db.orm.public.Guild.where({ id: invite.guildId }).first();
+      const guild = await db.query.guilds.findFirst({
+        where: { id: invite.guildId },
+      });
       if (!guild) {
         return status(404, { error: 'Guild not found' });
       }
 
-      const membership = await db.orm.public.GuildMember.where({
-        guildId: invite.guildId,
-        userId: session.userId,
-      }).first();
+      const membership = await db.query.guildMembers.findFirst({
+        where: { guildId: invite.guildId, userId: session.userId },
+      });
       if (!membership) {
-        await db.orm.public.GuildMember.create({
+        await db.insert(guildMembers).values({
           guildId: invite.guildId,
           userId: session.userId,
           role: 'MEMBER',
@@ -156,9 +167,10 @@ function isExpired(expiresAt: Date | string | null | undefined) {
 }
 
 async function guildChannels(guildId: string) {
-  const channels = await db.orm.public.Channel.where({ guildId })
-    .orderBy((channel) => channel.position.asc())
-    .all();
+  const channels = await db.query.channels.findMany({
+    where: { guildId },
+    orderBy: { position: 'asc' },
+  });
 
   return channels.map((channel) => ({
     id: channel.id,
@@ -193,16 +205,21 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
   if (!snapshot) return null;
 
   const guildId = makeFederatedGuildId(homeserver, snapshot.guild.id);
-  const existingGuild = await db.orm.public.Guild.where({ id: guildId }).first();
+  const existingGuild = await db.query.guilds.findFirst({
+    where: { id: guildId },
+  });
 
   if (existingGuild) {
-    await db.orm.public.Guild.where({ id: guildId }).update({
-      name: snapshot.guild.name,
-      description: snapshot.guild.description,
-      avatarUrl: snapshot.guild.avatarUrl,
-    });
+    await db
+      .update(guilds)
+      .set({
+        name: snapshot.guild.name,
+        description: snapshot.guild.description,
+        avatarUrl: snapshot.guild.avatarUrl,
+      })
+      .where(eq(guilds.id, guildId));
   } else {
-    await db.orm.public.Guild.create({
+    await db.insert(guilds).values({
       id: guildId,
       name: snapshot.guild.name,
       description: snapshot.guild.description,
@@ -212,12 +229,11 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
     });
   }
 
-  const membership = await db.orm.public.GuildMember.where({
-    guildId,
-    userId: session.userId,
-  }).first();
+  const membership = await db.query.guildMembers.findFirst({
+    where: { guildId, userId: session.userId },
+  });
   if (!membership) {
-    await db.orm.public.GuildMember.create({
+    await db.insert(guildMembers).values({
       guildId,
       userId: session.userId,
       role: 'MEMBER',
@@ -227,17 +243,22 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
   const channels = [];
   for (const channel of snapshot.channels) {
     const channelId = makeFederatedChannelId(homeserver, channel.id);
-    const existingChannel = await db.orm.public.Channel.where({ id: channelId }).first();
+    const existingChannel = await db.query.channels.findFirst({
+      where: { id: channelId },
+    });
 
     if (existingChannel) {
-      await db.orm.public.Channel.where({ id: channelId }).update({
-        guildId,
-        name: channel.name,
-        position: channel.position,
-        type: channel.type,
-      });
+      await db
+        .update(dbChannels)
+        .set({
+          guildId,
+          name: channel.name,
+          position: channel.position,
+          type: channel.type,
+        })
+        .where(eq(dbChannels.id, channelId));
     } else {
-      await db.orm.public.Channel.create({
+      await db.insert(dbChannels).values({
         id: channelId,
         guildId,
         name: channel.name,
