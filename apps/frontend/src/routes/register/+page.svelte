@@ -5,12 +5,11 @@
   import { goto } from '$app/navigation';
   import { useSession } from '$lib/session.svelte';
   import * as Card from '$lib/components/ui/card/index.js';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import Logo from '$lib/assets/favicon.svg';
   import * as Form from '$lib/components/ui/form/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import {
-    MessagesSquare,
     Server,
     AtSign,
     User,
@@ -121,7 +120,7 @@
       <Card.Header class="space-y-3">
         <div class="flex items-center gap-2.5">
           <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <MessagesSquare class="size-5" />
+            <img src={Logo} alt="novarum" class="absolute size-5" />
           </div>
           <span class="text-lg font-semibold tracking-tight">novarum</span>
         </div>

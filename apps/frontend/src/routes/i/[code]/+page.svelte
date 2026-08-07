@@ -7,7 +7,6 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import {
-    MessagesSquare,
     Users,
     LoaderCircle,
     Copy,
@@ -17,6 +16,7 @@
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { useSession } from '$lib/session.svelte';
+  import Logo from '$lib/assets/favicon.svg';
 
   type InviteState = {
     invite: {
@@ -197,7 +197,7 @@
         <Card.Header class="space-y-3">
           <div class="flex items-center gap-2.5">
             <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <MessagesSquare class="size-5" />
+              <img src={Logo} alt="novarum" class="absolute size-5" />
             </div>
             <span class="text-lg font-semibold tracking-tight">novarum</span>
           </div>
@@ -214,7 +214,7 @@
         <Card.Header class="space-y-3">
           <div class="flex items-center gap-2.5">
             <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <MessagesSquare class="size-5" />
+              <img src={Logo} alt="novarum" class="absolute size-5" />
             </div>
             <span class="text-lg font-semibold tracking-tight">novarum</span>
           </div>
@@ -252,7 +252,7 @@
         <Card.Header class="space-y-3">
           <div class="flex items-center gap-2.5">
             <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <MessagesSquare class="size-5" />
+              <img src={Logo} alt="novarum" class="absolute size-5" />
             </div>
             <span class="text-lg font-semibold tracking-tight">novarum</span>
           </div>

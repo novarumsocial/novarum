@@ -18,12 +18,12 @@
     LoaderCircle,
     Lock,
     Mail,
-    MessagesSquare,
     Server,
   } from '@lucide/svelte';
   import { defaults, superForm } from 'sveltekit-superforms';
   import { zod4, zod4Client } from 'sveltekit-superforms/adapters';
   import { z } from 'zod';
+  import Logo from '$lib/assets/favicon.svg';
 
   const homeServerSchema = z
     .string()
@@ -164,7 +164,7 @@
       <Card.Header class="space-y-3">
         <div class="flex items-center gap-2.5">
           <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <MessagesSquare class="size-5" />
+            <img src={Logo} alt="novarum" class="absolute size-5" />
           </div>
           <span class="text-lg font-semibold tracking-tight">novarum</span>
         </div>
