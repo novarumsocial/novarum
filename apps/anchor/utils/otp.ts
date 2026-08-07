@@ -119,3 +119,13 @@ export function createTOTPKeyURI(
 	});
 	return `${base}?${params}`;
 }
+
+export function generateRandomKey(length: number): Uint8Array {
+  if (length <= 0) {
+    throw new TypeError("Length must be a positive number");
+  }
+
+  const key = new Uint8Array(length);
+  crypto.getRandomValues(key);
+  return key;
+}

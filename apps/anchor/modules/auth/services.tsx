@@ -19,6 +19,7 @@ import { transporter } from '../../utils/services/email';
 import { createHmac, randomInt } from 'node:crypto';
 import { render } from 'react-email';
 import { rateLimit } from 'elysia-rate-limit';
+import { createTOTPKeyURI, generateRandomKey, verifyTOTPWithGracePeriod } from '../../utils/otp';
 
 const authRateLimit = (path: string, max: number, duration: number) =>
   rateLimit({
@@ -354,7 +355,80 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
       },
     }
-  );
+  ).get('/mfa/totp/qr', async ({ cookie, status }) => {
+    const token = cookie[sessionCookieName]?.value as string | undefined;
+    const session = await validateSessionToken(token);
+    if (!session) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const localCredentials = await db.query.localCredentials.findFirst({
+      where: {
+        userId: session.userId,
+      },
+    });
+    if (!localCredentials) {
+      return status(404, { error: 'User not found' });
+    }
+
+    if (localCredentials.totpSecret) {
+      return status(400, { error: 'TOTP is already enabled for this user' });
+    }
+
+    const key = generateRandomKey(20);
+    const gen = createTOTPKeyURI('Novarum', localCredentials.email, key, 30, 6)
+    return {
+      uri: gen,
+      secret: key,
+    }
+  }).post('/mfa/totp/enable', async ({ cookie, body, status }) => {
+    const token = cookie[sessionCookieName]?.value as string | undefined;
+    const session = await validateSessionToken(token);
+    if (!session) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const localCreds = await db.query.localCredentials.findFirst({
+      where: {
+        userId: session.userId,
+      },
+    });
+    if (!localCreds) {
+      return status(404, { error: 'User not found' });
+    }
+
+    if (localCreds.totpSecret) {
+      return status(400, { error: 'TOTP is already enabled for this user' });
+    }
+
+    const { secret, code } = body;
+    const encodedSecret = new TextEncoder().encode(secret);
+
+    const isValid = verifyTOTPWithGracePeriod(encodedSecret, 30, 6, code, 60);
+
+    if (!isValid) {
+      return status(400, { error: 'Invalid TOTP code' });
+    }
+
+    await db.update(localCredentials).set({ totpSecret: Buffer.from(secret, 'utf-8'), mfaEnabled: true }).where(eq(localCredentials.userId, session.userId));
+
+    return { success: true, message: 'TOTP enabled successfully' };
+  }, {
+    body: t.Object({
+      secret: t.String(),
+      code: t.String({ minLength: 6, maxLength: 6 }),
+    }),
+    response: {
+      200: z.object({
+        success: z.boolean(),
+        message: z.string(),
+      }),
+      400: genericResponseErrorSchema,
+      401: genericResponseErrorSchema,
+      404: genericResponseErrorSchema,
+    },
+  });
+  
 
 export function userResponse(user: Parameters<typeof publicUser>[0], email: string | null = null) {
   const { userId: id, ...profile } = publicUser(user);
