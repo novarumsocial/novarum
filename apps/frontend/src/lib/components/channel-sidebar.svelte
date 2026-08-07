@@ -10,6 +10,8 @@
     Settings,
     UserRoundPlus,
     Volume2,
+    Bell,
+    IdCardLanyard
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -236,12 +238,24 @@
       </DropdownMenu.Group>
 
       <DropdownMenu.Separator />
-
       <DropdownMenu.Item>
-        Leave guild
-
+        Notification Settings
         <DropdownMenu.Shortcut>
-          <LogOut class="size-3" />
+          <Bell class="size-3"/>
+        </DropdownMenu.Shortcut>
+      </DropdownMenu.Item>
+      <DropdownMenu.Separator />
+      <DropdownMenu.Item variant="destructive">
+        Leave Guild
+        <DropdownMenu.Shortcut>
+          <LogOut class="size-3" style="color: var(--destructive);"/>
+        </DropdownMenu.Shortcut>
+      </DropdownMenu.Item>
+      <DropdownMenu.Separator />
+      <DropdownMenu.Item>
+        Copy Guild ID
+        <DropdownMenu.Shortcut>
+          <IdCardLanyard class="size-3"/>
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
     </DropdownMenu.Content>
