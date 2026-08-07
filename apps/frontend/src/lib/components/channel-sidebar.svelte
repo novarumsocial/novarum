@@ -254,7 +254,9 @@
           aria-label="Add channel"
           class="peer order-2 cursor-pointer text-muted-foreground opacity-70 transition-opacity hover:text-sidebar-foreground hover:opacity-100"
         >
-          <Plus class="size-3 shrink-0" />
+          {#if server.canManageChannels}
+            <Plus class="size-3 shrink-0" />
+          {/if}
         </button>
 
         <button
