@@ -67,6 +67,10 @@ export const localCredentials = pgTable('local_credential', {
 
   email: text('email').notNull().unique(),
   passwordHash: text('passwordHash').notNull(),
+  
+  totpSecret: bytea('totpSecret'),
+  mfaEnabled: boolean('mfaEnabled').notNull().default(false),
+  mfaOptions: text('mfaOptions').notNull().default('NONE'),
 });
 
 export const sessions = pgTable(
