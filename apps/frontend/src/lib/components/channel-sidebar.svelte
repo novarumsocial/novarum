@@ -214,13 +214,15 @@
 
     <DropdownMenu.Content class="w-52" align="center">
       <DropdownMenu.Group>
-        <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
-          Invite
-
-          <DropdownMenu.Shortcut>
-            <UserRoundPlus class="size-3" />
-          </DropdownMenu.Shortcut>
-        </DropdownMenu.Item>
+        {#if server.canManageChannels}
+          <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
+            Invite
+  
+            <DropdownMenu.Shortcut>
+              <UserRoundPlus class="size-3" />
+            </DropdownMenu.Shortcut>
+          </DropdownMenu.Item>
+        {/if}
 
         {#if server.canManageChannels}
           <DropdownMenu.Item onclick={() => (settingsOpen = true)}>

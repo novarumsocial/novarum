@@ -25,6 +25,7 @@
     channel,
     voice,
     members,
+    onJoin,
     onLeave,
     onOpenNavigation,
     onOpenMembers,
@@ -32,12 +33,14 @@
     channel: Channel;
     voice: Voice;
     members: Author[];
+    onJoin: () => void;
     onLeave: () => void;
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
   } = $props();
 
   const participants = $derived(Array.from(voice.voiceStates.entries()));
+  const active = $derived(voice.channelId === channel.id && (voice.connected || voice.connecting));
   const screenShares = $derived(participants.filter(([, state]) => state.screenTrack));
   const tileCount = $derived(participants.length + screenShares.length);
   const gridColumns = $derived(Math.max(1, Math.ceil(Math.sqrt(tileCount))));
@@ -127,7 +130,18 @@
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto px-2 py-3 pb-24 sm:px-4 sm:py-4">
-    {#if voice.connecting}
+    {#if !active}
+      <div class="flex size-full flex-col items-center justify-center gap-4 text-center">
+        <div>
+          <p class="text-sm font-medium text-foreground">Join {channel.name}</p>
+          <p class="mt-1 text-sm text-muted-foreground">Connect when you are ready.</p>
+        </div>
+        <Button onclick={onJoin}>
+          <Volume2 class="size-4" />
+          Join Voice
+        </Button>
+      </div>
+    {:else if voice.connecting}
       <div class="flex size-full flex-col items-center justify-center gap-3 text-center">
         <LoaderCircle class="size-8 animate-spin text-muted-foreground" />
         <p class="text-sm text-muted-foreground">Joining voice channel...</p>
@@ -234,79 +248,81 @@
         {/each}
       </div>
     {/if}
-    {#if voice.audioPlaybackBlocked}
+    {#if active && voice.audioPlaybackBlocked}
       <Button class="absolute bottom-20" onclick={() => voice.startAudio()}>Enable sound</Button>
     {/if}
   </div>
 
   <!-- control bar -->
-  <div
-    class="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border border-border bg-sidebar/80 px-2 py-2 shadow-lg backdrop-blur sm:bottom-4 sm:gap-2 sm:px-2.5"
-    class:rounded-full={settings.value.circleIcons}
-  >
-    <Button
-      variant={voice.selfMuted ? 'destructive' : 'secondary'}
-      size="icon"
-      class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-      onclick={() => voice.setMuted(!voice.selfMuted)}
-      disabled={voice.selfDeafened}
-      aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
+  {#if active}
+    <div
+      class="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border border-border bg-sidebar/80 px-2 py-2 shadow-lg backdrop-blur sm:bottom-4 sm:gap-2 sm:px-2.5"
+      class:rounded-full={settings.value.circleIcons}
     >
-      {#if voice.selfMuted}
-        <MicOff class="size-3" />
-      {:else}
-        <Mic class="size-3" />
-      {/if}
-    </Button>
+      <Button
+        variant={voice.selfMuted ? 'destructive' : 'secondary'}
+        size="icon"
+        class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
+        onclick={() => voice.setMuted(!voice.selfMuted)}
+        disabled={voice.selfDeafened}
+        aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
+      >
+        {#if voice.selfMuted}
+          <MicOff class="size-3" />
+        {:else}
+          <Mic class="size-3" />
+        {/if}
+      </Button>
 
-    <Button
-      variant={voice.selfDeafened ? 'destructive' : 'secondary'}
-      size="icon"
-      class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-      onclick={() => voice.setDeafened(!voice.selfDeafened)}
-      aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
-    >
-      {#if voice.selfDeafened}
-        <HeadphoneOff class="size-3" />
-      {:else}
-        <Headphones class="size-3" />
-      {/if}
-    </Button>
+      <Button
+        variant={voice.selfDeafened ? 'destructive' : 'secondary'}
+        size="icon"
+        class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
+        onclick={() => voice.setDeafened(!voice.selfDeafened)}
+        aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
+      >
+        {#if voice.selfDeafened}
+          <HeadphoneOff class="size-3" />
+        {:else}
+          <Headphones class="size-3" />
+        {/if}
+      </Button>
 
-    <Button
-      variant={voice.selfCamera ? 'default' : 'secondary'}
-      size="icon"
-      class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-      onclick={() => voice.setCamera(!voice.selfCamera)}
-      aria-label={voice.selfCamera ? 'Turn camera off' : 'Turn camera on'}
-    >
-      {#if voice.selfCamera}
-        <Video class="size-3" />
-      {:else}
-        <VideoOff class="size-3" />
-      {/if}
-    </Button>
+      <Button
+        variant={voice.selfCamera ? 'default' : 'secondary'}
+        size="icon"
+        class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
+        onclick={() => voice.setCamera(!voice.selfCamera)}
+        aria-label={voice.selfCamera ? 'Turn camera off' : 'Turn camera on'}
+      >
+        {#if voice.selfCamera}
+          <Video class="size-3" />
+        {:else}
+          <VideoOff class="size-3" />
+        {/if}
+      </Button>
 
-    <Button
-      variant={voice.selfScreenShare ? 'default' : 'secondary'}
-      size="icon"
-      class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-      onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
-      aria-label={voice.selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
-    >
-      <MonitorUp class="size-3" />
-    </Button>
+      <Button
+        variant={voice.selfScreenShare ? 'default' : 'secondary'}
+        size="icon"
+        class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
+        onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
+        aria-label={voice.selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
+      >
+        <MonitorUp class="size-3" />
+      </Button>
 
-    <Button
-      variant="destructive"
-      size="icon"
-      class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-      onclick={onLeave}
-      aria-label="Leave call"
-    >
-      <PhoneOff class="size-3" />
-    </Button>
-  </div>
+      <Button
+        variant="destructive"
+        size="icon"
+        class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
+        onclick={onLeave}
+        aria-label="Leave call"
+      >
+        <PhoneOff class="size-3" />
+      </Button>
+    </div>
+  {/if}
 </div>
 
 <style>

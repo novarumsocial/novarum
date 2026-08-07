@@ -16,6 +16,7 @@
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
   import { X } from '@lucide/svelte';
+  import { ConnectionState } from 'livekit-client';
 
   const session = useSession();
 
@@ -42,8 +43,6 @@
   );
 
   const voice = new Voice();
-  let joinedVoiceChannelId = $state<string | null>(null);
-  let dismissedVoiceChannelId = $state<string | null>(null);
 
   const voiceChannelName = $derived(
     Object.values(chat.channelsByServer)
@@ -51,21 +50,6 @@
       .flatMap((category) => category.channels)
       .find((channel) => channel.id === voice.channelId)?.name ?? null
   );
-
-  // Join voice channels when selected; keep the call alive while browsing text channels.
-  $effect(() => {
-    const channelId = currentChannel?.type === 'VOICE' ? currentChannel.id : null;
-    const userId = currentUser?.id ?? null;
-
-    if (!channelId || !userId) {
-      return;
-    }
-
-    if (joinedVoiceChannelId !== channelId && dismissedVoiceChannelId !== channelId) {
-      joinedVoiceChannelId = channelId;
-      void voice.join(channelId).catch(() => null);
-    }
-  });
 
   $effect(() => {
     if (!booting) chat.syncActiveChannel();
@@ -86,8 +70,6 @@
   }
 
   function leaveVoice() {
-    dismissedVoiceChannelId = voice.channelId;
-    joinedVoiceChannelId = null;
     void voice.leave();
   }
 
@@ -96,16 +78,16 @@
   }
 
   function selectChannel(id: string) {
-    if (
-      currentCategories.some((category) =>
-        category.channels.some((channel) => channel.id === id && channel.type === 'VOICE')
-      )
-    ) {
-      dismissedVoiceChannelId = null;
-      joinedVoiceChannelId = null;
-    }
-    chat.selectChannel(id);
+    const channel = currentCategories
+      .flatMap((category) => category.channels)
+      .find((channel) => channel.id === id)!;
+
     mobileNavigationOpen = false;
+    // if you squint you'll understand...
+    if (channel.type !== 'VOICE' || (voice.connectionState !== ConnectionState.Disconnected && voice.channelId === id)) {
+      chat.selectChannel(id);
+    }
+    if (channel.type === 'VOICE') void voice.join(id).catch(() => null);
   }
 
   onMount(() => {
@@ -187,11 +169,12 @@
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
       />
-    {:else if currentChannel && currentChannel.type === 'VOICE' && (voice.connected || voice.connecting)}
+    {:else if currentChannel && currentChannel.type === 'VOICE'}
       <VoiceArea
         channel={currentChannel}
         {voice}
         members={chat.members}
+        onJoin={() => voice.join(currentChannel.id).catch(() => null)}
         onLeave={leaveVoice}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}

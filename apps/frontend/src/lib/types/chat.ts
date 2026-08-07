@@ -7,6 +7,7 @@ export interface Server {
   avatarUrl?: string | null;
   description?: string | null;
   color?: string;
+  ownerId?: string;
 }
 
 export interface ChannelCategory {
