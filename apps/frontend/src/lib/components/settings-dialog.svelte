@@ -813,10 +813,12 @@
               onValueChange={(value) => (settings.value.timeFormat = value as TimeFormat)}
               class="grid gap-3"
             >
+              <!-- auto doesnt do anything so im just commenting ts :joy::joy::joy:
               <div class="flex items-center gap-2">
                 <RadioGroup.Item value="auto" id="autohr" />
                 <Label for="autohr">Auto</Label>
               </div>
+              -->
               <div class="flex items-center gap-2">
                 <RadioGroup.Item value="12hr" id="12hr" />
                 <Label for="12hr">12-hour</Label>
