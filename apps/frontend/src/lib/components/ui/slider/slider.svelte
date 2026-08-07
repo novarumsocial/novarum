@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Slider as SliderPrimitive } from 'bits-ui';
   import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+  import { settings } from '$lib/settings.svelte'
 
   let {
     ref = $bindable(null),
@@ -45,12 +46,21 @@ get along, so we shut typescript up by casting `value` to `never`.
       />
     </span>
     {#each thumbItems as thumb (thumb.index)}
+      {#if settings.value.circleIcons}
+      <SliderPrimitive.Thumb
+        data-slot="slider-thumb"
+        index={thumb.index}
+        class="border-ring ring-ring/50 relative size-3 rounded-full border bg-white transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-1 focus-visible:ring-1 focus-visible:outline-hidden active:ring-1 block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50"
+        ondblclick={onThumbDblClick}
+      />
+      {:else}
       <SliderPrimitive.Thumb
         data-slot="slider-thumb"
         index={thumb.index}
         class="border-ring ring-ring/50 relative size-3 rounded-none border bg-white transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-1 focus-visible:ring-1 focus-visible:outline-hidden active:ring-1 block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50"
         ondblclick={onThumbDblClick}
       />
+      {/if}
     {/each}
     {@render children?.({ thumbItems, tickItems, thumbs, ticks })}
   {/snippet}
