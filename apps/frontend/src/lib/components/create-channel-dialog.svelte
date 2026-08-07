@@ -149,7 +149,7 @@
             <span>Creating…</span>
           {:else}
             <Plus class="size-4" />
-            <span>Create Channel  </span>
+            <span>Create Channel </span>
           {/if}
         </Button>
       </Dialog.Footer>

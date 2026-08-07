@@ -217,7 +217,7 @@
         {#if server.canManageChannels}
           <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
             Invite
-  
+
             <DropdownMenu.Shortcut>
               <UserRoundPlus class="size-3" />
             </DropdownMenu.Shortcut>
