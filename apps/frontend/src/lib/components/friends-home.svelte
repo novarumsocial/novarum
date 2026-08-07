@@ -103,14 +103,14 @@
               {#each visible as entry (entry.user.userId)}
                 {@const name = nameFor(entry)}
                 <div class="flex items-center gap-3 py-2.5">
-                  <ProfileCard user={profileFor(entry)}>
-                    <Avatar
-                      src={entry.user.avatarUrl}
-                      {name}
-                      class="size-9 text-sm"
-                      bgColor={entry.user.avatarColor}
-                    />
-                  </ProfileCard>
+                  <!--<ProfileCard user={profileFor(entry)}>-->
+                  <Avatar
+                    src={entry.user.avatarUrl}
+                    {name}
+                    class="size-9 text-sm"
+                    bgColor={entry.user.avatarColor}
+                  />
+                  <!--</ProfileCard>-->
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-medium">{name}</p>
                     <p class="truncate font-mono text-[10px] text-muted-foreground">
