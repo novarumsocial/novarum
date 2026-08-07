@@ -19,7 +19,7 @@ import { transporter } from '../../utils/services/email';
 import { createHmac, randomInt } from 'node:crypto';
 import { render } from 'react-email';
 import { rateLimit } from 'elysia-rate-limit';
-import { createTOTPKeyURI, generateRandomKey, verifyTOTPWithGracePeriod } from '../../utils/otp';
+import { createTOTPKeyURI, decodeBase32, encodeBase32, generateRandomKey, verifyTOTPWithGracePeriod } from '../../utils/otp';
 
 const authRateLimit = (path: string, max: number, duration: number) =>
   rateLimit({
@@ -379,7 +379,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     const gen = createTOTPKeyURI('Novarum', localCredentials.email, key, 30, 6)
     return {
       uri: gen,
-      secret: key,
+      secret: encodeBase32(key),
     }
   }).post('/mfa/totp/enable', async ({ cookie, body, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
@@ -402,9 +402,8 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     }
 
     const { secret, code } = body;
-    const encodedSecret = new TextEncoder().encode(secret);
 
-    const isValid = verifyTOTPWithGracePeriod(encodedSecret, 30, 6, code, 60);
+    const isValid = verifyTOTPWithGracePeriod(decodeBase32(secret), 30, 6, code, 60);
 
     if (!isValid) {
       return status(400, { error: 'Invalid TOTP code' });

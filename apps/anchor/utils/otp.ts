@@ -2,7 +2,7 @@
 // uses node:crypto and bun stuff instead!
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-function encodeBase32(bytes: Uint8Array): string {
+export function encodeBase32(bytes: Uint8Array): string {
 	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 	let result = "";
 	let value = 0;
@@ -20,6 +20,27 @@ function encodeBase32(bytes: Uint8Array): string {
 		result += alphabet[(value << (5 - bits)) & 31];
 	}
 	return result;
+}
+
+export function decodeBase32(base32: string): Uint8Array {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bytes: number[] = [];
+  let value = 0;
+  let bits = 0;
+
+  for (const char of base32) {
+    const index = alphabet.indexOf(char.toUpperCase());
+    if (index === -1) {
+      throw new TypeError(`Invalid base32 character: ${char}`);
+    }
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return new Uint8Array(bytes);
 }
 
 export function generateHOTP(key: Uint8Array, counter: bigint, digits: number): string {
