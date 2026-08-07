@@ -25,6 +25,11 @@
   const name = $derived(user.displayName || user.username);
   const friendStatus = $derived(friends.statusFor(user.username, user.server));
   const friendshipUserId = $derived(friends.userIdFor(user.username, user.server));
+  const isSelf = $derived(
+    Boolean(session.user) &&
+      user.username === session.user?.username &&
+      user.server === session.user?.homeserver
+  );
   const busy = $derived(
     friends.busyUserIds.includes(user.userId) ||
       (friendshipUserId ? friends.busyUserIds.includes(friendshipUserId) : false)
@@ -140,7 +145,7 @@
           {user.about}
         </p>
       {/if}
-      {#if user.username} <!-- TODO: if profile card username === YOUR username => dont show -->
+      {#if user.username && !isSelf}
       <Input
         id="server-name"
         placeholder="Message @{user.username}:{user.server}"
