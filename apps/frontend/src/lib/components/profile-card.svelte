@@ -9,6 +9,7 @@
   import { UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundPlus } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
+  import { Input } from '$lib/components/ui/input/index.js';
 
   let {
     user,
@@ -138,6 +139,15 @@
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
           {user.about}
         </p>
+      {/if}
+      {#if user.username} <!-- TODO: if profile card username === YOUR username => dont show -->
+      <Input
+        id="server-name"
+        placeholder="Message @{user.username}:{user.server}"
+        class="mt-2.5"
+        autocomplete="off"
+        spellcheck="false"
+      />
       {/if}
     </div>
   </Popover.Content>

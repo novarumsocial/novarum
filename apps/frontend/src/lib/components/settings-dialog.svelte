@@ -198,7 +198,7 @@
     }
   }
 
-  let css = $state(localStorage.getItem('quickcss') ?? '');
+  let css = $state(localStorage.getItem('quickcss') || "/* type your custom CSS code here (e.g. a shadcn-ui layout.css) */");
 
   $effect(() => {
     let tag = document.getElementById('quickcss') as HTMLStyleElement;
@@ -570,9 +570,7 @@
               <p class="text-xs font-medium">QuickCSS</p>
               <textarea
                 bind:value={css}
-                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2"
-                placeholder="whatever CSS you type here will update in real time! (e.g. paste whatever shadcn-ui theme's layout.css you like here :3c)"
-              ></textarea>
+                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2 mt-1 resize-none"></textarea>
             </div>
             <div class="flex items-center justify-between">
               <div>
