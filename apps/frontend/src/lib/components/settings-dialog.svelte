@@ -543,7 +543,7 @@
                 <div class="mt-1 flex items-center justify-between gap-3">
                   <p class="text-xs text-destructive">{aboutError ?? ''}</p>
                   <Button size="xs" disabled={aboutLoading} onclick={saveAbout}>
-                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved' : 'Save about'}
+                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved!' : 'Save about'}
                   </Button>
                 </div>
               </div>
