@@ -292,9 +292,6 @@
                     </InputOTP.Group>
                   {/snippet}
                 </InputOTP.Root>
-                <p class="text-center text-xs text-muted-foreground">
-                  Codes expire quickly. Never share yours with anyone.
-                </p>
               </div>
 
               <Button
