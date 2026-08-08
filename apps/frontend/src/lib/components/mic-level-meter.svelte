@@ -42,9 +42,9 @@
   // yellow -> green -> red
   function barColor(i: number): string {
     const t = i / (N - 1);
-    if (t < 0.7) return 'hsl(142 70% 45%)';  // green  -> most of the bar
-    if (t < 0.9) return 'hsl(45 90% 55%)';   // yellow -> getting loud
-    return 'hsl(0 80% 55%)';                 // red    -> too loud bro, lower your voice!!! mom's gonna wake up :(
+    if (t < 0.7) return 'hsl(142 70% 45%)'; // green  -> most of the bar
+    if (t < 0.9) return 'hsl(45 90% 55%)'; // yellow -> getting loud
+    return 'hsl(0 80% 55%)'; // red    -> too loud bro, lower your voice!!! mom's gonna wake up :(
   }
 </script>
 

@@ -146,13 +146,13 @@
         </p>
       {/if}
       {#if user.username && !isSelf}
-      <Input
-        id="server-name"
-        placeholder="Message @{user.username}:{user.server}"
-        class="mt-2.5"
-        autocomplete="off"
-        spellcheck="false"
-      />
+        <Input
+          id="server-name"
+          placeholder="Message @{user.username}:{user.server}"
+          class="mt-2.5"
+          autocomplete="off"
+          spellcheck="false"
+        />
       {/if}
     </div>
   </Popover.Content>

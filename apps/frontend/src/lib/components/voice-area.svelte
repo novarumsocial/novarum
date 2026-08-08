@@ -263,7 +263,8 @@
         variant={voice.selfMuted ? 'destructive' : 'secondary'}
         size="icon"
         class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-        onclick={() => (voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted))}
+        onclick={() =>
+          voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted)}
         aria-label={voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute'}
       >
         {#if voice.selfMuted}

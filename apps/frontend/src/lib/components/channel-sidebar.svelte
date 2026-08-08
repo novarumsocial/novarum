@@ -12,9 +12,7 @@
     Volume2,
     Bell,
     IdCardLanyard,
-
-    HeadphoneOff
-
+    HeadphoneOff,
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -244,21 +242,21 @@
       <DropdownMenu.Item>
         Notification Settings
         <DropdownMenu.Shortcut>
-          <Bell class="size-3"/>
+          <Bell class="size-3" />
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
       <DropdownMenu.Separator />
       <DropdownMenu.Item variant="destructive">
         Leave Guild
         <DropdownMenu.Shortcut>
-          <LogOut class="size-3" style="color: var(--destructive);"/>
+          <LogOut class="size-3" style="color: var(--destructive);" />
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
       <DropdownMenu.Separator />
       <DropdownMenu.Item>
         Copy Guild ID
         <DropdownMenu.Shortcut>
-          <IdCardLanyard class="size-3"/>
+          <IdCardLanyard class="size-3" />
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
     </DropdownMenu.Content>
@@ -375,7 +373,9 @@
                             {name}
                             fallback={initialsFor(name)}
                             bgColor={avatarColorFor(state.userId)}
-                            class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(state.userId)}"
+                            class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(
+                              state.userId
+                            )}"
                           />
                           {#if voice?.channelId === ch.id && voiceState?.speaking}
                             <div
@@ -389,9 +389,9 @@
                           {name}
                         </span>
 
-                        {#if voice?.channelId === ch.id && (voiceState?.selfMuted && !voiceState?.selfDeafened)}
+                        {#if voice?.channelId === ch.id && voiceState?.selfMuted && !voiceState?.selfDeafened}
                           <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                          {:else if voiceState?.selfDeafened}
+                        {:else if voiceState?.selfDeafened}
                           <MicOff class="size-3.5 shrink-0 text-rose-400" />
                           <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
                         {/if}
