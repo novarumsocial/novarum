@@ -196,9 +196,8 @@
               ? 'text-rose-400 hover:text-rose-300'
               : 'text-muted-foreground hover:text-sidebar-foreground'
         )}
-        onclick={() => voice.setMuted(!voice.selfMuted)}
-        disabled={voice.selfDeafened}
-        aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
+        onclick={() => (voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted))}
+        aria-label={voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute'}
       >
         {#if voice.selfMuted}
           <MicOff class="size-4" />
