@@ -485,7 +485,84 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       401: genericResponseErrorSchema,
       404: genericResponseErrorSchema,
     },
-  }).get('/mfa', async ({ cookie, status }) => {
+  }).post('/mfa/totp/toggle', async ({ cookie, body, status }) => {
+    const { enable } = body;
+    const token = cookie[sessionCookieName]?.value as string | undefined;
+    const session = await validateSessionToken(token);
+    if (!session) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const localCreds = await db.query.localCredentials.findFirst({
+      where: {
+        userId: session.userId,
+      },
+    });
+    if (!localCreds) {
+      return status(404, { error: 'User not found' });
+    }
+
+    if (enable && !localCreds.totpSecret) {
+      return status(400, { error: 'TOTP is not set up for this user' });
+    }
+
+    await db.update(localCredentials).set({
+      mfaOptions: enable
+        ? sql`array_append(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`
+        : sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
+    }).where(eq(localCredentials.userId, session.userId));
+
+    return { success: true, message: `TOTP MFA ${enable ? 'enabled' : 'disabled'} successfully` };
+  }, {
+    body: t.Object({
+      enable: t.Boolean(),
+    }),
+    response: {
+      200: z.object({
+        success: z.boolean(),
+        message: z.string(),
+      }),
+      400: genericResponseErrorSchema,
+      401: genericResponseErrorSchema,
+      404: genericResponseErrorSchema,
+    },
+  }).delete('/mfa/totp', async ({ cookie, status }) => {
+    const token = cookie[sessionCookieName]?.value as string | undefined;
+    const session = await validateSessionToken(token);
+    if (!session) {
+      return status(401, { error: 'Unauthorized' });
+    }
+
+    const localCreds = await db.query.localCredentials.findFirst({
+      where: {
+        userId: session.userId,
+      },
+    });
+    if (!localCreds) {
+      return status(404, { error: 'User not found' });
+    }
+    if (!localCreds.totpSecret) {
+      return status(400, { error: 'TOTP is not set up for this user' });
+    }
+
+    await db.update(localCredentials).set({
+      totpSecret: null,
+      mfaOptions: sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
+    }).where(eq(localCredentials.userId, session.userId));
+
+    return { success: true, message: 'TOTP MFA disabled successfully' };
+  }, {
+    response: {
+      200: z.object({
+        success: z.boolean(),
+        message: z.string(),
+      }),
+      400: genericResponseErrorSchema,
+      401: genericResponseErrorSchema,
+      404: genericResponseErrorSchema,
+    },
+  })
+  .get('/mfa', async ({ cookie, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
     if (!session) {

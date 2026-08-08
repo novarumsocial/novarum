@@ -20,6 +20,8 @@
     Copy,
     Check,
     LoaderCircle,
+    Mail,
+    Trash2,
   } from '@lucide/svelte';
   import { anchor } from '$lib/anchor.svelte';
   import { goto } from '$app/navigation';
@@ -43,6 +45,7 @@
   import * as Select from '$lib/components/ui/select/index.js';
   import { Slider } from '$lib/components/ui/slider/index.js';
   import QRCode from 'qrcode';
+  import { cn } from '$lib/utils';
 
   let { open = $bindable(false), voice }: { open: boolean; voice: Voice } = $props();
 
@@ -74,6 +77,12 @@
   });
   let audioDeviceError = $state<string | null>(null);
   let activeTab = $state('account');
+  let mfaOptions = $state<('EMAIL' | 'TOTP')[]>([]);
+  let mfaLoaded = $state(false);
+  let mfaLoading = $state(false);
+  let mfaError = $state<string | null>(null);
+  let emailMfaLoading = $state(false);
+  let emailMfaMessage = $state<string | null>(null);
   let totpState = $state<'idle' | 'setup' | 'enabled' | 'error'>('idle');
   let totpUri = $state('');
   let totpSecret = $state('');
@@ -81,7 +90,12 @@
   let totpCode = $state('');
   let totpLoading = $state(false);
   let totpError = $state<string | null>(null);
+  let totpMfaLoading = $state(false);
+  let totpMfaMessage = $state<string | null>(null);
   let secretCopied = $state(false);
+  let totpDeleteLoading = $state(false);
+  let confirmTotpDelete = $state(false);
+  let confirmTotpTimer: ReturnType<typeof setTimeout> | undefined;
 
   let anchorVersion = $state<string | null>();
   const desktopVersion = await window.electron?.getVersion();
@@ -112,21 +126,30 @@
   });
 
   $effect(() => {
-    if (open && activeTab === 'security' && totpState === 'idle' && !totpLoading) {
-      void loadTotpSetup();
+    if (open && activeTab === 'security' && !mfaLoaded && !mfaLoading && !mfaError) {
+      void loadMfaStatus();
     }
   });
 
   $effect(() => {
     if (open) return;
     activeTab = 'account';
+    mfaOptions = [];
+    mfaLoaded = false;
+    mfaError = null;
+    emailMfaMessage = null;
     totpState = 'idle';
     totpUri = '';
     totpSecret = '';
     totpQr = '';
     totpCode = '';
     totpError = null;
+    totpMfaMessage = null;
     secretCopied = false;
+    totpMfaLoading = false;
+    totpDeleteLoading = false;
+    confirmTotpDelete = false;
+    clearTimeout(confirmTotpTimer);
   });
 
   onMount(() => {
@@ -240,6 +263,77 @@
     }
   }
 
+  async function loadMfaStatus() {
+    mfaLoading = true;
+    mfaError = null;
+
+    try {
+      const result = await anchor.client.auth.mfa.get();
+      if (result.error || !result.data) {
+        mfaError = getErrorMessage(result.error?.value, 'Could not load MFA settings.');
+        return;
+      }
+
+      mfaOptions = result.data.mfaOptions;
+      mfaLoaded = true;
+      if (mfaOptions.includes('TOTP')) {
+        totpState = 'enabled';
+      } else {
+        await loadTotpSetup();
+      }
+    } catch (error) {
+      mfaError = getErrorMessage(error, 'Could not load MFA settings.');
+    } finally {
+      mfaLoading = false;
+    }
+  }
+
+  async function toggleEmailMfa(enable: boolean) {
+    emailMfaLoading = true;
+    emailMfaMessage = null;
+    mfaError = null;
+
+    try {
+      const result = await anchor.client.auth.mfa.email.toggle.post({ enable });
+      if (result.error) {
+        mfaError = getErrorMessage(result.error.value, 'Could not update email MFA.');
+        return;
+      }
+
+      mfaOptions = enable
+        ? [...new Set([...mfaOptions, 'EMAIL' as const])]
+        : mfaOptions.filter((option) => option !== 'EMAIL');
+      emailMfaMessage = `Email MFA ${enable ? 'enabled' : 'disabled'}.`;
+    } catch (error) {
+      mfaError = getErrorMessage(error, 'Could not update email MFA.');
+    } finally {
+      emailMfaLoading = false;
+    }
+  }
+
+  async function toggleTotpMfa(enable: boolean) {
+    totpMfaLoading = true;
+    totpMfaMessage = null;
+    mfaError = null;
+
+    try {
+      const result = await anchor.client.auth.mfa.totp.toggle.post({ enable });
+      if (result.error) {
+        mfaError = getErrorMessage(result.error.value, 'Could not update authenticator MFA.');
+        return;
+      }
+
+      mfaOptions = enable
+        ? [...new Set([...mfaOptions, 'TOTP' as const])]
+        : mfaOptions.filter((option) => option !== 'TOTP');
+      totpMfaMessage = `Authenticator MFA ${enable ? 'enabled' : 'disabled'}.`;
+    } catch (error) {
+      mfaError = getErrorMessage(error, 'Could not update authenticator MFA.');
+    } finally {
+      totpMfaLoading = false;
+    }
+  }
+
   async function loadTotpSetup() {
     totpLoading = true;
     totpError = null;
@@ -301,6 +395,7 @@
       }
 
       totpState = 'enabled';
+      mfaOptions = [...new Set([...mfaOptions, 'TOTP' as const])];
       totpUri = '';
       totpSecret = '';
       totpQr = '';
@@ -320,6 +415,38 @@
     } catch {
       totpError = 'Could not copy the setup key.';
     }
+  }
+
+  async function deleteTotp() {
+    totpDeleteLoading = true;
+    mfaError = null;
+
+    try {
+      const result = await anchor.client.auth.mfa.totp.delete();
+      if (result.error) {
+        mfaError = getErrorMessage(result.error.value, 'Could not remove authenticator MFA.');
+        return;
+      }
+
+      mfaOptions = mfaOptions.filter((option) => option !== 'TOTP');
+      totpState = 'idle';
+      await loadTotpSetup();
+    } catch (error) {
+      mfaError = getErrorMessage(error, 'Could not remove authenticator MFA.');
+    } finally {
+      totpDeleteLoading = false;
+    }
+  }
+
+  function requestDeleteTotp() {
+    if (!confirmTotpDelete) {
+      confirmTotpDelete = true;
+      confirmTotpTimer = setTimeout(() => (confirmTotpDelete = false), 5000);
+      return;
+    }
+    clearTimeout(confirmTotpTimer);
+    confirmTotpDelete = false;
+    void deleteTotp();
   }
 
   let css = $state(localStorage.getItem('quickcss') ?? '');
@@ -684,110 +811,180 @@
         </Tabs.Content>
 
         <Tabs.Content value="security" class="sm:h-full sm:overflow-y-auto sm:pr-1">
-            {#if totpLoading && totpState === 'idle'}
-              <Card.Root class="border-dashed" aria-live="polite">
-                <Card.Content class="flex min-h-40 items-center justify-center gap-2 py-8">
+          <div class="space-y-3 pb-1">
+            {#if mfaLoading && !mfaLoaded}
                   <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
                   <span class="text-xs text-muted-foreground">Checking MFA status...</span>
-                </Card.Content>
-              </Card.Root>
-            {:else if totpState === 'enabled'}
-              <Card.Root class="">
-                <Card.Content class="flex gap-3 py-4" aria-live="polite">
-                  <div
-                    class="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                  >
-                    <ShieldCheck class="size-5" />
-                  </div>
+            {:else if !mfaLoaded}
                   <div class="min-w-0">
-                    <p class="text-sm font-medium">Authenticator MFA is enabled</p>
-                    <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Your server requires a one-time code from your authenticator app when
-                      supported by sign-in.
-                    </p>
-                  </div>
-                </Card.Content>
-              </Card.Root>
-            {:else if totpState === 'setup'}
-              <div class="flex items-center space-x-2">
-                <Smartphone class="size-4" />
-                <p class="text-sm font-medium">Set up an authenticator app</p>
-                </div>
-                <div class="space-y-4 py-4">
-                  <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
-                    <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
-                      <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
-                    </div>
-
-                    <div class="min-w-0 space-y-2">
-                      <div>
-                        <p class="text-xs font-medium">Can't scan it?</p>
-                        <p class="text-[11px] text-muted-foreground">
-                          Enter this setup key manually. Keep it private.
-                        </p>
-                      </div>
-                      <div class="flex items-stretch border bg-muted/40">
-                        <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px]">
-                          {totpSecret}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          class="h-auto border-l"
-                          aria-label="Copy setup key"
-                          onclick={copyTotpSecret}
-                        >
-                          {#if secretCopied}
-                            <Check class="size-3.5" />
-                          {:else}
-                            <Copy class="size-3.5" />
-                          {/if}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <form class="space-y-2 border-t pt-4" onsubmit={enableTotp}>
-                    <div class="grid gap-1.5">
-                      <Label for="totp-code">Verification code</Label>
-                      <div class="flex gap-2">
-                        <Input
-                          id="totp-code"
-                          bind:value={totpCode}
-                          inputmode="numeric"
-                          autocomplete="one-time-code"
-                          maxlength={6}
-                          placeholder="000000"
-                          class="h-9 font-mono text-base tracking-[0.3em]"
-                          aria-invalid={Boolean(totpError)}
-                          autofocus
-                        />
-                        <Button type="submit" class="h-9" disabled={totpLoading}>
-                          {#if totpLoading}
-                            <LoaderCircle class="size-4 animate-spin" />
-                          {/if}
-                          Enable MFA
-                        </Button>
-                      </div>
-                    </div>
-                    <p class="min-h-4 text-xs text-destructive" aria-live="polite">
-                      {totpError ?? ''}
-                    </p>
-                  </form>
-                  </div>
-            {:else}
-              <Card.Root class="border-destructive/40">
-                <Card.Content class="space-y-3 py-4" aria-live="polite">
-                  <div>
                     <p class="text-sm font-medium">MFA settings are unavailable</p>
                     <p class="mt-1 text-xs text-destructive">
-                      {totpError ?? 'Could not load MFA settings.'}
+                      {mfaError ?? 'Could not load MFA settings.'}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onclick={loadTotpSetup}>Try again</Button>
-                </Card.Content>
-              </Card.Root>
+                  <Button variant="outline" size="xs" onclick={loadMfaStatus}>Try again</Button>
+            {:else}
+                <div class="flex items-center justify-between gap-4 px-4 py-3">
+                  <div class="flex min-w-0 items-start gap-3">
+                    <div
+                      class={cn("flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground",
+                        mfaOptions.includes('EMAIL') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      <Mail class="size-4" />
+                    </div>
+                    <div class="min-w-0">
+                      <Label for="email-mfa" class="text-sm font-medium">Email codes</Label>
+                      <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        A one-time code sent to your account email.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="email-mfa"
+                    checked={mfaOptions.includes('EMAIL')}
+                    disabled={emailMfaLoading}
+                    aria-label="Enable email MFA"
+                    onCheckedChange={toggleEmailMfa}
+                  />
+                </div>
+
+                {#if totpLoading && totpState === 'idle'}
+                  <div class="flex min-h-20 items-center justify-center gap-2 px-4 py-4">
+                    <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
+                    <span class="text-xs text-muted-foreground"
+                      >Preparing authenticator setup...</span
+                    >
+                  </div>
+                {:else if totpState === 'enabled'}
+                  <div class="flex items-center justify-between gap-4 px-4 py-3">
+                    <div class="flex min-w-0 items-start gap-3">
+                      <div
+                        class={cn("flex size-8 shrink-0 items-center justify-center rounded-md", mfaOptions.includes('TOTP') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}
+                        
+                      >
+                        <ShieldCheck class="size-4" />
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium">Authenticator app</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                          One-time codes from your authenticator app.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-4">
+                      <Button
+                        variant="outline"
+                        size="icon-xs"
+                        class={confirmTotpDelete
+                          ? 'border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground'
+                          : ''}
+                        disabled={totpMfaLoading || totpDeleteLoading}
+                        onclick={requestDeleteTotp}
+                      >
+                        {#if totpDeleteLoading}
+                          <LoaderCircle class="size-3.5 animate-spin" />
+                        {:else if confirmTotpDelete}
+                          <Trash2 class="size-3.5" /> ?
+                        {:else}
+                          <Trash2 class="size-3.5" />
+                        {/if}
+                      </Button>
+                      <Switch
+                        checked={mfaOptions.includes('TOTP')}
+                        disabled={totpMfaLoading || totpDeleteLoading}
+                        aria-label="Enable authenticator MFA"
+                        onCheckedChange={toggleTotpMfa}
+                      />
+                    </div>
+                  </div>
+                {:else if totpState === 'setup'}
+                  <div class="space-y-4 px-4 py-4">
+                    <div class="flex items-center gap-2">
+                      <Smartphone class="size-4" />
+                      <p class="text-sm font-medium">Set up an authenticator app</p>
+                    </div>
+
+                    <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
+                      <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
+                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
+                      </div>
+
+                      <div class="min-w-0 space-y-2">
+                        <div>
+                          <p class="text-xs font-medium">Can't scan it?</p>
+                          <p class="text-[11px] text-muted-foreground">
+                            Enter this setup key manually. Keep it private.
+                          </p>
+                        </div>
+                        <div class="flex items-stretch border bg-muted/40">
+                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px]">
+                            {totpSecret}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            class="h-auto border-l"
+                            aria-label="Copy setup key"
+                            onclick={copyTotpSecret}
+                          >
+                            {#if secretCopied}
+                              <Check class="size-3.5" />
+                            {:else}
+                              <Copy class="size-3.5" />
+                            {/if}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <form class="space-y-2" onsubmit={enableTotp}>
+                      <div class="grid gap-1.5">
+                        <Label for="totp-code">Verification code</Label>
+                        <div class="flex gap-2">
+                          <Input
+                            id="totp-code"
+                            bind:value={totpCode}
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength={6}
+                            placeholder="000000"
+                            class="h-9 font-mono text-base tracking-[0.3em]"
+                            aria-invalid={Boolean(totpError)}
+                            autofocus
+                          />
+                          <Button type="submit" class="h-9" disabled={totpLoading}>
+                            {#if totpLoading}
+                              <LoaderCircle class="size-4 animate-spin" />
+                            {/if}
+                            Enable MFA
+                          </Button>
+                        </div>
+                      </div>
+                      <p class="min-h-4 text-xs text-destructive" aria-live="polite">
+                        {totpError ?? ''}
+                      </p>
+                    </form>
+                  </div>
+                {:else}
+                  <div class="flex items-center justify-between gap-4 px-4 py-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium">Authenticator app</p>
+                      <p class="mt-0.5 text-xs text-destructive">
+                        {totpError ?? 'Could not prepare authenticator setup.'}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="xs" onclick={loadTotpSetup}
+                      >Try again</Button
+                    >
+                  </div>
+                {/if}
+
+                {#if mfaError}
+                  <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">{mfaError}</p>
+                {/if}
             {/if}
+          </div>
         </Tabs.Content>
 
         <Tabs.Content value="appearance" class="space-y-4">

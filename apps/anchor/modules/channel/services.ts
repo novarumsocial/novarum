@@ -176,7 +176,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           .insert(channels)
           .values({
             id: randomString(),
-            name,
+            name: name.replaceAll(' ', '-'),
             type,
             position: 0,
             guildId,
