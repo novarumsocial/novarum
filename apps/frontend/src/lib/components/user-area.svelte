@@ -164,12 +164,20 @@
   {/if}
 
   <div class="flex h-14 items-center gap-2.5 px-3">
-    <Avatar
-      src={user.avatarUrl}
-      name={user.displayName || user.username}
-      class="size-8 text-xs"
-      bgColor={user.avatarColor}
-    />
+    <div class="relative shrink-0">
+      <Avatar
+        src={user.avatarUrl}
+        name={user.displayName || user.username}
+        bgColor={user.avatarColor}
+        class="size-8 text-xs"
+      />
+      {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
+        <div
+          class="pointer-events-none absolute inset-0 ring-2 ring-[#23a55a] ring-offset-2 ring-offset-sidebar"
+          class:rounded-full={settings.value.circleIcons}
+        ></div>
+      {/if}
+    </div>
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
         {user.displayName || user.username}

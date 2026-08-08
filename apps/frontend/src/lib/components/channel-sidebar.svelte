@@ -366,19 +366,21 @@
                         onclick={() => selectChannel(ch)}
                         class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
                       >
-                        <Avatar
-                          src={avatarFor(state.userId)}
-                          {name}
-                          fallback={initialsFor(name)}
-                          bgColor={avatarColorFor(state.userId)}
-                          class={cn(
-                            'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
-                            avatarBg(state.userId),
-                            voice?.channelId === ch.id &&
-                              voiceState?.speaking &&
-                              'ring-2 ring-emerald-400'
-                          )}
-                        />
+                        <div class="relative shrink-0">
+                          <Avatar
+                            src={avatarFor(state.userId)}
+                            {name}
+                            fallback={initialsFor(name)}
+                            bgColor={avatarColorFor(state.userId)}
+                            class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(state.userId)}"
+                          />
+                          {#if voice?.channelId === ch.id && voiceState?.speaking}
+                            <div
+                              class="pointer-events-none absolute inset-0 ring-2 ring-[#23a55a] ring-offset-2 ring-offset-sidebar"
+                              class:rounded-full={settings.value.circleIcons}
+                            ></div>
+                          {/if}
+                        </div>
 
                         <span class="min-w-0 flex-1 truncate">
                           {name}
