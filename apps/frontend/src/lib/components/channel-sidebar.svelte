@@ -11,7 +11,10 @@
     UserRoundPlus,
     Volume2,
     Bell,
-    IdCardLanyard
+    IdCardLanyard,
+
+    HeadphoneOff
+
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -386,8 +389,11 @@
                           {name}
                         </span>
 
-                        {#if voice?.channelId === ch.id && (voiceState?.selfMuted || voiceState?.selfDeafened)}
+                        {#if voice?.channelId === ch.id && (voiceState?.selfMuted && !voiceState?.selfDeafened)}
                           <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                          {:else if voiceState?.selfDeafened}
+                          <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                          <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
                         {/if}
                       </button>
                     </ParticipantContextMenu>
