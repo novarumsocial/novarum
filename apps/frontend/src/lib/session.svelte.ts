@@ -19,8 +19,11 @@ type SignupInput = {
 };
 
 type SessionResult =
-  | { ok: true; user: SessionUser }
-  | { ok: false; error: string; cookieMissing?: boolean };
+  { ok: true; user: SessionUser } | { ok: false; error: string; cookieMissing?: boolean };
+
+export type MfaMethod = 'EMAIL' | 'TOTP';
+export type LoginResult =
+  SessionResult | { ok: true; mfa: { challenge: string; methods: MfaMethod[] } };
 
 export function getErrorMessage(error: unknown, fallback: string) {
   const stringError = z.string().safeParse(error);
@@ -61,14 +64,14 @@ class SessionState {
     }
   }
 
-  async login(input: LoginInput): Promise<SessionResult> {
+  async login(input: LoginInput): Promise<LoginResult> {
     this.loading = true;
     this.error = null;
 
     try {
       await anchor.setHomeServer(input.homeServer);
 
-      const { error } = await anchor.client.auth.login.post({
+      const { data, error } = await anchor.client.auth.login.post({
         username: input.username,
         password: input.password,
       });
@@ -76,6 +79,13 @@ class SessionState {
       if (error) {
         this.error = getErrorMessage(error.value, 'Could not sign you in.');
         return { ok: false, error: this.error };
+      }
+
+      if (data && 'mfaRequired' in data) {
+        return {
+          ok: true,
+          mfa: { challenge: data.challenge, methods: data.methods },
+        };
       }
 
       const sessionResult = await this.verifyNewSession('Sign-in');
@@ -87,6 +97,43 @@ class SessionState {
       return { ok: false, error: this.error };
     } finally {
       this.loading = false;
+    }
+  }
+
+  async completeMfa(challenge: string, method: MfaMethod, code: string): Promise<SessionResult> {
+    this.loading = true;
+    this.error = null;
+
+    try {
+      const { error } = await anchor.client.auth.login.mfa.post({ challenge, method, code });
+      if (error) {
+        this.error = getErrorMessage(error.value, 'Could not verify that code.');
+        return { ok: false, error: this.error };
+      }
+
+      return await this.verifyNewSession('Verification');
+    } catch (error) {
+      this.error = getErrorMessage(error, 'Could not verify that code. Try again.');
+      return { ok: false, error: this.error };
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async sendMfaEmail(challenge: string) {
+    try {
+      const { error } = await anchor.client.auth.login.mfa.email.post({ challenge });
+      if (error)
+        return {
+          ok: false as const,
+          error: getErrorMessage(error.value, 'Could not send the code.'),
+        };
+      return { ok: true as const };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: getErrorMessage(error, 'Could not send the code. Try again.'),
+      };
     }
   }
 

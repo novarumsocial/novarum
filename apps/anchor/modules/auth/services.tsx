@@ -13,7 +13,7 @@ import { db, emailOtps, localCredentials, users } from '../../src/db';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import OTPEmail from '../../src/emails/otp';
 import { transporter } from '../../utils/services/email';
 import { createHmac, randomInt } from 'node:crypto';
@@ -42,9 +42,17 @@ export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend
   email: z.string().nullable(),
 });
 const userPayloadResponseSchema = z.object({ user: userResponseSchema });
+const mfaMethodSchema = z.enum(['EMAIL', 'TOTP']);
+const mfaChallengeResponseSchema = z.object({
+  mfaRequired: z.literal(true),
+  challenge: z.string(),
+  methods: z.array(mfaMethodSchema),
+});
 
 export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
   .use(authRateLimit('/login', 10, 60_000)) // 10 requests per minute
+  .use(authRateLimit('/login/mfa', 10, 60_000))
+  .use(authRateLimit('/login/mfa/email', 3, 15 * 60_000))
   .use(authRateLimit('/signup', 5, 60 * 60_000)) // 3 requests per hour
   .use(authRateLimit('/reset-password', 5, 15 * 60_000)) // 5 requests per 15 minutes
   .use(authRateLimit('/password-reset/request', 3, 15 * 60_000)) // 3 requests per 15 minutes
@@ -153,6 +161,23 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         return status(401, { error: 'Invalid username or password' });
       }
 
+      const methods = (['EMAIL', 'TOTP'] as const).filter((method) =>
+        credential.mfaOptions.includes(method)
+      );
+      if (methods.length) {
+        const challenge = randomString();
+
+        await db.insert(emailOtps).values({
+          id: challenge,
+          email: credential.email,
+          otp: randomString(),
+          intent: 'MFA_LOGIN',
+          expiresAt: new Date(Date.now() + 10 * 60_000),
+        });
+
+        return status(202, { mfaRequired: true, challenge, methods });
+      }
+
       const session = await createSession(user.id);
       const sessionCookie = createSessionCookie(session.token);
 
@@ -169,6 +194,142 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       body: t.Object({
         username: t.String({ minLength: 2, maxLength: 32, pattern: '^[a-zA-Z0-9._]+$' }),
         password: t.String({ minLength: 8 }),
+      }),
+      response: {
+        200: userPayloadResponseSchema,
+        202: mfaChallengeResponseSchema,
+        401: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/login/mfa/email',
+    async ({ body, status }) => {
+      const pendingChallenge = await db.query.emailOtps.findFirst({
+        where: {
+          id: body.challenge,
+          intent: 'MFA_LOGIN',
+          expiresAt: { gte: new Date() },
+        },
+      });
+      if (!pendingChallenge) {
+        return status(401, { error: 'This verification request has expired. Sign in again.' });
+      }
+
+      const credential = await db.query.localCredentials.findFirst({
+        where: { email: pendingChallenge.email },
+      });
+      if (!credential?.mfaOptions.includes('EMAIL')) {
+        return status(401, { error: 'Invalid verification request' });
+      }
+
+      const otp = randomInt(100000, 1000000);
+      const [updated] = await db
+        .update(emailOtps)
+        .set({ otp: hashOtp(otp), expiresAt: new Date(Date.now() + 10 * 60_000) })
+        .where(
+          and(
+            eq(emailOtps.id, body.challenge),
+            eq(emailOtps.intent, 'MFA_LOGIN'),
+            gt(emailOtps.expiresAt, new Date())
+          )
+        )
+        .returning({ id: emailOtps.id });
+      if (!updated) {
+        return status(401, { error: 'This verification request has expired. Sign in again.' });
+      }
+
+      const html = await render(<OTPEmail otp={otp} intent="login" />);
+      await transporter.sendMail({
+        from: getConfig().email.from_email,
+        to: credential.email,
+        subject: '(novarum) sign-in verification code',
+        html,
+      });
+
+      return { success: true, message: 'Verification code sent' };
+    },
+    {
+      body: t.Object({
+        challenge: t.String({ minLength: 24, maxLength: 24 }),
+      }),
+      response: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        401: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/login/mfa',
+    async ({ body, cookie, status }) => {
+      const pendingChallenge = await db.query.emailOtps.findFirst({
+        where: {
+          id: body.challenge,
+          intent: 'MFA_LOGIN',
+          expiresAt: { gte: new Date() },
+        },
+      });
+      if (!pendingChallenge) {
+        return status(401, { error: 'This verification request has expired. Sign in again.' });
+      }
+
+      const credential = await db.query.localCredentials.findFirst({
+        where: { email: pendingChallenge.email },
+      });
+      if (!credential || !credential.mfaOptions.includes(body.method)) {
+        return status(401, { error: 'Invalid verification request' });
+      }
+
+      const validCode =
+        body.method === 'EMAIL'
+          ? hashOtp(Number(body.code)) === pendingChallenge.otp
+          : Boolean(
+              credential.totpSecret &&
+              verifyTOTPWithGracePeriod(
+                decodeBase32(Buffer.from(credential.totpSecret).toString()),
+                30,
+                6,
+                body.code,
+                30
+              )
+            );
+      if (!validCode) {
+        return status(401, { error: 'Invalid verification code' });
+      }
+
+      const [consumed] = await db
+        .delete(emailOtps)
+        .where(
+          and(
+            eq(emailOtps.id, body.challenge),
+            eq(emailOtps.intent, 'MFA_LOGIN'),
+            gt(emailOtps.expiresAt, new Date())
+          )
+        )
+        .returning({ id: emailOtps.id });
+      if (!consumed) {
+        return status(401, { error: 'This verification request has expired. Sign in again.' });
+      }
+
+      const user = await db.query.users.findFirst({ where: { id: credential.userId } });
+      if (!user) {
+        return status(401, { error: 'Invalid verification request' });
+      }
+
+      const session = await createSession(user.id);
+      const sessionCookie = createSessionCookie(session.token);
+      cookie[sessionCookie.name]!.set({
+        value: sessionCookie.value,
+        ...sessionCookie.attributes,
+      });
+
+      return { user: userResponse(user, credential.email) };
+    },
+    {
+      body: t.Object({
+        challenge: t.String({ minLength: 24, maxLength: 24 }),
+        method: t.Union([t.Literal('EMAIL'), t.Literal('TOTP')]),
+        code: t.String({ pattern: '^[0-9]{6}$' }),
       }),
       response: {
         200: userPayloadResponseSchema,
