@@ -74,6 +74,7 @@ export class Voice {
 
   noiseCancellationEnabled = $state<boolean>(settings.value.noiseCancellation);
   audioLoopbackTesting = $state(false);
+  audioLoopbackStream = $state<MediaStream | null>(null);
   private noiseProcessorTrack: LocalAudioTrack | null = null;
   private noiseCancellationOperation: Promise<void> = Promise.resolve();
   private captureSettingsOperation: Promise<void> = Promise.resolve();
@@ -261,6 +262,7 @@ export class Voice {
       await this.removeNoiseCancellation();
       const track = await createLocalAudioTrack(microphoneCaptureOptions());
       this.audioLoopbackTrack = track;
+      this.audioLoopbackStream = new MediaStream([track.mediaStreamTrack]);
 
       if (this.noiseCancellationEnabled) {
         const audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
@@ -294,6 +296,7 @@ export class Voice {
     const track = this.audioLoopbackTrack;
     const audioContext = this.audioLoopbackContext;
     this.audioLoopbackTrack = null;
+    this.audioLoopbackStream = null;
     this.audioLoopbackContext = null;
     if (this.audioLoopbackElement) {
       this.audioLoopbackElement.srcObject = null;

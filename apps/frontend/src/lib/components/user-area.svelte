@@ -10,6 +10,7 @@
     Signal,
   } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
+  import MicLevelMeter from './mic-level-meter.svelte';
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
   import Avatar from './avatar.svelte';
@@ -123,23 +124,26 @@
                   </span>
                 {/if}
               </div>
-              <Button
-                class="mt-2 w-full"
-                size="sm"
-                variant={voice.audioLoopbackTesting ? 'secondary' : 'outline'}
-                disabled={loopbackPending}
-                aria-pressed={voice.audioLoopbackTesting}
-                onclick={toggleAudioLoopback}
-              >
-                <Headphones data-icon="inline-start" />
-                {loopbackPending
-                  ? voice.audioLoopbackTesting
-                    ? 'Starting...'
-                    : 'Stopping...'
-                  : voice.audioLoopbackTesting
-                    ? 'Stop test'
-                    : 'Start test'}
-              </Button>
+              <div class="mt-2 flex items-center gap-2">
+                <Button
+                  class="flex-1"
+                  size="sm"
+                  variant={voice.audioLoopbackTesting ? 'secondary' : 'outline'}
+                  disabled={loopbackPending}
+                  aria-pressed={voice.audioLoopbackTesting}
+                  onclick={toggleAudioLoopback}
+                >
+                  <Headphones data-icon="inline-start" />
+                  {loopbackPending
+                    ? voice.audioLoopbackTesting
+                      ? 'Starting...'
+                      : 'Stopping...'
+                    : voice.audioLoopbackTesting
+                      ? 'Stop test'
+                      : 'Start test'}
+                </Button>
+                <MicLevelMeter stream={voice.audioLoopbackStream} />
+              </div>
               {#if loopbackError}
                 <p
                   class="mt-2 border border-destructive/20 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive"
