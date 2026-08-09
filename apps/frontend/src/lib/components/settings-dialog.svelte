@@ -907,7 +907,7 @@
 
                     <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
                       <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
-                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
+                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40 not-hover:blur-xs transition not-hover:blur-none" />
                       </div>
 
                       <div class="min-w-0 space-y-2">
@@ -918,7 +918,7 @@
                           </p>
                         </div>
                         <div class="flex items-stretch border bg-muted/40">
-                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs">
+                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs transition blur-none">
                             {totpSecret}
                           </code>
                           <Button
