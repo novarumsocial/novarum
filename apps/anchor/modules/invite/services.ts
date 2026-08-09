@@ -5,50 +5,47 @@ import { getConfig } from '../../utils/config';
 import { makeFederatedChannelId, makeFederatedGuildId } from '../../utils/federationIds';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { publishRealtime } from '../../utils/publishRealtime';
-import { channelSchema, ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
+import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 import { db, guildMembers, guilds, channels as dbChannels } from '../../src/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
+import {
+  channelResponseSchema,
+  federatedGuildResponseSchema,
+  guildInviteResponseSchema,
+  guildResponseSchema,
+  userSelectSchema,
+} from '../../src/db/zod';
 
 const remoteErrorSchema = z.object({ error: z.string() });
 const inviteResponseSchema = z.object({
-  invite: z.object({
-    id: z.string(),
-    guildId: z.string(),
-    code: z.string(),
-    createdAt: z.iso.datetime(),
-    expiresAt: z.iso.datetime().nullable(),
-    creatorId: z.string(),
+  invite: guildInviteResponseSchema.extend({
     creator: publicUserSchema.omit({ userId: true }).extend({
-      id: z.string(),
-      isHomeserverAdmin: z.boolean().nullable(),
-      createdAt: z.iso.datetime(),
-      updatedAt: z.iso.datetime(),
-      status: z.string(),
+      id: userSelectSchema.shape.id,
+      isHomeserverAdmin: userSelectSchema.shape.isHomeserverAdmin,
+      createdAt: userSelectSchema.shape.createdAt,
+      updatedAt: userSelectSchema.shape.updatedAt,
+      status: userSelectSchema.shape.status,
     }),
   }),
-  guild: z.object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    avatarUrl: z.url().nullable(),
-    memberCount: z.number().int().nonnegative(),
-  }),
+  guild: guildResponseSchema
+    .pick({
+      id: true,
+      name: true,
+      description: true,
+      avatarUrl: true,
+    })
+    .extend({
+      avatarUrl: z.url().nullable(),
+      memberCount: z.number().int().nonnegative(),
+    }),
 });
 const acceptedInviteResponseSchema = z.object({
   guildId: z.string(),
-  guild: z
-    .object({
-      id: z.string(),
-      homeserver: z.string(),
-      name: z.string(),
-      description: z.string().nullable(),
-      avatarUrl: z.string().nullable(),
-    })
-    .optional(),
-  channels: z.array(channelSchema).optional(),
+  guild: federatedGuildResponseSchema.optional(),
+  channels: z.array(channelResponseSchema).optional(),
 });
 
 export const invite = new Elysia({ prefix: '/invite', tags: ['Invite'] })

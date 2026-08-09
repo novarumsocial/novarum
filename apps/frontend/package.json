@@ -15,12 +15,13 @@
   "devDependencies": {
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
     "@internationalized/date": "^3.12.0",
-    "@lucide/svelte": "^1.28.0",
+    "@lucide/svelte": "^1.30.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.0",
     "@types/howler": "^2.2.13",
+    "@types/qrcode": "^1.5.6",
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",
     "embla-carousel-svelte": "^8.6.0",
@@ -45,6 +46,7 @@
     "anchor": "workspace:*",
     "elysia": "^1.4.29",
     "livekit-client": "^2.20.0",
+    "qrcode": "^1.5.4",
     "svelte-dnd-action": "^0.9.76",
     "svelte-sound": "^0.6.0"
   }

@@ -48,36 +48,23 @@ import {
   transitionFriendship,
 } from '../friends/model';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { channelSchema } from '../../utils/federationRealtime';
+import {
+  attachmentResponseSchema,
+  channelResponseSchema,
+  channelUsersResponseSchema,
+  federatedGuildResponseSchema,
+  guildInviteResponseSchema,
+  messageResponseBaseSchema,
+} from '../../src/db/zod';
 
 const federatedMessagePageSize = 50;
 const maxFederatedMessagePageSize = 100;
 const okResponseSchema = z.object({ ok: z.boolean() });
 const successResponseSchema = z.object({ success: z.boolean() });
-const federatedGuildSchema = z.object({
-  id: z.string(),
-  homeserver: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
-});
-const attachmentPayloadSchema = z.object({
-  id: z.string(),
-  filename: z.string(),
-  contentType: z.string(),
-  size: z.number(),
-  url: z.url(),
-});
-const federatedMessageSchema = z.object({
-  id: z.string(),
-  channelId: z.string(),
+const federatedMessageSchema = messageResponseBaseSchema.extend({
   guildId: z.string(),
-  content: z.string().nullable(),
-  nonce: z.string(),
-  replyTo: z.string().nullable(),
   pingedHandles: z.array(z.string()),
-  attachments: z.array(attachmentPayloadSchema),
-  createdAt: z.iso.datetime(),
+  attachments: z.array(attachmentResponseSchema),
   author: publicUserSchema,
 });
 const friendCommandErrorSchema = z.object({
@@ -365,11 +352,10 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     {
       response: {
         200: z.object({
-          invite: z.object({
-            code: z.string(),
-            expiresAt: z.iso.datetime().nullable(),
+          invite: guildInviteResponseSchema.pick({ code: true, expiresAt: true }),
+          guild: federatedGuildResponseSchema.extend({
+            memberCount: z.number().int().nonnegative(),
           }),
-          guild: federatedGuildSchema.extend({ memberCount: z.number().int().nonnegative() }),
         }),
         404: genericResponseErrorSchema,
       },
@@ -545,7 +531,10 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     },
     {
       response: {
-        200: z.object({ guild: federatedGuildSchema, channels: z.array(channelSchema) }),
+        200: z.object({
+          guild: federatedGuildResponseSchema,
+          channels: z.array(channelResponseSchema),
+        }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
@@ -865,15 +854,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     },
     {
       response: {
-        200: z.object({
-          users: z.array(
-            publicUserSchema.extend({
-              status: z.enum(['ONLINE', 'OFFLINE']),
-              role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
-              joinedAt: z.iso.datetime(),
-            })
-          ),
-        }),
+        200: channelUsersResponseSchema,
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,

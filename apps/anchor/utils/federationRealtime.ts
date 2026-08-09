@@ -10,26 +10,14 @@ import {
 import type { RealtimeEvent } from './types';
 import { publishRealtime } from './publishRealtime';
 import { publicUserSchema } from './publicUser';
+import {
+  attachmentResponseSchema,
+  channelResponseSchema,
+  messageResponseBaseSchema,
+  userStatusSchema,
+} from '../src/db/zod';
 
 const activeBridges = new Map<string, WebSocket | null>();
-
-const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
-const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
-const attachmentSchema = z.object({
-  id: z.string(),
-  filename: z.string(),
-  contentType: z.string(),
-  size: z.number(),
-  url: z.string().url(),
-});
-
-export const channelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  position: z.number(),
-  type: channelTypeSchema,
-  guildId: z.string(),
-});
 
 const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
@@ -40,24 +28,20 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       ownerId: z.string(),
       avatarUrl: z.string().url().nullable(),
       description: z.string().nullable(),
-      channels: z.array(channelSchema),
+      channels: z.array(channelResponseSchema),
     }),
   }),
   z.object({
     type: z.literal('channel.created'),
-    data: channelSchema,
+    data: channelResponseSchema,
   }),
   z.object({
     type: z.literal('message.created'),
-    data: z.object({
-      id: z.string(),
-      channelId: z.string(),
+    data: messageResponseBaseSchema.extend({
       guildId: z.string(),
-      content: z.string().nullable(),
-      nonce: z.string(),
-      replyTo: z.string().nullable().default(null),
+      replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
       pingedHandles: z.array(z.string()).default([]),
-      attachments: z.array(attachmentSchema),
+      attachments: z.array(attachmentResponseSchema),
       createdAt: z.string(),
       author: publicUserSchema,
     }),

@@ -25,39 +25,22 @@ import {
 } from '../../src/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { channelSchema } from '../../utils/federationRealtime';
+import {
+  channelResponseSchema,
+  guildCreateSchema,
+  guildInviteResponseSchema as inviteSchema,
+  guildResponseSchema as guildSchema,
+} from '../../src/db/zod';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const successResponseSchema = z.object({ success: z.boolean() });
-const guildSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
-  ownerId: z.string(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-  extAnchorDown: z.boolean().nullable(),
-});
-const inviteSchema = z.object({
-  id: z.string(),
-  guildId: z.string(),
-  code: z.string(),
-  createdAt: z.iso.datetime(),
-  expiresAt: z.iso.datetime().nullable(),
-  creatorId: z.string(),
-});
 const guildListResponseSchema = z.object({
   guilds: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
+    guildSchema.pick({ id: true, name: true, avatarUrl: true, description: true }).extend({
       down: z.boolean(),
       canManageChannels: z.boolean(),
-      avatarUrl: z.string().nullable(),
-      description: z.string().nullable(),
       channels: z.array(
-        channelSchema.extend({
+        channelResponseSchema.extend({
           lastReadMessageId: z.string().nullable(),
           unread: z.boolean(),
           mention: z.number().int().nonnegative(),
@@ -239,9 +222,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
       };
     },
     {
-      body: t.Object({
-        name: t.String({ minLength: 1, maxLength: 100 }),
-      }),
+      body: guildCreateSchema,
       response: {
         200: z.object({ guild: guildSchema }),
         401: genericResponseErrorSchema,

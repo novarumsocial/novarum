@@ -16,11 +16,15 @@ import {
 import { z } from 'zod';
 import { parseJson } from '../../utils/parseJson';
 import { isMessageAfter } from '../../utils/messageCursor';
-import { publicUser, publicUserSchema } from '../../utils/publicUser';
+import { publicUser } from '../../utils/publicUser';
 import { channelReadStates, channels, db } from '../../src/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { channelSchema } from '../../utils/federationRealtime';
+import {
+  channelCreateSchema,
+  channelResponseSchema,
+  channelUsersResponseSchema,
+} from '../../src/db/zod';
 
 const remoteErrorSchema = z.object({ error: z.string() });
 const successResponseSchema = z.object({ success: z.boolean() });
@@ -30,15 +34,6 @@ const callTokenResponseSchema = z.object({
   token: z.string(),
 });
 const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
-const channelUsersResponseSchema = z.object({
-  users: z.array(
-    publicUserSchema.extend({
-      status: z.enum(['ONLINE', 'OFFLINE']),
-      role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
-      joinedAt: z.iso.datetime(),
-    })
-  ),
-});
 const callParticipantsResponseSchema = z.object({
   participants: z.array(z.object({ identity: z.string(), name: z.string(), metadata: z.string() })),
 });
@@ -176,7 +171,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           .insert(channels)
           .values({
             id: randomString(),
-            name,
+            name: name.replaceAll(' ', '-'),
             type,
             position: 0,
             guildId,
@@ -207,13 +202,9 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       return createdChannel;
     },
     {
-      body: t.Object({
-        name: t.String({ minLength: 1, maxLength: 100 }),
-        type: t.Enum({ TEXT: 'TEXT', VOICE: 'VOICE' }),
-        guildId: t.String(),
-      }),
+      body: channelCreateSchema,
       response: {
-        200: channelSchema,
+        200: channelResponseSchema,
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
