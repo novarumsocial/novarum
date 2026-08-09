@@ -918,7 +918,7 @@
                           </p>
                         </div>
                         <div class="flex items-stretch border bg-muted/40">
-                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px]">
+                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs">
                             {totpSecret}
                           </code>
                           <Button
