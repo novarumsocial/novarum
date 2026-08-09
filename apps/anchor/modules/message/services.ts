@@ -23,6 +23,9 @@ const messageSchema = messageResponseBaseSchema.extend({
   author: publicUserSchema,
 });
 const messageListResponseSchema = z.object({ messages: z.array(messageSchema) });
+const federatedMessageListResponseSchema = messageListResponseSchema.extend({
+  nextCursor: z.string().nullable(),
+});
 const messageResponseSchema = z.object({ message: messageSchema });
 const successResponseSchema = z.object({ success: z.boolean() });
 
@@ -59,30 +62,45 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
-          federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages`,
-          { user: federationUserPayload(session) }
-        ).catch(() => null);
+        const remoteMessages: z.infer<typeof messageSchema>[] = [];
+        const seenCursors = new Set<string>();
+        let cursor: string | null = null;
 
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [401, 403, 404].includes(result.response.status)
-            ? (result.response.status as 401 | 403 | 404)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote messages failed' }
-          );
-        }
-        const remoteMessages = messageListResponseSchema.safeParse(result.data);
-        if (!remoteMessages.success) {
-          return status(502, { error: 'Remote messages returned an invalid response' });
-        }
+        do {
+          const result = await postSignedFederationJson(
+            federatedChannel.homeserver,
+            `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages`,
+            {
+              user: federationUserPayload(session),
+              limit: 100,
+              ...(cursor ? { cursor } : {}),
+            }
+          ).catch(() => null);
+
+          if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+          if (!result.response.ok) {
+            const remoteError = remoteErrorSchema.safeParse(result.data);
+            const remoteStatus = [401, 403, 404].includes(result.response.status)
+              ? (result.response.status as 401 | 403 | 404)
+              : 502;
+            return status(
+              remoteStatus,
+              remoteError.success ? remoteError.data : { error: 'Remote messages failed' }
+            );
+          }
+
+          const page = federatedMessageListResponseSchema.safeParse(result.data);
+          if (!page.success || (page.data.nextCursor && seenCursors.has(page.data.nextCursor))) {
+            return status(502, { error: 'Remote messages returned an invalid response' });
+          }
+
+          remoteMessages.push(...page.data.messages);
+          cursor = page.data.nextCursor;
+          if (cursor) seenCursors.add(cursor);
+        } while (cursor);
 
         return {
-          messages: remoteMessages.data.messages.map((message) =>
+          messages: remoteMessages.map((message) =>
             mapFederatedMessage(message, channel.id, channel.guildId)
           ),
         };
