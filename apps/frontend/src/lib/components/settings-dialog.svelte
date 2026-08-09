@@ -101,11 +101,8 @@
   const desktopVersion = await window.electron?.getVersion();
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
-  
-  let css = $state(
-    localStorage.getItem('quickcss') ||
-      '/* type your custom CSS code here (e.g. a shadcn-ui layout.css) */'
-  );
+
+  let css = $state(localStorage.getItem('quickcss') || '/* type your custom CSS code here (e.g. a shadcn-ui layout.css) */');
 
   $effect(() => {
     if (!open || anchorVersion !== undefined) return;
@@ -267,7 +264,7 @@
       await goto('/login');
     }
   }
-  
+
   async function loadMfaStatus() {
     mfaLoading = true;
     mfaError = null;
@@ -453,8 +450,6 @@
     confirmTotpDelete = false;
     void deleteTotp();
   }
-
-  let css = $state(localStorage.getItem('quickcss') ?? '');
 
   $effect(() => {
     let tag = document.getElementById('quickcss') as HTMLStyleElement;
@@ -866,7 +861,7 @@
                     <div class="flex min-w-0 items-start gap-3">
                       <div
                         class={cn("flex size-8 shrink-0 items-center justify-center rounded-md", mfaOptions.includes('TOTP') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}
-                        
+
                       >
                         <ShieldCheck class="size-4" />
                       </div>
