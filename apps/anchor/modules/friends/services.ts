@@ -20,7 +20,6 @@ import {
   friendAuthority,
   friendIdentitySchema,
   friendSnapshotSchema,
-  friendStatusSchema,
   rememberFriendCommand,
   retryPendingFriendSyncs,
   syncFriendship,
@@ -29,30 +28,16 @@ import {
   type FriendRelationship,
   type User,
 } from './model';
+import { friendRelationshipResponseSchema, friendStatusSchema } from '../../src/db/zod';
 
 const federationErrorSchema = z.object({ error: z.string() });
-const friendEntrySchema = z.object({
-  user: publicUserSchema,
-  createdAt: z.iso.datetime(),
-  acceptedAt: z.iso.datetime().nullable(),
-});
+const friendEntrySchema = friendRelationshipResponseSchema
+  .pick({ createdAt: true, acceptedAt: true })
+  .extend({ user: publicUserSchema });
 const friendsResponseSchema = z.object({
   accepted: z.array(friendEntrySchema),
   incoming: z.array(friendEntrySchema),
   outgoing: z.array(friendEntrySchema),
-});
-const friendRelationshipResponseSchema = z.object({
-  userOneId: z.string(),
-  userTwoId: z.string(),
-  requestedById: z.string(),
-  status: friendStatusSchema,
-  syncPending: z.boolean(),
-  version: z.number().int().positive(),
-  lastCommandId: z.string().nullable(),
-  acceptCommandId: z.string().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-  acceptedAt: z.iso.datetime().nullable(),
 });
 const friendMutationResponses = {
   200: friendRelationshipResponseSchema,

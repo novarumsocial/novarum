@@ -52,6 +52,15 @@
 <main class="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
   <div class="min-h-0 flex-1 overflow-y-auto">
     <div class="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        class="mb-2 -ml-2 md:hidden"
+        onclick={onOpenNavigation}
+        aria-label="Open channels"
+      >
+        <Menu class="size-5" />
+      </Button>
       <Tabs.Root value="people">
         <div class="flex items-center gap-2 border-b border-border">
           <Tabs.List variant="line" class="min-w-0 flex-1">

@@ -8,6 +8,7 @@ import {
   check,
   index,
   integer,
+  pgEnum,
   pgTable,
   primaryKey,
   serial,
@@ -23,6 +24,8 @@ const date = (name: string) =>
     mode: 'date',
     precision: 3,
   });
+
+export const mfaMethod = pgEnum('mfa_method', ['TOTP', 'EMAIL']);
 
 export const users = pgTable(
   'user',
@@ -67,6 +70,12 @@ export const localCredentials = pgTable('local_credential', {
 
   email: text('email').notNull().unique(),
   passwordHash: text('passwordHash').notNull(),
+
+  totpSecret: bytea('totpSecret'),
+  mfaOptions: mfaMethod('mfaOptions')
+    .array()
+    .notNull()
+    .default(sql`ARRAY[]::mfa_method[]`),
 });
 
 export const sessions = pgTable(

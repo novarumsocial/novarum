@@ -8,11 +8,11 @@ import {
   federationUserSchema,
   upsertFederatedUser,
 } from '../../utils/federationPayload';
+import { friendStatusSchema } from '../../src/db/zod';
 
 export const friendActionSchema = z.enum(['REQUEST', 'ACCEPT', 'DECLINE', 'CANCEL', 'REMOVE']);
 export type FriendAction = z.infer<typeof friendActionSchema>;
 
-export const friendStatusSchema = z.enum(['NONE', 'PENDING', 'ACCEPTED']);
 export type FriendStatus = z.infer<typeof friendStatusSchema>;
 
 export const friendIdentitySchema = z.object({

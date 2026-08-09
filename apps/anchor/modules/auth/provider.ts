@@ -127,6 +127,7 @@ function sessionCookieAttributes(maxAge: number): SessionCookie['attributes'] {
     httpOnly: true,
     secure,
     sameSite: secure ? 'none' : 'lax',
+    partitioned: secure,
     path: '/',
     maxAge,
   };
@@ -184,6 +185,7 @@ export interface SessionCookie {
     httpOnly: true;
     secure: boolean;
     sameSite: 'lax' | 'none';
+    partitioned: boolean;
     path: '/';
     maxAge: number;
   };
