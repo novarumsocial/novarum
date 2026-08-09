@@ -13,25 +13,13 @@ import { and, eq } from 'drizzle-orm';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
+import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
 const remoteErrorSchema = z.object({ error: z.string() });
-const attachmentSchema = z.object({
-  id: z.string(),
-  filename: z.string(),
-  contentType: z.string(),
-  size: z.number(),
-  url: z.string().url(),
-});
-const messageSchema = z.object({
-  id: z.string(),
-  channelId: z.string(),
+const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string(),
-  content: z.string().nullable(),
-  nonce: z.string(),
-  replyTo: z.string().nullable(),
   pingedHandles: z.array(z.string()).optional(),
-  attachments: z.array(attachmentSchema),
-  createdAt: z.iso.datetime(),
+  attachments: z.array(attachmentResponseSchema),
   author: publicUserSchema,
 });
 const messageListResponseSchema = z.object({ messages: z.array(messageSchema) });

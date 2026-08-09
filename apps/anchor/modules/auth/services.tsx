@@ -20,6 +20,7 @@ import { createHmac, randomInt } from 'node:crypto';
 import { render } from 'react-email';
 import { rateLimit } from 'elysia-rate-limit';
 import { createTOTPKeyURI, decodeBase32, encodeBase32, generateRandomKey, verifyTOTPWithGracePeriod } from '../../utils/otp';
+import { mfaMethodSchema } from '../../src/db/zod';
 
 const authRateLimit = (path: string, max: number, duration: number) =>
   rateLimit({
@@ -42,7 +43,6 @@ export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend
   email: z.string().nullable(),
 });
 const userPayloadResponseSchema = z.object({ user: userResponseSchema });
-const mfaMethodSchema = z.enum(['EMAIL', 'TOTP']);
 const mfaChallengeResponseSchema = z.object({
   mfaRequired: z.literal(true),
   challenge: z.string(),
@@ -743,7 +743,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
   }, {
     response: {
       200: z.object({
-        mfaOptions: z.array(z.enum(['EMAIL', 'TOTP'])),
+        mfaOptions: z.array(mfaMethodSchema),
       }),
       401: genericResponseErrorSchema,
       404: genericResponseErrorSchema,
