@@ -41,6 +41,8 @@
     "zod": "^4.4.3"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capgo/capacitor-updater": "^8.51.3",
     "@elysia/eden": "^1.4.10",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
     "anchor": "workspace:*",

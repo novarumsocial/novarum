@@ -3,9 +3,18 @@
   import { browser } from '$app/environment';
   import favicon from '$lib/assets/favicon.svg';
   import { settings } from '$lib/settings.svelte';
+  import { onMount } from 'svelte';
+  import { Capacitor } from '@capacitor/core';
+  import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
   let { children } = $props();
   const desktop = browser && navigator.userAgent.includes('Electron');
+
+  onMount(() => {
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorUpdater.checkForUpdates();
+    }
+  })
 
   $effect(() => {
     const root = document.documentElement;
