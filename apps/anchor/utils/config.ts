@@ -35,7 +35,8 @@ const schema = z.object({
       .min(1)
       .optional()
       .default(['*'])
-      .transform((o) => (o.includes('*') ? ['*'] : [...new Set([...o, 'app://novarum'])])),
+      // https://localhost for the mobile app, app://novarum for the electron app
+      .transform((o) => (o.includes('*') ? ['*'] : [...new Set([...o, 'app://novarum', 'https://localhost'])])),
   }),
   email: z.object({
     smtp_host: z.string().min(1),

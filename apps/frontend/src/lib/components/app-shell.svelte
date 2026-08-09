@@ -25,6 +25,7 @@
   let bootFinished = $state(false);
   let mobileNavigationOpen = $state(false);
   let mobileMembersOpen = $state(false);
+  let swipeStart: { x: number; y: number } | null = null;
 
   const currentServer = $derived(chat.currentServer);
   const currentCategories = $derived(chat.currentCategories);
@@ -90,6 +91,49 @@
     if (channel.type === 'VOICE') void voice.join(id).catch(() => null);
   }
 
+  function startSwipe(event: TouchEvent) {
+    const touch = event.touches[0];
+    if (
+      !touch ||
+      !(event.target instanceof Element) ||
+      event.target.closest(
+        'input, textarea, select, [contenteditable="true"], .touch-none, .overflow-x-auto, [data-slot^="dialog-"], [data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="carousel-content"]'
+      )
+    ) {
+      return;
+    }
+
+    swipeStart = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function finishSwipe(event: TouchEvent) {
+    const touch = event.changedTouches[0];
+    if (!swipeStart || !touch) return;
+
+    const start = swipeStart;
+    swipeStart = null;
+    const x = touch.clientX - start.x;
+    const y = touch.clientY - start.y;
+    if (Math.abs(x) < 56 || Math.abs(x) < Math.abs(y) * 1.25) return;
+
+    if (mobileNavigationOpen && x < 0) mobileNavigationOpen = false;
+    else if (mobileMembersOpen && x > 0) mobileMembersOpen = false;
+    else if (x > 0 && window.innerWidth < 768) openNavigation();
+    else if (x < 0 && window.innerWidth < 1024 && chat.route.kind === 'guild') {
+      openMembers();
+    }
+  }
+
+  function openNavigation() {
+    mobileMembersOpen = false;
+    mobileNavigationOpen = true;
+  }
+
+  function openMembers() {
+    mobileNavigationOpen = false;
+    mobileMembersOpen = true;
+  }
+
   onMount(() => {
     const disconnect = realtime.connect();
     void boot();
@@ -100,6 +144,12 @@
     };
   });
 </script>
+
+<svelte:window
+  ontouchstart={startSwipe}
+  ontouchend={finishSwipe}
+  ontouchcancel={() => (swipeStart = null)}
+/>
 
 {#if booting}
   <InitialLoader finished={bootFinished} />
