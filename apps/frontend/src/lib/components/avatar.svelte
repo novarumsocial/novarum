@@ -29,7 +29,7 @@
 </script>
 
 <div
-  class="flex shrink-0 items-center justify-center overflow-hidden font-bold text-white bg-primary/20 {className}"
+  class="flex shrink-0 items-center justify-center overflow-hidden font-bold text-white bg-primary/20 select-none {className}"
   class:rounded-full={settings.value.circleIcons}
   style:background-color={bgColor || undefined}
   role="img"
