@@ -84,7 +84,10 @@
 
     mobileNavigationOpen = false;
     // if you squint you'll understand...
-    if (channel.type !== 'VOICE' || (voice.connectionState !== ConnectionState.Disconnected && voice.channelId === id)) {
+    if (
+      channel.type !== 'VOICE' ||
+      (voice.connectionState !== ConnectionState.Disconnected && voice.channelId === id)
+    ) {
       chat.selectChannel(id);
     }
     if (channel.type === 'VOICE') void voice.join(id).catch(() => null);

@@ -102,6 +102,8 @@
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
 
+  let css = $state(localStorage.getItem('quickcss') || '/* type your custom CSS code here (e.g. a shadcn-ui layout.css) */');
+
   $effect(() => {
     if (!open || anchorVersion !== undefined) return;
 
@@ -448,8 +450,6 @@
     confirmTotpDelete = false;
     void deleteTotp();
   }
-
-  let css = $state(localStorage.getItem('quickcss') ?? '');
 
   $effect(() => {
     let tag = document.getElementById('quickcss') as HTMLStyleElement;
@@ -802,7 +802,7 @@
                 <div class="mt-1 flex items-center justify-between gap-3">
                   <p class="text-xs text-destructive">{aboutError ?? ''}</p>
                   <Button size="xs" disabled={aboutLoading} onclick={saveAbout}>
-                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved' : 'Save about'}
+                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved!' : 'Save about'}
                   </Button>
                 </div>
               </div>
@@ -861,7 +861,7 @@
                     <div class="flex min-w-0 items-start gap-3">
                       <div
                         class={cn("flex size-8 shrink-0 items-center justify-center rounded-md", mfaOptions.includes('TOTP') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}
-                        
+
                       >
                         <ShieldCheck class="size-4" />
                       </div>
@@ -907,7 +907,7 @@
 
                     <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
                       <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
-                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
+                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40 not-hover:blur-xs transition not-hover:blur-none" />
                       </div>
 
                       <div class="min-w-0 space-y-2">
@@ -918,7 +918,7 @@
                           </p>
                         </div>
                         <div class="flex items-stretch border bg-muted/40">
-                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px]">
+                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs transition blur-none">
                             {totpSecret}
                           </code>
                           <Button
@@ -1006,8 +1006,7 @@
               <p class="text-xs font-medium">QuickCSS</p>
               <textarea
                 bind:value={css}
-                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2"
-                placeholder="whatever CSS you type here will update in real time! (e.g. paste whatever shadcn-ui theme's layout.css you like here :3c)"
+                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2 mt-1 resize-none"
               ></textarea>
             </div>
             <div class="flex items-center justify-between">

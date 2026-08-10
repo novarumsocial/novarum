@@ -797,7 +797,9 @@ class ChatState {
   }
 
   private firstChannelForServer(serverId?: string) {
-    return serverId ? this.channelsByServer[serverId]?.[0]?.channels.filter(c => c.type === 'TEXT')[0] : null;
+    return serverId
+      ? this.channelsByServer[serverId]?.[0]?.channels.filter((c) => c.type === 'TEXT')[0]
+      : null;
   }
 
   private selectInitialChannel() {

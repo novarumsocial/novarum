@@ -115,6 +115,19 @@
   }
 
   const authorName = $derived(message.author.displayName || message.author.username);
+  const selfMentioned = $derived.by(() => {
+    const handle = session.user?.handle.toLowerCase();
+    if (!handle || message.author.userId === session.user?.id) return false;
+
+    const contentHandles =
+      message.content.match(
+        /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
+      ) ?? [];
+
+    return contentHandles.some(
+      (pingedHandle) => pingedHandle.toLowerCase() === handle
+    );
+  });
   const viewableAttachments = $derived(
     message.attachments.filter(
       (attachment) =>
@@ -172,7 +185,9 @@
 
 <div
   id={message.id}
-  class="relative flex gap-3 py-0.5 first:mt-0 hover:bg-muted/30 motion-reduce:animate-none"
+  class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
+    ? 'bg-amber-400/10 hover:bg-amber-400/15'
+    : 'hover:bg-muted/30'}"
   class:animate-message-flash={chat.activeMessage === message.id}
   onanimationend={() => {
     if (chat.activeMessage === message.id) {
@@ -185,6 +200,9 @@
   onmouseleave={() => (hovered = false)}
   role="group"
 >
+  {#if selfMentioned}
+    <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
+  {/if}
   {#if !grouped}
     <ProfileCard user={message.author} class="self-start">
       <Avatar

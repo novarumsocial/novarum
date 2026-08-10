@@ -39,7 +39,7 @@
 
   function mentionClass(text: string) {
     const self = text === `@${session.user!.username}:${session.user!.homeserver}`;
-    return `${self ? 'bg-amber-300/70' : 'bg-primary/15'} px-0.5 font-medium text-primary`;
+    return `${self ? 'bg-primary/30' : 'bg-primary/15'} rounded-[3px] px-0.5 font-medium text-primary transition-colors hover:bg-primary/35`;
   }
 
   function mentionUser(mention: string): Author {
