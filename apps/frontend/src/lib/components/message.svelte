@@ -124,7 +124,7 @@
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    return [...message.pingedHandles, ...contentHandles].some(
+    return contentHandles.some(
       (pingedHandle) => pingedHandle.toLowerCase() === handle
     );
   });
