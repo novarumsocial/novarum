@@ -150,6 +150,12 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     type: z.literal('friends.changed'),
     data: z.object({}),
   }),
+  z.object({
+    type: z.literal('user.updated'),
+    data: z.object({
+      user: publicUserSchema,
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 function parseRealtimeData(data: unknown) {
@@ -368,6 +374,9 @@ class RealtimeState {
       }
       if (event.type === 'friends.changed') {
         void friends.load();
+      }
+      if (event.type === 'user.updated') {
+        chat.updateUserProfile(event.data.user.userId, event.data.user);
       }
     });
   }

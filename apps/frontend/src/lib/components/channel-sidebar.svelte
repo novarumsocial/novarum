@@ -26,6 +26,7 @@
   import Avatar from './avatar.svelte';
   import ParticipantContextMenu from './participant-context-menu.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import ProfileCard from './profile-card.svelte';
 
   let {
     server,
@@ -111,6 +112,10 @@
 
   function avatarColorFor(identity: string) {
     return members.find((item) => item.userId === identity)?.avatarColor;
+  }
+
+  function userFor(identity: string) {
+    return members.find((item) => item.userId === identity);
   }
 
   function voiceUsersFor(channelId: string) {
@@ -361,42 +366,44 @@
                   {#each connectedVoiceUsers as state (state.userId)}
                     {@const name = state.name || nameFor(state.userId)}
                     {@const voiceState = voice?.voiceStates.get(state.userId)}
+                    {@const user = userFor(state.userId)!}
 
-                    <ParticipantContextMenu {voice} identity={state.userId} {name}>
-                      <button
-                        onclick={() => selectChannel(ch)}
-                        class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
-                      >
-                        <div class="relative shrink-0">
-                          <Avatar
-                            src={avatarFor(state.userId)}
+                    <ProfileCard {user} class="group flex w-full cursor-auto">
+                      <ParticipantContextMenu {voice} identity={state.userId} {name}>
+                        <div
+                          class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors"
+                        >
+                          <div class="relative shrink-0">
+                            <Avatar
+                              src={avatarFor(state.userId)}
+                              {name}
+                              fallback={initialsFor(name)}
+                              bgColor={avatarColorFor(state.userId)}
+                              class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(
+                                state.userId
+                              )}"
+                            />
+                            {#if voice?.channelId === ch.id && voiceState?.speaking}
+                              <div
+                                class="pointer-events-none absolute inset-0 ring-2 ring-[#23a55a] ring-offset-2 ring-offset-sidebar"
+                                class:rounded-full={settings.value.circleIcons}
+                              ></div>
+                            {/if}
+                          </div>
+
+                          <span class="min-w-0 flex-1 truncate group-hover:text-sidebar-foreground">
                             {name}
-                            fallback={initialsFor(name)}
-                            bgColor={avatarColorFor(state.userId)}
-                            class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(
-                              state.userId
-                            )}"
-                          />
-                          {#if voice?.channelId === ch.id && voiceState?.speaking}
-                            <div
-                              class="pointer-events-none absolute inset-0 ring-2 ring-[#23a55a] ring-offset-2 ring-offset-sidebar"
-                              class:rounded-full={settings.value.circleIcons}
-                            ></div>
+                          </span>
+
+                          {#if voice?.channelId === ch.id && voiceState?.selfMuted && !voiceState?.selfDeafened}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                          {:else if voiceState?.selfDeafened}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                            <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
                           {/if}
                         </div>
-
-                        <span class="min-w-0 flex-1 truncate">
-                          {name}
-                        </span>
-
-                        {#if voice?.channelId === ch.id && voiceState?.selfMuted && !voiceState?.selfDeafened}
-                          <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                        {:else if voiceState?.selfDeafened}
-                          <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                          <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
-                        {/if}
-                      </button>
-                    </ParticipantContextMenu>
+                      </ParticipantContextMenu>
+                    </ProfileCard>
                   {/each}
                 </div>
               {/if}

@@ -8,6 +8,9 @@ import { eq } from 'drizzle-orm';
 import { getAverageColor } from 'fast-average-color-node';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
+import { publicUser } from '../../utils/publicUser';
+import { publishRealtime } from '../../utils/publishRealtime';
+import type { RealtimeEvent } from '../../src';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const userPayloadResponseSchema = z.object({ user: userResponseSchema });
@@ -41,7 +44,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   )
   .post(
     '/avatar',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, status, server }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) return status(401, { error: 'Unauthorized' });
@@ -80,6 +83,22 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .returning();
       if (!user) return status(404, { error: 'User not found' });
 
+      if (server) {
+        const memberships = await db.query.guildMembers.findMany({
+          where: { userId: session.userId },
+          columns: { guildId: true },
+        });
+        const event: RealtimeEvent = { 
+          type: 'user.updated',
+          data: { user: publicUser(user) },
+        }
+        
+        publishRealtime(server, `userEvents:${session.userId}`, event);
+        for (const memb of memberships) {
+          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
+        }
+      }
+
       return { user: userResponse(user) };
     },
     {
@@ -97,17 +116,36 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   )
   .post(
     '/avatar/color',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, status, server }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) return status(401, { error: 'Unauthorized' });
 
-      await db
+      const [user] = await db
         .update(users)
         .set({
           avatarColor: body.color.toUpperCase(),
         })
-        .where(eq(users.id, session.user.id));
+        .where(eq(users.id, session.user.id))
+        .returning();
+
+      if (!user) return status(404, { error: 'User not found' });
+      
+      if (server) {
+        const memberships = await db.query.guildMembers.findMany({
+          where: { userId: session.userId },
+          columns: { guildId: true },
+        });
+        const event: RealtimeEvent = { 
+          type: 'user.updated',
+          data: { user: publicUser(user) },
+        }
+        
+        publishRealtime(server, `userEvents:${session.userId}`, event);
+        for (const memb of memberships) {
+          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
+        }
+      }
 
       return { color: body.color.toUpperCase() };
     },
@@ -120,6 +158,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       response: {
         200: z.object({ color: z.string().regex(/^#[0-9A-F]{6}$/) }),
         401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
       },
     }
   )
@@ -149,7 +188,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   )
   .post(
     '/banner',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, status, server }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) return status(401, { error: 'Unauthorized' });
@@ -175,6 +214,22 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .where(eq(users.id, session.userId));
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
+      
+      if (server) {
+        const memberships = await db.query.guildMembers.findMany({
+          where: { userId: session.userId },
+          columns: { guildId: true },
+        });
+        const event: RealtimeEvent = { 
+          type: 'user.updated',
+          data: { user: publicUser(user) },
+        }
+        
+        publishRealtime(server, `userEvents:${session.userId}`, event);
+        for (const memb of memberships) {
+          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
+        }
+      }
 
       return { user: userResponse(user) };
     },
@@ -206,7 +261,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   )
   .post(
     '/about',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, status, server }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) return status(401, { error: 'Unauthorized' });
@@ -217,6 +272,22 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .where(eq(users.id, session.userId));
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
+      
+      if (server) {
+        const memberships = await db.query.guildMembers.findMany({
+          where: { userId: session.userId },
+          columns: { guildId: true },
+        });
+        const event: RealtimeEvent = { 
+          type: 'user.updated',
+          data: { user: publicUser(user) },
+        }
+        
+        publishRealtime(server, `userEvents:${session.userId}`, event);
+        for (const memb of memberships) {
+          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
+        }
+      }
 
       return { user: userResponse(user) };
     },
