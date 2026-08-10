@@ -101,7 +101,13 @@ export type RealtimeEvent =
   | {
       type: 'friends.changed';
       data: Record<string, never>;
-    };
+  }
+  | {
+    type: 'user.updated';
+    data: {
+      user: PublicUser;
+    }
+  };
 
 export type AttachmentPayload = {
   id: string;
