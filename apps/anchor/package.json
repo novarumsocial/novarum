@@ -23,7 +23,8 @@
     "db:push": "bunx --bun drizzle-kit push",
     "dev": "bun run --watch src/index.ts",
     "email": "email dev --dir src/emails",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:pushfix": "bun run ./src/db/fix-push.ts"
   },
   "dependencies": {
     "@elysia/openapi": "^1.4.15",
