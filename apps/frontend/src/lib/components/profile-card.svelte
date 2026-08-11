@@ -122,6 +122,10 @@
               ? 'bg-emerald-500'
               : 'bg-muted-foreground'}"
             class:rounded-full={settings.value.circleIcons}
+            class:size-5={settings.value.circleIcons}
+            class:mr-0.25={settings.value.circleIcons}
+            class:mb-0.25={settings.value.circleIcons}
+            class:border-[4px]={settings.value.circleIcons}
             aria-label={user.status === 'ONLINE' ? 'Online' : 'Offline'}
           ></span>
         {/if}
@@ -147,7 +151,7 @@
       {/if}
       {#if user.username && !isSelf}
         <Input
-          id="server-name"
+          id="direct-message-person"
           placeholder="Message @{user.username}:{user.server}"
           class="mt-2.5"
           autocomplete="off"
