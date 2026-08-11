@@ -182,8 +182,9 @@
       />
       {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
         <div
-          class="pointer-events-none absolute inset-0 ring-2 ring-offset-2 ring-offset-sidebar"
-          style:--tw-ring-color={user.speakingRingColor ?? '#00d492'}
+          class="pointer-events-none absolute inset-0"
+          style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ??
+            '#00d492'}, inset 0 0 0 2.5px var(--color-sidebar)"
           class:rounded-full={settings.value.circleIcons}
         ></div>
       {/if}
