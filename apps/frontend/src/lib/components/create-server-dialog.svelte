@@ -72,7 +72,7 @@
     <form method="POST" class="space-y-4" onsubmit={handleSubmit}>
       <div class="flex flex-col items-center gap-3">
         <div
-          class="flex size-16 items-center justify-center text-lg font-bold text-white bg-primary"
+          class="flex size-16 items-center justify-center text-lg font-bold text-white bg-primary select-none"
           class:rounded-full={settings.value.circleIcons}
         >
           {initials(name) || 'N'}
