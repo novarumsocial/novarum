@@ -61,6 +61,7 @@
         about: null,
         isBot: false,
         avatarColor: 'bg-primary',
+        speakingRingColor: null,
       }
     );
   }

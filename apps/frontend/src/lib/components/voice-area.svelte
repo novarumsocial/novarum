@@ -192,8 +192,9 @@
               <div
                 class={cn(
                   'relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-muted transition-shadow duration-150',
-                  state.speaking && 'ring-2 ring-emerald-400'
+                  state.speaking && 'ring-2'
                 )}
+                style:--tw-ring-color={member?.speakingRingColor ?? '#00d492'}
               >
                 {#if state.cameraTrack}
                   <video

@@ -385,7 +385,9 @@
                             />
                             {#if voice?.channelId === ch.id && voiceState?.speaking}
                               <div
-                                class="pointer-events-none absolute inset-0 ring-2 ring-emerald-400 ring-offset-2 ring-offset-sidebar"
+                                class="pointer-events-none absolute inset-0 ring-2 ring-offset-2 ring-offset-sidebar"
+                                style:--tw-ring-color={userFor(state.userId)?.speakingRingColor ??
+                                  '#00d492'}
                                 class:rounded-full={settings.value.circleIcons}
                               ></div>
                             {/if}

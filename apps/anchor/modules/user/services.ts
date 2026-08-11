@@ -88,11 +88,11 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
           where: { userId: session.userId },
           columns: { guildId: true },
         });
-        const event: RealtimeEvent = { 
+        const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
         }
-        
+
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
           publishRealtime(server, `guildEvents:${memb.guildId}`, event);
@@ -124,39 +124,47 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       const [user] = await db
         .update(users)
         .set({
-          avatarColor: body.color.toUpperCase(),
+          avatarColor: body.avatarColor.toUpperCase(),
+          speakingRingColor: body.speakingRingColor.toUpperCase(),
         })
         .where(eq(users.id, session.user.id))
         .returning();
 
       if (!user) return status(404, { error: 'User not found' });
-      
+
       if (server) {
         const memberships = await db.query.guildMembers.findMany({
           where: { userId: session.userId },
           columns: { guildId: true },
         });
-        const event: RealtimeEvent = { 
+        const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
         }
-        
+
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
           publishRealtime(server, `guildEvents:${memb.guildId}`, event);
         }
       }
 
-      return { color: body.color.toUpperCase() };
+      return {
+        avatarColor: user.avatarColor!,
+        speakingRingColor: user.speakingRingColor!,
+      };
     },
     {
+      // should make one of these optional if the api starts getting used by clients outside of the web
       body: t.Object({
-        color: t.String({
+        avatarColor: t.String({
+          pattern: '^#[0-9A-Fa-f]{6}$',
+        }),
+        speakingRingColor: t.String({
           pattern: '^#[0-9A-Fa-f]{6}$',
         }),
       }),
       response: {
-        200: z.object({ color: z.string().regex(/^#[0-9A-F]{6}$/) }),
+        200: z.object({ avatarColor: z.string().regex(/^#[0-9A-F]{6}$/), speakingRingColor: z.string().regex(/^#[0-9A-F]{6}$/) }),
         401: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
@@ -214,17 +222,17 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .where(eq(users.id, session.userId));
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
-      
+
       if (server) {
         const memberships = await db.query.guildMembers.findMany({
           where: { userId: session.userId },
           columns: { guildId: true },
         });
-        const event: RealtimeEvent = { 
+        const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
         }
-        
+
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
           publishRealtime(server, `guildEvents:${memb.guildId}`, event);
@@ -272,17 +280,17 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .where(eq(users.id, session.userId));
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
-      
+
       if (server) {
         const memberships = await db.query.guildMembers.findMany({
           where: { userId: session.userId },
           columns: { guildId: true },
         });
-        const event: RealtimeEvent = { 
+        const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
         }
-        
+
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
           publishRealtime(server, `guildEvents:${memb.guildId}`, event);
