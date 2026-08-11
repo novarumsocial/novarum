@@ -208,7 +208,7 @@
         >
           <X class="size-5" />
         </button>
-        <MemberSidebar members={chat.members} />
+        <MemberSidebar server={currentServer!} members={chat.members} />
       </div>
     {/if}
   </div>

@@ -4,10 +4,14 @@
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
   import { settings } from '$lib/settings.svelte';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import type { Server } from '$lib/types/chat';
 
   let {
+    server,
     members,
   }: {
+    server: Server;
     members: Author[];
   } = $props();
 
@@ -21,8 +25,14 @@
 
 {#if settings.value.showMemberList}
   <aside class="flex size-full w-56 flex-col bg-sidebar">
-    <div class="h-12 shrink-0 border-b border-border"></div>
-
+    <div class="h-12 shrink-0 border-b border-border p-2">
+      <Input
+        id="search-in-channel"
+        placeholder="Search {server.name}"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
     <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">
       <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
         <Users class="size-3.5" />
