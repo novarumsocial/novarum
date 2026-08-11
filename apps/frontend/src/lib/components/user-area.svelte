@@ -20,6 +20,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { settings } from '$lib/settings.svelte';
   import type { SessionUser } from '$lib/session.svelte';
+  import { chat } from '$lib/chat-state.svelte';
 
   let {
     voice,
@@ -69,9 +70,13 @@
           >
             {voice.connecting ? 'Voice Connecting' : 'Voice Connected'}
           </p>
-          <p class="truncate text-[11px] text-muted-foreground">
+          <button
+            type="button"
+            class="m-0 block truncate border-0 bg-transparent p-0 text-left text-[11px] text-muted-foreground appearance-none hover:underline cursor-pointer"
+            onclick={() => chat.selectChannel(voice.channelId!)}
+          >
             {voiceChannelName ?? 'Voice channel'}
-          </p>
+          </button>
         </div>
         <Popover.Root
           onOpenChange={(open) => {
