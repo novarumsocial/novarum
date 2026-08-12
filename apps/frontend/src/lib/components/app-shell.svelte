@@ -15,6 +15,7 @@
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
+  import DmSidebar from './dm-sidebar.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -155,13 +156,16 @@
             voiceStates={chat.voiceStates}
           />
         {/if}
+        {#if chat.route.kind === 'home'}
+          <DmSidebar />
+        {/if}
       </div>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
     {#if chat.route.kind === 'home'}
       <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-    {:else if currentChannel && currentChannel.type === 'TEXT'}
+      {:else if currentChannel && currentChannel.type === 'TEXT'}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
