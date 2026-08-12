@@ -91,7 +91,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
-        }
+        };
 
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
@@ -140,7 +140,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
-        }
+        };
 
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
@@ -164,7 +164,10 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         }),
       }),
       response: {
-        200: z.object({ avatarColor: z.string().regex(/^#[0-9A-F]{6}$/), speakingRingColor: z.string().regex(/^#[0-9A-F]{6}$/) }),
+        200: z.object({
+          avatarColor: z.string().regex(/^#[0-9A-F]{6}$/),
+          speakingRingColor: z.string().regex(/^#[0-9A-F]{6}$/),
+        }),
         401: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
@@ -231,7 +234,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
-        }
+        };
 
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {
@@ -289,7 +292,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         const event: RealtimeEvent = {
           type: 'user.updated',
           data: { user: publicUser(user) },
-        }
+        };
 
         publishRealtime(server, `userEvents:${session.userId}`, event);
         for (const memb of memberships) {

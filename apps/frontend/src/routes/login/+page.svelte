@@ -204,7 +204,6 @@
       <Card.Content>
         {#if mfaChallenge}
           <form class="space-y-5" onsubmit={verifyMfa}>
-
             {#if showLoginOptions}
               <div class="space-y-2 rounded-lg border border-white/10 bg-background/35 p-2">
                 <p class="px-2 pt-1 text-xs font-medium text-muted-foreground">
@@ -249,7 +248,8 @@
               >
                 <Mail class="mx-auto size-6 text-primary" />
                 <p class="text-sm text-muted-foreground">
-                  Ready? Click that fancy button below to send a one-time code to the email on your account.
+                  Ready? Click that fancy button below to send a one-time code to the email on your
+                  account.
                 </p>
                 <Button
                   type="button"

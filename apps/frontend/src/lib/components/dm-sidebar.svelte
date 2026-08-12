@@ -33,11 +33,11 @@
 
   <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
     {#if device.isComputer}
-    <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
-      <Users class="size-4 shrink-0" />
-      <span class="flex-1 truncate">Friends</span>
-    </button>
-    <Separator class="mt-3" />
+      <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
+        <Users class="size-4 shrink-0" />
+        <span class="flex-1 truncate">Friends</span>
+      </button>
+      <Separator class="mt-3" />
     {/if}
 
     <div class="flex items-center justify-between px-2 pt-3 pb-1">

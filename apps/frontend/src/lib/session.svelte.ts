@@ -19,11 +19,13 @@ type SignupInput = {
 };
 
 type SessionResult =
-  { ok: true; user: SessionUser } | { ok: false; error: string; cookieMissing?: boolean };
+  | { ok: true; user: SessionUser }
+  | { ok: false; error: string; cookieMissing?: boolean };
 
 export type MfaMethod = 'EMAIL' | 'TOTP';
 export type LoginResult =
-  SessionResult | { ok: true; mfa: { challenge: string; methods: MfaMethod[] } };
+  | SessionResult
+  | { ok: true; mfa: { challenge: string; methods: MfaMethod[] } };
 
 export function getErrorMessage(error: unknown, fallback: string) {
   const stringError = z.string().safeParse(error);

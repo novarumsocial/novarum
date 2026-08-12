@@ -205,17 +205,20 @@
   </div>
 
   {#if typingText}
-  <div
-    class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
-    aria-live="polite"
-  >
-    <span class="flex items-center gap-0.5 mr-2.5">
-      <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"></span>
-      <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"></span>
-      <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
-    </span>
-    {typingText ?? ''}
-  </div>
+    <div
+      class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
+      aria-live="polite"
+    >
+      <span class="flex items-center gap-0.5 mr-2.5">
+        <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
+        ></span>
+        <span
+          class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
+        ></span>
+        <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
+      </span>
+      {typingText ?? ''}
+    </div>
   {/if}
 
   {#if replyingTo}

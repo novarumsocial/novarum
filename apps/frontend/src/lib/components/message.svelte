@@ -124,9 +124,7 @@
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    return contentHandles.some(
-      (pingedHandle) => pingedHandle.toLowerCase() === handle
-    );
+    return contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle);
   });
   const viewableAttachments = $derived(
     message.attachments.filter(

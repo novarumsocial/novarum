@@ -165,7 +165,7 @@
 
     {#if chat.route.kind === 'home'}
       <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-      {:else if currentChannel && currentChannel.type === 'TEXT'}
+    {:else if currentChannel && currentChannel.type === 'TEXT'}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
