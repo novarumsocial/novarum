@@ -242,8 +242,26 @@
   }
 
   function windowKeyDown(event: KeyboardEvent) {
-    if (textarea !== document.activeElement) {
+    if (
+      textarea !== document.activeElement &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !chat.editingMessage
+    ) {
       textarea.focus();
+    }
+  }
+
+  function handlePaste(event: ClipboardEvent) {
+    const items = Array.from(event.clipboardData?.items ?? []);
+    const files = items
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (files.length > 0) {
+      event.preventDefault();
+      addFiles(files);
     }
   }
 </script>
@@ -380,6 +398,7 @@
       bind:this={textarea}
       onkeydown={handleKeydown}
       onkeyup={handleKeyup}
+      onpaste={handlePaste}
       oninput={updateSearch}
       onclick={updateSearch}
       {placeholder}

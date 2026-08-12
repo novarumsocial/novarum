@@ -19,6 +19,15 @@ import {
 
 const activeBridges = new Map<string, WebSocket | null>();
 
+const messageEventDataSchema = messageResponseBaseSchema.extend({
+  guildId: z.string(),
+  replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
+  pingedHandles: z.array(z.string()).default([]),
+  attachments: z.array(attachmentResponseSchema),
+  createdAt: z.string(),
+  author: publicUserSchema,
+});
+
 const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('guild.created'),
@@ -37,14 +46,11 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('message.created'),
-    data: messageResponseBaseSchema.extend({
-      guildId: z.string(),
-      replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
-      pingedHandles: z.array(z.string()).default([]),
-      attachments: z.array(attachmentResponseSchema),
-      createdAt: z.string(),
-      author: publicUserSchema,
-    }),
+    data: messageEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('message.updated'),
+    data: messageEventDataSchema,
   }),
   z.object({
     type: z.literal('message.deleted'),
@@ -205,6 +211,17 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
   }
 
   if (event.type === 'message.created') {
+    return {
+      ...event,
+      data: {
+        ...event.data,
+        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
+        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+      },
+    };
+  }
+
+  if (event.type === 'message.updated') {
     return {
       ...event,
       data: {

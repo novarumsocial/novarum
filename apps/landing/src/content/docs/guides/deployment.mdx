@@ -110,7 +110,8 @@ A few files must be created. Hopefully it's not much :')
     s3_access_key = "READ_BELOW_FOR_GENERATION"
     s3_secret_key = "READ_BELOW_FOR_GENERATION"
     s3_bucket = "novarum"
-    s3_endpoint = "https://cdn.piedpiper.com"
+    s3_endpoint = "http://garage:3900"
+    s3_public_endpoint = "https://cdn.piedpiper.com"
     s3_region = "garage"
     s3_cors_origins = ["https://app.novarum.me"]
     
@@ -126,6 +127,7 @@ A few files must be created. Hopefully it's not much :')
     ```
 
     A few notes:
+      - `s3_endpoint` is the internal Garage address the server uses for its own requests and must bypass any proxy/CDN in front of Garage. `s3_public_endpoint` is only used to build the presigned URLs handed to clients and should be the public CDN URL. If they are the same, omit `s3_public_endpoint`.
       - Keep in mind that, automatically, a S3 CORS origin will be added to enable Novarum Desktop uploads. There is currently no way to disable it, though we highly doubt you would want to.
       - We recommend using Resend for email delivery because its free plan is very generous and probably enough for most deployments, though feel free to swap the SMTP credentials with your own.
 

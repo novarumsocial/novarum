@@ -140,14 +140,16 @@
       {/if}
 
       <Dialog.Footer class="border-t border-border pt-3">
-        <Button type="button" variant="ghost" onclick={() => (open = false)}>Cancel</Button>
+        <Button type="button" variant="ghost" class="mr-auto" onclick={() => (open = false)}>
+          Cancel
+        </Button>
         <Button type="submit" disabled={loading || !name.trim()}>
           {#if loading}
             <LoaderCircle class="size-4 animate-spin" />
-            <span>Creating...</span>
+            <span>Creating…</span>
           {:else}
             <Plus class="size-4" />
-            <span>Create Channel</span>
+            <span>Create Channel </span>
           {/if}
         </Button>
       </Dialog.Footer>

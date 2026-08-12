@@ -55,11 +55,14 @@
   let about = $state('');
   let avatarInput: HTMLInputElement;
   let bannerInput: HTMLInputElement;
-  let selectedAvatarColor = $state(session.user?.avatarColor ?? '#6366F1');
-  let savedAvatarColor = $state(session.user?.avatarColor ?? '#6366F1');
+  let selectedAvatarColor = $state(session.user?.avatarColor ?? '#005f78');
+  let savedAvatarColor = $state(session.user?.avatarColor ?? '#005f78');
   let avatarColorOpen = $state(false);
+  let speakingRingOpen = $state(false);
   let avatarColorLoading = $state(false);
   let avatarColorError = $state<string | null>(null);
+  let selectedSpeakingRing = $state(session.user?.speakingRingColor ?? '#00d492');
+  let savedSpeakingRing = $state(session.user?.speakingRingColor ?? '#00d492');
   let cropFile = $state<File | null>(null);
   let cropTarget = $state<'avatar' | 'banner'>('avatar');
   let cropOpen = $state(false);
@@ -82,7 +85,6 @@
   let mfaLoading = $state(false);
   let mfaError = $state<string | null>(null);
   let emailMfaLoading = $state(false);
-  let emailMfaMessage = $state<string | null>(null);
   let totpState = $state<'idle' | 'setup' | 'enabled' | 'error'>('idle');
   let totpUri = $state('');
   let totpSecret = $state('');
@@ -91,7 +93,6 @@
   let totpLoading = $state(false);
   let totpError = $state<string | null>(null);
   let totpMfaLoading = $state(false);
-  let totpMfaMessage = $state<string | null>(null);
   let secretCopied = $state(false);
   let totpDeleteLoading = $state(false);
   let confirmTotpDelete = $state(false);
@@ -101,6 +102,8 @@
   const desktopVersion = await window.electron?.getVersion();
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
+
+  let css = $state(localStorage.getItem('quickcss') || '/* type your custom CSS code here (e.g. a shadcn-ui layout.css) */');
 
   $effect(() => {
     if (!open || anchorVersion !== undefined) return;
@@ -119,10 +122,17 @@
     const avatarColor = session.user.avatarColor ?? '#6366F1';
     selectedAvatarColor = avatarColor;
     savedAvatarColor = avatarColor;
+    const speakingRing = session.user.speakingRingColor ?? '#00d492';
+    selectedSpeakingRing = speakingRing;
+    savedSpeakingRing = speakingRing;
   });
 
   $effect(() => {
     if (!avatarColorOpen) selectedAvatarColor = savedAvatarColor;
+  });
+
+  $effect(() => {
+    if (!speakingRingOpen) selectedSpeakingRing = savedSpeakingRing;
   });
 
   $effect(() => {
@@ -137,14 +147,12 @@
     mfaOptions = [];
     mfaLoaded = false;
     mfaError = null;
-    emailMfaMessage = null;
     totpState = 'idle';
     totpUri = '';
     totpSecret = '';
     totpQr = '';
     totpCode = '';
     totpError = null;
-    totpMfaMessage = null;
     secretCopied = false;
     totpMfaLoading = false;
     totpDeleteLoading = false;
@@ -235,16 +243,24 @@
 
     try {
       const result = await anchor.client.user.avatar.color.post({
-        color: selectedAvatarColor.toUpperCase(),
+        avatarColor: selectedAvatarColor.toUpperCase(),
+        speakingRingColor: selectedSpeakingRing.toUpperCase(),
       });
       if (result.error || !result.data || 'error' in result.data) {
         avatarColorError = 'Could not update your avatar color.';
         return;
       }
 
-      selectedAvatarColor = result.data.color;
-      savedAvatarColor = result.data.color;
-      if (session.user) chat.updateUserProfile(session.user.id, { avatarColor: result.data.color });
+      selectedAvatarColor = result.data.avatarColor;
+      savedAvatarColor = result.data.avatarColor;
+      selectedSpeakingRing = result.data.speakingRingColor;
+      savedSpeakingRing = result.data.speakingRingColor;
+      if (session.user) {
+        chat.updateUserProfile(session.user.id, {
+          avatarColor: result.data.avatarColor,
+          speakingRingColor: result.data.speakingRingColor,
+        });
+      }
       await session.refresh();
       avatarColorOpen = false;
     } catch {
@@ -290,7 +306,6 @@
 
   async function toggleEmailMfa(enable: boolean) {
     emailMfaLoading = true;
-    emailMfaMessage = null;
     mfaError = null;
 
     try {
@@ -303,7 +318,6 @@
       mfaOptions = enable
         ? [...new Set([...mfaOptions, 'EMAIL' as const])]
         : mfaOptions.filter((option) => option !== 'EMAIL');
-      emailMfaMessage = `Email MFA ${enable ? 'enabled' : 'disabled'}.`;
     } catch (error) {
       mfaError = getErrorMessage(error, 'Could not update email MFA.');
     } finally {
@@ -313,7 +327,6 @@
 
   async function toggleTotpMfa(enable: boolean) {
     totpMfaLoading = true;
-    totpMfaMessage = null;
     mfaError = null;
 
     try {
@@ -326,7 +339,6 @@
       mfaOptions = enable
         ? [...new Set([...mfaOptions, 'TOTP' as const])]
         : mfaOptions.filter((option) => option !== 'TOTP');
-      totpMfaMessage = `Authenticator MFA ${enable ? 'enabled' : 'disabled'}.`;
     } catch (error) {
       mfaError = getErrorMessage(error, 'Could not update authenticator MFA.');
     } finally {
@@ -448,8 +460,6 @@
     confirmTotpDelete = false;
     void deleteTotp();
   }
-
-  let css = $state(localStorage.getItem('quickcss') ?? '');
 
   $effect(() => {
     let tag = document.getElementById('quickcss') as HTMLStyleElement;
@@ -696,53 +706,110 @@
                     </button>
                   </div>
 
-                  <div class="pointer-events-auto mb-1 flex items-center gap-2">
-                    <Popover.Root bind:open={avatarColorOpen}>
-                      <Popover.Trigger>
-                        {#snippet child({ props })}
-                          <Button
-                            {...props}
-                            variant="outline"
-                            size="xs"
-                            class="gap-1.5 px-2 font-mono"
-                            aria-label={`Change avatar color, currently ${selectedAvatarColor}`}
-                          >
-                            <span
-                              class="size-3.5 rounded-full border border-black/15 ring-1 ring-white/20"
-                              style:background-color={selectedAvatarColor}
-                            ></span>
-                            <span class="hidden sm:inline">{selectedAvatarColor.toUpperCase()}</span
-                            >
-                          </Button>
-                        {/snippet}
-                      </Popover.Trigger>
-
-                      <Popover.Content align="end" class="w-auto overflow-hidden p-0">
-                        <ColorPicker.Root
-                          bind:value={selectedAvatarColor}
-                          formats={['hex']}
-                          class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
-                        />
-                        <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
-                          <p class="text-[11px] text-destructive">{avatarColorError ?? ''}</p>
-                          <div class="flex gap-2">
+                  <div class="pointer-events-auto mb-1 mt-12 flex flex-col items-end gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="hidden text-[11px] text-muted-foreground sm:inline"
+                        >Avatar color</span
+                      >
+                      <Popover.Root bind:open={avatarColorOpen}>
+                        <Popover.Trigger>
+                          {#snippet child({ props })}
                             <Button
-                              variant="ghost"
+                              {...props}
+                              variant="outline"
                               size="xs"
-                              disabled={avatarColorLoading}
-                              onclick={() => (avatarColorOpen = false)}>Cancel</Button
+                              class="gap-1.5 px-2 font-mono"
+                              aria-label={`Change avatar color, currently ${selectedAvatarColor}`}
+                              title="Avatar color"
                             >
-                            <Button
-                              size="xs"
-                              disabled={avatarColorLoading}
-                              onclick={saveAvatarColor}
-                            >
-                              {avatarColorLoading ? 'Saving...' : 'Save color'}
+                              <span
+                                class="size-3.5 rounded-full border border-black/15 ring-1 ring-white/20"
+                                style:background-color={selectedAvatarColor}
+                              ></span>
+                              <span class="hidden sm:inline">{selectedAvatarColor.toUpperCase()}</span>
                             </Button>
+                          {/snippet}
+                        </Popover.Trigger>
+
+                        <Popover.Content align="end" class="w-auto overflow-hidden p-0">
+                          <ColorPicker.Root
+                            bind:value={selectedAvatarColor}
+                            formats={['hex']}
+                            class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
+                          />
+                          <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
+                            <p class="text-[11px] text-destructive">{avatarColorError ?? ''}</p>
+                            <div class="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={avatarColorLoading}
+                                onclick={() => (avatarColorOpen = false)}>Cancel</Button
+                              >
+                              <Button
+                                size="xs"
+                                disabled={avatarColorLoading}
+                                onclick={saveAvatarColor}
+                              >
+                                {avatarColorLoading ? 'Saving...' : 'Save color'}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </Popover.Content>
-                    </Popover.Root>
+                        </Popover.Content>
+                      </Popover.Root>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <span class="hidden text-[11px] text-muted-foreground sm:inline"
+                        >Speaking ring</span
+                      >
+                      <Popover.Root bind:open={speakingRingOpen}>
+                        <Popover.Trigger>
+                          {#snippet child({ props })}
+                            <Button
+                              {...props}
+                              variant="outline"
+                              size="xs"
+                              class="gap-1.5 px-2 font-mono"
+                              aria-label={`Change speaking ring color, currently ${selectedSpeakingRing}`}
+                              title="Speaking ring color"
+                            >
+                              <span
+                                class="size-3.5 rounded-full border border-black/15 ring-1 ring-white/20"
+                                style:background-color={selectedSpeakingRing}
+                              ></span>
+                              <span class="hidden sm:inline">{selectedSpeakingRing.toUpperCase()}</span>
+                            </Button>
+                          {/snippet}
+                        </Popover.Trigger>
+
+                        <Popover.Content align="end" class="w-auto overflow-hidden p-0">
+                          <ColorPicker.Root
+                            bind:value={selectedSpeakingRing}
+                            formats={['hex']}
+                            class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
+                          />
+                          <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
+                            <p class="text-[11px] text-destructive">{avatarColorError ?? ''}</p>
+                            <div class="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={avatarColorLoading}
+                                onclick={() => (speakingRingOpen = false)}>Cancel</Button
+                              >
+                              <Button
+                                size="xs"
+                                disabled={avatarColorLoading}
+                                onclick={saveAvatarColor}
+                              >
+                                {avatarColorLoading ? 'Saving...' : 'Save color'}
+                              </Button>
+                            </div>
+                          </div>
+                        </Popover.Content>
+                      </Popover.Root>
+                    </div>
                   </div>
                 </div>
 
@@ -759,7 +826,7 @@
                   <p class="mt-3 text-xs text-destructive">{mediaError}</p>
                 {/if}
               </div>
-            </section>
+              </section>
 
             <section class="rounded-xl border bg-card">
               <div class="border-b px-4 py-2">
@@ -802,7 +869,7 @@
                 <div class="mt-1 flex items-center justify-between gap-3">
                   <p class="text-xs text-destructive">{aboutError ?? ''}</p>
                   <Button size="xs" disabled={aboutLoading} onclick={saveAbout}>
-                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved' : 'Save about'}
+                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved!' : 'Save about'}
                   </Button>
                 </div>
               </div>
@@ -861,7 +928,7 @@
                     <div class="flex min-w-0 items-start gap-3">
                       <div
                         class={cn("flex size-8 shrink-0 items-center justify-center rounded-md", mfaOptions.includes('TOTP') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}
-                        
+
                       >
                         <ShieldCheck class="size-4" />
                       </div>
@@ -907,7 +974,7 @@
 
                     <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
                       <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
-                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
+                        <img src={totpQr} alt="Authenticator setup QR code" class="size-40 not-hover:blur-xs transition not-hover:blur-none" />
                       </div>
 
                       <div class="min-w-0 space-y-2">
@@ -918,7 +985,7 @@
                           </p>
                         </div>
                         <div class="flex items-stretch border bg-muted/40">
-                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px]">
+                          <code class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs transition blur-none">
                             {totpSecret}
                           </code>
                           <Button
@@ -1006,8 +1073,7 @@
               <p class="text-xs font-medium">QuickCSS</p>
               <textarea
                 bind:value={css}
-                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2"
-                placeholder="whatever CSS you type here will update in real time! (e.g. paste whatever shadcn-ui theme's layout.css you like here :3c)"
+                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2 mt-1 resize-none"
               ></textarea>
             </div>
             <div class="flex items-center justify-between">

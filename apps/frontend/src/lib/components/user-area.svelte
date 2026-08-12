@@ -10,6 +10,7 @@
     Signal,
   } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
+  import MicLevelMeter from './mic-level-meter.svelte';
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
   import Avatar from './avatar.svelte';
@@ -19,6 +20,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { settings } from '$lib/settings.svelte';
   import type { SessionUser } from '$lib/session.svelte';
+  import { chat } from '$lib/chat-state.svelte';
 
   let {
     voice,
@@ -68,9 +70,13 @@
           >
             {voice.connecting ? 'Voice Connecting' : 'Voice Connected'}
           </p>
-          <p class="truncate text-[11px] text-muted-foreground">
+          <button
+            type="button"
+            class="m-0 block truncate border-0 bg-transparent p-0 text-left text-[11px] text-muted-foreground appearance-none hover:underline cursor-pointer"
+            onclick={() => chat.selectChannel(voice.channelId!)}
+          >
             {voiceChannelName ?? 'Voice channel'}
-          </p>
+          </button>
         </div>
         <Popover.Root
           onOpenChange={(open) => {
@@ -123,23 +129,26 @@
                   </span>
                 {/if}
               </div>
-              <Button
-                class="mt-2 w-full"
-                size="sm"
-                variant={voice.audioLoopbackTesting ? 'secondary' : 'outline'}
-                disabled={loopbackPending}
-                aria-pressed={voice.audioLoopbackTesting}
-                onclick={toggleAudioLoopback}
-              >
-                <Headphones data-icon="inline-start" />
-                {loopbackPending
-                  ? voice.audioLoopbackTesting
-                    ? 'Starting...'
-                    : 'Stopping...'
-                  : voice.audioLoopbackTesting
-                    ? 'Stop test'
-                    : 'Start test'}
-              </Button>
+              <div class="mt-2 flex items-center gap-2">
+                <Button
+                  class="flex-1"
+                  size="sm"
+                  variant={voice.audioLoopbackTesting ? 'secondary' : 'outline'}
+                  disabled={loopbackPending}
+                  aria-pressed={voice.audioLoopbackTesting}
+                  onclick={toggleAudioLoopback}
+                >
+                  <Headphones data-icon="inline-start" />
+                  {loopbackPending
+                    ? voice.audioLoopbackTesting
+                      ? 'Starting...'
+                      : 'Stopping...'
+                    : voice.audioLoopbackTesting
+                      ? 'Stop test'
+                      : 'Start test'}
+                </Button>
+                <MicLevelMeter stream={voice.audioLoopbackStream} />
+              </div>
               {#if loopbackError}
                 <p
                   class="mt-2 border border-destructive/20 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive"
@@ -164,12 +173,22 @@
   {/if}
 
   <div class="flex h-14 items-center gap-2.5 px-3">
-    <Avatar
-      src={user.avatarUrl}
-      name={user.displayName || user.username}
-      class="size-8 text-xs"
-      bgColor={user.avatarColor}
-    />
+    <div class="relative shrink-0">
+      <Avatar
+        src={user.avatarUrl}
+        name={user.displayName || user.username}
+        bgColor={user.avatarColor}
+        class="size-8 text-xs"
+      />
+      {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
+        <div
+          class="pointer-events-none absolute inset-0"
+          style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ??
+            '#00d492'}, inset 0 0 0 2.5px var(--color-sidebar)"
+          class:rounded-full={settings.value.circleIcons}
+        ></div>
+      {/if}
+    </div>
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
         {user.displayName || user.username}
@@ -188,9 +207,9 @@
               ? 'text-rose-400 hover:text-rose-300'
               : 'text-muted-foreground hover:text-sidebar-foreground'
         )}
-        onclick={() => voice.setMuted(!voice.selfMuted)}
-        disabled={voice.selfDeafened}
-        aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
+        onclick={() =>
+          voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted)}
+        aria-label={voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute'}
       >
         {#if voice.selfMuted}
           <MicOff class="size-4" />

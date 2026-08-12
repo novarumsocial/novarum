@@ -6,9 +6,12 @@
     ref = $bindable(null),
     value = $bindable(),
     class: className,
+    disableResize,
     'data-slot': dataSlot = 'textarea',
     ...restProps
-  }: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> = $props();
+  }: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> & {
+    disableResize?: boolean;
+  } = $props();
 </script>
 
 <textarea
@@ -16,6 +19,7 @@
   data-slot={dataSlot}
   class={cn(
     'rounded-none border border-input bg-transparent px-2.5 py-2 text-xs transition-colors focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:bg-input/50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 md:text-xs dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 flex field-sizing-content min-h-16 w-full outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+    disableResize ? 'resize-none' : '',
     className
   )}
   bind:value

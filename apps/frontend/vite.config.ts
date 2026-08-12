@@ -31,8 +31,8 @@ export default defineConfig({
         },
       },
       adapter: adapter({
-        fallback: 'index.html',
-      }),
+              fallback: 'index.html',
+            }),
     }),
   ],
   define: {

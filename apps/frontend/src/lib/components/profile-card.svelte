@@ -9,6 +9,7 @@
   import { UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundPlus } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
+  import { Input } from '$lib/components/ui/input/index.js';
 
   let {
     user,
@@ -24,6 +25,11 @@
   const name = $derived(user.displayName || user.username);
   const friendStatus = $derived(friends.statusFor(user.username, user.server));
   const friendshipUserId = $derived(friends.userIdFor(user.username, user.server));
+  const isSelf = $derived(
+    Boolean(session.user) &&
+      user.username === session.user?.username &&
+      user.server === session.user?.homeserver
+  );
   const busy = $derived(
     friends.busyUserIds.includes(user.userId) ||
       (friendshipUserId ? friends.busyUserIds.includes(friendshipUserId) : false)
@@ -138,6 +144,15 @@
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
           {user.about}
         </p>
+      {/if}
+      {#if user.username && !isSelf}
+        <Input
+          id="server-name"
+          placeholder="Message @{user.username}:{user.server}"
+          class="mt-2.5"
+          autocomplete="off"
+          spellcheck="false"
+        />
       {/if}
     </div>
   </Popover.Content>

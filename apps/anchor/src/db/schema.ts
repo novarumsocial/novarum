@@ -46,7 +46,8 @@ export const users = pgTable(
     bannerUrl: text('bannerUrl'),
     about: text('about'),
 
-    avatarColor: text('avatarColor'),
+    avatarColor: text('avatarColor').default('#005f78'),
+    speakingRingColor: text('speakingRingColor').default('#00d492'),
 
     isBot: boolean('isBot').notNull(),
     isHomeserverAdmin: boolean('isHomeserverAdmin').default(false),

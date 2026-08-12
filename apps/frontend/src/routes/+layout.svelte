@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import { Capacitor } from '@capacitor/core';
   import { CapacitorUpdater } from '@capgo/capacitor-updater';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let { children } = $props();
   const desktop = browser && navigator.userAgent.includes('Electron');
@@ -37,4 +38,6 @@
   </header>
 {/if}
 
-{@render children()}
+<Tooltip.Provider delayDuration={250}>
+  {@render children()}
+</Tooltip.Provider>

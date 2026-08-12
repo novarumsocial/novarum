@@ -19,7 +19,7 @@ import {
   presignedUploadSchema,
 } from '../../utils/attachments';
 import { createPendingAttachment } from '../upload/services';
-import { getPingRecipients, verifyPendingAttachments } from '../message/services';
+import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../message/services';
 import { storage } from '../../utils/services/storage';
 import { z } from 'zod';
 import { isMessageAfter } from '../../utils/messageCursor';
@@ -676,6 +676,91 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     }
   )
   .post(
+    '/channels/:id/messages/edit',
+    async ({ params, request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const messageId = getObjectProperty(parsed.body, 'messageId');
+      const content = getObjectProperty(parsed.body, 'content');
+      if (typeof messageId !== 'string') return status(400, { error: 'Invalid message ID' });
+      if (content !== null && typeof content !== 'string') {
+        return status(400, { error: 'Invalid federation message' });
+      }
+
+      const access = await getFederatedChannelAccess(params.id, userPayload);
+      if (!access.ok) return status(access.status, { error: access.error });
+
+      const existing = await db.query.messages.findFirst({
+        where: { id: messageId, channelId: params.id },
+        with: { attachments: true },
+      });
+      if (!existing) return status(404, { error: 'Message not found' });
+      if (existing.authorId !== access.user.id) return status(403, { error: 'Forbidden' });
+      if (content === null && existing.attachments.length === 0) {
+        return status(400, { error: 'Message content or an attachment is required' });
+      }
+
+      const replyTarget = existing.replyTo
+        ? await db.query.messages.findFirst({
+            where: { id: existing.replyTo, channelId: params.id },
+          })
+        : null;
+      const pingRecipients = await getPingRecipients(
+        access.channel.guildId,
+        content,
+        replyTarget?.authorId,
+        access.user.id
+      );
+
+      const message = await db.transaction(async (tx) => {
+        await tx.delete(messagePings).where(eq(messagePings.messageId, existing.id));
+        for (const recipient of pingRecipients) {
+          await tx.insert(messagePings).values({
+            messageId: existing.id,
+            userId: recipient.userId,
+          });
+        }
+        return (
+          await tx.update(messages).set({ content }).where(eq(messages.id, existing.id)).returning()
+        )[0];
+      });
+
+      const responseMessage = federatedMessageResponse(
+        {
+          ...message,
+          attachments: existing.attachments,
+          pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+        },
+        access.channel,
+        access.user
+      );
+      if (server) {
+        publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+          type: 'message.updated',
+          data: responseMessage,
+        });
+      }
+
+      return { message: responseMessage };
+    },
+    {
+      response: {
+        200: z.object({ message: federatedMessageSchema }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
     '/channels/:id/messages/delete',
     async ({ params, request, server, status }) => {
       const parsed = await verifiedFederationJsonBody(request);
@@ -1297,6 +1382,8 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     content: message.content,
     nonce: message.nonce,
     replyTo: message.replyTo ?? null,
+    edited: messageEdited(message),
+    editedTime: messageEdited(message) ? new Date(message.updatedAt).toISOString() : undefined,
     pingedHandles: Array.isArray(message.pingedHandles) ? message.pingedHandles : [],
     attachments: Array.isArray(message.attachments)
       ? message.attachments.map(attachmentPayload)

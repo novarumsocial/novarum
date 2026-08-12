@@ -10,6 +10,9 @@
     Settings,
     UserRoundPlus,
     Volume2,
+    Bell,
+    IdCardLanyard,
+    HeadphoneOff,
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -23,6 +26,7 @@
   import Avatar from './avatar.svelte';
   import ParticipantContextMenu from './participant-context-menu.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import ProfileCard from './profile-card.svelte';
 
   let {
     server,
@@ -108,6 +112,10 @@
 
   function avatarColorFor(identity: string) {
     return members.find((item) => item.userId === identity)?.avatarColor;
+  }
+
+  function userFor(identity: string) {
+    return members.find((item) => item.userId === identity);
   }
 
   function voiceUsersFor(channelId: string) {
@@ -217,7 +225,7 @@
         {#if server.canManageChannels}
           <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
             Invite
-  
+
             <DropdownMenu.Shortcut>
               <UserRoundPlus class="size-3" />
             </DropdownMenu.Shortcut>
@@ -236,12 +244,24 @@
       </DropdownMenu.Group>
 
       <DropdownMenu.Separator />
-
       <DropdownMenu.Item>
-        Leave guild
-
+        Notification Settings
         <DropdownMenu.Shortcut>
-          <LogOut class="size-3" />
+          <Bell class="size-3" />
+        </DropdownMenu.Shortcut>
+      </DropdownMenu.Item>
+      <DropdownMenu.Separator />
+      <DropdownMenu.Item variant="destructive">
+        Leave Guild
+        <DropdownMenu.Shortcut>
+          <LogOut class="size-3" style="color: var(--destructive);" />
+        </DropdownMenu.Shortcut>
+      </DropdownMenu.Item>
+      <DropdownMenu.Separator />
+      <DropdownMenu.Item>
+        Copy Guild ID
+        <DropdownMenu.Shortcut>
+          <IdCardLanyard class="size-3" />
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
     </DropdownMenu.Content>
@@ -256,7 +276,9 @@
           aria-label="Add channel"
           class="peer order-2 cursor-pointer text-muted-foreground opacity-70 transition-opacity hover:text-sidebar-foreground hover:opacity-100"
         >
-          <Plus class="size-3 shrink-0" />
+          {#if server.canManageChannels}
+            <Plus class="size-3 shrink-0" />
+          {/if}
         </button>
 
         <button
@@ -344,35 +366,46 @@
                   {#each connectedVoiceUsers as state (state.userId)}
                     {@const name = state.name || nameFor(state.userId)}
                     {@const voiceState = voice?.voiceStates.get(state.userId)}
+                    {@const user = userFor(state.userId)!}
 
-                    <ParticipantContextMenu {voice} identity={state.userId} {name}>
-                      <button
-                        onclick={() => selectChannel(ch)}
-                        class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-sidebar-foreground"
-                      >
-                        <Avatar
-                          src={avatarFor(state.userId)}
-                          {name}
-                          fallback={initialsFor(name)}
-                          bgColor={avatarColorFor(state.userId)}
-                          class={cn(
-                            'relative flex size-6 shrink-0 items-center justify-center text-[10px] font-bold text-white',
-                            avatarBg(state.userId),
-                            voice?.channelId === ch.id &&
-                              voiceState?.speaking &&
-                              'ring-2 ring-emerald-400'
-                          )}
-                        />
+                    <ProfileCard {user} class="group flex w-full cursor-auto">
+                      <ParticipantContextMenu {voice} identity={state.userId} {name}>
+                        <div
+                          class="flex w-full items-center gap-1.5 rounded-none px-2 py-0.5 text-left text-sm text-muted-foreground transition-colors"
+                        >
+                          <div class="relative shrink-0">
+                            <Avatar
+                              src={avatarFor(state.userId)}
+                              {name}
+                              fallback={initialsFor(name)}
+                              bgColor={avatarColorFor(state.userId)}
+                              class="flex size-6 items-center justify-center text-[10px] font-bold text-white {avatarBg(
+                                state.userId
+                              )}"
+                            />
+                            {#if voice?.channelId === ch.id && voiceState?.speaking}
+                              <div
+                                class="pointer-events-none absolute inset-0"
+                                style:box-shadow="inset 0 0 0 1.5px {userFor(state.userId)
+                                  ?.speakingRingColor ?? '#00d492'}, inset 0 0 0 2.5px var(--color-sidebar)"
+                                class:rounded-full={settings.value.circleIcons}
+                              ></div>
+                            {/if}
+                          </div>
 
-                        <span class="min-w-0 flex-1 truncate">
-                          {name}
-                        </span>
+                          <span class="min-w-0 flex-1 truncate group-hover:text-sidebar-foreground">
+                            {name}
+                          </span>
 
-                        {#if voice?.channelId === ch.id && (voiceState?.selfMuted || voiceState?.selfDeafened)}
-                          <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                        {/if}
-                      </button>
-                    </ParticipantContextMenu>
+                          {#if voice?.channelId === ch.id && voiceState?.selfMuted && !voiceState?.selfDeafened}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                          {:else if voiceState?.selfDeafened}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
+                            <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
+                          {/if}
+                        </div>
+                      </ParticipantContextMenu>
+                    </ProfileCard>
                   {/each}
                 </div>
               {/if}

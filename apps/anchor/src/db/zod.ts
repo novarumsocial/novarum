@@ -61,14 +61,16 @@ export const attachmentResponseSchema = createSelectSchema(attachments, { size: 
 
 export const messageResponseBaseSchema = createSelectSchema(messages, {
   createdAt: isoDateSchema,
-}).pick({
-  id: true,
-  channelId: true,
-  content: true,
-  nonce: true,
-  replyTo: true,
-  createdAt: true,
-});
+})
+  .pick({
+    id: true,
+    channelId: true,
+    content: true,
+    nonce: true,
+    replyTo: true,
+    createdAt: true,
+  })
+  .extend({ edited: z.boolean().default(false), editedTime: isoDateSchema.optional() });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {
   status: friendStatusSchema,

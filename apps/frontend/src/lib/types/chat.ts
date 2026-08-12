@@ -38,6 +38,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   edited: boolean;
+  editedTime?: string;
   replyTo: string | null;
   pingedHandles: string[];
   attachments: Attachment[];

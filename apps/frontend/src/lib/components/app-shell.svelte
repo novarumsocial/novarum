@@ -85,7 +85,10 @@
 
     mobileNavigationOpen = false;
     // if you squint you'll understand...
-    if (channel.type !== 'VOICE' || (voice.connectionState !== ConnectionState.Disconnected && voice.channelId === id)) {
+    if (
+      channel.type !== 'VOICE' ||
+      (voice.connectionState !== ConnectionState.Disconnected && voice.channelId === id)
+    ) {
       chat.selectChannel(id);
     }
     if (channel.type === 'VOICE') void voice.join(id).catch(() => null);
@@ -216,6 +219,7 @@
         onSend={(content, files, replyTo) =>
           chat.sendMessage(currentChannel.id, content, files, replyTo)}
         onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
+        onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
       />

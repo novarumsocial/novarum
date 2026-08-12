@@ -6,14 +6,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import {
-    Users,
-    LoaderCircle,
-    Copy,
-    Check,
-    Hash,
-    ArrowRight,
-  } from '@lucide/svelte';
+  import { Users, LoaderCircle, Copy, Check, Hash, ArrowRight } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { useSession } from '$lib/session.svelte';
   import Logo from '$lib/assets/favicon.svg';

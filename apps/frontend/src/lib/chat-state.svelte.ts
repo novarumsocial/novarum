@@ -33,6 +33,8 @@ type AddMessageInput = {
   channelId: string;
   content: string | null;
   createdAt: string | Date;
+  edited?: boolean;
+  editedTime?: string;
   replyTo?: string | null;
   pingedHandles?: string[];
   author: PublicUser;
@@ -96,7 +98,8 @@ function messageFromInput(message: AddMessageInput): Message {
     author: authorFromInput(message.author),
     content: message.content ?? '',
     timestamp: new Date(message.createdAt),
-    edited: false,
+    edited: message.edited ?? false,
+    editedTime: message.editedTime ?? undefined,
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
     pingedHandles: message.pingedHandles ?? [],
@@ -181,6 +184,9 @@ class ChatState {
   activeChannel = $derived(this.route.kind === 'guild' ? this.route.channelId : null);
   activeMessage = $derived(this.route.kind === 'guild' ? this.route.messageId : null);
   activeDMUser = $derived(this.route.kind === 'dms' ? this.route.userId : null);
+
+  editingMessage = $state<boolean>(false);
+  editingMessageId = $state<string | null>(null);
 
   get currentServer() {
     return this.activeServer
@@ -382,6 +388,16 @@ class ChatState {
     );
   }
 
+  updateMessage(channelId: string, message: AddMessageInput) {
+    const messages = this.messagesByChannel[channelId];
+    if (!messages?.some((item) => item.id === message.id)) return;
+
+    this.setChannelMessages(
+      channelId,
+      messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+    );
+  }
+
   updateMemberStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {
     this.members = this.members.map((member) =>
       member.userId === userId ? { ...member, status } : member
@@ -391,7 +407,10 @@ class ChatState {
   updateUserProfile(
     userId: string,
     profile: Partial<
-      Pick<Author, 'displayName' | 'avatarUrl' | 'avatarColor' | 'bannerUrl' | 'about'>
+      Pick<
+        Author,
+        'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
+      >
     >
   ) {
     this.members = this.members.map((member) =>
@@ -528,6 +547,19 @@ class ChatState {
     }
 
     this.removeMessage(channelId, messageId);
+  }
+
+  async editMessage(channelId: string, messageId: string, content: string | null) {
+    const result = await anchor.client.message.edit.post({ channelId, messageId, content });
+
+    if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
+      console.error('Failed to edit message', result.error ?? result.data);
+      throw new Error('Failed to edit message');
+    }
+
+    this.updateMessage(channelId, result.data.message);
   }
 
   async loadMessages(channelId: string) {
@@ -797,7 +829,9 @@ class ChatState {
   }
 
   private firstChannelForServer(serverId?: string) {
-    return serverId ? this.channelsByServer[serverId]?.[0]?.channels.filter(c => c.type === 'TEXT')[0] : null;
+    return serverId
+      ? this.channelsByServer[serverId]?.[0]?.channels.filter((c) => c.type === 'TEXT')[0]
+      : null;
   }
 
   private selectInitialChannel() {

@@ -49,6 +49,20 @@ const channelSchema = z.object({
   guildId: z.string(),
 });
 
+const messageEventDataSchema = z.object({
+  id: z.string(),
+  channelId: z.string(),
+  guildId: z.string(),
+  content: z.string().nullable(),
+  nonce: z.string(),
+  replyTo: z.string().nullable().default(null),
+  editedTime: z.string().optional(),
+  pingedHandles: z.array(z.string()).default([]),
+  attachments: z.array(attachmentSchema),
+  createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
+  author: publicUserSchema,
+});
+
 const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('guild.created'),
@@ -67,18 +81,11 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('message.created'),
-    data: z.object({
-      id: z.string(),
-      channelId: z.string(),
-      guildId: z.string(),
-      content: z.string().nullable(),
-      nonce: z.string(),
-      replyTo: z.string().nullable().default(null),
-      pingedHandles: z.array(z.string()).default([]),
-      attachments: z.array(attachmentSchema),
-      createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
-      author: publicUserSchema,
-    }),
+    data: messageEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('message.updated'),
+    data: messageEventDataSchema,
   }),
   z.object({
     type: z.literal('message.deleted'),
@@ -149,6 +156,12 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('friends.changed'),
     data: z.object({}),
+  }),
+  z.object({
+    type: z.literal('user.updated'),
+    data: z.object({
+      user: publicUserSchema,
+    }),
   }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
@@ -341,6 +354,9 @@ class RealtimeState {
         chat.addMessage(event.data);
         chat.clearTyping(event.data.channelId, event.data.author.userId);
       }
+      if (event.type === 'message.updated') {
+        chat.updateMessage(event.data.channelId, { ...event.data, edited: true });
+      }
       if (event.type === 'message.deleted') {
         chat.removeMessage(event.data.channelId, event.data.id);
       }
@@ -368,6 +384,9 @@ class RealtimeState {
       }
       if (event.type === 'friends.changed') {
         void friends.load();
+      }
+      if (event.type === 'user.updated') {
+        chat.updateUserProfile(event.data.user.userId, event.data.user);
       }
     });
   }

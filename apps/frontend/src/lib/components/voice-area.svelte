@@ -42,9 +42,30 @@
   const participants = $derived(Array.from(voice.voiceStates.entries()));
   const active = $derived(voice.channelId === channel.id && (voice.connected || voice.connecting));
   const screenShares = $derived(participants.filter(([, state]) => state.screenTrack));
-  const tileCount = $derived(participants.length + screenShares.length);
+  const tiles = $derived([
+    ...screenShares.map(([identity, state]) => ({
+      key: `screen:${identity}`,
+      identity,
+      state,
+      kind: 'screen' as const,
+    })),
+    ...participants.map(([identity, state]) => ({
+      key: identity,
+      identity,
+      state,
+      kind: 'participant' as const,
+    })),
+  ]);
+  const tileCount = $derived(tiles.length);
   const gridColumns = $derived(Math.max(1, Math.ceil(Math.sqrt(tileCount))));
   const gridRows = $derived(Math.max(1, Math.ceil(tileCount / gridColumns)));
+
+  let focused = $state<string | null>(null);
+  const focusTile = $derived(tiles.find((t) => t.key === focused) ?? null);
+
+  function toggleFocus(key: string) {
+    focused = focused === key ? null : key;
+  }
 
   function initialsFor(id: string) {
     return id
@@ -152,23 +173,27 @@
         <p class="mt-1 text-sm text-muted-foreground">No one else is here yet.</p>
       </div>
     {:else}
-      <div
-        class="participant-grid grid min-h-full gap-3 sm:size-full"
-        style={`--grid-columns: ${gridColumns}; --grid-rows: ${gridRows};`}
-      >
-        {#each screenShares as [identity, state]}
-          {@const name = nameFor(identity)}
-          <div class="flex min-h-0 min-w-0 items-center justify-center">
+      {#snippet tile(t: (typeof tiles)[number])}
+        {@const name = nameFor(t.identity)}
+        {@const member = memberFor(t.identity)}
+        {#if t.kind === 'screen'}
+          <div
+            class="min-h-0 min-w-0 cursor-pointer w-full"
+            role="button"
+            tabindex="0"
+            onclick={() => toggleFocus(t.key)}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFocus(t.key)}
+          >
             <div
-              class="relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-black shadow-2xl"
+              class="relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-black"
             >
-              {#if state.screenTrack}
+              {#if t.state.screenTrack}
                 <video
-                  class="size-full object-contain"
+                  class="size-full object-cover"
                   autoplay
                   playsinline
-                  muted={identity === voice.localIdentity}
-                  use:attachVideo={state.screenTrack}
+                  muted={t.identity === voice.localIdentity}
+                  use:attachVideo={t.state.screenTrack}
                 ></video>
               {/if}
               <div
@@ -176,38 +201,41 @@
               >
                 <MonitorUp class="size-4" />
                 <span>{name}</span>
-                {#if identity === voice.localIdentity}
+                {#if t.identity === voice.localIdentity}
                   <span class="text-white/70">(you)</span>
                 {/if}
               </div>
             </div>
           </div>
-        {/each}
-
-        {#each participants as [identity, state]}
-          {@const name = nameFor(identity)}
-          {@const member = memberFor(identity)}
-          <ParticipantContextMenu {voice} {identity} {name}>
-            <div class="flex min-h-0 min-w-0 items-center justify-center">
+        {:else}
+          <ParticipantContextMenu {voice} identity={t.identity} {name}>
+            <div
+              class={cn(
+                'min-h-0 min-w-0 cursor-pointer',
+                t.state.speaking && 'ring'
+              )}
+              style:--tw-ring-color={member?.speakingRingColor ?? '#00d492'}
+              role="button"
+              tabindex="0"
+              onclick={() => toggleFocus(t.key)}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFocus(t.key)}
+            >
               <div
-                class={cn(
-                  'relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-muted transition-shadow duration-150',
-                  state.speaking && 'ring-2 ring-emerald-400'
-                )}
+                class="relative aspect-video max-h-full w-full overflow-hidden rounded-sm border border-border bg-muted transition-shadow duration-150"
               >
-                {#if state.cameraTrack}
+                {#if t.state.cameraTrack}
                   <video
                     class="size-full object-cover"
                     autoplay
                     playsinline
-                    muted={identity === voice.localIdentity}
-                    use:attachVideo={state.cameraTrack}
+                    muted={t.identity === voice.localIdentity}
+                    use:attachVideo={t.state.cameraTrack}
                   ></video>
                 {:else}
                   <div
                     class={cn(
                       'relative flex size-full items-center justify-center overflow-hidden',
-                      !member?.avatarColor && fallbackAvatarBg(identity)
+                      !member?.avatarColor && fallbackAvatarBg(t.identity)
                     )}
                     style:background-color={member?.avatarColor}
                   >
@@ -225,19 +253,19 @@
                   class="absolute bottom-3 left-3 rounded-sm bg-black/65 px-2 py-1 text-sm font-medium text-white backdrop-blur"
                 >
                   {name}
-                  {#if identity === voice.localIdentity}
+                  {#if t.identity === voice.localIdentity}
                     <span class="text-white/70">(you)</span>
                   {/if}
                 </div>
 
-                {#if state.selfMuted || state.selfDeafened}
+                {#if t.state.selfMuted || t.state.selfDeafened}
                   <div
                     class="absolute bottom-3 right-3 flex size-7 items-center justify-center bg-rose-600"
                     class:rounded-full={settings.value.circleIcons}
                   >
-                    {#if state.selfMuted && !state.selfDeafened}
+                    {#if t.state.selfMuted && !t.state.selfDeafened}
                       <MicOff class="size-4 text-white" />
-                    {:else if state.selfDeafened}
+                    {:else if t.state.selfDeafened}
                       <HeadphoneOff class="size-4 text-white" />
                     {/if}
                   </div>
@@ -245,8 +273,36 @@
               </div>
             </div>
           </ParticipantContextMenu>
-        {/each}
-      </div>
+        {/if}
+      {/snippet}
+
+      {#if focusTile}
+        <div class="flex size-full flex-col gap-3 sm:flex-row">
+          <div
+            class="min-h-0 flex-1 cursor-pointer p-1"
+            role="button"
+            tabindex="0"
+            onclick={() => toggleFocus(focusTile.key)}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleFocus(focusTile.key)}
+          >
+            {@render tile(focusTile)}
+          </div>
+          <div class="flex shrink-0 gap-3 sm:w-44 sm:flex-col sm:overflow-y-auto">
+            {#each tiles.filter((t) => t.key !== focused) as t}
+              {@render tile(t)}
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <div
+          class="participant-grid grid min-h-full gap-3 sm:size-full"
+          style={`--grid-columns: ${gridColumns}; --grid-rows: ${gridRows};`}
+        >
+          {#each tiles as t}
+            {@render tile(t)}
+          {/each}
+        </div>
+      {/if}
     {/if}
     {#if active && voice.audioPlaybackBlocked}
       <Button class="absolute bottom-20" onclick={() => voice.startAudio()}>Enable sound</Button>
@@ -263,9 +319,9 @@
         variant={voice.selfMuted ? 'destructive' : 'secondary'}
         size="icon"
         class="size-10 sm:size-8 {settings.value.circleIcons ? 'rounded-full' : ''}"
-        onclick={() => voice.setMuted(!voice.selfMuted)}
-        disabled={voice.selfDeafened}
-        aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
+        onclick={() =>
+          voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted)}
+        aria-label={voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute'}
       >
         {#if voice.selfMuted}
           <MicOff class="size-3" />
