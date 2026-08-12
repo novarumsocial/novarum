@@ -33,6 +33,7 @@ type AddMessageInput = {
   channelId: string;
   content: string | null;
   createdAt: string | Date;
+  edited?: boolean;
   replyTo?: string | null;
   pingedHandles?: string[];
   author: PublicUser;
@@ -96,7 +97,7 @@ function messageFromInput(message: AddMessageInput): Message {
     author: authorFromInput(message.author),
     content: message.content ?? '',
     timestamp: new Date(message.createdAt),
-    edited: false,
+    edited: message.edited ?? false,
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
     pingedHandles: message.pingedHandles ?? [],
@@ -382,6 +383,16 @@ class ChatState {
     );
   }
 
+  updateMessage(channelId: string, message: AddMessageInput) {
+    const messages = this.messagesByChannel[channelId];
+    if (!messages?.some((item) => item.id === message.id)) return;
+
+    this.setChannelMessages(
+      channelId,
+      messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+    );
+  }
+
   updateMemberStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {
     this.members = this.members.map((member) =>
       member.userId === userId ? { ...member, status } : member
@@ -391,7 +402,10 @@ class ChatState {
   updateUserProfile(
     userId: string,
     profile: Partial<
-      Pick<Author, 'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'>
+      Pick<
+        Author,
+        'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
+      >
     >
   ) {
     this.members = this.members.map((member) =>
@@ -528,6 +542,19 @@ class ChatState {
     }
 
     this.removeMessage(channelId, messageId);
+  }
+
+  async editMessage(channelId: string, messageId: string, content: string | null) {
+    const result = await anchor.client.message.edit.post({ channelId, messageId, content });
+
+    if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
+      console.error('Failed to edit message', result.error ?? result.data);
+      throw new Error('Failed to edit message');
+    }
+
+    this.updateMessage(channelId, result.data.message);
   }
 
   async loadMessages(channelId: string) {

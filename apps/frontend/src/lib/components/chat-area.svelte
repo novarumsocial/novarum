@@ -13,6 +13,7 @@
     loading = false,
     onSend,
     onDelete,
+    onEdit,
     onOpenNavigation,
     onOpenMembers,
   }: {
@@ -25,6 +26,7 @@
       replyTo: string | null
     ) => void | Promise<void>;
     onDelete: (messageId: string) => void | Promise<void>;
+    onEdit: (messageId: string, content: string | null) => void | Promise<void>;
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
   } = $props();
@@ -196,6 +198,7 @@
               {repliedMessage}
               {grouped}
               {onDelete}
+              {onEdit}
               onReply={() => (replyingTo = msg)}
             />
           {/each}

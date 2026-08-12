@@ -169,6 +169,7 @@
         onSend={(content, files, replyTo) =>
           chat.sendMessage(currentChannel.id, content, files, replyTo)}
         onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
+        onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
       />

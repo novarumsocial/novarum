@@ -11,6 +11,7 @@
     Reply,
     Ellipsis,
     Trash2,
+    Pencil,
     Link,
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -30,12 +31,14 @@
     grouped,
     onDelete,
     onReply,
+    onEdit,
   }: {
     message: Message;
     repliedMessage: Message | null;
     grouped: boolean;
     onDelete: (messageId: string) => void | Promise<void>;
     onReply: () => void;
+    onEdit: (messageId: string, content: string | null) => void | Promise<void>;
   } = $props();
 
   let shiftPressed = $state(false);
@@ -45,6 +48,9 @@
   let deleting = $state(false);
   let deleteText = $state('Delete');
   let deleteFirstClick = $state(false);
+  let editing = $state(false);
+  let editContent = $state('');
+  let savingEdit = $state(false);
 
   const dropdownItems: DropdownItems[] = $derived([
     {
@@ -58,6 +64,15 @@
     },
     ...(message.author.userId === session.user?.id
       ? [
+          {
+            label: () => 'Edit',
+            icon: Pencil,
+            onclick: () => {
+              editContent = message.content;
+              editing = true;
+              dropdownOpen = false;
+            },
+          },
           {
             label: () => deleteText,
             icon: Trash2,
@@ -124,9 +139,7 @@
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    return contentHandles.some(
-      (pingedHandle) => pingedHandle.toLowerCase() === handle
-    );
+    return contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle);
   });
   const viewableAttachments = $derived(
     message.attachments.filter(
@@ -169,6 +182,24 @@
       dropdownOpen = false;
     } finally {
       deleting = false;
+    }
+  }
+
+  async function saveEdit() {
+    if (savingEdit) return;
+
+    const next = editContent.trim();
+    if (next === message.content) {
+      editing = false;
+      return;
+    }
+
+    savingEdit = true;
+    try {
+      await onEdit(message.id, next || null);
+      editing = false;
+    } finally {
+      savingEdit = false;
     }
   }
 
@@ -223,6 +254,9 @@
           {authorName}
         </ProfileCard>
         <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
+        {#if message.edited}
+          <span class="text-[11px] text-muted-foreground/60">(edited)</span>
+        {/if}
       </div>
     {/if}
 
@@ -252,9 +286,25 @@
       </a>
     {/if}
 
-    <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-      <EmojiText content={message.content} links />
-    </div>
+    {#if editing}
+      <div class="mt-1 flex max-w-2xl flex-col gap-1.5">
+        <textarea
+          bind:value={editContent}
+          rows="3"
+          class="min-h-10 resize-none border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+          aria-label="Edit message"></textarea>
+        <div class="flex gap-1.5">
+          <Button size="xs" onclick={saveEdit} disabled={savingEdit}>
+            {savingEdit ? 'Saving...' : 'Save'}
+          </Button>
+          <Button variant="ghost" size="xs" onclick={() => (editing = false)}>Cancel</Button>
+        </div>
+      </div>
+    {:else}
+      <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+        <EmojiText content={message.content} links />
+      </div>
+    {/if}
 
     {#if hovered || dropdownOpen}
       <div class="absolute top-0 right-0">

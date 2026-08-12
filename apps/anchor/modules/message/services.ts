@@ -123,6 +123,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           content: message.content,
           nonce: message.nonce,
           replyTo: message.replyTo ?? null,
+          edited: messageEdited(message),
           attachments: message.attachments.map((attachment) =>
             attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
           ),
@@ -242,6 +243,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
             content: priorMsg.content,
             nonce: priorMsg.nonce,
             replyTo: priorMsg.replyTo ?? null,
+            edited: messageEdited(priorMsg),
             pingedHandles: [],
             attachments: priorMsg.attachments.map((attachment) =>
               attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
@@ -314,6 +316,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         content: message.content,
         nonce: message.nonce,
         replyTo: message.replyTo ?? null,
+        edited: messageEdited(message),
         pingedHandles: pingRecipients.map((recipient) => recipient.handle),
         attachments: responseAttachments,
         createdAt:
@@ -347,6 +350,142 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/edit',
+    async ({ body, session, status, server }) => {
+      const { channelId, messageId, content } = body;
+      const channel = await db.query.channels.findFirst({
+        where: { id: channelId },
+      });
+      if (!channel) return status(404, { error: 'Channel not found' });
+
+      const membership = await db.query.guildMembers.findFirst({
+        where: {
+          guildId: channel.guildId,
+          userId: session.userId,
+        },
+      });
+      if (!membership) return status(403, { error: 'Forbidden' });
+
+      const federatedChannel = parseFederatedChannelId(channelId);
+      if (federatedChannel) {
+        const result = await postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages/edit`,
+          { user: federationUserPayload(session), messageId, content }
+        ).catch(() => null);
+
+        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
+        if (!result.response.ok) {
+          const remoteError = remoteErrorSchema.safeParse(result.data);
+          const remoteStatus = [400, 401, 403, 404].includes(result.response.status)
+            ? (result.response.status as 400 | 401 | 403 | 404)
+            : 502;
+          return status(
+            remoteStatus,
+            remoteError.success ? remoteError.data : { error: 'Remote edit failed' }
+          );
+        }
+
+        const remoteMessage = messageResponseSchema.safeParse(result.data);
+        if (!remoteMessage.success) {
+          return status(502, { error: 'Remote edit returned an invalid response' });
+        }
+
+        const mappedMessage = mapFederatedMessage(
+          remoteMessage.data.message,
+          channel.id,
+          channel.guildId
+        );
+        if (server) {
+          publishRealtime(server, `guildEvents:${channel.guildId}`, {
+            type: 'message.updated',
+            data: mappedMessage,
+          });
+        }
+
+        return { message: mappedMessage };
+      }
+
+      const existing = await db.query.messages.findFirst({
+        where: { id: messageId, channelId },
+        with: { attachments: true },
+      });
+      if (!existing) return status(404, { error: 'Message not found' });
+      if (existing.authorId !== session.userId) return status(403, { error: 'Forbidden' });
+      if (content === null && existing.attachments.length === 0) {
+        return status(400, { error: 'Message content or an attachment is required' });
+      }
+
+      const replyTarget = existing.replyTo
+        ? await db.query.messages.findFirst({ where: { id: existing.replyTo, channelId } })
+        : null;
+      const pingRecipients = await getPingRecipients(
+        channel.guildId,
+        content,
+        replyTarget?.authorId,
+        session.userId
+      );
+
+      const updated = await db.transaction(async (tx) => {
+        await tx.delete(messagePings).where(eq(messagePings.messageId, existing.id));
+        for (const recipient of pingRecipients) {
+          await tx.insert(messagePings).values({
+            messageId: existing.id,
+            userId: recipient.userId,
+          });
+        }
+        const [updated] = await tx
+          .update(messages)
+          .set({ content })
+          .where(eq(messages.id, existing.id))
+          .returning();
+        if (!updated) throw new Error('message edit shit the bed');
+        return updated;
+      });
+
+      const responseMessage = {
+        id: updated.id,
+        channelId: updated.channelId,
+        guildId: channel.guildId,
+        content: updated.content,
+        nonce: updated.nonce,
+        replyTo: updated.replyTo ?? null,
+        edited: true,
+        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+        attachments: existing.attachments.map((attachment) =>
+          attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
+        ),
+        createdAt:
+          updated.createdAt instanceof Date ? updated.createdAt.toISOString() : updated.createdAt,
+        author: publicUser(session.user),
+      };
+
+      if (server) {
+        publishRealtime(server, `guildEvents:${channel.guildId}`, {
+          type: 'message.updated',
+          data: responseMessage,
+        });
+      }
+
+      return { message: responseMessage };
+    },
+    {
+      body: t.Object({
+        channelId: t.String(),
+        messageId: t.String(),
+        content: t.Nullable(t.String()),
+      }),
+      response: {
+        200: messageResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
       },
     }
@@ -443,6 +582,13 @@ function mapFederatedMessage(
     guildId,
     pingedHandles: message.pingedHandles ?? [],
   };
+}
+
+function messageEdited(message: { createdAt: Date | string; updatedAt?: Date | string }) {
+  return (
+    new Date(message.updatedAt ?? message.createdAt).getTime() >
+    new Date(message.createdAt).getTime()
+  );
 }
 
 export async function verifyPendingAttachments(
