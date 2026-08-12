@@ -30,18 +30,11 @@ export type RealtimeEvent =
     }
   | {
       type: 'message.created';
-      data: {
-        id: string;
-        channelId: string;
-        guildId: string;
-        content: string | null;
-        nonce: string;
-        replyTo: string | null;
-        pingedHandles: string[];
-        attachments: AttachmentPayload[];
-        createdAt: string;
-        author: PublicUser;
-      };
+      data: MessageEventData;
+    }
+  | {
+      type: 'message.updated';
+      data: MessageEventData;
     }
   | {
       type: 'message.deleted';
@@ -115,6 +108,19 @@ export type AttachmentPayload = {
   contentType: string;
   size: number;
   url: string;
+};
+
+export type MessageEventData = {
+  id: string;
+  channelId: string;
+  guildId: string;
+  content: string | null;
+  nonce: string;
+  replyTo: string | null;
+  pingedHandles: string[];
+  attachments: AttachmentPayload[];
+  createdAt: string;
+  author: PublicUser;
 };
 
 export type VoicePresence = {

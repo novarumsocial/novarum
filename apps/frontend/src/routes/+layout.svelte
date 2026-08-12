@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import favicon from '$lib/assets/favicon.svg';
   import { settings } from '$lib/settings.svelte';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let { children } = $props();
   const desktop = browser && navigator.userAgent.includes('Electron');
@@ -28,4 +29,6 @@
   </header>
 {/if}
 
-{@render children()}
+<Tooltip.Provider delayDuration={250}>
+  {@render children()}
+</Tooltip.Provider>

@@ -6,6 +6,7 @@
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
+  import { formatDate } from '$lib/formatDate';
 
   let {
     channel,
@@ -13,6 +14,7 @@
     loading = false,
     onSend,
     onDelete,
+    onEdit,
     onOpenNavigation,
     onOpenMembers,
   }: {
@@ -25,6 +27,7 @@
       replyTo: string | null
     ) => void | Promise<void>;
     onDelete: (messageId: string) => void | Promise<void>;
+    onEdit: (messageId: string, content: string | null) => void | Promise<void>;
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
   } = $props();
@@ -177,7 +180,7 @@
                 aria-label={msg.timestamp.toLocaleDateString()}
               >
                 <span class="h-px flex-1 bg-muted-foreground/20"></span>
-                <span>{msg.timestamp.toLocaleDateString()}</span>
+                <span>{formatDate(msg.timestamp)}</span>
               </div>
             {/if}
             {#if firstUnread}
@@ -196,6 +199,7 @@
               {repliedMessage}
               {grouped}
               {onDelete}
+              {onEdit}
               onReply={() => (replyingTo = msg)}
             />
           {/each}
