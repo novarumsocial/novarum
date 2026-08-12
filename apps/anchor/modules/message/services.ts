@@ -625,7 +625,8 @@ export async function verifyPendingAttachments(
           .catch(() => {});
         return { ok: false as const, error: `${attachment.filename} has an invalid size` };
       }
-    } catch {
+    } catch (e) {
+      console.log('meow', e);
       return {
         ok: false as const,
         error: `${attachment.filename} has not finished uploading`,
