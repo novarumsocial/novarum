@@ -3,7 +3,7 @@
   import { friends } from '$lib/friends.svelte';
   import Avatar from './avatar.svelte';
   import { Separator } from '$lib/components/ui/separator/index.js';
-  import { device } from '$lib/device.svelte'
+  import { device } from '$lib/device.svelte';
 
   const entries = $derived(
     [...friends.accepted].sort(
