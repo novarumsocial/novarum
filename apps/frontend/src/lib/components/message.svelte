@@ -24,6 +24,9 @@
   import type { Component } from 'svelte';
   import { goto } from '$app/navigation';
   import { settings } from '$lib/settings.svelte';
+  import Textarea from './ui/textarea/textarea.svelte';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import { formatDate, formatTime } from '$lib/formatDate';
 
   let {
     message,
@@ -48,8 +51,8 @@
   let deleting = $state(false);
   let deleteText = $state('Delete');
   let deleteFirstClick = $state(false);
-  let editing = $state(false);
   let editContent = $state('');
+  let editMsgTextarea = $state<HTMLTextAreaElement | null>(null);
   let savingEdit = $state(false);
 
   const dropdownItems: DropdownItems[] = $derived([
@@ -64,15 +67,6 @@
     },
     ...(message.author.userId === session.user?.id
       ? [
-          {
-            label: () => 'Edit',
-            icon: Pencil,
-            onclick: () => {
-              editContent = message.content;
-              editing = true;
-              dropdownOpen = false;
-            },
-          },
           {
             label: () => deleteText,
             icon: Trash2,
@@ -103,25 +97,6 @@
     };
   });
 
-  function formatTime(date: Date): string {
-    if (settings.value.timeFormat === 'auto') {
-      const locale = navigator.language || 'en-US';
-      return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-    }
-    if (settings.value.timeFormat === '12hr') {
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    }
-    if (settings.value.timeFormat === '24hr') {
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-    }
-
-    // this should never show up unless you have manipulated the settings in the console or something
-    return 'what did you do lmao';
-  }
 
   function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -190,16 +165,23 @@
 
     const next = editContent.trim();
     if (next === message.content) {
-      editing = false;
+      chat.editingMessage = false;
       return;
     }
 
     savingEdit = true;
     try {
       await onEdit(message.id, next || null);
-      editing = false;
+      chat.editingMessage = false;
     } finally {
       savingEdit = false;
+    }
+  }
+
+  function handleEditKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      saveEdit();
     }
   }
 
@@ -254,9 +236,6 @@
           {authorName}
         </ProfileCard>
         <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
-        {#if message.edited}
-          <span class="text-[11px] text-muted-foreground/60">(edited)</span>
-        {/if}
       </div>
     {/if}
 
@@ -286,23 +265,38 @@
       </a>
     {/if}
 
-    {#if editing}
+    {#if chat.editingMessage && chat.editingMessageId === message.id}
       <div class="mt-1 flex max-w-2xl flex-col gap-1.5">
-        <textarea
+        <Textarea
           bind:value={editContent}
-          rows="3"
-          class="min-h-10 resize-none border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
-          aria-label="Edit message"></textarea>
+          bind:ref={editMsgTextarea}
+          rows={3}
+          class="resize-none"
+          aria-label="Edit message"
+          onkeydown={handleEditKeyDown}
+        ></Textarea>
         <div class="flex gap-1.5">
           <Button size="xs" onclick={saveEdit} disabled={savingEdit}>
             {savingEdit ? 'Saving...' : 'Save'}
           </Button>
-          <Button variant="ghost" size="xs" onclick={() => (editing = false)}>Cancel</Button>
+          <Button variant="ghost" size="xs" onclick={() => (chat.editingMessage = false)}
+            >Cancel</Button
+          >
         </div>
       </div>
     {:else}
       <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
         <EmojiText content={message.content} links />
+        {#if message.edited}
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              <p>{message.editedTime ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}` : ''}</p>
+            </Tooltip.Content>
+          </Tooltip.Root>
+        {/if}
       </div>
     {/if}
 
@@ -312,7 +306,24 @@
           <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
             ><Reply class="size-3" /></Button
           >
-          {#if shiftPressed}
+          {#if message.author.userId === session.user?.id}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Edit"
+              onclick={() => {
+                editContent = message.content;
+                chat.editingMessage = true;
+                chat.editingMessageId = message.id;
+                dropdownOpen = false;
+                // should wait a small bit to open up the textarea before focusing it
+                setTimeout(() => {
+                  editMsgTextarea?.focus();
+                }, 0);
+              }}><Pencil class="size-3" /></Button
+            >
+          {/if}
+          {#if shiftPressed && !chat.editingMessage}
             {#each dropdownItems as item (item.label)}
               <Button
                 onclick={item.onclick}

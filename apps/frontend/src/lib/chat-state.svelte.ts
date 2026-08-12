@@ -34,6 +34,7 @@ type AddMessageInput = {
   content: string | null;
   createdAt: string | Date;
   edited?: boolean;
+  editedTime?: string;
   replyTo?: string | null;
   pingedHandles?: string[];
   author: PublicUser;
@@ -98,6 +99,7 @@ function messageFromInput(message: AddMessageInput): Message {
     content: message.content ?? '',
     timestamp: new Date(message.createdAt),
     edited: message.edited ?? false,
+    editedTime: message.editedTime ?? undefined,
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
     pingedHandles: message.pingedHandles ?? [],
@@ -182,6 +184,9 @@ class ChatState {
   activeChannel = $derived(this.route.kind === 'guild' ? this.route.channelId : null);
   activeMessage = $derived(this.route.kind === 'guild' ? this.route.messageId : null);
   activeDMUser = $derived(this.route.kind === 'dms' ? this.route.userId : null);
+
+  editingMessage = $state<boolean>(false);
+  editingMessageId = $state<string | null>(null);
 
   get currentServer() {
     return this.activeServer

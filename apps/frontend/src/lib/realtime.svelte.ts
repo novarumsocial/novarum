@@ -56,6 +56,7 @@ const messageEventDataSchema = z.object({
   content: z.string().nullable(),
   nonce: z.string(),
   replyTo: z.string().nullable().default(null),
+  editedTime: z.string().optional(),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentSchema),
   createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),

@@ -19,7 +19,7 @@ import {
   presignedUploadSchema,
 } from '../../utils/attachments';
 import { createPendingAttachment } from '../upload/services';
-import { getPingRecipients, verifyPendingAttachments } from '../message/services';
+import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../message/services';
 import { storage } from '../../utils/services/storage';
 import { z } from 'zod';
 import { isMessageAfter } from '../../utils/messageCursor';
@@ -1382,9 +1382,8 @@ function federatedMessageResponse(message: any, channel: { guildId: string }, au
     content: message.content,
     nonce: message.nonce,
     replyTo: message.replyTo ?? null,
-    edited:
-      new Date(message.updatedAt ?? message.createdAt).getTime() >
-      new Date(message.createdAt).getTime(),
+    edited: messageEdited(message),
+    editedTime: messageEdited(message) ? new Date(message.updatedAt).toISOString() : undefined,
     pingedHandles: Array.isArray(message.pingedHandles) ? message.pingedHandles : [],
     attachments: Array.isArray(message.attachments)
       ? message.attachments.map(attachmentPayload)

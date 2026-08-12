@@ -70,7 +70,7 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     replyTo: true,
     createdAt: true,
   })
-  .extend({ edited: z.boolean().default(false) });
+  .extend({ edited: z.boolean().default(false), editedTime: isoDateSchema.optional() });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {
   status: friendStatusSchema,

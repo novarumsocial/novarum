@@ -116,21 +116,27 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       });
 
       return {
-        messages: messages.map((message) => ({
-          id: message.id,
-          channelId: message.channelId,
-          guildId: channel.guildId,
-          content: message.content,
-          nonce: message.nonce,
-          replyTo: message.replyTo ?? null,
-          edited: messageEdited(message),
-          attachments: message.attachments.map((attachment) =>
-            attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
-          ),
-          createdAt:
-            message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
-          author: publicUser(message.author),
-        })),
+        messages: messages.map((message) => {
+          const edit = messageEdited(message);
+          return {
+            id: message.id,
+            channelId: message.channelId,
+            guildId: channel.guildId,
+            content: message.content,
+            nonce: message.nonce,
+            replyTo: message.replyTo ?? null,
+            edited: edit,
+            editedTime: edit ? message.updatedAt.toISOString() : undefined,
+            attachments: message.attachments.map((attachment) =>
+              attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
+            ),
+            createdAt:
+              message.createdAt instanceof Date
+                ? message.createdAt.toISOString()
+                : message.createdAt,
+            author: publicUser(message.author),
+          };
+        }),
       };
     },
     {
@@ -456,6 +462,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         nonce: updated.nonce,
         replyTo: updated.replyTo ?? null,
         edited: true,
+        editedTime: updated.updatedAt.toISOString(),
         pingedHandles: pingRecipients.map((recipient) => recipient.handle),
         attachments: existing.attachments.map((attachment) =>
           attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
@@ -584,7 +591,7 @@ function mapFederatedMessage(
   };
 }
 
-function messageEdited(message: { createdAt: Date | string; updatedAt?: Date | string }) {
+export function messageEdited(message: { createdAt: Date | string; updatedAt?: Date | string }) {
   return (
     new Date(message.updatedAt ?? message.createdAt).getTime() >
     new Date(message.createdAt).getTime()

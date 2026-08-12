@@ -242,7 +242,12 @@
   }
 
   function windowKeyDown(event: KeyboardEvent) {
-    if (textarea !== document.activeElement && !event.ctrlKey && !event.metaKey) {
+    if (
+      textarea !== document.activeElement &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !chat.editingMessage
+    ) {
       textarea.focus();
     }
   }
