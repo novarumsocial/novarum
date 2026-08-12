@@ -9,7 +9,7 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { randomString } from '../../utils/randomString';
-import { storage } from '../../utils/services/storage';
+import { storage, publicPresign, noStoreRedirect } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { attachments, db } from '../../src/db';
 import { z } from 'zod';
@@ -26,13 +26,13 @@ export const upload = new Elysia({ tags: ['Upload'] })
       });
       if (!attachment) return status(404, { error: 'Attachment not found' });
 
-      const url = storage.presign(attachment.objectKey, {
+      const url = publicPresign(attachment.objectKey, {
         method: 'GET',
         expiresIn: 5 * 60,
         contentDisposition: `inline; filename="${safeAttachmentFilename(attachment.filename)}"`,
       });
 
-      return Response.redirect(url);
+      return noStoreRedirect(url);
     },
     {
       response: {
@@ -146,7 +146,7 @@ export async function createPendingAttachment(input: {
 
   return {
     attachmentId,
-    uploadUrl: storage.presign(objectKey, {
+    uploadUrl: publicPresign(objectKey, {
       method: 'PUT',
       expiresIn: 5 * 60,
       type: input.contentType,

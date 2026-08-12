@@ -28,6 +28,8 @@ const schema = z.object({
     // apparently the rest is optional if you use amazon s3
     s3_bucket: z.string().min(1).optional(),
     s3_endpoint: z.string().min(1).optional(),
+    // public endpoint used for browser-facing presigned URLs; defaults to s3_endpoint
+    s3_public_endpoint: z.string().min(1).optional(),
     s3_region: z.string().min(1).optional(),
     s3_virtual_hosted_style: z.boolean().optional().default(false),
     s3_cors_origins: z
