@@ -97,7 +97,6 @@
     };
   });
 
-
   function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -293,7 +292,11 @@
               <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
             </Tooltip.Trigger>
             <Tooltip.Content>
-              <p>{message.editedTime ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}` : ''}</p>
+              <p>
+                {message.editedTime
+                  ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
+                  : ''}
+              </p>
             </Tooltip.Content>
           </Tooltip.Root>
         {/if}

@@ -25,7 +25,6 @@
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
-
   <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2 mt-2">
     {#if device.isComputer}
       <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>

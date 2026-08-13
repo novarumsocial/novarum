@@ -113,12 +113,14 @@
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.6)_100%)]"
   ></div>
 
-  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">                    <!-- start logo -->
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <!-- start logo -->
     <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
       <img src={Logo} alt="novarum" class="absolute size-5" />
     </div>
     <span class="text-lg font-semibold tracking-tight">novarum</span>
-  </div>                                                                                            <!--  end logo  -->
+  </div>
+  <!--  end logo  -->
 
   <div class="relative flex min-h-svh items-center justify-center p-4 py-10">
     <Card.Root

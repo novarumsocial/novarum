@@ -67,7 +67,10 @@
             <Tabs.Trigger value="people" class="cursor-pointer data-[state=active]:cursor-default">
               People
             </Tabs.Trigger>
-            <Tabs.Trigger value="requests" class="cursor-pointer data-[state=active]:cursor-default">
+            <Tabs.Trigger
+              value="requests"
+              class="cursor-pointer data-[state=active]:cursor-default"
+            >
               Friend requests
               {#if friends.incoming.length > 0}
                 <span
