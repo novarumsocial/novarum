@@ -7,7 +7,9 @@
     "build": "bun run --filter frontend build",
     "sync": "bun run build && cap sync",
     "android": "bun run sync && cap run android",
-    "ios": "bun run sync && cap run ios"
+    "ios": "bun run sync && cap run ios",
+    "android:build": ". ./.env && bun run sync && cap build android --keystorepath $ANDROID_KEYSTORE_PATH --keystorepass $ANDROID_KEYSTORE_PASS --keystorealias $ANDROID_KEY_ALIAS --keystorealiaspass $ANDROID_KEY_PASS --androidreleasetype APK --signing-type apksigner",
+    "ios:build": "bun run sync && cap build ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
