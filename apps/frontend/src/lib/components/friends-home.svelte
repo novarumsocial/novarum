@@ -64,8 +64,10 @@
       <Tabs.Root value="people">
         <div class="flex items-center gap-2 border-b border-border">
           <Tabs.List variant="line" class="min-w-0 flex-1">
-            <Tabs.Trigger value="people">People</Tabs.Trigger>
-            <Tabs.Trigger value="requests">
+            <Tabs.Trigger value="people" class="cursor-pointer data-[state=active]:cursor-default">
+              People
+            </Tabs.Trigger>
+            <Tabs.Trigger value="requests" class="cursor-pointer data-[state=active]:cursor-default">
               Friend requests
               {#if friends.incoming.length > 0}
                 <span
@@ -120,7 +122,7 @@
                     bgColor={entry.user.avatarColor}
                   />
                   <!--</ProfileCard>-->
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 select-none">
                     <p class="truncate text-sm font-medium">{name}</p>
                     <p class="truncate font-mono text-[10px] text-muted-foreground">
                       {handleFor(entry)}
