@@ -140,7 +140,7 @@
               <Form.Field {form} name="username" class="space-y-1.5">
                 <Form.Control>
                   {#snippet children({ props })}
-                    <Form.Label>Username</Form.Label>
+                    <Form.Label>Username <span class="text-destructive">*</span></Form.Label>
                     <div class="relative">
                       <AtSign
                         class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -157,13 +157,13 @@
                     </div>
                   {/snippet}
                 </Form.Control>
-                <Form.FieldErrors class="text-xs" />
+                <Form.FieldErrors class="text-xs select-none" />
               </Form.Field>
 
               <Form.Field {form} name="homeserver" class="space-y-1.5">
                 <Form.Control>
                   {#snippet children({ props })}
-                    <Form.Label>Home server</Form.Label>
+                    <Form.Label>Home server <span class="text-destructive">*</span></Form.Label>
                     <div class="relative">
                       <Server
                         class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -179,13 +179,13 @@
                     </div>
                   {/snippet}
                 </Form.Control>
-                <Form.FieldErrors class="text-xs" />
+                <Form.FieldErrors class="text-xs select-none" />
               </Form.Field>
             </div>
+
             <p class="text-xs text-muted-foreground select-none">
               Handle preview: <span class="font-mono text-foreground">{handle}</span>
             </p>
-            <Separator />
           </div>
 
           <Form.Field {form} name="displayName" class="space-y-1.5">
@@ -209,13 +209,13 @@
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs" />
+            <Form.FieldErrors class="text-xs select-none" />
           </Form.Field>
 
           <Form.Field {form} name="email" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Email</Form.Label>
+                <Form.Label>Email <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Mail
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -231,13 +231,13 @@
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs" />
+            <Form.FieldErrors class="text-xs select-none" />
           </Form.Field>
 
           <Form.Field {form} name="password" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Password</Form.Label>
+                <Form.Label>Password <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Lock
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -266,7 +266,7 @@
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs" />
+            <Form.FieldErrors class="text-xs select-none" />
             {#if $formData.password.length >= 8}
               <p class="flex items-center gap-1 text-xs text-emerald-400">
                 <CircleCheck class="size-3" />Looks good
@@ -277,7 +277,7 @@
           <Form.Field {form} name="confirmPassword" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Confirm password</Form.Label>
+                <Form.Label>Confirm password <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Lock
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -293,7 +293,7 @@
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs" />
+            <Form.FieldErrors class="text-xs select-none" />
             {#if $formData.confirmPassword && $formData.confirmPassword === $formData.password}
               <p class="flex items-center gap-1 text-xs text-emerald-400">
                 <CircleCheck class="size-3" />Matches
