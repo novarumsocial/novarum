@@ -5,7 +5,7 @@
   import { settings } from '$lib/settings.svelte';
   import { onMount } from 'svelte';
   import { Capacitor } from '@capacitor/core';
-  import { CapacitorUpdater } from '@capgo/capacitor-updater';
+  import { checkForUpdates } from '$lib/ota';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let { children } = $props();
@@ -13,7 +13,7 @@
 
   onMount(() => {
     if (Capacitor.isNativePlatform()) {
-      void CapacitorUpdater.checkForUpdates();
+      void checkForUpdates();
     }
   })
 

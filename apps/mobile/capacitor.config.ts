@@ -6,7 +6,7 @@ export default {
   webDir: '../frontend/build',
   plugins: {
     CapacitorUpdater: {
-      updateUrl: 'https://mobile.novarum.me/updates'
+      autoUpdate: 'off',
     },
   },
 } satisfies CapacitorConfig;

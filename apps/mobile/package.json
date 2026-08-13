@@ -7,8 +7,7 @@
     "build": "bun run --filter frontend build",
     "sync": "bun run build && cap sync",
     "android": "bun run sync && cap run android",
-    "ios": "bun run sync && cap run ios",
-    "ota": "bun run build && capgo bundle upload social.novarum.app --path ../frontend/build --channel production"
+    "ios": "bun run sync && cap run ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -17,7 +16,6 @@
     "@capgo/capacitor-updater": "^8.51.3"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.0",
-    "@capgo/cli": "^8.33.0"
+    "@capacitor/cli": "^8.5.0"
   }
 }
