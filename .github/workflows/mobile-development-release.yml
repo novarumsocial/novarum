@@ -53,7 +53,7 @@ jobs:
       - name: Write signing environment
         run: |
           cat > .env <<'EOF'
-          ANDROID_KEYSTORE_PATH=android/keystore/release.jks
+          ANDROID_KEYSTORE_PATH=keystore/release.jks
           ANDROID_KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASS }}
           ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASS=${{ secrets.ANDROID_KEY_PASS }}
