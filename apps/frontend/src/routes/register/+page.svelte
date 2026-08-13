@@ -114,7 +114,6 @@
   ></div>
 
   <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
-    <!-- start logo -->
     <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
       <img src={Logo} alt="novarum" class="absolute size-5" />
     </div>

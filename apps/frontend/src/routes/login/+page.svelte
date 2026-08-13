@@ -450,7 +450,7 @@
 				</Button>-->
       </Card.Content>
 
-      <Card.Footer class="justify-center text-xs text-muted-foreground mb-1">
+      <Card.Footer class="justify-center text-xs text-muted-foreground">
         {#if mfaChallenge}
           <button
             type="button"
