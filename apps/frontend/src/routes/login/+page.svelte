@@ -21,6 +21,7 @@
     LoaderCircle,
     Mail,
     Smartphone,
+    LogIn,
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { safeRedirect } from '$lib/safeRedirect';
@@ -174,22 +175,23 @@
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.6)_100%)]"
   ></div>
 
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
+      <img src={Logo} alt="novarum" class="absolute size-5" />
+    </div>
+    <span class="text-lg font-semibold tracking-tight">novarum</span>
+  </div>
+
   <div class="relative flex min-h-svh items-center justify-center p-4">
     <Card.Root
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <img src={Logo} alt="novarum" class="absolute size-5" />
-          </div>
-          <span class="text-lg font-semibold tracking-tight">novarum</span>
-        </div>
-        <div class="space-y-1">
-          <Card.Title class="text-xl">
+        <div class="space-y-1 mt-2.5">
+          <Card.Title class="text-xl text-center select-none">
             {mfaChallenge ? 'Verify it’s you' : 'Welcome back'}
           </Card.Title>
-          <Card.Description>
+          <Card.Description class="text-center select-none">
             {mfaChallenge
               ? mfaMethod === 'EMAIL'
                 ? emailSent
@@ -353,7 +355,7 @@
                       bind:value={$formData.homeServer}
                       name="homeServer"
                       placeholder="novarum.me"
-                      class="pl-8"
+                      class="pl-8 select-none"
                       autocomplete="url"
                       spellcheck="false"
                     />
@@ -376,7 +378,7 @@
                       bind:value={$formData.username}
                       name="username"
                       placeholder="alice"
-                      class="pl-8"
+                      class="pl-8 select-none"
                       autocomplete="username"
                       spellcheck="false"
                       autocapitalize="none"
@@ -396,7 +398,7 @@
                       href={redirectParam
                         ? `/reset-password?redirect=${encodeURIComponent(safeRedirect(redirectParam))}`
                         : '/reset-password'}
-                      class="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      class="text-xs text-muted-foreground transition-colors hover:text-foreground select-none"
                       tabindex="-1"
                     >
                       Forgot password?
@@ -411,7 +413,7 @@
                       type="password"
                       bind:value={$formData.password}
                       placeholder="••••••••"
-                      class="pl-8"
+                      class="pl-8 select-none"
                       autocomplete="current-password"
                       name="password"
                     />
@@ -426,8 +428,8 @@
                 <LoaderCircle class="size-4 animate-spin" />
                 <span>Signing in…</span>
               {:else}
-                <span>Continue</span>
-                <ArrowRight class="size-4" />
+                <span>Sign in</span>
+                <LogIn class="size-4" />
               {/if}
             </Form.Button>
 
@@ -448,7 +450,7 @@
 				</Button>-->
       </Card.Content>
 
-      <Card.Footer class="justify-center text-xs text-muted-foreground">
+      <Card.Footer class="justify-center text-xs text-muted-foreground mb-1">
         {#if mfaChallenge}
           <button
             type="button"
@@ -459,10 +461,10 @@
             Back to sign in
           </button>
         {:else}
-          <span>Don't have an account?</span>
+          <span class="select-none">Don't have an account?</span>
           <a
             href={`/register?redirect=${safeRedirect(redirectParam)}`}
-            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline select-none"
             >Register</a
           >
         {/if}
