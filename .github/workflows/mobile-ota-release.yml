@@ -7,6 +7,7 @@ on:
     paths:
       - 'apps/frontend/**'
       - '.github/workflows/mobile-ota-release.yml'
+  workflow_dispatch:
 
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -49,6 +50,7 @@ jobs:
         run: |
           npx -y wrangler@latest r2 object put \
             novarum-mobile-ota/bundles/${{ steps.version.outputs.version }}/bundle.zip \
+            --remote \
             --file /tmp/bundle.zip \
             --content-type application/zip \
             --cache-control "public, max-age=31536000, immutable"
@@ -63,6 +65,7 @@ jobs:
             > /tmp/updates.json
           npx -y wrangler@latest r2 object put \
             novarum-mobile-ota/updates.json \
+            --remote \
             --file /tmp/updates.json \
             --content-type application/json \
             --cache-control "no-cache"
