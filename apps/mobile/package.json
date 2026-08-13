@@ -1,0 +1,21 @@
+{
+  "name": "mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run --filter frontend build",
+    "sync": "bun run build && cap sync",
+    "android": "bun run sync && cap run android",
+    "ios": "bun run sync && cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@capgo/capacitor-updater": "^8.51.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0"
+  }
+}

@@ -9,7 +9,7 @@ import {
 } from '../../utils/federationIds';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
-import { storage } from '../../utils/services/storage';
+import { storage, publicPresign, noStoreRedirect } from '../../utils/services/storage';
 import { getConfig } from '../../utils/config';
 import { randomInt } from 'node:crypto';
 import { postSignedFederationJson } from '../../utils/discovery';
@@ -70,14 +70,14 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
 
       const format = query.format === 'gif' ? 'gif' : 'png';
       const type = format === 'gif' ? 'image/gif' : 'image/png';
-      const url = storage.presign(`guild-avatars/${guild.id}.${format}`, {
+      const url = publicPresign(`guild-avatars/${guild.id}.${format}`, {
         method: 'GET',
         expiresIn: 5 * 60,
         type,
         contentDisposition: 'inline',
       });
 
-      return Response.redirect(url);
+      return noStoreRedirect(url);
     },
     {
       response: {

@@ -3,10 +3,19 @@
   import { browser } from '$app/environment';
   import favicon from '$lib/assets/favicon.svg';
   import { settings } from '$lib/settings.svelte';
+  import { onMount } from 'svelte';
+  import { Capacitor } from '@capacitor/core';
+  import { checkForUpdates } from '$lib/ota';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let { children } = $props();
   const desktop = browser && navigator.userAgent.includes('Electron');
+
+  onMount(() => {
+    if (Capacitor.isNativePlatform()) {
+      void checkForUpdates();
+    }
+  })
 
   $effect(() => {
     const root = document.documentElement;

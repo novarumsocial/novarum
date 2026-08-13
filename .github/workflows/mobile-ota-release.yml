@@ -1,0 +1,71 @@
+name: Release mobile development bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/frontend/**'
+      - '.github/workflows/mobile-ota-release.yml'
+  workflow_dispatch:
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  ota:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Set version
+        id: version
+        run: |
+          echo "version=$(jq -r .version apps/frontend/package.json)-dev.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend bundle
+        run: bun run --filter frontend build
+
+      - name: Package bundle
+        id: bundle
+        run: |
+          cd apps/frontend/build
+          python3 -m zipfile -c /tmp/bundle.zip .
+          echo "checksum=$(sha256sum /tmp/bundle.zip | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bundle to R2
+        run: |
+          npx -y wrangler@latest r2 object put \
+            novarum-mobile-ota/bundles/${{ steps.version.outputs.version }}/bundle.zip \
+            --remote \
+            --file /tmp/bundle.zip \
+            --content-type application/zip \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Publish update manifest
+        run: |
+          jq -n \
+            --arg version "${{ steps.version.outputs.version }}" \
+            --arg url "https://mobile.novarum.me/bundles/${{ steps.version.outputs.version }}/bundle.zip" \
+            --arg checksum "${{ steps.bundle.outputs.checksum }}" \
+            '{version: $version, url: $url, checksum: $checksum}' \
+            > /tmp/updates.json
+          npx -y wrangler@latest r2 object put \
+            novarum-mobile-ota/updates.json \
+            --remote \
+            --file /tmp/updates.json \
+            --content-type application/json \
+            --cache-control "no-cache"

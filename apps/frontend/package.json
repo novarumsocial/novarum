@@ -16,7 +16,6 @@
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
     "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.30.0",
-    "@sveltejs/adapter-auto": "^7.0.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -42,6 +41,8 @@
     "zod": "^4.4.3"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capgo/capacitor-updater": "^8.51.3",
     "@elysia/eden": "^1.4.10",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
     "anchor": "workspace:*",

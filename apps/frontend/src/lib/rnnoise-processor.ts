@@ -14,17 +14,22 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
   private node?: RnnoiseWorkletNode;
   private mono?: GainNode;
   private destination?: MediaStreamAudioDestinationNode;
+  private context?: AudioContext;
+  private ownsContext = false;
 
   async init({ track, audioContext }: AudioProcessorOptions) {
-    let worklet = loadedContexts.get(audioContext);
+    // livekit omits audioContext on processor restart, so keep our own
+    const context = (this.context ??= audioContext ?? new AudioContext());
+    this.ownsContext ||= !audioContext;
+    let worklet = loadedContexts.get(context);
     if (!worklet) {
-      worklet = audioContext.audioWorklet.addModule(rnnoiseWorkletUrl);
-      loadedContexts.set(audioContext, worklet);
+      worklet = context.audioWorklet.addModule(rnnoiseWorkletUrl);
+      loadedContexts.set(context, worklet);
     }
 
-    await Promise.all([audioContext.resume(), worklet]);
-    this.source = audioContext.createMediaStreamSource(new MediaStream([track]));
-    this.node = new RnnoiseWorkletNode(audioContext, {
+    await Promise.all([context.resume(), worklet]);
+    this.source = context.createMediaStreamSource(new MediaStream([track]));
+    this.node = new RnnoiseWorkletNode(context, {
       maxChannels: 1,
       wasmBinary: await (wasmBinary ??= loadRnnoise({
         url: rnnoiseWasmUrl,
@@ -53,10 +58,13 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
     this.mono?.disconnect();
     this.destination?.disconnect();
     this.processedTrack?.stop();
+    if (this.ownsContext) this.context?.close();
     this.source = undefined;
     this.node = undefined;
     this.mono = undefined;
     this.destination = undefined;
     this.processedTrack = undefined;
+    this.context = undefined;
+    this.ownsContext = false;
   }
 }

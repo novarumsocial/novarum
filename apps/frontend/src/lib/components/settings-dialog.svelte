@@ -278,7 +278,7 @@
     await anchor.client.auth.logout.post();
     const me = await anchor.client.auth.me.get();
     if (!me.data) {
-      await goto('/login');
+      window.location.href = '/login';
     }
   }
 

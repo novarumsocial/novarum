@@ -184,6 +184,14 @@ class SessionState {
   }
 
   private async verifyNewSession(action: string): Promise<SessionResult> {
+    const result = await this.verifyNewSessionOnce(action);
+    if (result.ok) return result;
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return this.verifyNewSessionOnce(action);
+  }
+
+  private async verifyNewSessionOnce(action: string): Promise<SessionResult> {
     try {
       const { data, error, response } = await anchor.client.auth.me.get();
       if (error) {

@@ -1,5 +1,5 @@
 import Elysia, { t } from 'elysia';
-import { storage } from '../../utils/services/storage';
+import { storage, publicPresign, noStoreRedirect } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { getConfig } from '../../utils/config';
 import { userResponse, userResponseSchema } from '../auth/services';
@@ -26,14 +26,14 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
 
       const format = query.format === 'gif' ? 'gif' : 'png';
       const type = format === 'gif' ? 'image/gif' : 'image/png';
-      const url = storage.presign(`avatars/${user.id}${format === 'gif' ? '.gif' : ''}`, {
+      const url = publicPresign(`avatars/${user.id}${format === 'gif' ? '.gif' : ''}`, {
         method: 'GET',
         expiresIn: 5 * 60,
         type,
         contentDisposition: 'inline',
       });
 
-      return Response.redirect(url);
+      return noStoreRedirect(url);
     },
     {
       response: {
@@ -181,8 +181,8 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
 
       const format = query.format === 'gif' ? 'gif' : 'png';
       const type = format === 'gif' ? 'image/gif' : 'image/png';
-      return Response.redirect(
-        storage.presign(`banners/${user.id}.${format}`, {
+      return noStoreRedirect(
+        publicPresign(`banners/${user.id}.${format}`, {
           method: 'GET',
           expiresIn: 5 * 60,
           type,

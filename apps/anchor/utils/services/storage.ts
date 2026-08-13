@@ -10,6 +10,7 @@ const {
   s3_region,
   s3_virtual_hosted_style,
   s3_cors_origins,
+  s3_public_endpoint,
 } = getConfig().files;
 
 export const storage = new S3Client({
@@ -20,6 +21,19 @@ export const storage = new S3Client({
   bucket: s3_bucket,
   virtualHostedStyle: s3_virtual_hosted_style,
 });
+
+export function publicPresign(
+  key: string,
+  options?: Parameters<typeof storage.presign>[1]
+) {
+  return storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint });
+}
+
+export function noStoreRedirect(url: string) {
+  const response = Response.redirect(url);
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
+}
 
 export async function configureStorageCors() {
   if (!s3_endpoint || !s3_bucket || !s3_region) {
