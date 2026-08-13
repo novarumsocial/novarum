@@ -95,7 +95,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_tag="v${MOBILE_VERSION}"
+          release_tag="mobile-v${MOBILE_VERSION}"
           notes="Development build for commit ${GITHUB_SHA}."
 
           if gh release view "$release_tag" >/dev/null 2>&1; then
