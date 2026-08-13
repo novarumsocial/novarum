@@ -25,18 +25,14 @@
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
-  <div class="flex h-12 shrink-0 items-center border-b border-border px-4">
-    <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
-      Direct messages
-    </span>
-  </div>
 
-  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2 mt-2">
     {#if device.isComputer}
       <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
         <Users class="size-4 shrink-0" />
         <span class="flex-1 truncate">Friends</span>
       </button>
+
       <Separator class="mt-3" />
     {/if}
 
