@@ -240,7 +240,7 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="space-y-1 select-none">
+          <div class="space-y-1 text-center select-none mt-1.5">
             <Card.Title class="text-xl">You're invited!</Card.Title>
             <Card.Description>Join your friends on a shared server.</Card.Description>
           </div>

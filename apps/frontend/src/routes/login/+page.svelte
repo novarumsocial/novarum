@@ -187,7 +187,7 @@
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="space-y-1 mt-2.5">
+        <div class="space-y-1 mt-1.5">
           <Card.Title class="text-xl text-center select-none">
             {mfaChallenge ? 'Verify it’s you' : 'Welcome back'}
           </Card.Title>

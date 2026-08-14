@@ -157,20 +157,20 @@
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.6)_100%)]"
   ></div>
 
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
+      <img src={Logo} alt="novarum" class="absolute size-5" />
+    </div>
+    <span class="text-lg font-semibold tracking-tight">novarum</span>
+  </div>
+
   <div class="relative flex min-h-svh items-center justify-center p-4 py-10">
     <Card.Root
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <img src={Logo} alt="novarum" class="absolute size-5" />
-          </div>
-          <span class="text-lg font-semibold tracking-tight">novarum</span>
-        </div>
-
         {#if step === 'request'}
-          <div class="space-y-1">
+          <div class="space-y-1 select-none text-center mt-2">
             <Card.Title class="text-xl">Reset your password</Card.Title>
             <Card.Description>
               Enter your account email and a 6-digit code will be sent to you.
@@ -206,7 +206,7 @@
                       {...props}
                       bind:value={$requestData.homeServer}
                       placeholder="novarum.me"
-                      class="pl-8"
+                      class="pl-8 select-none"
                       autocomplete="url"
                       spellcheck="false"
                     />
@@ -229,7 +229,7 @@
                       type="email"
                       bind:value={$requestData.email}
                       placeholder="you@example.com"
-                      class="pl-8"
+                      class="pl-8 select-none"
                       autocomplete="email"
                     />
                   </div>
@@ -381,7 +381,7 @@
       </Card.Content>
 
       {#if step !== 'complete'}
-        <Card.Footer class="justify-center text-xs text-muted-foreground">
+        <Card.Footer class="justify-center text-xs text-muted-foreground select-none">
           <span>Remember your password?</span>
           <a
             href={loginHref}

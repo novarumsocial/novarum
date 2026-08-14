@@ -119,14 +119,13 @@
     </div>
     <span class="text-lg font-semibold tracking-tight">novarum</span>
   </div>
-  <!--  end logo  -->
 
   <div class="relative flex min-h-svh items-center justify-center p-4 py-10">
     <Card.Root
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="space-y-1 mt-2.5 text-center select-none">
+        <div class="space-y-1 mt-1.5 text-center select-none">
           <Card.Title class="text-xl">Create your account</Card.Title>
           <Card.Description>
             Pick a home server and username - your handle works across the federation.
