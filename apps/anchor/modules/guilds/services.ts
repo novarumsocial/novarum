@@ -31,6 +31,7 @@ import {
   guildInviteResponseSchema as inviteSchema,
   guildResponseSchema as guildSchema,
 } from '../../src/db/zod';
+import { processImage } from '../../utils/optimizeWebp';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const successResponseSchema = z.object({ success: z.boolean() });
@@ -63,17 +64,16 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
   .get(
     '/avatar/:id',
     async ({ params, query, status }) => {
+      const { format } = query;
       const guild = await db.query.guilds.findFirst({
         where: { id: params.id },
       });
       if (!guild?.avatarUrl) return status(404, { error: 'Guild picture not found' });
 
-      const format = query.format === 'gif' ? 'gif' : 'png';
-      const type = format === 'gif' ? 'image/gif' : 'image/png';
-      const url = publicPresign(`guild-avatars/${guild.id}.${format}`, {
+      const url = publicPresign(`guild-avatars/${guild.id}.${format || 'webp'}`, {
         method: 'GET',
         expiresIn: 5 * 60,
-        type,
+        type: `image/${format || 'webp'}`,
         contentDisposition: 'inline',
       });
 
@@ -84,6 +84,9 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
         302: t.Void(),
         404: genericResponseErrorSchema,
       },
+      query: t.Object({
+        format: t.Optional(t.Enum({ png: 'png', gif: 'gif' })),
+      }),
     }
   )
   .resolve(async ({ cookie, status }) => {
@@ -113,13 +116,13 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
         return status(413, { error: 'Guild picture is too large' });
       }
 
-      const format = body.avatar.type === 'image/gif' ? 'gif' : 'png';
-      await storage.write(`guild-avatars/${guild.id}.${format}`, body.avatar, {
-        type: body.avatar.type,
+      const image = await processImage(await body.avatar.arrayBuffer());
+      await storage.write(`guild-avatars/${guild.id}.webp`, image.data, {
+        type: 'image/webp',
       });
 
       const avatarUrl = new URL(
-        `/guilds/avatar/${encodeURIComponent(guild.id)}?format=${format}&v=${Date.now()}`,
+        `/guilds/avatar/${encodeURIComponent(guild.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
         getConfig().server.baseUrl
       ).toString();
       await db.update(dbGuilds).set({ avatarUrl }).where(eq(dbGuilds.id, guild.id));

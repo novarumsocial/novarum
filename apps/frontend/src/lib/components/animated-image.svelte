@@ -15,28 +15,30 @@
     onerror?: () => void;
   } = $props();
 
-  let playGif = $state(false);
+  let play = $state(false);
   let image = $state<HTMLImageElement | null>(null);
   let frozenFrame = $state<HTMLCanvasElement | null>(null);
   let frozenReady = $state(false);
-  const isGif = $derived(/(\.gif(?:$|[?#])|[?&]format=gif(?:&|$))/i.test(src));
+  const animated = $derived(
+    /(\.gif(?:$|[?#])|[?&]format=gif(?:&|$)|[?&]animated=1(?:&|$))/i.test(src)
+  );
 
   $effect(() => {
     src;
+    play = focused;
     frozenReady = false;
-    playGif = focused;
   });
 
   $effect(() => {
-    if (playGif) {
+    if (play) {
       frozenReady = false;
-    } else if (isGif && image?.complete && frozenFrame) {
-      freezeGif();
+    } else if (animated && image?.complete && frozenFrame) {
+      freeze();
     }
   });
 
-  function freezeGif() {
-    if (playGif || !isGif || !image || !frozenFrame) return;
+  function freeze() {
+    if (play || !animated || !image || !frozenFrame) return;
 
     const scale = Math.min(1, 512 / image.naturalWidth);
     frozenFrame.width = image.naturalWidth * scale;
@@ -50,33 +52,33 @@
   class="overflow-hidden {className}"
   role="presentation"
   onmouseenter={() => {
-    if (isGif && !focused) playGif = true;
+    if (animated && !focused) play = true;
   }}
   onmouseleave={() => {
-    if (isGif && !focused) playGif = false;
+    if (animated && !focused) play = false;
   }}
 >
-  {#if isGif}
+  {#if animated}
     <canvas
       bind:this={frozenFrame}
       class="size-full"
       class:object-cover={fit === 'cover'}
       class:object-contain={fit === 'contain'}
-      class:hidden={playGif || !frozenReady}
+      class:hidden={play || !frozenReady}
       aria-hidden="true"
     ></canvas>
   {/if}
-  {#if !isGif || playGif || !frozenReady}
+  {#if !animated || play || !frozenReady}
     <img
       {src}
       {alt}
       class="size-full"
       class:object-cover={fit === 'cover'}
       class:object-contain={fit === 'contain'}
-      class:hidden={isGif && !playGif}
+      class:hidden={animated && !play}
       referrerpolicy="no-referrer"
       {onerror}
-      onload={freezeGif}
+      onload={freeze}
       bind:this={image}
     />
   {/if}
