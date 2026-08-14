@@ -87,7 +87,7 @@ jobs:
     needs:
       - build-linux-windows
       - build-macos
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
     steps:
