@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Plus, Users } from '@lucide/svelte';
+  import { Plus, Users, X } from '@lucide/svelte';
   import { friends } from '$lib/friends.svelte';
   import Avatar from './avatar.svelte';
   import { Separator } from '$lib/components/ui/separator/index.js';
@@ -45,13 +45,18 @@
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="Create direct message"
       >
-        <Plus class="size-3.5" />
+        <a href="">
+          <Plus class="size-3.5" />
+        </a>
       </button>
     </div>
 
     {#each entries as entry (entry.user.userId)}
       {@const name = entry.user.displayName || entry.user.username}
-      <button class={itemClass(entry.user.userId)} onclick={() => (selected = entry.user.userId)}>
+      <button
+        class={itemClass(entry.user.userId) + ' group hover:cursor-pointer'}
+        onclick={() => (selected = entry.user.userId)}
+      >
         <Avatar
           src={entry.user.avatarUrl}
           {name}
@@ -59,6 +64,9 @@
           bgColor={entry.user.avatarColor}
         />
         <span class="flex-1 truncate">{name}</span>
+        <a href="">
+          <X class="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+        </a>
       </button>
     {/each}
   </div>
