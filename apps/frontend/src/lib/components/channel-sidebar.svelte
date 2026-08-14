@@ -322,7 +322,7 @@
               <button
                 onclick={() => selectChannel(ch)}
                 class={cn(
-                  'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors',
+                  'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors hover:cursor-pointer',
                   activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
                   activeChannel !== ch.id && 'text-muted-foreground hover:text-sidebar-foreground',
                   reorderLoading && 'opacity-70'
