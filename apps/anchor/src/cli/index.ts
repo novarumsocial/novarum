@@ -84,7 +84,7 @@ if (command === 'compute-avatar-color') {
   process.exit(0);
 }
 
-if (command === 'migrate-assets-to-webp') {
+if (command === 'reprocess-webp') {
   // migrate user pfps
   const allUsers = await db.query.users.findMany({
     where: {

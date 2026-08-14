@@ -50,8 +50,8 @@ export async function processImage(
       .toBuffer();
     return { data, animated: true };
   }
-  const data = await new Bun.Image(Buffer.from(imageBuffer))
-    .webp({ quality, lossless: false })
-    .buffer();
+  const data = await sharp(Buffer.from(imageBuffer))
+    .webp({ quality })
+    .toBuffer();
   return { data, animated: false };
 }
