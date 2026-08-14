@@ -240,7 +240,7 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="space-y-1">
+          <div class="space-y-1 select-none">
             <Card.Title class="text-xl">You're invited!</Card.Title>
             <Card.Description>Join your friends on a shared server.</Card.Description>
           </div>
@@ -251,7 +251,7 @@
             class="flex items-center gap-4 rounded-sm border border-border bg-muted/30 px-4 py-3"
           >
             <div
-              class="flex size-10 shrink-0 items-center justify-center bg-primary/20 text-primary"
+              class="flex size-10 shrink-0 items-center justify-center bg-primary/20 text-primary select-none"
               class:rounded-full={settings.value.circleIcons}
             >
               {#if invite?.guild.avatarUrl}
@@ -266,7 +266,7 @@
                 </span>
               {/if}
             </div>
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0 flex-1 select-none">
               <p class="truncate font-medium">{invite.guild.name}</p>
               <p class="flex items-center gap-1 text-xs text-muted-foreground">
                 <Users class="size-3" />
@@ -282,7 +282,7 @@
           </div>
 
           <div class="grid gap-1.5">
-            <label for="invite-link" class="text-xs font-medium text-foreground">
+            <label for="invite-link" class="text-xs font-medium text-foreground select-none">
               Invite Link
             </label>
             <div class="flex gap-2">
@@ -318,14 +318,21 @@
           {/if}
         </Card.Content>
 
-        <Card.Footer class="justify-center text-xs text-muted-foreground">
+        <Card.Footer class="justify-center text-xs text-muted-foreground select-none">
           <span>Not {homeServer}?</span>
+          <!--
           <button
             type="button"
             class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
           >
             Sign in with a different account
           </button>
+          -->
+          <a
+            href={`/register`}
+            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+            >Sign in with a different account</a
+          >
         </Card.Footer>
       </Card.Root>
     {/if}
