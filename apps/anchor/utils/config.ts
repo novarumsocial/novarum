@@ -60,5 +60,7 @@ export type Config = z.infer<typeof schema>;
 export function getConfig() {
   // doing readfilesync so its not a pain to work with.
   const config = schema.parse(TOML.parse(readFileSync('./config.toml').toString()));
+  // pushes base url because we need that now (don't ask, s3 is black magic)
+  config.files.s3_cors_origins.push(config.server.baseUrl);
   return config;
 }

@@ -11,6 +11,7 @@ import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { publicUser } from '../../utils/publicUser';
 import { publishRealtime } from '../../utils/publishRealtime';
 import type { RealtimeEvent } from '../../src';
+import { processImage } from '../../utils/optimizeWebp';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const userPayloadResponseSchema = z.object({ user: userResponseSchema });
@@ -19,17 +20,17 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   .get(
     '/avatar/:userId',
     async ({ params, query, status }) => {
+      const { format } = query;
       const user = await db.query.users.findFirst({
         where: { id: params.userId },
       });
       if (!user?.avatarUrl) return status(404, { error: 'Avatar not found' });
 
-      const format = query.format === 'gif' ? 'gif' : 'png';
-      const type = format === 'gif' ? 'image/gif' : 'image/png';
-      const url = publicPresign(`avatars/${user.id}${format === 'gif' ? '.gif' : ''}`, {
+      const key = `avatars/${user.id}${format ? (format === 'gif' ? '.gif' : '') : '.webp'}`;
+      const url = publicPresign(key, {
         method: 'GET',
         expiresIn: 5 * 60,
-        type,
+        type: `image/${format || 'webp'}`,
         contentDisposition: 'inline',
       });
 
@@ -40,6 +41,9 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         302: t.Void(),
         404: genericResponseErrorSchema,
       },
+      query: t.Object({
+        format: t.Optional(t.Enum({ png: 'png', gif: 'gif' })),
+      }),
     }
   )
   .post(
@@ -55,20 +59,18 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         return status(413, { error: 'Avatar must be smaller than 2 MB' });
       }
 
-      const format = body.avatar.type === 'image/gif' ? 'gif' : 'png';
-      await storage.write(
-        `avatars/${session.userId}${format === 'gif' ? '.gif' : ''}`,
-        body.avatar,
-        {
-          type: body.avatar.type,
-        }
-      );
+      const avatarArrayBuffer = await body.avatar.arrayBuffer();
 
-      const color = await getAverageColor(Buffer.from(await body.avatar.arrayBuffer()));
+      const image = await processImage(avatarArrayBuffer);
+      await storage.write(`avatars/${session.userId}.webp`, image.data, {
+        type: 'image/webp',
+      });
+
+      const color = await getAverageColor(Buffer.from(avatarArrayBuffer));
 
       const version = Date.now();
       const avatarUrl = new URL(
-        `/user/avatar/${encodeURIComponent(session.userId)}?format=${format}&v=${version}`,
+        `/user/avatar/${encodeURIComponent(session.userId)}?v=${version}${image.animated ? '&animated=1' : ''}`,
         getConfig().server.baseUrl
       ).toString();
 
@@ -176,16 +178,15 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
   .get(
     '/banner/:userId',
     async ({ params, query, status }) => {
+      const { format } = query;
       const user = await db.query.users.findFirst({ where: { id: params.userId } });
       if (!user?.bannerUrl) return status(404, { error: 'Banner not found' });
 
-      const format = query.format === 'gif' ? 'gif' : 'png';
-      const type = format === 'gif' ? 'image/gif' : 'image/png';
       return noStoreRedirect(
-        publicPresign(`banners/${user.id}.${format}`, {
+        publicPresign(`banners/${user.id}.${format || 'webp'}`, {
           method: 'GET',
           expiresIn: 5 * 60,
-          type,
+          type: `image/${format || 'webp'}`,
           contentDisposition: 'inline',
         })
       );
@@ -195,6 +196,9 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         302: t.Void(),
         404: genericResponseErrorSchema,
       },
+      query: t.Object({
+        format: t.Optional(t.Enum({ png: 'png', gif: 'gif' })),
+      }),
     }
   )
   .post(
@@ -210,13 +214,13 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         return status(413, { error: 'Banner is too large' });
       }
 
-      const format = body.banner.type === 'image/gif' ? 'gif' : 'png';
-      await storage.write(`banners/${session.userId}.${format}`, body.banner, {
-        type: body.banner.type,
+      const image = await processImage(await body.banner.arrayBuffer());
+      await storage.write(`banners/${session.userId}.webp`, image.data, {
+        type: 'image/webp',
       });
 
       const bannerUrl = new URL(
-        `/user/banner/${encodeURIComponent(session.userId)}?format=${format}&v=${Date.now()}`,
+        `/user/banner/${encodeURIComponent(session.userId)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
         getConfig().server.baseUrl
       ).toString();
       await db
