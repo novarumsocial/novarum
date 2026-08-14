@@ -99,12 +99,12 @@ if (command === 'reprocess-webp') {
       continue;
     }
     const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
     await storage.write(`avatars/${user.id}.webp`, image.data, {
       type: 'image/webp',
     });
-    
+
     const avatarUrl = new URL(
       `/user/avatar/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -132,12 +132,12 @@ if (command === 'reprocess-webp') {
       continue;
     }
     const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
     await storage.write(`banners/${user.id}.webp`, image.data, {
       type: 'image/webp',
     });
-    
+
     const bannerUrl = new URL(
       `/user/banner/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -154,7 +154,11 @@ if (command === 'reprocess-webp') {
   // migrate guild icons
   const allGuilds = await db.query.guilds.findMany({
     where: {
-      AND: [{ avatarUrl: { isNotNull: true } }, { avatarUrl: { like: '%?format=%' } }, { id: { notLike: 'fed:%' } }],
+      AND: [
+        { avatarUrl: { isNotNull: true } },
+        { avatarUrl: { like: '%?format=%' } },
+        { id: { notLike: 'fed:%' } },
+      ],
     },
   });
   for (const guild of allGuilds) {
@@ -164,12 +168,12 @@ if (command === 'reprocess-webp') {
       continue;
     }
     const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
     await storage.write(`guild-avatars/${guild.id}.webp`, image.data, {
       type: 'image/webp',
     });
-    
+
     const avatarUrl = new URL(
       `/guilds/avatar/${encodeURIComponent(guild.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -183,7 +187,9 @@ if (command === 'reprocess-webp') {
     console.log(`migrated avatar for guild ${guild.name}`);
   }
 
-  console.log('migration complete! note that you may need to refresh the frontend to get the migrated images')
+  console.log(
+    'migration complete! note that you may need to refresh the frontend to get the migrated images'
+  );
 
   process.exit(0);
 }
