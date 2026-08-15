@@ -117,10 +117,9 @@
         />
         {#if user.status}
           <span
-            class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status ===
-            'ONLINE'
+            class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status === 'ONLINE'
               ? 'bg-emerald-500'
-              : 'bg-muted-foreground'}"
+              : 'bg-neutral-900 ring-3 ring-inset ring-neutral-500'}"
             class:rounded-full={settings.value.circleIcons}
             class:size-5={settings.value.circleIcons}
             class:mr-0.25={settings.value.circleIcons}
