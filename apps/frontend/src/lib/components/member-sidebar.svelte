@@ -91,14 +91,6 @@
                   class="size-7 text-xs"
                   bgColor={member.avatarColor}
                 />
-                <span
-                  class="absolute -bottom-px -right-px size-2.5 border-2 border-sidebar bg-muted-foreground"
-                ></span>
-                {#if settings.value.circleIcons}
-                  <span
-                    class="rounded-full absolute -bottom-px -right-px size-2.75 border-2 border-sidebar bg-muted-foreground"
-                  ></span>
-                {/if}
               </div>
               <div class="flex min-w-0 flex-1">
                 <span class="block truncate text-sm text-foreground">{name}</span>

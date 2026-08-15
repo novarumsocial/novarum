@@ -101,7 +101,7 @@
           {:else if friendStatus === 'OUTGOING'}
             <UserRoundCog />
           {:else if friendStatus === 'FRIEND'}
-            <UserRoundCheck />
+            <UserRoundCheck /> <!-- TODO: if hover, text-destructive and switch to UserRoundMinus -->
           {:else}
             <UserRoundPlus />
           {/if}
