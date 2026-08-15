@@ -54,7 +54,7 @@
     {#each entries as entry (entry.user.userId)}
       {@const name = entry.user.displayName || entry.user.username}
       <button
-        class={itemClass(entry.user.userId) + ' group hover:cursor-pointer'}
+        class={itemClass(entry.user.userId) + ' group cursor-pointer'}
         onclick={() => (selected = entry.user.userId)}
       >
         <Avatar

@@ -72,7 +72,7 @@
 <nav class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3">
   <button
     onclick={() => onSelect(undefined)}
-    class="flex size-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+    class="flex size-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
     class:opacity-70={activeId !== null}
     class:ring-2={activeId === null}
     class:ring-primary={activeId === null}
@@ -112,7 +112,7 @@
       <div animate:flip={{ duration: flipDurationMs }} class="size-10 touch-none">
         <button
           onclick={() => onSelect(server.id)}
-          class="relative flex size-full items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
+          class="cursor-pointer relative flex size-full items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
             ? 'bg-destructive'
             : 'bg-primary'}"
           class:ring-2={activeId === server.id}
