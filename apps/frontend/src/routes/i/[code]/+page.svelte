@@ -54,6 +54,10 @@
     if (inviteCode && homeServer) lookupInvite();
   });
 
+  $effect(() => {
+    if (!session.initialized) void session.refresh();
+  });
+
   async function lookupInvite() {
     let inviteClient: ReturnType<typeof createAnchorClient>;
 
@@ -188,7 +192,7 @@
   ></div>
 
   <div class="relative flex min-h-svh items-center justify-center p-4">
-    {#if loading}
+    {#if loading || !session.initialized}
       <Card.Root
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
@@ -242,7 +246,7 @@
         <Card.Header class="space-y-3">
           <div class="space-y-1 text-center select-none mt-1.5">
             <Card.Title class="text-xl">You're invited!</Card.Title>
-            <Card.Description>Join your friends on a shared server.</Card.Description>
+            <Card.Description>Join your friends on this guild.</Card.Description>
           </div>
         </Card.Header>
 

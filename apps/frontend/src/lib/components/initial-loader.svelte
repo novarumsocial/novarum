@@ -55,11 +55,11 @@
   .sun {
     transform-box: view-box;
     transform-origin: 12px 10px;
-    animation: loading 1.6s ease-out both;
+    animation: loading 0.8s ease-out both;
   }
 
   .sun.finished {
-    animation: finished 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: finished 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   @keyframes loading {
