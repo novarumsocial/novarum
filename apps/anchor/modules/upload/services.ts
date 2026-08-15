@@ -14,6 +14,10 @@ import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { attachments, db } from '../../src/db';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
+import sharp from 'sharp';
+import { sniffAudioVideo } from '../../utils/sniffAudioVideo';
+import { Demuxer, Decoder, Scaler } from 'node-av/api';
+import { getConfig } from '../../utils/config';
 
 const remoteErrorSchema = z.object({ error: z.string() });
 
@@ -41,6 +45,84 @@ export const upload = new Elysia({ tags: ['Upload'] })
       },
     }
   )
+  .get('/attachment/:id/preview', async ({ params, status }) => {
+    const saveStorage = getConfig().misc.save_attachment_thumbnails;
+    const attachment = await db.query.attachments.findFirst({
+      where: { id: params.id, status: 'ATTACHED' },
+    });
+    if (!attachment) return status(404, { error: 'Attachment not found' });
+
+    const exists =
+      saveStorage && (await storage.exists(`attachment-previews/${attachment.objectKey}`));
+    if (exists) {
+      const file = storage.file(`attachment-previews/${attachment.objectKey}`);
+      return new Response(Buffer.from(await file.arrayBuffer()), {
+        headers: {
+          'content-type': file.type,
+        },
+      });
+    }
+
+    const url = publicPresign(attachment.objectKey, {
+      method: 'GET',
+      expiresIn: 5 * 60,
+      contentDisposition: `inline; filename="${safeAttachmentFilename(attachment.filename)}"`,
+    });
+    const file = await (await fetch(url)).arrayBuffer();
+    const type = sniffAudioVideo(file);
+
+    let thumbnail: Buffer | undefined;
+    if (type === 'image') {
+      const img = sharp(file);
+      const { width, height } = await img.metadata();
+      thumbnail = await img
+        .resize({
+          width: width / 4,
+          height: height / 4,
+          fit: 'inside',
+        })
+        .webp({ quality: 75 })
+        .toBuffer();
+    } else if (type === 'video') {
+      await using input = await Demuxer.open(Buffer.from(file));
+
+      const video = input.video();
+      if (!video) throw new Error('no video stream found');
+
+      using decoder = await Decoder.create(video);
+      using scaler = new Scaler();
+
+      if (input.duration > 0) await input.seek(input.duration * 0.1, video.index);
+
+      for await (const frame of decoder.frames(input.packets(video.index))) {
+        if (!frame) continue;
+        const scale = Math.min(1, 320 / frame.width, 240 / frame.height);
+
+        // the scaler can only really do jpeg so we're going with that for a bit
+        thumbnail = await scaler.toJpeg(frame, {
+          resize: {
+            width: Math.round(frame.width * scale),
+            height: Math.round(frame.height * scale),
+          },
+          quality: 75,
+        });
+        break;
+      }
+    }
+
+    if (saveStorage && thumbnail) {
+      await storage.write(`attachment-previews/${attachment.objectKey}`, thumbnail, {
+        type: type === 'video' ? 'image/jpeg' : 'image/webp',
+      });
+    }
+
+    if (!thumbnail) return status(404, { error: 'No preview available' });
+    return new Response(thumbnail, {
+      headers: {
+        'content-type': type === 'video' ? 'image/jpeg' : 'image/webp',
+      },
+    });
+  })
   .post(
     '/upload/presign',
     async ({ body, cookie, status }) => {

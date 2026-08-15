@@ -40,7 +40,7 @@ A few files must be created. Hopefully it's not much :')
             condition: service_healthy
           livekit:
             condition: service_started
-    
+
       postgres:
         image: postgres:18-alpine
         container_name: postgres
@@ -56,7 +56,7 @@ A few files must be created. Hopefully it's not much :')
           interval: 5s
           timeout: 3s
           retries: 20
-    
+
       livekit:
         image: livekit/livekit-server:latest
         container_name: livekit
@@ -89,6 +89,7 @@ A few files must be created. Hopefully it's not much :')
           - --single-node
           - --default-bucket
     ```
+
   </TabItem>
   <TabItem label="config.toml">
     This is Anchor's configuration file.
@@ -97,15 +98,15 @@ A few files must be created. Hopefully it's not much :')
     database_url = "postgresql://novarum:Y0U_SH0ULD_CHANG3_TH1S@postgres:5432/novarum"
     homeserver = "piedpiper.com"
     baseUrl = "https://piedpiper.com"
-    
+
     [federation]
     key_dir = "./keys"
-    
+
     [voice]
     livekit_url = "wss://lk.piedpiper.com"
     livekit_key = "RANDOMLY_GENERATED_KEY"
     livekit_secret = "RANDOMLY_GENERATED_SECRET"
-    
+
     [files]
     s3_access_key = "READ_BELOW_FOR_GENERATION"
     s3_secret_key = "READ_BELOW_FOR_GENERATION"
@@ -114,16 +115,19 @@ A few files must be created. Hopefully it's not much :')
     s3_public_endpoint = "https://cdn.piedpiper.com"
     s3_region = "garage"
     s3_cors_origins = ["https://app.novarum.me"]
-    
+
     [email]
     smtp_host = "smtp.resend.com"
     smtp_secure = true
     smtp_user = "resend"
     smtp_pass = "REPLACE_WITH_YOUR_RESEND_API_KEY"
     from_email = "novarum@piedpiper.com"
-    
+
     [misc]
     otp_pepper = "RANDOMLY_GENERATED_PEPPER"
+    # controls if the server saves attachment thumbnails.
+    # this is here in case you want to save space by getting it cached through a CDN
+    save_attachment_thumbnails = true
     ```
 
     A few notes:
@@ -138,25 +142,26 @@ A few files must be created. Hopefully it's not much :')
     port: 7880
     bind_addresses:
       - '0.0.0.0'
-    
+
     rtc:
       tcp_port: 7881
       port_range_start: 50100
       port_range_end: 50200
       use_external_ip: false
-    
+
     keys:
       RANDOMLY_GENERATED_KEY: RANDOMLY_GENERATED_SECRET
-    
+
     webhook:
       api_key: 'RANDOMLY_GENERATED_KEY'
       urls:
         - 'https://piedpiper.com/channel/livekit/webhook'
-    
+
     audio:
       update_interval: 100
       smooth_intervals: 1
-    ``` 
+    ```
+
   </TabItem>
   <TabItem label="garage.toml">
     This is Garage's configuration file.
@@ -164,17 +169,18 @@ A few files must be created. Hopefully it's not much :')
     metadata_dir = "/var/lib/garage/meta"
     data_dir = "/var/lib/garage/data"
     db_engine = "sqlite"
-    
+
     replication_factor = 1
-    
+
     rpc_bind_addr = "[::]:3901"
     rpc_public_addr = "127.0.0.1:3901"
-    
+
     [s3_api]
     s3_region = "garage"
     api_bind_addr = "[::]:3900"
     root_domain = ".s3.garage.localhost"
     ```
+
   </TabItem>
 </Tabs>
 
@@ -209,11 +215,11 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to             |
-| ----------------- | --------------------- |
-| piedpiper.com     | http://localhost:5049 |
-| lk.piedpiper.com  | http://localhost:7880 |
-| cdn.piedpiper.com | http://localhost:3900 |
+| Domain            | Points to               |
+| ----------------- | ----------------------- |
+| piedpiper.com     | <http://localhost:5049> |
+| lk.piedpiper.com  | <http://localhost:7880> |
+| cdn.piedpiper.com | <http://localhost:3900> |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 

@@ -89,22 +89,40 @@ if (command === 'reprocess-webp') {
   const allUsers = await db.query.users.findMany({
     where: {
       homeserver,
-      AND: [{ avatarUrl: { isNotNull: true } }, { avatarUrl: { like: '%?format=%' } }],
+      avatarUrl: { isNotNull: true },
     },
   });
   for (const user of allUsers) {
-    const img = await fetch(user.avatarUrl!);
-    if (!img.ok) {
-      console.error(`failed to fetch avatar for user ${user.username}: ${img.statusText}`);
-      continue;
+    const webpKey = `avatars/${user.id}.webp`;
+    if (await storage.file(webpKey).exists()) continue;
+
+    let buffer: ArrayBuffer;
+    if (user.avatarUrl!.includes('format=')) {
+      const img = await fetch(user.avatarUrl!);
+      if (!img.ok) {
+        console.error(`failed to fetch avatar for user ${user.username}: ${img.statusText}`);
+        continue;
+      }
+      buffer = await img.arrayBuffer();
+    } else {
+      // avatars uploaded before the `format` query param existed are stored
+      // without an extension, and the current route no longer serves them
+      const original = await storage
+        .file(`avatars/${user.id}`)
+        .arrayBuffer()
+        .catch(() => null);
+      if (!original) {
+        console.error(`no original avatar found for ${user.username}, skipping`);
+        continue;
+      }
+      buffer = original;
     }
-    const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
-    await storage.write(`avatars/${user.id}.webp`, image.data, {
+    await storage.write(webpKey, image.data, {
       type: 'image/webp',
     });
-    
+
     const avatarUrl = new URL(
       `/user/avatar/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -132,12 +150,12 @@ if (command === 'reprocess-webp') {
       continue;
     }
     const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
     await storage.write(`banners/${user.id}.webp`, image.data, {
       type: 'image/webp',
     });
-    
+
     const bannerUrl = new URL(
       `/user/banner/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -154,7 +172,11 @@ if (command === 'reprocess-webp') {
   // migrate guild icons
   const allGuilds = await db.query.guilds.findMany({
     where: {
-      AND: [{ avatarUrl: { isNotNull: true } }, { avatarUrl: { like: '%?format=%' } }, { id: { notLike: 'fed:%' } }],
+      AND: [
+        { avatarUrl: { isNotNull: true } },
+        { avatarUrl: { like: '%?format=%' } },
+        { id: { notLike: 'fed:%' } },
+      ],
     },
   });
   for (const guild of allGuilds) {
@@ -164,12 +186,12 @@ if (command === 'reprocess-webp') {
       continue;
     }
     const buffer = await img.arrayBuffer();
-    
+
     const image = await processImage(buffer);
     await storage.write(`guild-avatars/${guild.id}.webp`, image.data, {
       type: 'image/webp',
     });
-    
+
     const avatarUrl = new URL(
       `/guilds/avatar/${encodeURIComponent(guild.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
       getConfig().server.baseUrl
@@ -183,7 +205,9 @@ if (command === 'reprocess-webp') {
     console.log(`migrated avatar for guild ${guild.name}`);
   }
 
-  console.log('migration complete! note that you may need to refresh the frontend to get the migrated images')
+  console.log(
+    'migration complete! note that you may need to refresh the frontend to get the migrated images'
+  );
 
   process.exit(0);
 }

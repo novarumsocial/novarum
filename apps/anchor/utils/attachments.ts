@@ -26,7 +26,7 @@ export const attachmentPresignSchema = z.object({
 
 export const presignedUploadSchema = z.object({
   attachmentId: z.string(),
-  uploadUrl: z.string().url(),
+  uploadUrl: z.url(),
   headers: z.record(z.string(), z.string()),
 });
 
@@ -57,6 +57,10 @@ export function attachmentPayload(attachment: {
     size: attachment.size,
     url: new URL(
       `/attachment/${encodeURIComponent(attachment.id)}`,
+      getConfig().server.baseUrl
+    ).toString(),
+    previewUrl: new URL(
+      `/attachment/${encodeURIComponent(attachment.id)}/preview`,
       getConfig().server.baseUrl
     ).toString(),
   };

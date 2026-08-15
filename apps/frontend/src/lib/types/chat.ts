@@ -50,6 +50,7 @@ export interface Attachment {
   contentType: string;
   size: number;
   url: string;
+  previewUrl: string;
 }
 
 export interface VoiceUser {

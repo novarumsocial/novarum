@@ -57,7 +57,7 @@ export const attachmentResponseSchema = createSelectSchema(attachments, { size: 
     contentType: true,
     size: true,
   })
-  .extend({ url: z.url() });
+  .extend({ url: z.url(), previewUrl: z.url() });
 
 export const messageResponseBaseSchema = createSelectSchema(messages, {
   createdAt: isoDateSchema,

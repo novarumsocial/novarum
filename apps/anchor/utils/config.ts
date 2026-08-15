@@ -38,7 +38,9 @@ const schema = z.object({
       .optional()
       .default(['*'])
       // https://localhost for the mobile app, app://novarum for the electron app
-      .transform((o) => (o.includes('*') ? ['*'] : [...new Set([...o, 'app://novarum', 'https://localhost'])])),
+      .transform((o) =>
+        o.includes('*') ? ['*'] : [...new Set([...o, 'app://novarum', 'https://localhost'])]
+      ),
   }),
   email: z.object({
     smtp_host: z.string().min(1),
@@ -50,6 +52,7 @@ const schema = z.object({
   }),
   misc: z.object({
     otp_pepper: z.string().min(1),
+    save_attachment_thumbnails: z.boolean().optional().default(true),
   }),
 });
 
