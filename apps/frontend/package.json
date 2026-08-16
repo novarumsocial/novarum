@@ -45,6 +45,7 @@
     "@capgo/capacitor-updater": "^8.51.3",
     "@elysia/eden": "^1.4.10",
     "@sapphi-red/web-noise-suppressor": "^0.3.5",
+    "@videojs/html": "10.0.0-beta.26",
     "anchor": "workspace:*",
     "elysia": "^1.4.29",
     "livekit-client": "^2.20.0",

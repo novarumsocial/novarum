@@ -7,7 +7,6 @@
     Download,
     FileAudio,
     FileText,
-    FileVideo,
     Reply,
     Ellipsis,
     Trash2,
@@ -16,6 +15,7 @@
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
+  import VideoPlayer from './video-player.svelte';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
   import EmojiText from './emoji-text.svelte';
@@ -123,6 +123,12 @@
         attachment.contentType.startsWith('audio/') ||
         attachment.contentType === 'application/pdf'
     )
+  );
+  const videoAttachments = $derived(
+    message.attachments.filter((attachment) => attachment.contentType.startsWith('video/'))
+  );
+  const gridAttachments = $derived(
+    message.attachments.filter((attachment) => !attachment.contentType.startsWith('video/'))
   );
   let viewerOpen = $state(false);
   let viewerIndex = $state(0);
@@ -368,64 +374,69 @@
     {/if}
 
     {#if message.attachments.length > 0}
-      <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
-        {#each message.attachments as attachment (attachment.id)}
-          {#if attachment.contentType.startsWith('image/')}
-            <Button
-              variant="outline"
-              class="group relative aspect-[4/3] h-auto min-w-0 overflow-hidden p-0 text-left"
-              aria-label={`View ${attachment.filename}`}
-              onclick={() => viewAttachment(attachment.id)}
-            >
-              <img
-                src={attachment.previewUrl}
-                alt={attachment.filename}
-                loading="lazy"
-                class="size-full object-cover transition-transform group-hover:scale-[1.02]"
-              />
-            </Button>
-          {:else if attachment.contentType.startsWith('video/') || attachment.contentType.startsWith('audio/') || attachment.contentType === 'application/pdf'}
-            <Button
-              variant="outline"
-              class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
-              onclick={() => viewAttachment(attachment.id)}
-            >
-              <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
-                {#if attachment.contentType.startsWith('video/')}
-                  <FileVideo class="size-4 text-primary" />
-                {:else if attachment.contentType.startsWith('audio/')}
-                  <FileAudio class="size-4 text-primary" />
-                {:else}
-                  <FileText class="size-4 text-primary" />
-                {/if}
-              </div>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[11px] font-medium">{attachment.filename}</span>
-                <span class="font-mono text-[9px] uppercase text-muted-foreground">View</span>
-              </span>
-            </Button>
-          {:else}
-            <Button
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              variant="outline"
-              class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
-            >
-              <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
-                <FileText class="size-4 text-primary" />
-              </div>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-xs font-medium">{attachment.filename}</span>
-                <span class="font-mono text-[10px] uppercase text-muted-foreground">
-                  {formatBytes(attachment.size)}
+      {#each videoAttachments as attachment (attachment.id)}
+        <div class="mt-2 max-w-md">
+          <VideoPlayer {attachment} />
+        </div>
+      {/each}
+      {#if gridAttachments.length > 0}
+        <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {#each gridAttachments as attachment (attachment.id)}
+            {#if attachment.contentType.startsWith('image/')}
+              <Button
+                variant="outline"
+                class="group relative aspect-[4/3] h-auto min-w-0 overflow-hidden p-0 text-left"
+                aria-label={`View ${attachment.filename}`}
+                onclick={() => viewAttachment(attachment.id)}
+              >
+                <img
+                  src={attachment.previewUrl}
+                  alt={attachment.filename}
+                  loading="lazy"
+                  class="size-full object-cover transition-transform group-hover:scale-[1.02]"
+                />
+              </Button>
+            {:else if attachment.contentType.startsWith('audio/') || attachment.contentType === 'application/pdf'}
+              <Button
+                variant="outline"
+                class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+                onclick={() => viewAttachment(attachment.id)}
+              >
+                <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
+                  {#if attachment.contentType.startsWith('audio/')}
+                    <FileAudio class="size-4 text-primary" />
+                  {:else}
+                    <FileText class="size-4 text-primary" />
+                  {/if}
+                </div>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-[11px] font-medium">{attachment.filename}</span>
+                  <span class="font-mono text-[9px] uppercase text-muted-foreground">View</span>
                 </span>
-              </span>
-              <Download class="size-3.5 shrink-0 text-muted-foreground" />
-            </Button>
-          {/if}
-        {/each}
-      </div>
+              </Button>
+            {:else}
+              <Button
+                href={attachment.url}
+                target="_blank"
+                rel="noreferrer"
+                variant="outline"
+                class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+              >
+                <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
+                  <FileText class="size-4 text-primary" />
+                </div>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-xs font-medium">{attachment.filename}</span>
+                  <span class="font-mono text-[10px] uppercase text-muted-foreground">
+                    {formatBytes(attachment.size)}
+                  </span>
+                </span>
+                <Download class="size-3.5 shrink-0 text-muted-foreground" />
+              </Button>
+            {/if}
+          {/each}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
