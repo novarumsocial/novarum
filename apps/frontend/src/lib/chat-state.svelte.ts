@@ -66,6 +66,7 @@ type TypingInput = {
 
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
+const messagesPageSize = 50;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 async function stripImageMetadata(file: File) {
@@ -176,8 +177,11 @@ class ChatState {
   members = $state<Author[]>([]);
   voiceStates = $state<Record<string, VoicePresenceInput[]>>({});
   typingByChannel = $state<Record<string, TypingInput[]>>({});
+  loadingOlderByChannel = $state<Record<string, boolean>>({});
   private loadedChannel: string | null = null;
   private lastTypingByChannel = new Map<string, number>();
+  private nextCursorByChannel = new Map<string, number>();
+  private hasMoreByChannel = new Map<string, boolean>();
 
   route = $derived(currentRoute());
   activeServer = $derived(this.route.kind === 'guild' ? this.route.serverId : null);
@@ -567,10 +571,11 @@ class ChatState {
       ...this.messagesLoadingByChannel,
       [channelId]: true,
     };
+    this.nextCursorByChannel.set(channelId, 0);
 
     try {
       const result = await anchor.client.message.list.get({
-        query: { channelId },
+        query: { channelId, cursor: 0, amount: messagesPageSize },
       });
 
       if (result.error || !result.data || 'error' in result.data) {
@@ -580,6 +585,7 @@ class ChatState {
         return;
       }
 
+      this.hasMoreByChannel.set(channelId, result.data.messages.length === messagesPageSize);
       this.setMessages(channelId, result.data.messages);
       return result.data.messages.at(-1);
     } finally {
@@ -588,6 +594,50 @@ class ChatState {
         [channelId]: false,
       };
     }
+  }
+
+  async loadOlderMessages(channelId: string) {
+    if (this.messagesLoadingByChannel[channelId] || this.loadingOlderByChannel[channelId]) return;
+    if (!this.hasMoreByChannel.get(channelId)) return;
+
+    this.loadingOlderByChannel = {
+      ...this.loadingOlderByChannel,
+      [channelId]: true,
+    };
+
+    try {
+      const cursor = this.nextCursorByChannel.get(channelId) ?? 0;
+      const result = await anchor.client.message.list.get({
+        query: { channelId, cursor, amount: messagesPageSize },
+      });
+
+      if (result.error || !result.data || 'error' in result.data) {
+        if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
+        console.error('Failed to load older messages', result.error ?? result.data);
+        return;
+      }
+
+      const loaded = result.data.messages.map(messageFromInput);
+      const existing = this.messagesByChannel[channelId] ?? [];
+      const existingIds = new Set(existing.map((message) => message.id));
+      const older = loaded.filter((message: Message) => !existingIds.has(message.id));
+      if (older.length > 0) {
+        this.setChannelMessages(channelId, [...older, ...existing]);
+      }
+
+      this.nextCursorByChannel.set(channelId, cursor + loaded.length);
+      this.hasMoreByChannel.set(channelId, loaded.length === messagesPageSize);
+    } finally {
+      this.loadingOlderByChannel = {
+        ...this.loadingOlderByChannel,
+        [channelId]: false,
+      };
+    }
+  }
+
+  hasMoreMessages(channelId: string) {
+    return this.hasMoreByChannel.get(channelId) ?? false;
   }
 
   async onTyping() {
