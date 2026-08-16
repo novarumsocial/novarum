@@ -74,7 +74,7 @@
         <AnimatedImage
           src={user.bannerUrl}
           alt=""
-          class="size-full"
+          class="size-full select-none"
           focused={false}
           fit="contain"
         />
@@ -140,8 +140,16 @@
           </span>
         {/if}
       </div>
-      <Popover.Description class="truncate font-mono text-[11px]">
-        @{user.username}:{user.server}
+      <Popover.Description class="flex items-center gap-1 truncate font-mono text-[11px] select-none">
+        <span class="truncate">@{user.username}:{user.server}</span>
+<!--        {#if user.pronouns}-->
+          <span class="flex shrink-0 items-center gap-1 text-muted-foreground">
+            <span aria-hidden="true">•</span>
+            <span class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+              pro/nouns
+            </span>
+          </span>
+<!--        {/if}-->
       </Popover.Description>
       {#if user.about}
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">

@@ -207,7 +207,7 @@
   <DropdownMenu.Root>
     <DropdownMenu.Trigger>
       <div class="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-        <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+        <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground select-none">
           {server.name}
         </span>
 
@@ -270,7 +270,7 @@
   <!-- Channel list -->
   <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
     {#each categories as cat (cat.id)}
-      <div class="flex w-full items-center gap-1 px-1 py-1">
+      <div class="flex w-full items-center gap-1 px-1 py-1 select-none">
         <button
           onclick={() => openCreateChannel(cat)}
           aria-label="Add channel"
@@ -336,7 +336,7 @@
                   />
                 {/if}
 
-                <span class="flex-1 truncate" class:text-white={ch.unread || ch.mention > 0}>
+                <span class="flex-1 truncate select-none" class:text-white={ch.unread || ch.mention > 0}>
                   {ch.label || ch.name}
                 </span>
 
