@@ -39,7 +39,7 @@ await migrate(db, {
 console.log('[DB] Migrations complete!');
 
 const app = new Elysia()
-  .use(cors({ credentials: true }))
+  .use(cors({ credentials: true, origin: getConfig().files.s3_cors_origins }))
   .use(ip({ headersFirst: true }))
   .use(
     openapi({
