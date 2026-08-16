@@ -89,19 +89,41 @@ if (command === 'reprocess-webp') {
   const allUsers = await db.query.users.findMany({
     where: {
       homeserver,
-      AND: [{ avatarUrl: { isNotNull: true } }, { avatarUrl: { like: '%?format=%' } }],
+      avatarUrl: { isNotNull: true },
     },
   });
   for (const user of allUsers) {
-    const img = await fetch(user.avatarUrl!);
-    if (!img.ok) {
-      console.error(`failed to fetch avatar for user ${user.username}: ${img.statusText}`);
-      continue;
+    const webpKey = `avatars/${user.id}.webp`;
+    if (await storage.file(webpKey).exists()) continue;
+
+    let buffer: ArrayBuffer;
+    if (user.avatarUrl!.includes('format=')) {
+      const img = await fetch(user.avatarUrl!);
+      if (!img.ok) {
+        console.error(`failed to fetch avatar for user ${user.username}: ${img.statusText}`);
+        continue;
+      }
+      buffer = await img.arrayBuffer();
+    } else {
+      // avatars uploaded before the `format` query param existed are stored
+      // without an extension, and the current route no longer serves them
+      const original = await storage
+        .file(`avatars/${user.id}`)
+        .arrayBuffer()
+        .catch(() => null);
+      if (!original) {
+        console.error(`no original avatar found for ${user.username}, skipping`);
+        continue;
+      }
+      buffer = original;
     }
+<<<<<<< HEAD
     const buffer = await img.arrayBuffer();
+=======
+>>>>>>> dc3d09dfb06949c7395de9abd7d225e063492545
 
     const image = await processImage(buffer);
-    await storage.write(`avatars/${user.id}.webp`, image.data, {
+    await storage.write(webpKey, image.data, {
       type: 'image/webp',
     });
 

@@ -41,7 +41,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
   .get(
     '/list',
     async ({ query, session, status }) => {
-      const { channelId } = query;
+      const { channelId, amount, cursor } = query;
 
       const channel = await db.query.channels.findFirst({
         where: { id: channelId },
@@ -108,12 +108,15 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const messages = await db.query.messages.findMany({
         where: { channelId },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         with: {
           author: true,
           attachments: true,
         },
+        limit: amount,
+        offset: cursor,
       });
+      messages.reverse();
 
       return {
         messages: messages.map((message) => {
@@ -142,6 +145,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
     {
       query: t.Object({
         channelId: t.String(),
+        cursor: t.Number(),
+        amount: t.Number({ min: 20, max: 100, default: 50 }),
       }),
       response: {
         200: messageListResponseSchema,

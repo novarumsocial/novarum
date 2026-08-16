@@ -33,6 +33,7 @@
   } = $props();
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
+  let olderLoading = $state(false);
   let previousChannelId: string | null = null;
   let previousMessageCount = 0;
   let unreadBoundary = $state<{ channelId: string; lastReadMessageId: string | null } | null>(null);
@@ -72,9 +73,10 @@
         ? { channelId: channel.id, lastReadMessageId: channel.lastReadMessageId }
         : null;
       replyingTo = null;
+      olderLoading = false;
     }
 
-    if (!scrollContainer || loading) return;
+    if (!scrollContainer || loading || olderLoading) return;
     previousChannelId = channel.id;
 
     void tick().then(() => {
@@ -96,9 +98,52 @@
     unreadBoundary = null;
     replyingTo = null;
   }
+
+  function onScroll() {
+    const container = scrollContainer;
+    if (!container || loading || olderLoading) return;
+    if (container.scrollTop > 100) return;
+    if (!chat.hasMoreMessages(channel.id)) return;
+
+    void loadOlder();
+  }
+
+  async function loadOlder() {
+    const container = scrollContainer;
+    if (!container || loading || olderLoading) return;
+
+    const channelId = channel.id;
+    const previousHeight = container.scrollHeight;
+    const previousTop = container.scrollTop;
+    olderLoading = true;
+
+    await chat.loadOlderMessages(channelId);
+    olderLoading = false;
+    await tick();
+
+    if (scrollContainer && channel.id === channelId) {
+      scrollContainer.scrollTop = scrollContainer.scrollHeight - previousHeight + previousTop;
+    }
+  }
 </script>
 
 <svelte:window onkeydown={(event) => event.key === 'Escape' && (unreadBoundary = null)} />
+
+{#snippet skeletonRows(count: number)}
+  {#each Array.from({ length: count }) as _, i}
+    <div class="flex gap-3" class:opacity-60={i > 2}>
+      <div class="mt-0.5 size-9 shrink-0 animate-pulse bg-muted"></div>
+      <div class="min-w-0 flex-1 space-y-2">
+        <div class="flex items-center gap-2">
+          <div class="h-3 w-24 animate-pulse bg-muted"></div>
+          <div class="h-2 w-10 animate-pulse bg-muted/70"></div>
+        </div>
+        <div class="h-3 w-3/4 animate-pulse bg-muted"></div>
+        <div class="h-3 w-1/2 animate-pulse bg-muted/70"></div>
+      </div>
+    </div>
+  {/each}
+{/snippet}
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
   <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
@@ -132,23 +177,16 @@
     </Button>
   </div>
 
-  <div bind:this={scrollContainer} class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+  <div bind:this={scrollContainer} class="min-h-0 min-w-0 flex-1 overflow-y-auto" onscroll={onScroll}>
+    {#if olderLoading}
+      <div class="space-y-5 px-3 pt-4 sm:px-4">
+        {@render skeletonRows(2)}
+      </div>
+    {/if}
     <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
       {#if loading}
         <div class="space-y-5">
-          {#each Array.from({ length: 5 }) as _, i}
-            <div class="flex gap-3" class:opacity-60={i > 2}>
-              <div class="mt-0.5 size-9 shrink-0 animate-pulse bg-muted"></div>
-              <div class="min-w-0 flex-1 space-y-2">
-                <div class="flex items-center gap-2">
-                  <div class="h-3 w-24 animate-pulse bg-muted"></div>
-                  <div class="h-2 w-10 animate-pulse bg-muted/70"></div>
-                </div>
-                <div class="h-3 w-3/4 animate-pulse bg-muted"></div>
-                <div class="h-3 w-1/2 animate-pulse bg-muted/70"></div>
-              </div>
-            </div>
-          {/each}
+          {@render skeletonRows(5)}
         </div>
       {:else if messages.length === 0}
         <div class="mb-4 max-w-md border border-dashed border-border p-4 select-none">
