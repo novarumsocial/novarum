@@ -22,14 +22,7 @@ export const storage = new S3Client({
   virtualHostedStyle: s3_virtual_hosted_style,
 });
 
-<<<<<<< HEAD
 export function publicPresign(key: string, options?: Parameters<typeof storage.presign>[1]) {
-=======
-export function publicPresign(
-  key: string,
-  options?: S3FilePresignOptions
-) {
->>>>>>> 12dcecde46bd7a535b5762572c5c5893c71fdaf9
   return storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint });
 }
 

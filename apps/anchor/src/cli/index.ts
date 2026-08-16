@@ -117,10 +117,6 @@ if (command === 'reprocess-webp') {
       }
       buffer = original;
     }
-<<<<<<< HEAD
-    const buffer = await img.arrayBuffer();
-=======
->>>>>>> dc3d09dfb06949c7395de9abd7d225e063492545
 
     const image = await processImage(buffer);
     await storage.write(webpKey, image.data, {
