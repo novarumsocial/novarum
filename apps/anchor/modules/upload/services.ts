@@ -18,6 +18,7 @@ import sharp from 'sharp';
 import { sniffAudioVideo } from '../../utils/sniffAudioVideo';
 import { Demuxer, Decoder, Scaler } from 'node-av/api';
 import { getConfig } from '../../utils/config';
+import { AV_AFD_4_3 } from 'node-av';
 
 const remoteErrorSchema = z.object({ error: z.string() });
 
@@ -75,10 +76,15 @@ export const upload = new Elysia({ tags: ['Upload'] })
     if (type === 'image') {
       const img = sharp(file);
       const { width, height } = await img.metadata();
+
+      let ratio = 4;
+      if (width < 320 && height < 240) {
+        ratio = 1;
+      }
       thumbnail = await img
         .resize({
-          width: Math.round(width / 4),
-          height: Math.round(height / 4),
+          width: Math.round(width / ratio),
+          height: Math.round(height / ratio),
           fit: 'inside',
         })
         .webp({ quality: 75 })
