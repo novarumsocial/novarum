@@ -77,8 +77,8 @@ export const upload = new Elysia({ tags: ['Upload'] })
       const { width, height } = await img.metadata();
       thumbnail = await img
         .resize({
-          width: width / 4,
-          height: height / 4,
+          width: Math.round(width / 4),
+          height: Math.round(height / 4),
           fit: 'inside',
         })
         .webp({ quality: 75 })
