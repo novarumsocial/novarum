@@ -820,15 +820,20 @@
                   </div>
                 </div>
 
-                <!-- TODO: pronouns (woke) -->
+                <div class="mt-3 flex items-end justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-base font-semibold">
+                      {session.user?.displayName || session.user?.username || 'Your profile'}
+                    </p>
+                    <p class="truncate text-xs text-muted-foreground">
+                      {session.user?.handle || `@${session.user?.username ?? 'you'}`}
+                    </p>
+                  </div>
 
-                <div class="mt-3 min-w-0">
-                  <p class="truncate text-base font-semibold">
-                    {session.user?.displayName || session.user?.username || 'Your profile'}
-                  </p>
-                  <p class="truncate text-xs text-muted-foreground">
-                    {session.user?.handle || `@${session.user?.username ?? 'you'}`}
-                  </p>
+                  <div class="grid shrink-0 gap-1.5">
+                    <Label for="pronouns">Pronouns</Label>
+                    <Input id="pronouns" placeholder="e.g. they/them" class="h-9 w-36 bg-background" />
+                  </div>
                 </div>
 
                 {#if mediaError}
