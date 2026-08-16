@@ -412,7 +412,7 @@
           ? `emoji-result-${selectedEmoji}`
           : undefined}
       rows="1"
-      class="select-none min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+      class="min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
     ></textarea>
     <Button
       onclick={handleSend}

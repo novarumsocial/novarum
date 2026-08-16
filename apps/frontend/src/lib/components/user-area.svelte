@@ -189,7 +189,7 @@
         ></div>
       {/if}
     </div>
-    <div class="min-w-0 flex-1 select-none">
+    <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
         {user.displayName || user.username}
       </p>

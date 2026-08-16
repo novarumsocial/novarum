@@ -125,7 +125,7 @@
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="space-y-1 mt-1.5 text-center select-none">
+        <div class="space-y-1 mt-1.5 text-center">
           <Card.Title class="text-xl">Create your account</Card.Title>
           <Card.Description>
             Pick a home server and username - your handle works across the federation.
@@ -149,7 +149,7 @@
                         {...props}
                         bind:value={$formData.username}
                         placeholder="alice"
-                        class="pl-8 select-none"
+                        class="pl-8"
                         autocomplete="username"
                         spellcheck="false"
                         autocapitalize="none"
@@ -157,7 +157,7 @@
                     </div>
                   {/snippet}
                 </Form.Control>
-                <Form.FieldErrors class="text-xs select-none" />
+                <Form.FieldErrors class="text-xs" />
               </Form.Field>
 
               <Form.Field {form} name="homeserver" class="space-y-1.5">
@@ -174,18 +174,18 @@
                         {...props}
                         bind:value={$formData.homeserver}
                         placeholder="novarum.me"
-                        class="pl-8 select-none"
+                        class="pl-8"
                         autocomplete="url"
                         spellcheck="false"
                       />
                     </div>
                   {/snippet}
                 </Form.Control>
-                <Form.FieldErrors class="text-xs select-none" />
+                <Form.FieldErrors class="text-xs" />
               </Form.Field>
             </div>
 
-            <p class="text-xs text-muted-foreground select-none">
+            <p class="text-xs text-muted-foreground">
               Handle preview: <span class="font-mono text-foreground">{handle}</span>
             </p>
           </div>
@@ -204,14 +204,14 @@
                     {...props}
                     bind:value={$formData.displayName}
                     placeholder="Alice"
-                    class="pl-8 select-none"
+                    class="pl-8"
                     autocomplete="nickname"
                     maxlength={64}
                   />
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs select-none" />
+            <Form.FieldErrors class="text-xs" />
           </Form.Field>
 
           <Form.Field {form} name="email" class="space-y-1.5">
@@ -227,13 +227,13 @@
                     type="email"
                     bind:value={$formData.email}
                     placeholder="you@example.com"
-                    class="pl-8 select-none"
+                    class="pl-8"
                     autocomplete="email"
                   />
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs select-none" />
+            <Form.FieldErrors class="text-xs" />
           </Form.Field>
 
           <Form.Field {form} name="password" class="space-y-1.5">
@@ -249,7 +249,7 @@
                     type={showPassword ? 'text' : 'password'}
                     bind:value={$formData.password}
                     placeholder="At least 8 characters"
-                    class="pl-8 select-none pr-8"
+                    class="pl-8 pr-8"
                     autocomplete="new-password"
                   />
                   <button
@@ -268,7 +268,7 @@
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs select-none" />
+            <Form.FieldErrors class="text-xs" />
             {#if $formData.password.length >= 8}
               <p class="flex items-center gap-1 text-xs text-emerald-400">
                 <CircleCheck class="size-3" />Looks good
@@ -289,13 +289,13 @@
                     type={showPassword ? 'text' : 'password'}
                     bind:value={$formData.confirmPassword}
                     placeholder="Re-enter your password"
-                    class="pl-8 select-none"
+                    class="pl-8"
                     autocomplete="new-password"
                   />
                 </div>
               {/snippet}
             </Form.Control>
-            <Form.FieldErrors class="text-xs select-none" />
+            <Form.FieldErrors class="text-xs" />
             {#if $formData.confirmPassword && $formData.confirmPassword === $formData.password}
               <p class="flex items-center gap-1 text-xs text-emerald-400">
                 <CircleCheck class="size-3" />Matches
@@ -329,7 +329,7 @@
 				</Button>-->
       </Card.Content>
 
-      <Card.Footer class="justify-center text-xs text-muted-foreground select-none">
+      <Card.Footer class="justify-center text-xs text-muted-foreground">
         <span>Already have an account?</span>
         <a
           href="/login"

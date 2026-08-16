@@ -170,7 +170,7 @@
     >
       <Card.Header class="space-y-3">
         {#if step === 'request'}
-          <div class="space-y-1 select-none text-center mt-2">
+          <div class="space-y-1 text-center mt-2">
             <Card.Title class="text-xl">Reset your password</Card.Title>
             <Card.Description>
               Enter your account email and a 6-digit code will be sent to you.
@@ -208,7 +208,7 @@
                       {...props}
                       bind:value={$requestData.homeServer}
                       placeholder="novarum.me"
-                      class="pl-8 select-none"
+                      class="pl-8"
                       autocomplete="url"
                       spellcheck="false"
                     />
@@ -231,7 +231,7 @@
                       type="email"
                       bind:value={$requestData.email}
                       placeholder="you@example.com"
-                      class="pl-8 select-none"
+                      class="pl-8"
                       autocomplete="email"
                     />
                   </div>
@@ -383,7 +383,7 @@
       </Card.Content>
 
       {#if step !== 'complete'}
-        <Card.Footer class="justify-center text-xs text-muted-foreground select-none">
+        <Card.Footer class="justify-center text-xs text-muted-foreground">
           <span>Remember your password?</span>
           <a
             href={loginHref}

@@ -244,7 +244,7 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="space-y-1 text-center select-none mt-1.5">
+          <div class="space-y-1 text-center mt-1.5">
             <Card.Title class="text-xl">You're invited!</Card.Title>
             <Card.Description>Join your friends on this guild.</Card.Description>
           </div>
@@ -270,7 +270,7 @@
                 </span>
               {/if}
             </div>
-            <div class="min-w-0 flex-1 select-none">
+            <div class="min-w-0 flex-1">
               <p class="truncate font-medium">{invite.guild.name}</p>
               <p class="flex items-center gap-1 text-xs text-muted-foreground">
                 <Users class="size-3" />
@@ -286,7 +286,7 @@
           </div>
 
           <div class="grid gap-1.5">
-            <label for="invite-link" class="text-xs font-medium text-foreground select-none">
+            <label for="invite-link" class="text-xs font-medium text-foreground">
               Invite Link
             </label>
             <div class="flex gap-2">
@@ -322,7 +322,7 @@
           {/if}
         </Card.Content>
 
-        <Card.Footer class="justify-center text-xs text-muted-foreground select-none">
+        <Card.Footer class="justify-center text-xs text-muted-foreground">
           <span>Not {homeServer}?</span>
           <!--
           <button

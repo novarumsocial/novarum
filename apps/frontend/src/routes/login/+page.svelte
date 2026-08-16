@@ -188,10 +188,10 @@
     >
       <Card.Header class="space-y-3">
         <div class="space-y-1 mt-1.5">
-          <Card.Title class="text-xl text-center select-none">
+          <Card.Title class="text-xl text-center">
             {mfaChallenge ? 'Verify it’s you' : 'Welcome back'}
           </Card.Title>
-          <Card.Description class="text-center select-none">
+          <Card.Description class="text-center">
             {mfaChallenge
               ? mfaMethod === 'EMAIL'
                 ? emailSent
@@ -357,7 +357,7 @@
                       bind:value={$formData.homeServer}
                       name="homeServer"
                       placeholder="novarum.me"
-                      class="pl-8 select-none"
+                      class="pl-8"
                       autocomplete="url"
                       spellcheck="false"
                     />
@@ -380,7 +380,7 @@
                       bind:value={$formData.username}
                       name="username"
                       placeholder="alice"
-                      class="pl-8 select-none"
+                      class="pl-8"
                       autocomplete="username"
                       spellcheck="false"
                       autocapitalize="none"
@@ -400,7 +400,7 @@
                       href={redirectParam
                         ? `/reset-password?redirect=${encodeURIComponent(safeRedirect(redirectParam))}`
                         : '/reset-password'}
-                      class="text-xs text-muted-foreground transition-colors hover:text-foreground select-none"
+                      class="text-xs text-muted-foreground transition-colors hover:text-foreground"
                       tabindex="-1"
                     >
                       Forgot password?
@@ -415,7 +415,7 @@
                       type="password"
                       bind:value={$formData.password}
                       placeholder="••••••••"
-                      class="pl-8 select-none"
+                      class="pl-8"
                       autocomplete="current-password"
                       name="password"
                     />
@@ -463,10 +463,10 @@
             Back to sign in
           </button>
         {:else}
-          <span class="select-none">Don't have an account?</span>
+          <span>Don't have an account?</span>
           <a
             href={`/register?redirect=${safeRedirect(redirectParam)}`}
-            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline select-none"
+            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
             >Register</a
           >
         {/if}

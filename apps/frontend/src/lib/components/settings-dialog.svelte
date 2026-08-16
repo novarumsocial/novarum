@@ -820,6 +820,8 @@
                   </div>
                 </div>
 
+                <!-- TODO: pronouns (woke) -->
+
                 <div class="mt-3 min-w-0">
                   <p class="truncate text-base font-semibold">
                     {session.user?.displayName || session.user?.username || 'Your profile'}

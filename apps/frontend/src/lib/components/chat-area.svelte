@@ -161,7 +161,7 @@
     {:else}
       <Hash class="size-5 text-muted-foreground" />
     {/if}
-    <span class="text-sm font-semibold text-foreground select-none">{channel.name}</span>
+    <span class="text-sm font-semibold text-foreground">{channel.name}</span>
     {#if channel.topic}
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>

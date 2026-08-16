@@ -35,12 +35,11 @@
       <Input
         id="search-in-channel"
         placeholder="Search {server.name}"
-        class="select-none"
         autocomplete="off"
         spellcheck="false"
       />
     </div>
-    <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3 select-none">
+    <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">
       <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
         <Users class="size-3.5" />
         Online - {online.length}
