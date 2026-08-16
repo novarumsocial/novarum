@@ -336,7 +336,7 @@
             {#each dropdownItems as item (item.label)}
               <Button
                 onclick={item.onclick}
-                variant={item.variant}
+                variant={item.variant === 'default' ? 'ghost' : 'destructive'}
                 disabled={item.disabled?.()}
                 size="icon-xs"
               >
