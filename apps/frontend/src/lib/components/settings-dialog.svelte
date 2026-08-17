@@ -830,6 +830,7 @@
                     </p>
                   </div>
 
+                  <!-- TODO: pronouns
                   <div class="grid shrink-0 gap-1.5">
                     <Label for="pronouns">Pronouns</Label>
                     <Input
@@ -838,6 +839,7 @@
                       class="h-9 w-36 bg-background"
                     />
                   </div>
+                  -->
                 </div>
 
                 {#if mediaError}

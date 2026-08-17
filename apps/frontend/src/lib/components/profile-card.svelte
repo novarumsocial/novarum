@@ -144,14 +144,16 @@
       </div>
       <Popover.Description class="flex items-center gap-1 truncate font-mono text-[11px]">
         <span class="truncate">@{user.username}:{user.server}</span>
-        <!-- {#if user.pronouns}-->
+        <!-- TODO: pronouns
+        {#if user.pronouns
         <span class="flex shrink-0 items-center gap-1 text-muted-foreground">
           <span aria-hidden="true">•</span>
           <span class="rounded-full bg-muted px-1.5 py-0.5 mb-1 text-[10px] font-medium">
             pro/nouns
           </span>
         </span>
-        <!-- {/if}-->
+        {/if}
+        -->
       </Popover.Description>
       {#if user.about}
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
