@@ -1,4 +1,6 @@
-# Demo video script
+---
+title: Demo video script
+---
 
 Novarum is a free, open source, self-hosted and federated chat platform. It can do
 - Guilds
