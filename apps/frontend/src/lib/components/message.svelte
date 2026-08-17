@@ -105,7 +105,11 @@
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    return contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle);
+    const replyingMe = repliedMessage?.author.userId === session.user?.id;
+
+    return (
+      replyingMe || contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
+    );
   });
   const viewableAttachments = $derived(
     message.attachments.filter(

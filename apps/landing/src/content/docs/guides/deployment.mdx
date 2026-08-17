@@ -97,7 +97,7 @@ A few files must be created. Hopefully it's not much :')
     [server]
     database_url = "postgresql://novarum:Y0U_SH0ULD_CHANG3_TH1S@postgres:5432/novarum"
     homeserver = "piedpiper.com"
-    baseUrl = "https://piedpiper.com"
+    base_url = "https://piedpiper.com"
 
     [federation]
     key_dir = "./keys"
@@ -222,6 +222,16 @@ We recommend running everything though a reverse proxy, such as Caddy, but the d
 | cdn.piedpiper.com | http://localhost:3900 |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
+
+## Handling different hosts
+
+Anchor sometimes needs to be hosted on a different host than what the homeserver URL is.  
+For example, the `novarum.me` Anchor isn't hosted in the same place, and is instead on `anchor.novarum.me`.
+
+It should be relatively simple to handle these cases:
+1. Run the Anchor on another host, such as `anchor.novarum.me`.
+2. Proxy only the `/.well-known/anchor/info` endpoint to `novarum.me`, so clients can discover the actual homeserver URL. We use Cloudflare Workers to do this.
+3. Set `homeserver` to `novarum.me` and `base_url` to `https://anchor.novarum.me` in the `config.toml` file.
 
 ---
 

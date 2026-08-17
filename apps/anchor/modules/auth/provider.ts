@@ -121,7 +121,7 @@ export function createBlankSessionCookie(): SessionCookie {
 }
 
 function sessionCookieAttributes(maxAge: number): SessionCookie['attributes'] {
-  const secure = new URL(getConfig().server.baseUrl).protocol === 'https:';
+  const secure = new URL(getConfig().server.base_url).protocol === 'https:';
 
   return {
     httpOnly: true,

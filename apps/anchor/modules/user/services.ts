@@ -71,7 +71,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       const version = Date.now();
       const avatarUrl = new URL(
         `/user/avatar/${encodeURIComponent(session.userId)}?v=${version}${image.animated ? '&animated=1' : ''}`,
-        getConfig().server.baseUrl
+        getConfig().server.base_url
       ).toString();
 
       // updating but also getting the returning to prevent so many queries
@@ -221,7 +221,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
 
       const bannerUrl = new URL(
         `/user/banner/${encodeURIComponent(session.userId)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
-        getConfig().server.baseUrl
+        getConfig().server.base_url
       ).toString();
       await db
         .update(users)
