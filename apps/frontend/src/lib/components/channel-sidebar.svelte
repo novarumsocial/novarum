@@ -11,8 +11,17 @@
     UserRoundPlus,
     Volume2,
     Bell,
+    BellOff,
     IdCardLanyard,
     HeadphoneOff,
+    Eye,
+    Pin,
+    Copy,
+    Pencil,
+    Trash2,
+    Fingerprint,
+    CopyPlus,
+    Link,
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -26,6 +35,7 @@
   import Avatar from './avatar.svelte';
   import ParticipantContextMenu from './participant-context-menu.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+  import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
   import ProfileCard from './profile-card.svelte';
 
   let {
@@ -57,6 +67,8 @@
   let collapsed = $state<Record<string, boolean>>({});
   let createOpen = $state(false);
   let createCategory = $state<ChannelCategory | null>(null);
+  let deleteConfirmId = $state<string | null>(null);
+  let deleteConfirmTimer = $state<ReturnType<typeof setTimeout> | null>(null);
 
   let createInviteOpen = $state(false);
   let settingsOpen = $state(false);
@@ -133,6 +145,19 @@
     }
 
     return users;
+  }
+
+  function confirmDelete(channelId: string) {
+    if (deleteConfirmId === channelId) {
+      if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+      deleteConfirmId = null;
+      // TODO: implement deleteChannel
+    } else {
+      deleteConfirmId = channelId;
+      deleteConfirmTimer = setTimeout(() => {
+        deleteConfirmId = null;
+      }, 5000);
+    }
   }
 
   function avatarBg(id: string) {
@@ -319,47 +344,126 @@
             {@const connectedVoiceUsers = ch.type === 'VOICE' ? voiceUsersFor(ch.id) : []}
 
             <div animate:flip={{ duration: flipDurationMs }} class="touch-none">
-              <button
-                onclick={() => selectChannel(ch)}
-                class={cn(
-                  'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors cursor-pointer',
-                  activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
-                  activeChannel !== ch.id && 'text-muted-foreground hover:text-sidebar-foreground',
-                  reorderLoading && 'opacity-70'
-                )}
-              >
-                {#if ch.type === 'VOICE'}
-                  <Volume2 class="size-4 shrink-0" />
-                {:else}
-                  <Hash
-                    class={cn('size-4 shrink-0', (ch.unread || ch.mention > 0) && 'text-white')}
-                  />
-                {/if}
+              <ContextMenu.Root>
+                <ContextMenu.Trigger>
+                  <button
+                    onclick={() => selectChannel(ch)}
+                    class={cn(
+                      'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors cursor-pointer',
+                      activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
+                      activeChannel !== ch.id && 'text-muted-foreground hover:text-sidebar-foreground',
+                      reorderLoading && 'opacity-70'
+                    )}
+                  >
+                    {#if ch.type === 'VOICE'}
+                      <Volume2 class="size-4 shrink-0" />
+                    {:else}
+                      <Hash
+                        class={cn('size-4 shrink-0', (ch.unread || ch.mention > 0) && 'text-white')}
+                      />
+                    {/if}
 
-                <span class="flex-1 truncate" class:text-white={ch.unread || ch.mention > 0}>
-                  {ch.label || ch.name}
-                </span>
-
-                {#if ch.mention > 0}
-                  <span class="flex size-5 shrink-0 items-center justify-center">
-                    <span
-                      class="flex size-5 items-center justify-center bg-destructive text-[11px] font-bold text-destructive-foreground"
-                      class:rounded-full={settings.value.circleIcons}
-                    >
-                      {ch.mention > 99 ? '99+' : ch.mention}
+                    <span class="flex-1 truncate" class:text-white={ch.unread || ch.mention > 0}>
+                      {ch.label || ch.name}
                     </span>
-                  </span>
-                {/if}
 
-                {#if ch.unread && ch.mention === 0}
-                  <span class="flex size-5 shrink-0 items-center justify-center">
-                    <span
-                      class="size-2 bg-foreground/80"
-                      class:rounded-full={settings.value.circleIcons}
-                    ></span>
-                  </span>
-                {/if}
-              </button>
+                    {#if ch.mention > 0}
+                      <span class="flex size-5 shrink-0 items-center justify-center">
+                        <span
+                          class="flex size-5 items-center justify-center bg-destructive text-[11px] font-bold text-destructive-foreground"
+                          class:rounded-full={settings.value.circleIcons}
+                        >
+                          {ch.mention > 99 ? '99+' : ch.mention}
+                        </span>
+                      </span>
+                    {/if}
+
+                    {#if ch.unread && ch.mention === 0}
+                      <span class="flex size-5 shrink-0 items-center justify-center">
+                        <span
+                          class="size-2 bg-foreground/80"
+                          class:rounded-full={settings.value.circleIcons}
+                        ></span>
+                      </span>
+                    {/if}
+                  </button>
+                </ContextMenu.Trigger>
+
+                <ContextMenu.Content class="w-56">
+                  <ContextMenu.Item disabled={!ch.unread && ch.mention === 0}>
+                    <Eye class="size-4" />
+                    Mark as Read
+                  </ContextMenu.Item>
+                  <ContextMenu.Item>
+                    <UserRoundPlus class="size-4" />
+                    Invite to Channel
+                  </ContextMenu.Item>
+                  <ContextMenu.Item>
+                    <Pin class="size-4" />
+                    Pin Channel to Top
+                  </ContextMenu.Item>
+                  <ContextMenu.Item onclick={() => navigator.clipboard.writeText(ch.id)}>
+                    <Link class="size-4" />
+                    Copy Link
+                  </ContextMenu.Item>
+
+                  <ContextMenu.Separator />
+
+                  <ContextMenu.Sub>
+                    <ContextMenu.SubTrigger>
+                      <BellOff class="size-4" />
+                      Mute Channel
+                    </ContextMenu.SubTrigger>
+                    <ContextMenu.SubContent>
+                      <ContextMenu.Item>For 15 Minutes</ContextMenu.Item>
+                      <ContextMenu.Item>For 1 Hour</ContextMenu.Item>
+                      <ContextMenu.Item>For 8 Hours</ContextMenu.Item>
+                      <ContextMenu.Item>For 24 Hours</ContextMenu.Item>
+                      <ContextMenu.Item>Until I turn it back on</ContextMenu.Item>
+                    </ContextMenu.SubContent>
+                  </ContextMenu.Sub>
+
+                  <ContextMenu.Sub>
+                    <ContextMenu.SubTrigger>
+                      <Bell class="size-4" />
+                      Notifications
+                    </ContextMenu.SubTrigger>
+                    <ContextMenu.SubContent>
+                      <ContextMenu.Item>All Messages</ContextMenu.Item>
+                      <ContextMenu.Item>Only Mentions</ContextMenu.Item>
+                      <ContextMenu.Item>Nothing</ContextMenu.Item>
+                    </ContextMenu.SubContent>
+                  </ContextMenu.Sub>
+
+                  <ContextMenu.Separator />
+
+                  <ContextMenu.Item>
+                    <Pencil class="size-4" />
+                    Edit Channel
+                  </ContextMenu.Item>
+
+                  {#if server.canManageChannels}
+                    <ContextMenu.Item>
+                      <CopyPlus class="size-4" />
+                      Duplicate Channel
+                    </ContextMenu.Item>
+                    <ContextMenu.Item
+                      variant="destructive"
+                      onclick={() => confirmDelete(ch.id)}
+                    >
+                      <Trash2 class="size-4" />
+                      {deleteConfirmId === ch.id ? 'Deleting...' : 'Delete Channel'}
+                    </ContextMenu.Item>
+                  {/if}
+
+                  <ContextMenu.Separator />
+
+                  <ContextMenu.Item onclick={() => navigator.clipboard.writeText(ch.id)}>
+                    <IdCardLanyard class="size-3" />
+                    Copy Channel ID
+                  </ContextMenu.Item>
+                </ContextMenu.Content>
+              </ContextMenu.Root>
 
               {#if connectedVoiceUsers.length > 0}
                 <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
