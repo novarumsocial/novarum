@@ -232,7 +232,7 @@
 
           {#if friends.outgoing.length > 0}
             <h2
-              class="mb-3 mt-6 border-b border-border pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none"
+              class="mt-6 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none"
             >
               Sent
             </h2>
