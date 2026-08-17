@@ -177,7 +177,11 @@
     </Button>
   </div>
 
-  <div bind:this={scrollContainer} class="min-h-0 min-w-0 flex-1 overflow-y-auto" onscroll={onScroll}>
+  <div
+    bind:this={scrollContainer}
+    class="min-h-0 min-w-0 flex-1 overflow-y-auto"
+    onscroll={onScroll}
+  >
     {#if olderLoading}
       <div class="space-y-5 px-3 pt-4 sm:px-4">
         {@render skeletonRows(2)}

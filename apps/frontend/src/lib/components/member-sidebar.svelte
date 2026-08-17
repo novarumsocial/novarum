@@ -18,10 +18,11 @@
 
   const online = $derived(members.filter((member) => member.status !== 'OFFLINE'));
   const offline = $derived(members.filter((member) => member.status === 'OFFLINE'));
-  const isSelf = $derived((member: Author) =>
-    Boolean(useSession().user) &&
-    member.username === useSession().user?.username &&
-    member.server === useSession().user?.homeserver
+  const isSelf = $derived(
+    (member: Author) =>
+      Boolean(useSession().user) &&
+      member.username === useSession().user?.username &&
+      member.server === useSession().user?.homeserver
   );
 
   function nameFor(member: Author) {

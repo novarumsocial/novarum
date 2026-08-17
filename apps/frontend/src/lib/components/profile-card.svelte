@@ -101,7 +101,8 @@
           {:else if friendStatus === 'OUTGOING'}
             <UserRoundCog />
           {:else if friendStatus === 'FRIEND'}
-            <UserRoundCheck /> <!-- TODO: if hover, text-destructive and switch to UserRoundMinus -->
+            <UserRoundCheck />
+            <!-- TODO: if hover, text-destructive and switch to UserRoundMinus -->
           {:else}
             <UserRoundPlus />
           {/if}
@@ -117,7 +118,8 @@
         />
         {#if user.status}
           <span
-            class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status === 'ONLINE'
+            class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status ===
+            'ONLINE'
               ? 'bg-emerald-500'
               : 'bg-neutral-900 ring-3 ring-inset ring-neutral-500'}"
             class:rounded-full={settings.value.circleIcons}
@@ -142,14 +144,14 @@
       </div>
       <Popover.Description class="flex items-center gap-1 truncate font-mono text-[11px]">
         <span class="truncate">@{user.username}:{user.server}</span>
-<!--        {#if user.pronouns}-->
-          <span class="flex shrink-0 items-center gap-1 text-muted-foreground">
-            <span aria-hidden="true">•</span>
-            <span class="rounded-full bg-muted px-1.5 py-0.5 mb-1 text-[10px] font-medium">
-              pro/nouns
-            </span>
+        <!-- {#if user.pronouns}-->
+        <span class="flex shrink-0 items-center gap-1 text-muted-foreground">
+          <span aria-hidden="true">•</span>
+          <span class="rounded-full bg-muted px-1.5 py-0.5 mb-1 text-[10px] font-medium">
+            pro/nouns
           </span>
-<!--        {/if}-->
+        </span>
+        <!-- {/if}-->
       </Popover.Description>
       {#if user.about}
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">

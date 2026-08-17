@@ -832,7 +832,11 @@
 
                   <div class="grid shrink-0 gap-1.5">
                     <Label for="pronouns">Pronouns</Label>
-                    <Input id="pronouns" placeholder="e.g. they/them" class="h-9 w-36 bg-background" />
+                    <Input
+                      id="pronouns"
+                      placeholder="e.g. they/them"
+                      class="h-9 w-36 bg-background"
+                    />
                   </div>
                 </div>
 
