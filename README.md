@@ -1,14 +1,14 @@
 <!-- template credited to https://github.com/othneildrew/Best-README-Template -->
+
 <a id="readme-top"></a>
 
 <!-- PROJECT SHIELDS -->
+
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![Unlicense License][license-shield]][license-url]
-
-
 
 <!-- PROJECT LOGO -->
 <br />
@@ -30,8 +30,6 @@
     <a href="https://github.com/novarumsocial/novarum/issues/new">Report Bug</a>
   </p>
 </div>
-
-
 
 <!-- TABLE OF CONTENTS -->
 <details>
@@ -55,9 +53,8 @@
   </ol>
 </details>
 
-
-
 <!-- ABOUT THE PROJECT -->
+
 ## About The Project
 
 Novarum is a FOSS chat platform that aims to provide a simple yet effective way to talk to a community of any size.
@@ -66,19 +63,16 @@ It is selfhostable, federated and respects your privacy.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 ### Built With
 
-* [![Svelte][Svelte.dev]][Svelte-url]
-* [![Bun][Bun.dev]][Bun-url]
-* [![Elysia][Elysia.dev]][Elysia-url]
+- [![Svelte][Svelte.dev]][Svelte-url]
+- [![Bun][Bun.dev]][Bun-url]
+- [![Elysia][Elysia.dev]][Elysia-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- GETTING STARTED -->
+
 ## Getting Started
 
 The [documentation page](https://docs.novarum.me) contains all the information you need to get started with Novarum!
@@ -86,27 +80,24 @@ If you want to run your own Anchor (the Novarum backend), check out the [guide](
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- CONTRIBUTING -->
+
 ## Contributing
 
 Please do! There's no roadmap at the moment, but check out the issues or fix any nitpicks you have with the server or the client.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- LICENSE -->
+
 ## License
 
 Novarum is primarily under the AGPL. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- MARKDOWN LINKS & IMAGES -->
+
 [contributors-shield]: https://img.shields.io/github/contributors/novarumsocial/novarum.svg?style=for-the-badge
 [contributors-url]: https://github.com/novarumsocial/novarum/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/novarumsocial/novarum.svg?style=for-the-badge
