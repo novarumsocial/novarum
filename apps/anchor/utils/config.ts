@@ -39,8 +39,11 @@ const schema = z.object({
       .default(['*'])
       // https://localhost for the mobile app, app://novarum for the electron app
       .transform((o) =>
-        o.includes('*') ? ['*'] : [...new Set([...o, 'app://novarum', 'https://localhost', 'http://localhost:5173'])]
+        o.includes('*')
+          ? ['*']
+          : [...new Set([...o, 'app://novarum', 'https://localhost', 'http://localhost:5173'])]
       ),
+    s3_disable_cors: z.boolean().optional().default(false),
   }),
   email: z.object({
     smtp_host: z.string().min(1),

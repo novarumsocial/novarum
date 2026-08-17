@@ -189,7 +189,7 @@
             >
               {#if t.state.screenTrack}
                 <video
-                  class="size-full object-cover"
+                  class="size-full object-contain"
                   autoplay
                   playsinline
                   muted={t.identity === voice.localIdentity}
@@ -210,10 +210,7 @@
         {:else}
           <ParticipantContextMenu {voice} identity={t.identity} {name}>
             <div
-              class={cn(
-                'min-h-0 min-w-0 cursor-pointer',
-                t.state.speaking && 'ring'
-              )}
+              class={cn('min-h-0 min-w-0 cursor-pointer', t.state.speaking && 'ring')}
               style:--tw-ring-color={member?.speakingRingColor ?? '#00d492'}
               role="button"
               tabindex="0"
@@ -225,7 +222,7 @@
               >
                 {#if t.state.cameraTrack}
                   <video
-                    class="size-full object-cover"
+                    class="size-full object-contain"
                     autoplay
                     playsinline
                     muted={t.identity === voice.localIdentity}

@@ -25,7 +25,9 @@ if (argv[2] === 'cli') {
   await import('./cli/index.ts');
 }
 
-await configureStorageCors();
+if (!getConfig().files.s3_disable_cors || getConfig().files.s3_cors_origins.length > 0) {
+  await configureStorageCors();
+}
 await writeEmojis();
 await clearOnlineUsers();
 
