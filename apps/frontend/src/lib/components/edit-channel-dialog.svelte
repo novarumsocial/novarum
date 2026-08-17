@@ -41,7 +41,9 @@
   <Dialog.Content class="sm:max-w-md">
     <Dialog.Header>
       <Dialog.Title>Edit Channel</Dialog.Title>
-      <Dialog.Description>Rename #{channel?.label || channel?.name || 'channel'}.</Dialog.Description>
+      <Dialog.Description
+        >Rename #{channel?.label || channel?.name || 'channel'}.</Dialog.Description
+      >
     </Dialog.Header>
 
     <form method="POST" class="space-y-4" onsubmit={handleSubmit}>

@@ -31,8 +31,9 @@
     <Dialog.Header>
       <Dialog.Title>Delete Channel</Dialog.Title>
       <Dialog.Description>
-        Are you sure you want to delete <strong>#{channel?.label || channel?.name || 'channel'}</strong>?
-        This cannot be undone.
+        Are you sure you want to delete <strong
+          >#{channel?.label || channel?.name || 'channel'}</strong
+        >? This cannot be undone.
       </Dialog.Description>
     </Dialog.Header>
 

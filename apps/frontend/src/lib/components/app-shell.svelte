@@ -168,7 +168,7 @@
         }}
       ></button>
     {/if}
-<!--
+    <!--
     {#if mobileMembersOpen}
       <button
         class="fixed inset-0 z-30 bg-black/60 lg:hidden"
