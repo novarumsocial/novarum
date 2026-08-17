@@ -16,10 +16,8 @@
     HeadphoneOff,
     Eye,
     Pin,
-    Copy,
     Pencil,
     Trash2,
-    Fingerprint,
     CopyPlus,
     Link,
   } from '@lucide/svelte';
@@ -351,7 +349,8 @@
                     class={cn(
                       'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors cursor-pointer',
                       activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
-                      activeChannel !== ch.id && 'text-muted-foreground hover:text-sidebar-foreground',
+                      activeChannel !== ch.id &&
+                        'text-muted-foreground hover:text-sidebar-foreground',
                       reorderLoading && 'opacity-70'
                     )}
                   >
@@ -447,10 +446,7 @@
                       <CopyPlus class="size-4" />
                       Duplicate Channel
                     </ContextMenu.Item>
-                    <ContextMenu.Item
-                      variant="destructive"
-                      onclick={() => confirmDelete(ch.id)}
-                    >
+                    <ContextMenu.Item variant="destructive" onclick={() => confirmDelete(ch.id)}>
                       <Trash2 class="size-4" />
                       {deleteConfirmId === ch.id ? 'Deleting...' : 'Delete Channel'}
                     </ContextMenu.Item>
