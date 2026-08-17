@@ -28,6 +28,8 @@
   import type { Voice } from '$lib/voice.svelte';
   import { settings } from '$lib/settings.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
+  import EditChannelDialog from './edit-channel-dialog.svelte';
+  import DeleteChannelDialog from './delete-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
   import GuildSettingsDialog from './guild-settings-dialog.svelte';
   import Avatar from './avatar.svelte';
@@ -65,8 +67,10 @@
   let collapsed = $state<Record<string, boolean>>({});
   let createOpen = $state(false);
   let createCategory = $state<ChannelCategory | null>(null);
-  let deleteConfirmId = $state<string | null>(null);
-  let deleteConfirmTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+  let editOpen = $state(false);
+  let editChannel = $state<Channel | null>(null);
+  let deleteOpen = $state(false);
+  let deleteChannelTarget = $state<Channel | null>(null);
 
   let createInviteOpen = $state(false);
   let settingsOpen = $state(false);
@@ -145,17 +149,14 @@
     return users;
   }
 
-  function confirmDelete(channelId: string) {
-    if (deleteConfirmId === channelId) {
-      if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
-      deleteConfirmId = null;
-      // TODO: implement deleteChannel
-    } else {
-      deleteConfirmId = channelId;
-      deleteConfirmTimer = setTimeout(() => {
-        deleteConfirmId = null;
-      }, 5000);
-    }
+  function openEditChannel(channel: Channel) {
+    editChannel = channel;
+    editOpen = true;
+  }
+
+  function openDeleteChannel(channel: Channel) {
+    deleteChannelTarget = channel;
+    deleteOpen = true;
   }
 
   function avatarBg(id: string) {
@@ -436,7 +437,7 @@
 
                   <ContextMenu.Separator />
 
-                  <ContextMenu.Item>
+                  <ContextMenu.Item onclick={() => openEditChannel(ch)}>
                     <Pencil class="size-4" />
                     Edit Channel
                   </ContextMenu.Item>
@@ -446,9 +447,9 @@
                       <CopyPlus class="size-4" />
                       Duplicate Channel
                     </ContextMenu.Item>
-                    <ContextMenu.Item variant="destructive" onclick={() => confirmDelete(ch.id)}>
+                    <ContextMenu.Item variant="destructive" onclick={() => openDeleteChannel(ch)}>
                       <Trash2 class="size-4" />
-                      {deleteConfirmId === ch.id ? 'Deleting...' : 'Delete Channel'}
+                      Delete Channel
                     </ContextMenu.Item>
                   {/if}
 
@@ -539,3 +540,19 @@
 <InviteDialog bind:open={createInviteOpen} guildId={server.id} />
 
 <GuildSettingsDialog bind:open={settingsOpen} {server} />
+
+<EditChannelDialog
+  bind:open={editOpen}
+  channel={editChannel}
+  onSave={(channel, name) => {
+    // TODO: implement editChannel
+  }}
+/>
+
+<DeleteChannelDialog
+  bind:open={deleteOpen}
+  channel={deleteChannelTarget}
+  onDelete={(channel) => {
+    // TODO: implement deleteChannel
+  }}
+/>
