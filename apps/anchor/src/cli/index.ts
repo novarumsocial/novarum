@@ -125,7 +125,7 @@ if (command === 'reprocess-webp') {
 
     const avatarUrl = new URL(
       `/user/avatar/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
-      getConfig().server.baseUrl
+      getConfig().server.base_url
     ).toString();
     await db
       .update(users)
@@ -158,7 +158,7 @@ if (command === 'reprocess-webp') {
 
     const bannerUrl = new URL(
       `/user/banner/${encodeURIComponent(user.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
-      getConfig().server.baseUrl
+      getConfig().server.base_url
     ).toString();
     await db
       .update(users)
@@ -194,7 +194,7 @@ if (command === 'reprocess-webp') {
 
     const avatarUrl = new URL(
       `/guilds/avatar/${encodeURIComponent(guild.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
-      getConfig().server.baseUrl
+      getConfig().server.base_url
     ).toString();
     await db
       .update(guilds)

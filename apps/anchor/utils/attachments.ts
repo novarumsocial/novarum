@@ -57,11 +57,11 @@ export function attachmentPayload(attachment: {
     size: attachment.size,
     url: new URL(
       `/attachment/${encodeURIComponent(attachment.id)}`,
-      getConfig().server.baseUrl
+      getConfig().server.base_url
     ).toString(),
     previewUrl: new URL(
       `/attachment/${encodeURIComponent(attachment.id)}/preview`,
-      getConfig().server.baseUrl
+      getConfig().server.base_url
     ).toString(),
   };
 }

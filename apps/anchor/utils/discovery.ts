@@ -230,7 +230,7 @@ async function assertSafeFederationUrl(url: URL) {
 
 function allowLocalFederationTargets() {
   try {
-    const baseUrl = new URL(getConfig().server.baseUrl);
+    const baseUrl = new URL(getConfig().server.base_url);
     return isLocalHostname(baseUrl.hostname) || isPrivateIp(baseUrl.hostname);
   } catch {
     return false;

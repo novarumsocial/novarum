@@ -6,7 +6,7 @@ const schema = z.object({
   server: z.object({
     database_url: z.string().regex(/^postgresql:\/\/.*$/),
     homeserver: z.string(),
-    baseUrl: z.string().regex(/^https?:\/\/(?:localhost:\d+|[^\/\s]+)$/),
+    base_url: z.string().regex(/^https?:\/\/(?:localhost:\d+|[^\/\s]+)$/),
     listen_port: z.number().int().positive().optional().default(5049),
   }),
   federation: z.object({
@@ -62,6 +62,6 @@ export function getConfig() {
   // doing readfilesync so its not a pain to work with.
   const config = schema.parse(TOML.parse(readFileSync('./config.toml').toString()));
   // pushes base url because we need that now (don't ask, s3 is black magic)
-  config.files.s3_cors_origins.push(config.server.baseUrl);
+  config.files.s3_cors_origins.push(config.server.base_url);
   return config;
 }

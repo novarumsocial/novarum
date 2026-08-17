@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Well known'] }).get(
   '/info',
   async () => {
-    const { homeserver, baseUrl } = getConfig().server;
+    const { homeserver, base_url: baseUrl } = getConfig().server;
     const { publicKey, id } = await getKeys();
 
     return {

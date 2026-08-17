@@ -123,7 +123,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
 
       const avatarUrl = new URL(
         `/guilds/avatar/${encodeURIComponent(guild.id)}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
-        getConfig().server.baseUrl
+        getConfig().server.base_url
       ).toString();
       await db.update(dbGuilds).set({ avatarUrl }).where(eq(dbGuilds.id, guild.id));
 
