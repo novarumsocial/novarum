@@ -191,6 +191,7 @@ class ChatState {
 
   editingMessage = $state<boolean>(false);
   editingMessageId = $state<string | null>(null);
+  uploadProgress = $state<Record<number, number>>({});
 
   get currentServer() {
     return this.activeServer
@@ -500,7 +501,7 @@ class ChatState {
     const nonce = messageNonce();
     const attachmentIds: string[] = [];
 
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
       const uploadFile = await stripImageMetadata(file);
       const contentType = uploadFile.type || 'application/octet-stream';
       const presign = await anchor.client.upload.presign.post({
@@ -514,12 +515,12 @@ class ChatState {
         throw new Error(`Could not prepare ${file.name} for upload`);
       }
 
-      const uploaded = await fetch(presign.data.uploadUrl, {
-        method: 'PUT',
-        headers: presign.data.headers,
-        body: uploadFile,
-      });
-      if (!uploaded.ok) throw new Error(`Could not upload ${file.name}`);
+      try {
+        await this.uploadWithProgress(presign.data.uploadUrl, presign.data.headers, uploadFile, index);
+      } finally {
+        const { [index]: _removed, ...rest } = this.uploadProgress;
+        this.uploadProgress = rest;
+      }
 
       attachmentIds.push(presign.data.attachmentId);
     }
@@ -538,6 +539,32 @@ class ChatState {
       console.error('Failed to send message', result.error ?? result.data);
       throw new Error('Failed to send message');
     }
+  }
+
+  private uploadWithProgress(
+    uploadUrl: string,
+    headers: Record<string, string>,
+    file: File,
+    index: number
+  ) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      for (const [name, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(name, value);
+      }
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          this.uploadProgress = { ...this.uploadProgress, [index]: event.loaded / event.total };
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`Could not upload ${file.name}`));
+      };
+      xhr.onerror = () => reject(new Error(`Could not upload ${file.name}`));
+      xhr.send(file);
+    });
   }
 
   async deleteMessage(channelId: string, messageId: string) {
