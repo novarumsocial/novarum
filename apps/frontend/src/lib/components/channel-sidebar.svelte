@@ -389,11 +389,13 @@
                   </button>
                 </ContextMenu.Trigger>
 
-                <ContextMenu.Content class="w-56">
+                <ContextMenu.Content class="w-56"> <!-- mark here -->
+                  {#if ch.type === 'TEXT'}
                   <ContextMenu.Item disabled={!ch.unread && ch.mention === 0}>
                     <Eye class="size-4" />
                     Mark as Read
                   </ContextMenu.Item>
+                  {/if}
                   <ContextMenu.Item>
                     <UserRoundPlus class="size-4" />
                     Invite to Channel
