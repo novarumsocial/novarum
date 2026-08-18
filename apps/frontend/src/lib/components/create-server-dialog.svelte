@@ -64,7 +64,7 @@
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Content class="sm:max-w-md">
-    <Dialog.Header>
+    <Dialog.Header class="select-none">
       <Dialog.Title>Create Server</Dialog.Title>
       <Dialog.Description>Give your server a name and upload a picture.</Dialog.Description>
     </Dialog.Header>
