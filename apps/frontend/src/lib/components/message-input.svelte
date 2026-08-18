@@ -1,11 +1,11 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Progress } from '$lib/components/ui/progress/index.js';
   import { realtime } from '$lib/realtime.svelte';
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
   import { device } from '$lib/device.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import type { Author } from '$lib/types/chat';
-  import { Progress } from '$lib/components/ui/progress/index.js';
 
   let content = $state('');
   let files = $state<File[]>([]);
