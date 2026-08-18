@@ -11,6 +11,7 @@ const {
   s3_virtual_hosted_style,
   s3_cors_origins,
   s3_public_endpoint,
+  s3_public_host_rewrite,
 } = getConfig().files;
 
 export const storage = new S3Client({
@@ -22,10 +23,12 @@ export const storage = new S3Client({
   virtualHostedStyle: s3_virtual_hosted_style,
 });
 
-export function publicPresign(
-  key: string,
-  options?: S3FilePresignOptions
-) {
+export function publicPresign(key: string, options?: S3FilePresignOptions) {
+  if (s3_public_host_rewrite && s3_endpoint && s3_public_endpoint) {
+    const url = storage.presign(key, { ...options, endpoint: s3_endpoint });
+    const stripTrailingSlash = (u: string) => u.replace(/\/+$/, '');
+    return url.replace(stripTrailingSlash(s3_endpoint), stripTrailingSlash(s3_public_endpoint));
+  }
   return storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint });
 }
 

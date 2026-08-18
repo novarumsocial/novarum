@@ -30,6 +30,8 @@ const schema = z.object({
     s3_endpoint: z.string().min(1).optional(),
     // public endpoint used for browser-facing presigned URLs; defaults to s3_endpoint
     s3_public_endpoint: z.string().min(1).optional(),
+    // sign for s3_endpoint and swap the host to s3_public_endpoint in the url
+    s3_public_host_rewrite: z.boolean().optional().default(false),
     s3_region: z.string().min(1).optional(),
     s3_virtual_hosted_style: z.boolean().optional().default(false),
     s3_cors_origins: z
