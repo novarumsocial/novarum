@@ -3,7 +3,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { session } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
-  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link } from '@lucide/svelte';
+  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link, Copy } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import VideoPlayer from './video-player.svelte';
@@ -19,6 +19,7 @@
   import Textarea from './ui/textarea/textarea.svelte';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { formatDate, formatTime } from '$lib/formatDate';
+  import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
   let {
     message,
@@ -40,6 +41,7 @@
 
   let hovered = $state(false);
   let dropdownOpen = $state(false);
+  let contextMenuOpen = $state(false);
   let deleting = $state(false);
   let deleteText = $state('Delete');
   let deleteFirstClick = $state(false);
@@ -48,6 +50,38 @@
   let savingEdit = $state(false);
 
   const dropdownItems: DropdownItems[] = $derived([
+    {
+      label: () => 'Reply',
+      icon: Reply,
+      variant: 'default',
+      onclick: onReply,
+    },
+    ...(message.author.userId === session.user?.id
+      ? [
+          {
+            label: () => 'Edit message',
+            icon: Pencil,
+            variant: 'default' as const,
+            onclick: () => {
+              editContent = message.content;
+              chat.editingMessage = true;
+              chat.editingMessageId = message.id;
+              dropdownOpen = false;
+              setTimeout(() => {
+                editMsgTextarea?.focus();
+              }, 0);
+            },
+          },
+        ]
+      : []),
+    {
+      label: () => 'Copy text',
+      icon: Copy,
+      variant: 'default',
+      onclick: () => {
+        navigator.clipboard.writeText(message.content ?? '');
+      },
+    },
     {
       label: () => 'Message link',
       icon: Link,
@@ -232,266 +266,303 @@
   }
 </script>
 
-<div
-  id={message.id}
-  class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
-    ? 'bg-amber-400/10 hover:bg-amber-400/15'
-    : 'hover:bg-muted/30'}"
-  class:animate-message-flash={chat.activeMessage === message.id}
-  onanimationend={() => {
-    if (chat.activeMessage === message.id) {
-      goto(chat.existingChannelPath(), { replaceState: true, noScroll: true, keepFocus: true });
-    }
-  }}
-  class:mt-0.5={grouped}
-  class:mt-4={!grouped}
-  onmouseenter={() => (hovered = true)}
-  onmouseleave={() => (hovered = false)}
-  role="group"
->
-  {#if selfMentioned}
-    <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
-  {/if}
-  {#if !grouped}
-    <ProfileCard user={message.author} class="self-start">
-      <Avatar
-        src={message.author.avatarUrl}
-        name={authorName}
-        class="mt-0.5 size-9 text-xs"
-        bgColor={message.author.avatarColor}
-      />
-    </ProfileCard>
-  {:else}
-    <div class="w-9 shrink-0"></div>
-  {/if}
-
-  <div class="min-w-0 flex-1">
-    {#if !grouped}
-      <div class="flex items-baseline gap-2">
-        <ProfileCard user={message.author} class="text-sm font-semibold text-foreground">
-          {authorName}
-        </ProfileCard>
-        <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
-      </div>
-    {/if}
-
-    {#if message.replyTo}
-      <a
-        href={chat.messagePath(message.replyTo)}
-        class="mt-0.5 flex max-w-2xl min-w-0 items-start gap-1 border-l-2 border-primary/40 pl-1.5 text-[11px] leading-4 hover:border-primary hover:bg-muted/40"
+<ContextMenu.Root bind:open={contextMenuOpen}>
+  <ContextMenu.Trigger>
+    {#snippet child({ props })}
+      <div
+        {...props}
+        id={message.id}
+        class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
+          ? 'bg-amber-400/10 hover:bg-amber-400/15'
+          : 'hover:bg-muted/30'}"
+        class:animate-message-flash={chat.activeMessage === message.id}
+        onanimationend={() => {
+          if (chat.activeMessage === message.id) {
+            goto(chat.existingChannelPath(), {
+              replaceState: true,
+              noScroll: true,
+              keepFocus: true,
+            });
+          }
+        }}
+        class:mt-0.5={grouped}
+        class:mt-4={!grouped}
+        onmouseenter={() => (hovered = true)}
+        onmouseleave={() => (hovered = false)}
+        role="group"
       >
-        <Reply class="size-3 shrink-0 text-primary/60" aria-hidden="true" />
-        {#if repliedMessage}
-          <span class="shrink-0 font-medium text-foreground/75">
-            {repliedMessage.author.displayName || repliedMessage.author.username}
-          </span>
-          <span class="text-muted-foreground/40">·</span>
-          <span class="min-w-0 break-words text-muted-foreground">
-            {#if repliedMessage.content}
-              <EmojiText content={repliedMessage.content} />
-            {:else}
-              {repliedMessage.attachments.length} attachment{repliedMessage.attachments.length === 1
-                ? ''
-                : 's'}
-            {/if}
-          </span>
+        {#if selfMentioned}
+          <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
+        {/if}
+        {#if !grouped}
+          <ProfileCard user={message.author} class="self-start">
+            <Avatar
+              src={message.author.avatarUrl}
+              name={authorName}
+              class="mt-0.5 size-9 text-xs"
+              bgColor={message.author.avatarColor}
+            />
+          </ProfileCard>
         {:else}
-          <span class="italic text-muted-foreground/70">Original message unavailable</span>
+          <div class="w-9 shrink-0"></div>
         {/if}
-      </a>
-    {/if}
 
-    {#if chat.editingMessage && chat.editingMessageId === message.id}
-      <div class="mt-1 flex max-w-2xl flex-col gap-1.5">
-        <Textarea
-          bind:value={editContent}
-          bind:ref={editMsgTextarea}
-          rows={3}
-          class="resize-none"
-          aria-label="Edit message"
-          onkeydown={handleEditKeyDown}
-        ></Textarea>
-        <div class="flex gap-1.5">
-          <Button size="xs" onclick={saveEdit} disabled={savingEdit}>
-            {savingEdit ? 'Saving...' : 'Save'}
-          </Button>
-          <Button variant="ghost" size="xs" onclick={() => (chat.editingMessage = false)}
-            >Cancel</Button
-          >
-        </div>
-      </div>
-    {:else if message.content?.trim()}
-      <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-        <EmojiText content={message.content} links />
-        {#if message.edited}
-          <Tooltip.Root>
-            <Tooltip.Trigger>
-              <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
-            </Tooltip.Trigger>
-            <Tooltip.Content>
-              <p>
-                {message.editedTime
-                  ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
-                  : ''}
-              </p>
-            </Tooltip.Content>
-          </Tooltip.Root>
-        {/if}
-      </div>
-    {/if}
-
-    {#if hovered || dropdownOpen}
-      <div class="absolute top-0 right-0">
-        <ButtonGroup.Root>
-          <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
-            ><Reply class="size-3" /></Button
-          >
-          {#if message.author.userId === session.user?.id}
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Edit"
-              onclick={() => {
-                editContent = message.content;
-                chat.editingMessage = true;
-                chat.editingMessageId = message.id;
-                dropdownOpen = false;
-                // should wait a small bit to open up the textarea before focusing it
-                setTimeout(() => {
-                  editMsgTextarea?.focus();
-                }, 0);
-              }}><Pencil class="size-3" /></Button
-            >
+        <div class="min-w-0 flex-1">
+          {#if !grouped}
+            <div class="flex items-baseline gap-2">
+              <ProfileCard user={message.author} class="text-sm font-semibold text-foreground">
+                {authorName}
+              </ProfileCard>
+              <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
+            </div>
           {/if}
-          {#if shiftPressed && !chat.editingMessage}
-            {#each dropdownItems as item (item.label)}
-              <Button
-                onclick={item.onclick}
-                variant={item.variant === 'default' ? 'ghost' : 'destructive'}
-                disabled={item.disabled?.()}
-                size="icon-xs"
-              >
-                <item.icon class="size-3" />
-              </Button>
-            {/each}
-          {:else}
-            <DropdownMenu.Root bind:open={dropdownOpen}>
-              <DropdownMenu.Trigger>
-                {#snippet child({ props })}
-                  <Button {...props} variant="ghost" size="icon-xs" aria-label="Message actions">
-                    <Ellipsis class="size-3" />
-                  </Button>
-                {/snippet}
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content>
-                <DropdownMenu.Group>
+
+          {#if message.replyTo}
+            <a
+              href={chat.messagePath(message.replyTo)}
+              class="mt-0.5 flex max-w-2xl min-w-0 items-start gap-1 border-l-2 border-primary/40 pl-1.5 text-[11px] leading-4 hover:border-primary hover:bg-muted/40"
+            >
+              <Reply class="size-3 shrink-0 text-primary/60" aria-hidden="true" />
+              {#if repliedMessage}
+                <span class="shrink-0 font-medium text-foreground/75">
+                  {repliedMessage.author.displayName || repliedMessage.author.username}
+                </span>
+                <span class="text-muted-foreground/40">·</span>
+                <span class="min-w-0 break-words text-muted-foreground">
+                  {#if repliedMessage.content}
+                    <EmojiText content={repliedMessage.content} />
+                  {:else}
+                    {repliedMessage.attachments.length} attachment{repliedMessage.attachments
+                      .length === 1
+                      ? ''
+                      : 's'}
+                  {/if}
+                </span>
+              {:else}
+                <span class="italic text-muted-foreground/70">Original message unavailable</span>
+              {/if}
+            </a>
+          {/if}
+
+          {#if chat.editingMessage && chat.editingMessageId === message.id}
+            <div class="mt-1 flex max-w-2xl flex-col gap-1.5">
+              <Textarea
+                bind:value={editContent}
+                bind:ref={editMsgTextarea}
+                rows={3}
+                class="resize-none"
+                aria-label="Edit message"
+                onkeydown={handleEditKeyDown}
+              ></Textarea>
+              <div class="flex gap-1.5">
+                <Button size="xs" onclick={saveEdit} disabled={savingEdit}>
+                  {savingEdit ? 'Saving...' : 'Save'}
+                </Button>
+                <Button variant="ghost" size="xs" onclick={() => (chat.editingMessage = false)}
+                  >Cancel</Button
+                >
+              </div>
+            </div>
+          {:else if message.content?.trim()}
+            <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+              <EmojiText content={message.content} links />
+              {#if message.edited}
+                <Tooltip.Root>
+                  <Tooltip.Trigger>
+                    <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    <p>
+                      {message.editedTime
+                        ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
+                        : ''}
+                    </p>
+                  </Tooltip.Content>
+                </Tooltip.Root>
+              {/if}
+            </div>
+          {/if}
+
+          {#if hovered || dropdownOpen || contextMenuOpen}
+            <div class="absolute top-0 right-0">
+              <ButtonGroup.Root>
+                <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
+                  ><Reply class="size-3" /></Button
+                >
+                {#if message.author.userId === session.user?.id}
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Edit"
+                    onclick={() => {
+                      editContent = message.content;
+                      chat.editingMessage = true;
+                      chat.editingMessageId = message.id;
+                      dropdownOpen = false;
+                      // should wait a small bit to open up the textarea before focusing it
+                      setTimeout(() => {
+                        editMsgTextarea?.focus();
+                      }, 0);
+                    }}><Pencil class="size-3" /></Button
+                  >
+                {/if}
+                {#if shiftPressed && !chat.editingMessage}
                   {#each dropdownItems as item (item.label)}
-                    <DropdownMenu.Item
+                    <Button
                       onclick={item.onclick}
+                      variant={item.variant === 'default' ? 'ghost' : 'destructive'}
                       disabled={item.disabled?.()}
-                      variant={item.variant}
-                      closeOnSelect={item.closeOnSelect ?? true}
+                      size="icon-xs"
                     >
                       <item.icon class="size-3" />
-                      {item.label()}
-                    </DropdownMenu.Item>
+                    </Button>
                   {/each}
-                </DropdownMenu.Group>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
+                {:else}
+                  <DropdownMenu.Root bind:open={dropdownOpen}>
+                    <DropdownMenu.Trigger>
+                      {#snippet child({ props })}
+                        <Button
+                          {...props}
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label="Message actions"
+                        >
+                          <Ellipsis class="size-3" />
+                        </Button>
+                      {/snippet}
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Group>
+                        {#each dropdownItems as item (item.label)}
+                          <DropdownMenu.Item
+                            onclick={item.onclick}
+                            disabled={item.disabled?.()}
+                            variant={item.variant}
+                            closeOnSelect={item.closeOnSelect ?? true}
+                          >
+                            <item.icon class="size-3" />
+                            {item.label()}
+                          </DropdownMenu.Item>
+                        {/each}
+                      </DropdownMenu.Group>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
+                {/if}
+              </ButtonGroup.Root>
+            </div>
           {/if}
-        </ButtonGroup.Root>
-      </div>
-    {/if}
 
-    {#if message.attachments.length > 0}
-      {#each videoAttachments as attachment (attachment.id)}
-        <div class="mt-2 max-w-md">
-          <VideoPlayer {attachment} />
-        </div>
-      {/each}
-      {#each audioAttachments as attachment (attachment.id)}
-        <div class="mt-2 max-w-md">
-          <AudioPlayer {attachment} />
-        </div>
-      {/each}
-      {#if soloImage}
-        <Button
-          variant="outline"
-          class="group relative mt-2 h-auto w-fit min-w-0 overflow-hidden p-0 text-left"
-          aria-label={`View ${soloImage.filename}`}
-          onclick={() => viewAttachment(soloImage.id)}
-        >
-          <img
-            bind:this={soloImgEl}
-            src={soloImage.previewUrl}
-            alt={soloImage.filename}
-            loading="lazy"
-            onload={(event) => measureSoloImage(event.currentTarget as HTMLImageElement)}
-            style={soloImageDims
-              ? `width:${soloImageDims.width}px;height:${soloImageDims.height}px;`
-              : `max-width:${IMG_MAX_WIDTH}px;max-height:${IMG_MAX_HEIGHT}px;`}
-            class="block object-contain cursor-pointer"
-          />
-        </Button>
-      {/if}
-      {#if gridAttachments.length > 0}
-        <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {#each gridAttachments as attachment (attachment.id)}
-            {#if attachment.contentType.startsWith('image/')}
+          {#if message.attachments.length > 0}
+            {#each videoAttachments as attachment (attachment.id)}
+              <div class="mt-2 max-w-md">
+                <VideoPlayer {attachment} />
+              </div>
+            {/each}
+            {#each audioAttachments as attachment (attachment.id)}
+              <div class="mt-2 max-w-md">
+                <AudioPlayer {attachment} />
+              </div>
+            {/each}
+            {#if soloImage}
               <Button
                 variant="outline"
-                class="group relative h-auto min-w-0 overflow-hidden p-0 text-left"
-                aria-label={`View ${attachment.filename}`}
-                onclick={() => viewAttachment(attachment.id)}
+                class="group relative mt-2 h-auto w-fit min-w-0 overflow-hidden p-0 text-left"
+                aria-label={`View ${soloImage.filename}`}
+                onclick={() => viewAttachment(soloImage.id)}
               >
                 <img
-                  src={attachment.previewUrl}
-                  alt={attachment.filename}
+                  bind:this={soloImgEl}
+                  src={soloImage.previewUrl}
+                  alt={soloImage.filename}
                   loading="lazy"
-                  class="size-full max-h-64 object-contain cursor-pointer"
+                  onload={(event) => measureSoloImage(event.currentTarget as HTMLImageElement)}
+                  style={soloImageDims
+                    ? `width:${soloImageDims.width}px;height:${soloImageDims.height}px;`
+                    : `max-width:${IMG_MAX_WIDTH}px;max-height:${IMG_MAX_HEIGHT}px;`}
+                  class="block object-contain cursor-pointer"
                 />
               </Button>
-            {:else if attachment.contentType === 'application/pdf'}
-              <Button
-                variant="outline"
-                class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
-                onclick={() => viewAttachment(attachment.id)}
-              >
-                <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
-                  <FileText class="size-4 text-primary" />
-                </div>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-[11px] font-medium">{attachment.filename}</span>
-                  <span class="font-mono text-[9px] uppercase text-muted-foreground">View</span>
-                </span>
-              </Button>
-            {:else}
-              <Button
-                href={attachment.url}
-                target="_blank"
-                rel="noreferrer"
-                variant="outline"
-                class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
-              >
-                <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
-                  <FileText class="size-4 text-primary" />
-                </div>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-xs font-medium">{attachment.filename}</span>
-                  <span class="font-mono text-[10px] uppercase text-muted-foreground">
-                    {formatBytes(attachment.size)}
-                  </span>
-                </span>
-                <Download class="size-3.5 shrink-0 text-muted-foreground" />
-              </Button>
             {/if}
-          {/each}
+            {#if gridAttachments.length > 0}
+              <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {#each gridAttachments as attachment (attachment.id)}
+                  {#if attachment.contentType.startsWith('image/')}
+                    <Button
+                      variant="outline"
+                      class="group relative h-auto min-w-0 overflow-hidden p-0 text-left"
+                      aria-label={`View ${attachment.filename}`}
+                      onclick={() => viewAttachment(attachment.id)}
+                    >
+                      <img
+                        src={attachment.previewUrl}
+                        alt={attachment.filename}
+                        loading="lazy"
+                        class="size-full max-h-64 object-contain cursor-pointer"
+                      />
+                    </Button>
+                  {:else if attachment.contentType === 'application/pdf'}
+                    <Button
+                      variant="outline"
+                      class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+                      onclick={() => viewAttachment(attachment.id)}
+                    >
+                      <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
+                        <FileText class="size-4 text-primary" />
+                      </div>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-[11px] font-medium"
+                          >{attachment.filename}</span
+                        >
+                        <span class="font-mono text-[9px] uppercase text-muted-foreground"
+                          >View</span
+                        >
+                      </span>
+                    </Button>
+                  {:else}
+                    <Button
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="outline"
+                      class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+                    >
+                      <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
+                        <FileText class="size-4 text-primary" />
+                      </div>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-xs font-medium">{attachment.filename}</span
+                        >
+                        <span class="font-mono text-[10px] uppercase text-muted-foreground">
+                          {formatBytes(attachment.size)}
+                        </span>
+                      </span>
+                      <Download class="size-3.5 shrink-0 text-muted-foreground" />
+                    </Button>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+          {/if}
         </div>
-      {/if}
-    {/if}
-  </div>
-</div>
+      </div>
+    {/snippet}
+  </ContextMenu.Trigger>
+  <ContextMenu.Content>
+    <ContextMenu.Group>
+      {#each dropdownItems as item (item.label)}
+        <ContextMenu.Item
+          onclick={item.onclick}
+          disabled={item.disabled?.()}
+          variant={item.variant}
+          closeOnSelect={item.closeOnSelect ?? true}
+        >
+          <item.icon class="size-3" />
+          {item.label()}
+        </ContextMenu.Item>
+      {/each}
+    </ContextMenu.Group>
+  </ContextMenu.Content>
+</ContextMenu.Root>
 
 <AttachmentViewer
   bind:open={viewerOpen}
