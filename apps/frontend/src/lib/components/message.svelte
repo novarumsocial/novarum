@@ -3,7 +3,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { session } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
-  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link, Copy } from '@lucide/svelte';
+  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link, Copy, IdCardLanyard } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import VideoPlayer from './video-player.svelte';
@@ -82,6 +82,7 @@
         navigator.clipboard.writeText(message.content ?? '');
       },
     },
+    // TODO: separator here
     {
       label: () => 'Copy Message Link',
       icon: Link,
@@ -91,6 +92,7 @@
         navigator.clipboard.writeText(`${window.location.origin}${url}`);
       },
     },
+    // TODO: separator here
     ...(message.author.userId === session.user?.id
       ? [
           {
@@ -103,9 +105,10 @@
           },
         ]
       : []),
+    // TODO: separator here
     {
       label: () => 'Copy Message ID',
-      icon: Link,
+      icon: IdCardLanyard,
       variant: 'default',
       onclick: () => navigator.clipboard.writeText(message.id),
     },
