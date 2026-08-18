@@ -5,6 +5,7 @@
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
   import { device } from '$lib/device.svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
 
   let content = $state('');
@@ -36,7 +37,7 @@
       .slice(0, 8);
   });
   const maxFiles = 5;
-  const maxFileSize = 10 * 1024 * 1024;
+  const maxFileSize = $derived(anchor.maxFileSize * 1024 * 1024);
   let {
     placeholder = 'Send a message',
     onSend = () => {},
@@ -198,7 +199,7 @@
     const oversized = unique.find((file) => file.size > maxFileSize);
 
     if (oversized) {
-      sendError = `${oversized.name} exceeds the 10 MB limit.`;
+      sendError = `${oversized.name} exceeds the ${anchor.maxFileSize} MB limit.`;
       return;
     }
 

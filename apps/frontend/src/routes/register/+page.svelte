@@ -95,7 +95,7 @@
   });
 
   const { form: formData, enhance } = form;
-  let handle = $derived(`@${$formData.username || 'username'}@${$formData.homeserver || 'server'}`);
+  let handle = $derived(`@${$formData.username || 'username'}:${$formData.homeserver || 'server'}`);
 </script>
 
 <svelte:head>
