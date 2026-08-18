@@ -3,17 +3,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { session } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
-  import {
-    Download,
-    FileText,
-    Reply,
-    Ellipsis,
-    Trash2,
-    Pencil,
-    Link,
-    Copy,
-    IdCardLanyard,
-  } from '@lucide/svelte';
+  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link, Copy } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import VideoPlayer from './video-player.svelte';
@@ -59,77 +49,67 @@
   let editMsgTextarea = $state<HTMLTextAreaElement | null>(null);
   let savingEdit = $state(false);
 
-  const dropdownGroups: DropdownItems[][] = $derived([
-    [
-      {
-        label: () => 'Reply',
-        icon: Reply,
-        variant: 'default',
-        onclick: onReply,
-      },
-      ...(message.author.userId === session.user?.id
-        ? [
-            {
-              label: () => 'Edit Message',
-              icon: Pencil,
-              variant: 'default' as const,
-              onclick: () => {
-                editContent = message.content;
-                chat.editingMessage = true;
-                chat.editingMessageId = message.id;
-                dropdownOpen = false;
-                setTimeout(() => {
-                  editMsgTextarea?.focus();
-                }, 0);
-              },
-            },
-          ]
-        : []),
-    ],
-    [
-      {
-        label: () => 'Copy Text',
-        icon: Copy,
-        variant: 'default',
-        onclick: () => {
-          navigator.clipboard.writeText(message.content ?? '');
-        },
-      },
-      {
-        label: () => 'Copy Message Link',
-        icon: Link,
-        variant: 'default',
-        onclick: () => {
-          const url = chat.messagePath(message.id);
-          navigator.clipboard.writeText(`${window.location.origin}${url}`);
-        },
-      },
-    ],
+  const dropdownItems: DropdownItems[] = $derived([
+    {
+      label: () => 'Reply',
+      icon: Reply,
+      variant: 'default',
+      onclick: onReply,
+    },
     ...(message.author.userId === session.user?.id
       ? [
-          [
-            {
-              label: () => deleteText,
-              icon: Trash2,
-              variant: 'destructive' as const,
-              onclick: () => navigator.clipboard.writeText(message.id),
-              disabled: () => deleting,
-              closeOnSelect: false,
+          {
+            label: () => 'Edit Message',
+            icon: Pencil,
+            variant: 'default' as const,
+            onclick: () => {
+              editContent = message.content;
+              chat.editingMessage = true;
+              chat.editingMessageId = message.id;
+              dropdownOpen = false;
+              setTimeout(() => {
+                editMsgTextarea?.focus();
+              }, 0);
             },
-          ],
+          },
         ]
       : []),
-    [
-      {
-        label: () => 'Copy Message ID',
-        icon: IdCardLanyard,
-        variant: 'default',
-        onclick: () => navigator.clipboard.writeText(message.id),
+    {
+      label: () => 'Copy Text',
+      icon: Copy,
+      variant: 'default',
+      onclick: () => {
+        navigator.clipboard.writeText(message.content ?? '');
       },
-    ],
-  ] satisfies DropdownItems[][]);
-
-  const dropdownItems: DropdownItems[] = $derived(dropdownGroups.flat());
+    },
+    {
+      label: () => 'Copy Message Link',
+      icon: Link,
+      variant: 'default',
+      onclick: () => {
+        const url = chat.messagePath(message.id);
+        navigator.clipboard.writeText(`${window.location.origin}${url}`);
+      },
+    },
+    ...(message.author.userId === session.user?.id
+      ? [
+          {
+            label: () => deleteText,
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onclick: deleteMessage,
+            disabled: () => deleting,
+            closeOnSelect: false,
+          },
+        ]
+      : []),
+    {
+      label: () => 'Copy Message ID',
+      icon: Link,
+      variant: 'default',
+      onclick: () => navigator.clipboard.writeText(message.id),
+    },
+  ]);
 
   $effect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -458,24 +438,19 @@
                       {/snippet}
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content>
-                      {#each dropdownGroups as group, i (i)}
-                        <DropdownMenu.Group>
-                          {#each group as item (item.label)}
-                            <DropdownMenu.Item
-                              onclick={item.onclick}
-                              disabled={item.disabled?.()}
-                              variant={item.variant}
-                              closeOnSelect={item.closeOnSelect ?? true}
-                            >
-                              <item.icon class="size-3" />
-                              {item.label()}
-                            </DropdownMenu.Item>
-                          {/each}
-                        </DropdownMenu.Group>
-                        {#if i < dropdownGroups.length - 1}
-                          <DropdownMenu.Separator />
-                        {/if}
-                      {/each}
+                      <DropdownMenu.Group>
+                        {#each dropdownItems as item (item.label)}
+                          <DropdownMenu.Item
+                            onclick={item.onclick}
+                            disabled={item.disabled?.()}
+                            variant={item.variant}
+                            closeOnSelect={item.closeOnSelect ?? true}
+                          >
+                            <item.icon class="size-3" />
+                            {item.label()}
+                          </DropdownMenu.Item>
+                        {/each}
+                      </DropdownMenu.Group>
                     </DropdownMenu.Content>
                   </DropdownMenu.Root>
                 {/if}
@@ -579,24 +554,19 @@
     {/snippet}
   </ContextMenu.Trigger>
   <ContextMenu.Content>
-    {#each dropdownGroups as group, i (i)}
-      <ContextMenu.Group>
-        {#each group as item (item.label)}
-          <ContextMenu.Item
-            onclick={item.onclick}
-            disabled={item.disabled?.()}
-            variant={item.variant}
-            closeOnSelect={item.closeOnSelect ?? true}
-          >
-            <item.icon class="size-3" />
-            {item.label()}
-          </ContextMenu.Item>
-        {/each}
-      </ContextMenu.Group>
-      {#if i < dropdownGroups.length - 1}
-        <ContextMenu.Separator />
-      {/if}
-    {/each}
+    <ContextMenu.Group>
+      {#each dropdownItems as item (item.label)}
+        <ContextMenu.Item
+          onclick={item.onclick}
+          disabled={item.disabled?.()}
+          variant={item.variant}
+          closeOnSelect={item.closeOnSelect ?? true}
+        >
+          <item.icon class="size-3" />
+          {item.label()}
+        </ContextMenu.Item>
+      {/each}
+    </ContextMenu.Group>
   </ContextMenu.Content>
 </ContextMenu.Root>
 
