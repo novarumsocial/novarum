@@ -23,14 +23,11 @@ import { getConfig } from '../../utils/config';
 import { AV_AFD_4_3 } from 'node-av';
 
 const remoteErrorSchema = z.object({ error: z.string() });
-const multipartStartSchema = z.object({ attachmentId: z.string(), partSize: z.number() });
+const multipartStartSchema = z.object({ attachmentId: z.string() });
 const okSchema = z.object({ ok: z.literal(true) });
 const multipartPartSize = 5 * 1024 * 1024;
 
-const activeMultipartUploads = new Map<
-  string,
-  { writer: NetworkSink; nextPart: number; partCount: number; size: number }
->();
+const activeMultipartUploads = new Map<string, { writer: NetworkSink; size: number }>();
 
 async function requireUploadAccess(
   channelId: string,
@@ -263,12 +260,10 @@ export const upload = new Elysia({ tags: ['Upload'] })
         .writer({ type: body.contentType, partSize: multipartPartSize, queueSize: 3 });
       activeMultipartUploads.set(pending.attachmentId, {
         writer,
-        nextPart: 1,
-        partCount: Math.ceil(body.size / multipartPartSize),
         size: body.size,
       });
 
-      return { attachmentId: pending.attachmentId, partSize: multipartPartSize };
+      return { attachmentId: pending.attachmentId };
     },
     {
       body: t.Object({
@@ -288,57 +283,40 @@ export const upload = new Elysia({ tags: ['Upload'] })
     }
   )
   .post(
-    '/upload/multipart/:attachmentId/part/:partNumber',
+    '/upload/multipart/:attachmentId',
     async ({ params, request, status }) => {
       const upload = activeMultipartUploads.get(params.attachmentId);
       if (!upload) return status(404, { error: 'Upload not found' });
+      if (!request.body) return status(400, { error: 'Missing request body' });
 
-      const partNumber = Number(params.partNumber);
-      if (!Number.isInteger(partNumber) || partNumber !== upload.nextPart) {
-        return status(409, { error: `Expected part ${upload.nextPart}` });
+      let received = 0;
+      try {
+        for await (const chunk of request.body) {
+          received += chunk.byteLength;
+          await upload.writer.write(chunk);
+        }
+        if (received !== upload.size) {
+          throw new Error(`Expected ${upload.size} bytes, received ${received}`);
+        }
+
+        activeMultipartUploads.delete(params.attachmentId);
+        await upload.writer.end();
+
+        return { ok: true };
+      } catch (error) {
+        activeMultipartUploads.delete(params.attachmentId);
+        await Promise.resolve(upload.writer.end(new Error('Multipart upload failed'))).catch(
+          () => {}
+        );
+        await db.delete(attachments).where(eq(attachments.id, params.attachmentId)).catch(() => {});
+        return status(400, { error: 'Upload failed' });
       }
-
-      const chunk = await request.arrayBuffer();
-      const expectedSize = Math.min(
-        upload.size - (partNumber - 1) * multipartPartSize,
-        multipartPartSize
-      );
-      if (chunk.byteLength !== expectedSize) return status(400, { error: 'Unexpected part size' });
-
-      upload.nextPart += 1;
-      await upload.writer.write(chunk);
-      await upload.writer.flush();
-
-      return { ok: true };
     },
     {
       response: {
         200: okSchema,
         400: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
-        409: genericResponseErrorSchema,
-      },
-    }
-  )
-  .post(
-    '/upload/multipart/:attachmentId/complete',
-    async ({ params, status }) => {
-      const upload = activeMultipartUploads.get(params.attachmentId);
-      if (!upload) return status(404, { error: 'Upload not found' });
-      if (upload.nextPart - 1 !== upload.partCount) {
-        return status(409, { error: 'Upload is incomplete' });
-      }
-
-      activeMultipartUploads.delete(params.attachmentId);
-      await upload.writer.end();
-
-      return { ok: true };
-    },
-    {
-      response: {
-        200: okSchema,
-        404: genericResponseErrorSchema,
-        409: genericResponseErrorSchema,
       },
     }
   )

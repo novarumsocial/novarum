@@ -69,7 +69,6 @@ const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const multipartThreshold = 10 * 1024 * 1024;
-const maxPartUploadAttempts = 3;
 
 async function stripImageMetadata(file: File) {
   if (!reencodedImageTypes.has(file.type)) return file;
@@ -575,36 +574,17 @@ class ChatState {
       throw new Error(`Could not start upload for ${file.name}`);
     }
 
-    const { attachmentId, partSize } = started.data;
-    const parts = Math.ceil(file.size / partSize);
-
+    const attachmentId = started.data.attachmentId;
     try {
-      for (let part = 0; part < parts; part++) {
-        const chunk = file.slice(part * partSize, Math.min((part + 1) * partSize, file.size));
-        const offset = part * partSize;
-
-        for (let attempt = 0; ; attempt++) {
-          try {
-            await this.xhrUpload(
-              `${anchor.baseUrl}/upload/multipart/${encodeURIComponent(attachmentId)}/part/${part + 1}`,
-              'POST',
-              null,
-              chunk,
-              file.size,
-              offset,
-              index
-            );
-            break;
-          } catch (error) {
-            if (attempt >= maxPartUploadAttempts - 1) throw error;
-          }
-        }
-      }
-
-      const completed = await anchor.client.upload.multipart({ attachmentId }).complete.post();
-      if (completed.error || !completed.data || 'error' in completed.data) {
-        throw new Error(`Could not finish upload for ${file.name}`);
-      }
+      await this.xhrUpload(
+        `${anchor.baseUrl}/upload/multipart/${encodeURIComponent(attachmentId)}`,
+        'POST',
+        null,
+        file,
+        file.size,
+        0,
+        index
+      );
     } catch (error) {
       void anchor.client.upload.multipart({ attachmentId }).delete();
       throw error;
