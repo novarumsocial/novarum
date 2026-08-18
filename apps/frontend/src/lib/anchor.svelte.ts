@@ -26,6 +26,10 @@ class AnchorState {
   maxFileSize = $state(10);
   client = $derived(createAnchorClient(this.baseUrl));
 
+  constructor() {
+    void this.refreshInfo();
+  }
+
   async setHomeServer(homeServer: string) {
     const normalizedHomeServer = normalizeHomeServer(homeServer);
     const info = await getAnchorInfo(normalizedHomeServer);
@@ -35,6 +39,16 @@ class AnchorState {
     this.maxFileSize = info.maxFileSize;
     localStorage.setItem(homeServerStorageKey, normalizedHomeServer);
     localStorage.setItem(anchorBaseUrlStorageKey, this.baseUrl);
+  }
+
+  private async refreshInfo() {
+    try {
+      const info = await getAnchorInfo(this.homeServer);
+      this.baseUrl = info.baseUrl.replace(/\/+$/, '');
+      this.maxFileSize = info.maxFileSize;
+    } catch {
+      // offline or unreachable — keep cached values
+    }
   }
 }
 
