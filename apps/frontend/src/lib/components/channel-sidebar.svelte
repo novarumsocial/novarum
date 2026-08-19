@@ -29,7 +29,6 @@
   import { settings } from '$lib/settings.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import EditChannelDialog from './edit-channel-dialog.svelte';
-  import DeleteChannelDialog from './delete-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
   import GuildSettingsDialog from './guild-settings-dialog.svelte';
   import Avatar from './avatar.svelte';
@@ -69,8 +68,10 @@
   let createCategory = $state<ChannelCategory | null>(null);
   let editOpen = $state(false);
   let editChannel = $state<Channel | null>(null);
-  let deleteOpen = $state(false);
-  let deleteChannelTarget = $state<Channel | null>(null);
+  let deleteChannelText = $state('Delete Channel');
+  let deleteChannelFirstClick = $state(false);
+  let deletingChannel = $state(false);
+  let shiftPressed = $state(false);
 
   let createInviteOpen = $state(false);
   let settingsOpen = $state(false);
@@ -97,6 +98,21 @@
         return [category.id, [...existing, ...added]];
       })
     );
+  });
+
+  $effect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') shiftPressed = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') shiftPressed = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   });
 
   function openCreateChannel(category: ChannelCategory) {
@@ -154,9 +170,28 @@
     editOpen = true;
   }
 
-  function openDeleteChannel(channel: Channel) {
-    deleteChannelTarget = channel;
-    deleteOpen = true;
+  async function deleteChannel(channel: Channel) {
+    if (deletingChannel) return;
+
+    if (!shiftPressed && !deleteChannelFirstClick) {
+      deleteChannelText = 'You sure?';
+      deleteChannelFirstClick = true;
+      await new Promise((resolve) =>
+        setTimeout(() => {
+          deleteChannelText = 'Delete Channel';
+          deleteChannelFirstClick = false;
+          resolve(void 0);
+        }, 3000)
+      );
+      return;
+    }
+
+    deletingChannel = true;
+    deleteChannelText = 'Deleting...';
+    // TODO: implement deleteChannel
+    deletingChannel = false;
+    deleteChannelText = 'Delete Channel';
+    deleteChannelFirstClick = false;
   }
 
   function avatarBg(id: string) {
@@ -389,12 +424,12 @@
                   </button>
                 </ContextMenu.Trigger>
 
-                <ContextMenu.Content class="w-56"> <!-- mark here -->
+                <ContextMenu.Content class="w-56">
                   {#if ch.type === 'TEXT'}
-                  <ContextMenu.Item disabled={!ch.unread && ch.mention === 0}>
-                    <Eye class="size-4" />
-                    Mark as Read
-                  </ContextMenu.Item>
+                    <ContextMenu.Item disabled={!ch.unread && ch.mention === 0}>
+                      <Eye class="size-4" />
+                      Mark as Read
+                    </ContextMenu.Item>
                   {/if}
                   <ContextMenu.Item>
                     <UserRoundPlus class="size-4" />
@@ -449,9 +484,14 @@
                       <CopyPlus class="size-4" />
                       Duplicate Channel
                     </ContextMenu.Item>
-                    <ContextMenu.Item variant="destructive" onclick={() => openDeleteChannel(ch)}>
+                    <ContextMenu.Item
+                      variant="destructive"
+                      closeOnSelect={false}
+                      onclick={() => deleteChannel(ch)}
+                      disabled={deletingChannel}
+                    >
                       <Trash2 class="size-4" />
-                      Delete Channel
+                      {deleteChannelText}
                     </ContextMenu.Item>
                   {/if}
 
@@ -548,13 +588,5 @@
   channel={editChannel}
   onSave={(channel, name) => {
     // TODO: implement editChannel
-  }}
-/>
-
-<DeleteChannelDialog
-  bind:open={deleteOpen}
-  channel={deleteChannelTarget}
-  onDelete={(channel) => {
-    // TODO: implement deleteChannel
   }}
 />
