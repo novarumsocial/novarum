@@ -739,11 +739,17 @@ class ChatState {
     }
   }
 
-  setTyping(channelId: string, userId: string, name: string) {
+  setTyping(channelId: string, userId: string, username: string, homeserver: string, name: string) {
     const session = useSession();
 
     if (!session.user) return;
     if (userId === session.user.id) return;
+    if (
+      username === session.user.username &&
+      homeserver.toLowerCase() === session.user.homeserver.toLowerCase()
+    ) {
+      return;
+    }
 
     const expiresAt = Date.now() + typingExpiryMs;
     const typing = this.typingByChannel[channelId] ?? [];
