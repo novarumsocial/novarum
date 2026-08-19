@@ -86,7 +86,7 @@ Please open the [Web app](https://app.novarum.me) to see the current state of th
 
 ## Getting Started
 
-The [documentation page](https://docs.novarum.me) contains all the information you need to get started with Novarum!
+The [documentation page](https://novarum.me/docs) contains all the information you need to get started with Novarum!
 If you want to run your own Anchor (the Novarum backend), check out the [guide](https://www.novarum.me/guides/deployment/).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
