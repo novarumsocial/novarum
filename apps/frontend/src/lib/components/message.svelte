@@ -484,7 +484,7 @@
             {/each}
             {#each audioAttachments as attachment (attachment.id)}
               <div class="mt-2 max-w-md">
-                <AudioPlayer {attachment} />
+                <AudioPlayer {attachment} {hovered} />
               </div>
             {/each}
             {#if soloImage}
