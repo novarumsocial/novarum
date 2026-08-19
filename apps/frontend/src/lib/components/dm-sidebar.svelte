@@ -25,7 +25,10 @@
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
-  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2 mt-2">
+  <div
+    class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2"
+    class:mt-2={device.isComputer}
+  >
     {#if device.isComputer}
       <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
         <Users class="size-4 shrink-0" />
@@ -45,7 +48,7 @@
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="Create direct message"
       >
-        <a href="">
+        <a href="#"> <!-- does nothing -->
           <Plus class="size-3.5" />
         </a>
       </button>
@@ -64,7 +67,7 @@
           bgColor={entry.user.avatarColor}
         />
         <span class="flex-1 truncate">{name}</span>
-        <a href="">
+        <a href="#"> <!-- does nothing -->
           <X class="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
         </a>
       </button>
