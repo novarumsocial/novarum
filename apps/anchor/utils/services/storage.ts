@@ -23,18 +23,6 @@ export const storage = new S3Client({
   virtualHostedStyle: s3_virtual_hosted_style,
 });
 
-export const s3Bucket = s3_bucket;
-export const s3Endpoint = s3_endpoint;
-export const s3PublicEndpoint = s3_public_endpoint;
-export const s3VirtualHostedStyle = s3_virtual_hosted_style;
-
-export const awsS3 = new AwsClient({
-  accessKeyId: s3_access_key,
-  secretAccessKey: s3_secret_key,
-  region: s3_region,
-  service: 's3',
-});
-
 export function publicPresign(key: string, options?: S3FilePresignOptions) {
   if (s3_public_host_rewrite && s3_endpoint && s3_public_endpoint) {
     const url = storage.presign(key, { ...options, endpoint: s3_endpoint });
@@ -63,6 +51,13 @@ export async function configureStorageCors() {
     .join('');
   const body = `<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${corsRules}</CORSConfiguration>`;
 
+  const client = new AwsClient({
+    accessKeyId: s3_access_key,
+    secretAccessKey: s3_secret_key,
+    region: s3_region,
+    service: 's3',
+  });
+
   const endpoints = [...new Set([s3_public_endpoint ?? s3_endpoint, s3_endpoint])];
   for (const endpoint of endpoints) {
     const url = new URL(endpoint);
@@ -74,7 +69,7 @@ export async function configureStorageCors() {
     }
     url.search = 'cors';
 
-    const response = await awsS3.fetch(url, {
+    const response = await client.fetch(url, {
       method: 'PUT',
       headers: { 'content-type': 'application/xml' },
       body,
