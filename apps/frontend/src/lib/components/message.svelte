@@ -153,14 +153,18 @@
   const authorName = $derived(message.author.displayName || message.author.username);
   const selfMentioned = $derived.by(() => {
     const handle = session.user?.handle.toLowerCase();
-    if (!handle || message.author.userId === session.user?.id) return false;
+    if (!handle) return false;
+
+    const isMe = (author: { username: string; server: string } | undefined) =>
+      author ? `@${author.username}:${author.server}`.toLowerCase() === handle : false;
+    if (isMe(message.author)) return false;
 
     const contentHandles =
       message.content.match(
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    const replyingMe = repliedMessage?.author.userId === session.user?.id;
+    const replyingMe = isMe(repliedMessage?.author);
 
     return (
       replyingMe || contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle)

@@ -44,6 +44,7 @@ type AddMessageInput = {
     contentType: string;
     size: number;
     url: string;
+    previewUrl: string;
   }[];
 };
 

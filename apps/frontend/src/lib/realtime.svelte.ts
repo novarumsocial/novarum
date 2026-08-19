@@ -17,6 +17,7 @@ const attachmentSchema = z.object({
   contentType: z.string(),
   size: z.number(),
   url: z.string().url(),
+  previewUrl: z.string().url(),
 });
 
 const emojiSchema = z.object({
