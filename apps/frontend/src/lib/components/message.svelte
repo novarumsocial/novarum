@@ -3,7 +3,17 @@
   import { chat } from '$lib/chat-state.svelte';
   import { session } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
-  import { Download, FileText, Reply, Ellipsis, Trash2, Pencil, Link, Copy, IdCardLanyard } from '@lucide/svelte';
+  import {
+    Download,
+    FileText,
+    Reply,
+    Ellipsis,
+    Trash2,
+    Pencil,
+    Link,
+    Copy,
+    IdCardLanyard,
+  } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import VideoPlayer from './video-player.svelte';
@@ -55,6 +65,7 @@
       icon: Reply,
       variant: 'default',
       onclick: onReply,
+      hideFromShift: true,
     },
     ...(message.author.userId === session.user?.id
       ? [
@@ -62,6 +73,7 @@
             label: () => 'Edit Message',
             icon: Pencil,
             variant: 'default' as const,
+            hideFromShift: true,
             onclick: () => {
               editContent = message.content;
               chat.editingMessage = true;
@@ -272,6 +284,7 @@
     variant?: 'default' | 'destructive';
     disabled?: () => boolean;
     closeOnSelect?: boolean;
+    hideFromShift?: boolean;
   }
 </script>
 
@@ -416,7 +429,7 @@
                   >
                 {/if}
                 {#if shiftPressed && !chat.editingMessage}
-                  {#each dropdownItems as item (item.label)}
+                  {#each dropdownItems.filter((i) => !i.hideFromShift) as item (item.label)}
                     <Button
                       onclick={item.onclick}
                       variant={item.variant === 'default' ? 'ghost' : 'destructive'}
