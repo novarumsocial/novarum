@@ -6,7 +6,13 @@
   import { friends } from '$lib/friends.svelte';
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundPlus } from '@lucide/svelte';
+  import {
+    UserRoundArrowLeft,
+    UserRoundCheck,
+    UserRoundCog,
+    UserRoundMinus,
+    UserRoundPlus,
+  } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -91,7 +97,7 @@
         <Button
           variant="outline"
           size="icon"
-          class="absolute top-1 right-3"
+          class="group absolute top-1 right-3"
           disabled={busy}
           aria-label={friendAction.label}
           onclick={friendAction.run}
@@ -101,8 +107,12 @@
           {:else if friendStatus === 'OUTGOING'}
             <UserRoundCog />
           {:else if friendStatus === 'FRIEND'}
-            <UserRoundCheck />
-            <!-- TODO: if hover, text-destructive and switch to UserRoundMinus -->
+            <div class="group-hover:hidden">
+              <UserRoundCheck />
+            </div>
+            <div class="hidden group-hover:block text-destructive">
+              <UserRoundMinus />
+            </div>
           {:else}
             <UserRoundPlus />
           {/if}
