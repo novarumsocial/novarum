@@ -1,0 +1,10 @@
+name = "novarum-cdn"
+main = "src/index.ts"
+compatibility_date = "2026-08-19"
+custom_domain = "cdn.novarum.me"
+
+[vars]
+B2_ENDPOINT = "s3.eu-central-003.backblazeb2.com"
+
+[observability]
+enabled = true

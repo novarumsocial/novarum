@@ -58,26 +58,23 @@ export async function configureStorageCors() {
     service: 's3',
   });
 
-  const endpoints = [...new Set([s3_public_endpoint ?? s3_endpoint, s3_endpoint])];
-  for (const endpoint of endpoints) {
-    const url = new URL(endpoint);
-    if (s3_virtual_hosted_style) {
-      url.hostname = `${s3_bucket}.${url.hostname}`;
-      url.pathname = '/';
-    } else {
-      url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(s3_bucket)}`;
-    }
-    url.search = 'cors';
+  const url = new URL(s3_endpoint);
+  if (s3_virtual_hosted_style) {
+    url.hostname = `${s3_bucket}.${url.hostname}`;
+    url.pathname = '/';
+  } else {
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(s3_bucket)}`;
+  }
+  url.search = 'cors';
 
-    const response = await client.fetch(url, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/xml' },
-      body,
-    });
+  const response = await client.fetch(url, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/xml' },
+    body,
+  });
 
-    if (!response.ok) {
-      throw new Error(`Could not configure S3 CORS (${response.status}): ${await response.text()}`);
-    }
+  if (!response.ok) {
+    throw new Error(`Could not configure S3 CORS (${response.status}): ${await response.text()}`);
   }
 }
 
