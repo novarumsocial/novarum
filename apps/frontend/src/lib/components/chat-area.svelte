@@ -177,7 +177,11 @@
     </Button>
   </div>
 
-  <div bind:this={scrollContainer} class="min-h-0 min-w-0 flex-1 overflow-y-auto" onscroll={onScroll}>
+  <div
+    bind:this={scrollContainer}
+    class="min-h-0 min-w-0 flex-1 overflow-y-auto"
+    onscroll={onScroll}
+  >
     {#if olderLoading}
       <div class="space-y-5 px-3 pt-4 sm:px-4">
         {@render skeletonRows(2)}
@@ -189,7 +193,7 @@
           {@render skeletonRows(5)}
         </div>
       {:else if messages.length === 0}
-        <div class="mb-4 max-w-md border border-dashed border-border p-4">
+        <div class="mb-4 max-w-md border border-dashed border-border p-4 select-none">
           <p class="text-sm font-medium text-foreground">No messages yet</p>
           <p class="mt-1 text-sm text-muted-foreground">
             Start the conversation in #{channel.name}.
@@ -246,12 +250,22 @@
     </div>
   </div>
 
-  <div
-    class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
-    aria-live="polite"
-  >
-    {typingText ?? ''}
-  </div>
+  {#if typingText}
+    <div
+      class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
+      aria-live="polite"
+    >
+      <span class="flex items-center gap-0.5 mr-2.5">
+        <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
+        ></span>
+        <span
+          class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
+        ></span>
+        <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
+      </span>
+      {typingText ?? ''}
+    </div>
+  {/if}
 
   {#if replyingTo}
     <div class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4">

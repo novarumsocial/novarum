@@ -81,7 +81,6 @@
         <div class="flex gap-2">
           <Input id="invite-link" value={inviteUrl} readonly class="font-mono text-xs" />
           <Button
-            type="button"
             variant="outline"
             size="icon"
             aria-label="Copy invite link"
@@ -98,21 +97,24 @@
       </div>
 
       <Dialog.Footer class="border-t border-border pt-3">
-        <div class="flex gap-2">
-          <Button type="button" variant="outline" onclick={regenerateInvite} disabled={loading}>
-            <RefreshCw class="size-4" />
-            <span>Regenerate</span>
-          </Button>
-          <Button type="button" onclick={copyInvite} disabled={loading}>
-            {#if copied}
-              <Check class="size-4" />
-              <span>Copied</span>
-            {:else}
-              <Copy class="size-4" />
-              <span>Copy Invite</span>
-            {/if}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          class="mr-auto"
+          onclick={regenerateInvite}
+          disabled={loading}
+        >
+          <RefreshCw class="size-4" />
+          <span>Regenerate</span>
+        </Button>
+        <Button onclick={copyInvite} disabled={loading}>
+          {#if copied}
+            <Check class="size-4" />
+            <span>Copied</span>
+          {:else}
+            <Copy class="size-4" />
+            <span>Copy Invite</span>
+          {/if}
+        </Button>
       </Dialog.Footer>
     </div>
   </Dialog.Content>

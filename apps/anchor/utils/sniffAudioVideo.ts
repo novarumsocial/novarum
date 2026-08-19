@@ -14,8 +14,7 @@ const videoSignatures = [
 // uses magic bytes to sniff the media type. whatever that means.
 export function sniffAudioVideo(buffer: ArrayBuffer): 'image' | 'video' | null {
   const bytes = new Uint8Array(buffer);
-  const has = (sig: readonly number[]) =>
-    sig.every((byte, i) => bytes[i] === byte);
+  const has = (sig: readonly number[]) => sig.every((byte, i) => bytes[i] === byte);
 
   if (imageSignatures.some(has)) return 'image';
   if (videoSignatures.some(has)) return 'video';

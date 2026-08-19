@@ -15,6 +15,7 @@
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
+  import DmSidebar from './dm-sidebar.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -167,6 +168,7 @@
         }}
       ></button>
     {/if}
+    <!--
     {#if mobileMembersOpen}
       <button
         class="fixed inset-0 z-30 bg-black/60 lg:hidden"
@@ -174,7 +176,7 @@
         onclick={() => (mobileMembersOpen = false)}
       ></button>
     {/if}
-
+-->
     <div
       class="fixed inset-y-0 left-0 z-40 flex max-w-[calc(100vw-3rem)] shrink-0 flex-col bg-sidebar transition-transform md:static md:z-auto md:max-w-none md:translate-x-0"
       class:-translate-x-full={!mobileNavigationOpen}
@@ -204,6 +206,9 @@
             members={chat.members}
             voiceStates={chat.voiceStates}
           />
+        {/if}
+        {#if chat.route.kind === 'home'}
+          <DmSidebar />
         {/if}
       </div>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
@@ -252,6 +257,7 @@
         class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0"
         class:translate-x-full={!mobileMembersOpen}
       >
+        <!--
         <button
           class="absolute top-1.5 right-2 z-10 flex size-9 items-center justify-center text-muted-foreground hover:text-foreground lg:hidden"
           aria-label="Close member list"
@@ -259,7 +265,8 @@
         >
           <X class="size-5" />
         </button>
-        <MemberSidebar members={chat.members} />
+        -->
+        <MemberSidebar server={currentServer!} members={chat.members} />
       </div>
     {/if}
   </div>

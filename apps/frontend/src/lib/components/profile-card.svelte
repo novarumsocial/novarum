@@ -6,7 +6,13 @@
   import { friends } from '$lib/friends.svelte';
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundPlus } from '@lucide/svelte';
+  import {
+    UserRoundArrowLeft,
+    UserRoundCheck,
+    UserRoundCog,
+    UserRoundMinus,
+    UserRoundPlus,
+  } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -74,7 +80,7 @@
         <AnimatedImage
           src={user.bannerUrl}
           alt=""
-          class="size-full"
+          class="size-full select-none"
           focused={false}
           fit="contain"
         />
@@ -91,7 +97,7 @@
         <Button
           variant="outline"
           size="icon"
-          class="absolute top-1 right-3"
+          class="group absolute top-1 right-3"
           disabled={busy}
           aria-label={friendAction.label}
           onclick={friendAction.run}
@@ -101,7 +107,12 @@
           {:else if friendStatus === 'OUTGOING'}
             <UserRoundCog />
           {:else if friendStatus === 'FRIEND'}
-            <UserRoundCheck />
+            <div class="group-hover:hidden">
+              <UserRoundCheck />
+            </div>
+            <div class="hidden group-hover:block text-destructive">
+              <UserRoundMinus />
+            </div>
           {:else}
             <UserRoundPlus />
           {/if}
@@ -120,8 +131,12 @@
             class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status ===
             'ONLINE'
               ? 'bg-emerald-500'
-              : 'bg-muted-foreground'}"
+              : 'bg-neutral-900 ring-3 ring-inset ring-neutral-500'}"
             class:rounded-full={settings.value.circleIcons}
+            class:size-5={settings.value.circleIcons}
+            class:mr-0.25={settings.value.circleIcons}
+            class:mb-0.25={settings.value.circleIcons}
+            class:border-[4px]={settings.value.circleIcons}
             aria-label={user.status === 'ONLINE' ? 'Online' : 'Offline'}
           ></span>
         {/if}
@@ -137,8 +152,18 @@
           </span>
         {/if}
       </div>
-      <Popover.Description class="truncate font-mono text-[11px]">
-        @{user.username}:{user.server}
+      <Popover.Description class="flex items-center gap-1 truncate font-mono text-[11px]">
+        <span class="truncate">@{user.username}:{user.server}</span>
+        <!-- TODO: pronouns
+        {#if user.pronouns
+        <span class="flex shrink-0 items-center gap-1 text-muted-foreground">
+          <span aria-hidden="true">•</span>
+          <span class="rounded-full bg-muted px-1.5 py-0.5 mb-1 text-[10px] font-medium">
+            pro/nouns
+          </span>
+        </span>
+        {/if}
+        -->
       </Popover.Description>
       {#if user.about}
         <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
@@ -147,7 +172,7 @@
       {/if}
       {#if user.username && !isSelf}
         <Input
-          id="server-name"
+          id="direct-message-person"
           placeholder="Message @{user.username}:{user.server}"
           class="mt-2.5"
           autocomplete="off"

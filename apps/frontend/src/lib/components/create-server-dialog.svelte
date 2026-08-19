@@ -64,7 +64,7 @@
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Content class="sm:max-w-md">
-    <Dialog.Header>
+    <Dialog.Header class="select-none">
       <Dialog.Title>Create Server</Dialog.Title>
       <Dialog.Description>Give your server a name and upload a picture.</Dialog.Description>
     </Dialog.Header>
@@ -72,7 +72,7 @@
     <form method="POST" class="space-y-4" onsubmit={handleSubmit}>
       <div class="flex flex-col items-center gap-3">
         <div
-          class="flex size-16 items-center justify-center text-lg font-bold text-white bg-primary"
+          class="flex size-16 items-center justify-center text-lg font-bold text-white bg-primary select-none"
           class:rounded-full={settings.value.circleIcons}
         >
           {initials(name) || 'N'}

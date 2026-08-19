@@ -6,10 +6,11 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import { Users, LoaderCircle, Copy, Check, Hash, ArrowRight } from '@lucide/svelte';
+  import { Users, LoaderCircle, Copy, Check, ArrowRight } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { useSession } from '$lib/session.svelte';
   import Logo from '$lib/assets/favicon.svg';
+  import { settings } from '$lib/settings.svelte';
 
   type InviteState = {
     invite: {
@@ -158,6 +159,16 @@
       return value;
     }
   }
+
+  function initialsFor(name: string) {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('')
+      .slice(0, 2);
+  }
 </script>
 
 <svelte:head>
@@ -167,7 +178,12 @@
 
 <div class="dark relative min-h-svh overflow-hidden bg-background">
   <ConstellationBackground class="absolute inset-0 h-full w-full" />
-
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
+      <img src={Logo} alt="novarum" class="absolute size-5" />
+    </div>
+    <span class="text-lg font-semibold tracking-tight">novarum</span>
+  </div>
   <div
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(130,175,235,0.10),transparent_58%)]"
   ></div>
@@ -192,12 +208,6 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="flex items-center gap-2.5">
-            <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <img src={Logo} alt="novarum" class="absolute size-5" />
-            </div>
-            <span class="text-lg font-semibold tracking-tight">novarum</span>
-          </div>
           <Card.Title class="text-xl">You joined the server!</Card.Title>
           <Card.Description>
             Redirecting you to {invite?.guild.name ?? 'the server'}…
@@ -209,12 +219,6 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="flex items-center gap-2.5">
-            <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <img src={Logo} alt="novarum" class="absolute size-5" />
-            </div>
-            <span class="text-lg font-semibold tracking-tight">novarum</span>
-          </div>
           <Card.Title class="text-xl">Invite not found</Card.Title>
           <Card.Description>{error}</Card.Description>
         </Card.Header>
@@ -224,13 +228,6 @@
             The invite link you're trying to use may have expired or is invalid. Ask the server
             owner for a new one.
           </p>
-
-          <div
-            class="flex items-center gap-2 rounded-sm border border-border bg-muted/50 px-3 py-2"
-          >
-            <Hash class="size-4 shrink-0 text-muted-foreground" />
-            <code class="flex-1 truncate font-mono text-xs text-muted-foreground">{inviteUrl}</code>
-          </div>
         </Card.Content>
 
         <Card.Footer class="justify-center text-xs text-muted-foreground">
@@ -247,13 +244,7 @@
         class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
       >
         <Card.Header class="space-y-3">
-          <div class="flex items-center gap-2.5">
-            <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-              <img src={Logo} alt="novarum" class="absolute size-5" />
-            </div>
-            <span class="text-lg font-semibold tracking-tight">novarum</span>
-          </div>
-          <div class="space-y-1">
+          <div class="space-y-1 text-center mt-1.5">
             <Card.Title class="text-xl">You're invited!</Card.Title>
             <Card.Description>Join your friends on this guild.</Card.Description>
           </div>
@@ -264,9 +255,20 @@
             class="flex items-center gap-4 rounded-sm border border-border bg-muted/30 px-4 py-3"
           >
             <div
-              class="flex size-10 shrink-0 items-center justify-center bg-primary/20 text-primary"
+              class="flex size-10 shrink-0 items-center justify-center bg-primary/20 text-primary select-none"
+              class:rounded-full={settings.value.circleIcons}
             >
-              <Hash class="size-5" />
+              {#if invite?.guild.avatarUrl}
+                <img
+                  src={invite?.guild.avatarUrl}
+                  alt={invite?.guild.name}
+                  class:rounded-full={settings.value.circleIcons}
+                />
+              {:else}
+                <span class="text-sm font-semibold">
+                  {initialsFor(invite.guild.name)}
+                </span>
+              {/if}
             </div>
             <div class="min-w-0 flex-1">
               <p class="truncate font-medium">{invite.guild.name}</p>
@@ -322,12 +324,19 @@
 
         <Card.Footer class="justify-center text-xs text-muted-foreground">
           <span>Not {homeServer}?</span>
+          <!--
           <button
             type="button"
             class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
           >
             Sign in with a different account
           </button>
+          -->
+          <a
+            href={`/register`}
+            class="ml-1 font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+            >Sign in with a different account</a
+          >
         </Card.Footer>
       </Card.Root>
     {/if}

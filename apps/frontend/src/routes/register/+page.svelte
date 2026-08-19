@@ -113,18 +113,19 @@
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.6)_100%)]"
   ></div>
 
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
+      <img src={Logo} alt="novarum" class="absolute size-5" />
+    </div>
+    <span class="text-lg font-semibold tracking-tight">novarum</span>
+  </div>
+
   <div class="relative flex min-h-svh items-center justify-center p-4 py-10">
     <Card.Root
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <img src={Logo} alt="novarum" class="absolute size-5" />
-          </div>
-          <span class="text-lg font-semibold tracking-tight">novarum</span>
-        </div>
-        <div class="space-y-1">
+        <div class="space-y-1 mt-1.5 text-center">
           <Card.Title class="text-xl">Create your account</Card.Title>
           <Card.Description>
             Pick a home server and username - your handle works across the federation.
@@ -134,57 +135,58 @@
 
       <Card.Content>
         <form method="POST" class="space-y-4" use:enhance>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Form.Field {form} name="username" class="space-y-1.5">
-              <Form.Control>
-                {#snippet children({ props })}
-                  <Form.Label>Username</Form.Label>
-                  <div class="relative">
-                    <AtSign
-                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                      {...props}
-                      bind:value={$formData.username}
-                      placeholder="alice"
-                      class="pl-8"
-                      autocomplete="username"
-                      spellcheck="false"
-                      autocapitalize="none"
-                    />
-                  </div>
-                {/snippet}
-              </Form.Control>
-              <Form.FieldErrors class="text-xs" />
-            </Form.Field>
+          <div class="space-y-2">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Form.Field {form} name="username" class="space-y-1.5">
+                <Form.Control>
+                  {#snippet children({ props })}
+                    <Form.Label>Username <span class="text-destructive">*</span></Form.Label>
+                    <div class="relative">
+                      <AtSign
+                        class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <Input
+                        {...props}
+                        bind:value={$formData.username}
+                        placeholder="alice"
+                        class="pl-8"
+                        autocomplete="username"
+                        spellcheck="false"
+                        autocapitalize="none"
+                      />
+                    </div>
+                  {/snippet}
+                </Form.Control>
+                <Form.FieldErrors class="text-xs" />
+              </Form.Field>
 
-            <Form.Field {form} name="homeserver" class="space-y-1.5">
-              <Form.Control>
-                {#snippet children({ props })}
-                  <Form.Label>Home server</Form.Label>
-                  <div class="relative">
-                    <Server
-                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                      {...props}
-                      bind:value={$formData.homeserver}
-                      placeholder="novarum.me"
-                      class="pl-8"
-                      autocomplete="url"
-                      spellcheck="false"
-                    />
-                  </div>
-                {/snippet}
-              </Form.Control>
-              <Form.FieldErrors class="text-xs" />
-            </Form.Field>
-          </div>
+              <Form.Field {form} name="homeserver" class="space-y-1.5">
+                <Form.Control>
+                  {#snippet children({ props })}
+                    <Form.Label>Home server <span class="text-destructive">*</span></Form.Label>
+                    <div class="relative">
+                      <Server
+                        class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                      />
 
-          <div class="rounded-none border border-white/10 bg-white/[0.03] px-3 py-2">
-            <p class="text-xs text-muted-foreground">Your handle</p>
-            <p class="break-all font-mono text-sm tracking-tight text-foreground">
-              {handle}
+                      <!-- TODO: when possible, instead of placeholder="novarum.me" remember last logged in instance from localstorage -->
+                      <Input
+                        {...props}
+                        bind:value={$formData.homeserver}
+                        placeholder="novarum.me"
+                        class="pl-8"
+                        autocomplete="url"
+                        spellcheck="false"
+                      />
+                    </div>
+                  {/snippet}
+                </Form.Control>
+                <Form.FieldErrors class="text-xs" />
+              </Form.Field>
+            </div>
+
+            <p class="text-xs text-muted-foreground">
+              Handle preview: <span class="font-mono text-foreground">{handle}</span>
             </p>
           </div>
 
@@ -215,7 +217,7 @@
           <Form.Field {form} name="email" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Email</Form.Label>
+                <Form.Label>Email <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Mail
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -237,7 +239,7 @@
           <Form.Field {form} name="password" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Password</Form.Label>
+                <Form.Label>Password <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Lock
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -277,7 +279,7 @@
           <Form.Field {form} name="confirmPassword" class="space-y-1.5">
             <Form.Control>
               {#snippet children({ props })}
-                <Form.Label>Confirm password</Form.Label>
+                <Form.Label>Confirm password <span class="text-destructive">*</span></Form.Label>
                 <div class="relative">
                   <Lock
                     class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"

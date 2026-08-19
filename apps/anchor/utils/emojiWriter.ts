@@ -41,7 +41,8 @@ export async function writeEmojis() {
       const written = new Set(
         (
           await db.query.emojis.findMany({
-            columns: { unicode: true }, })
+            columns: { unicode: true },
+          })
         ).map((emoji) => emoji.unicode)
       );
       if (difference.some((emoji) => !written.has(emoji.unified))) throw error;

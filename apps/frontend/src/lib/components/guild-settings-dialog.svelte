@@ -201,7 +201,7 @@
                       {member.displayName || member.username}
                     </p>
                     <p class="truncate text-xs text-muted-foreground">
-                      @{member.username}
+                      @{member.username}:{member.server}
                     </p>
                   </div>
                   <div class="flex shrink-0 gap-1.5">

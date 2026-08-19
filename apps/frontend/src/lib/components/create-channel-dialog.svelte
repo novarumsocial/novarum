@@ -70,7 +70,7 @@
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Content class="sm:max-w-md">
-    <Dialog.Header>
+    <Dialog.Header class="select-none">
       <Dialog.Title>Create Channel</Dialog.Title>
       <Dialog.Description>
         Add a channel to {resolvedCategoryLabel}.

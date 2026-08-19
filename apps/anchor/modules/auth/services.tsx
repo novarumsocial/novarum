@@ -19,7 +19,13 @@ import { transporter } from '../../utils/services/email';
 import { createHmac, randomInt } from 'node:crypto';
 import { render } from 'react-email';
 import { rateLimit } from 'elysia-rate-limit';
-import { createTOTPKeyURI, decodeBase32, encodeBase32, generateRandomKey, verifyTOTPWithGracePeriod } from '../../utils/otp';
+import {
+  createTOTPKeyURI,
+  decodeBase32,
+  encodeBase32,
+  generateRandomKey,
+  verifyTOTPWithGracePeriod,
+} from '../../utils/otp';
 import { mfaMethodSchema } from '../../src/db/zod';
 
 const authRateLimit = (path: string, max: number, duration: number) =>
@@ -516,7 +522,8 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
       },
     }
-  ).get('/mfa/totp/qr', async ({ cookie, status }) => {
+  )
+  .get('/mfa/totp/qr', async ({ cookie, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
     if (!session) {
@@ -537,218 +544,254 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     }
 
     const key = generateRandomKey(20);
-    const gen = createTOTPKeyURI('Novarum', localCredentials.email, key, 30, 6)
+    const gen = createTOTPKeyURI('Novarum', localCredentials.email, key, 30, 6);
     return {
       uri: gen,
       secret: encodeBase32(key),
-    }
-  }).post('/mfa/totp/enable', async ({ cookie, body, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
-    if (!session) {
-      return status(401, { error: 'Unauthorized' });
-    }
+    };
+  })
+  .post(
+    '/mfa/totp/enable',
+    async ({ cookie, body, status }) => {
+      const token = cookie[sessionCookieName]?.value as string | undefined;
+      const session = await validateSessionToken(token);
+      if (!session) {
+        return status(401, { error: 'Unauthorized' });
+      }
 
-    const localCreds = await db.query.localCredentials.findFirst({
-      where: {
-        userId: session.userId,
-      },
-    });
-    if (!localCreds) {
-      return status(404, { error: 'User not found' });
-    }
+      const localCreds = await db.query.localCredentials.findFirst({
+        where: {
+          userId: session.userId,
+        },
+      });
+      if (!localCreds) {
+        return status(404, { error: 'User not found' });
+      }
 
-    if (localCreds.totpSecret) {
-      return status(400, { error: 'TOTP is already enabled for this user' });
-    }
+      if (localCreds.totpSecret) {
+        return status(400, { error: 'TOTP is already enabled for this user' });
+      }
 
-    const { secret, code } = body;
+      const { secret, code } = body;
 
-    const isValid = verifyTOTPWithGracePeriod(decodeBase32(secret), 30, 6, code, 60);
+      const isValid = verifyTOTPWithGracePeriod(decodeBase32(secret), 30, 6, code, 60);
 
-    if (!isValid) {
-      return status(400, { error: 'Invalid TOTP code' });
-    }
+      if (!isValid) {
+        return status(400, { error: 'Invalid TOTP code' });
+      }
 
-    // this is a funny query ai made for me because i dont know ball
-    // sql is hard
-    const [enabled] = await db
-      .update(localCredentials)
-      .set({
-        totpSecret: Buffer.from(secret),
-        mfaOptions: sql`
+      // this is a funny query ai made for me because i dont know ball
+      // sql is hard
+      const [enabled] = await db
+        .update(localCredentials)
+        .set({
+          totpSecret: Buffer.from(secret),
+          mfaOptions: sql`
           array_append(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)
         `,
-      })
-      .where(
-        and(
-          eq(localCredentials.userId, session.userId),
-          isNull(localCredentials.totpSecret),
-          sql`NOT (${localCredentials.mfaOptions} @> ARRAY['TOTP']::mfa_method[])`
+        })
+        .where(
+          and(
+            eq(localCredentials.userId, session.userId),
+            isNull(localCredentials.totpSecret),
+            sql`NOT (${localCredentials.mfaOptions} @> ARRAY['TOTP']::mfa_method[])`
+          )
         )
-      )
-      .returning({ userId: localCredentials.userId });
-    
-    if (!enabled) {
-      return status(409, { error: 'TOTP is already enabled' });
-    }
+        .returning({ userId: localCredentials.userId });
 
-    return { success: true, message: 'TOTP enabled successfully' };
-  }, {
-    body: t.Object({
-      secret: t.String(),
-      code: t.String({ minLength: 6, maxLength: 6 }),
-    }),
-    response: {
-      200: z.object({
-        success: z.boolean(),
-        message: z.string(),
-      }),
-      400: genericResponseErrorSchema,
-      401: genericResponseErrorSchema,
-      404: genericResponseErrorSchema,
-      409: genericResponseErrorSchema,
+      if (!enabled) {
+        return status(409, { error: 'TOTP is already enabled' });
+      }
+
+      return { success: true, message: 'TOTP enabled successfully' };
     },
-  }).post('/mfa/email/toggle', async ({ cookie, body, status }) => {
-    const { enable } = body;
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
-    if (!session) {
-      return status(401, { error: 'Unauthorized' });
-    }
-
-    const localCreds = await db.query.localCredentials.findFirst({
-      where: {
-        userId: session.userId,
+    {
+      body: t.Object({
+        secret: t.String(),
+        code: t.String({ minLength: 6, maxLength: 6 }),
+      }),
+      response: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        409: genericResponseErrorSchema,
       },
-    });
-    if (!localCreds) {
-      return status(404, { error: 'User not found' });
     }
+  )
+  .post(
+    '/mfa/email/toggle',
+    async ({ cookie, body, status }) => {
+      const { enable } = body;
+      const token = cookie[sessionCookieName]?.value as string | undefined;
+      const session = await validateSessionToken(token);
+      if (!session) {
+        return status(401, { error: 'Unauthorized' });
+      }
 
-    await db.update(localCredentials).set({
-      mfaOptions: enable
-        ? sql`array_append(${localCredentials.mfaOptions}, 'EMAIL'::mfa_method)`
-        : sql`array_remove(${localCredentials.mfaOptions}, 'EMAIL'::mfa_method)`,
-    }).where(eq(localCredentials.userId, session.userId));
+      const localCreds = await db.query.localCredentials.findFirst({
+        where: {
+          userId: session.userId,
+        },
+      });
+      if (!localCreds) {
+        return status(404, { error: 'User not found' });
+      }
 
-    return { success: true, message: `Email MFA ${enable ? 'enabled' : 'disabled'} successfully` };
-  }, {
-    body: t.Object({
-      enable: t.Boolean(),
-    }),
-    response: {
-      200: z.object({
-        success: z.boolean(),
-        message: z.string(),
-      }),
-      400: genericResponseErrorSchema,
-      401: genericResponseErrorSchema,
-      404: genericResponseErrorSchema,
+      await db
+        .update(localCredentials)
+        .set({
+          mfaOptions: enable
+            ? sql`array_append(${localCredentials.mfaOptions}, 'EMAIL'::mfa_method)`
+            : sql`array_remove(${localCredentials.mfaOptions}, 'EMAIL'::mfa_method)`,
+        })
+        .where(eq(localCredentials.userId, session.userId));
+
+      return {
+        success: true,
+        message: `Email MFA ${enable ? 'enabled' : 'disabled'} successfully`,
+      };
     },
-  }).post('/mfa/totp/toggle', async ({ cookie, body, status }) => {
-    const { enable } = body;
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
-    if (!session) {
-      return status(401, { error: 'Unauthorized' });
-    }
-
-    const localCreds = await db.query.localCredentials.findFirst({
-      where: {
-        userId: session.userId,
+    {
+      body: t.Object({
+        enable: t.Boolean(),
+      }),
+      response: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
       },
-    });
-    if (!localCreds) {
-      return status(404, { error: 'User not found' });
     }
+  )
+  .post(
+    '/mfa/totp/toggle',
+    async ({ cookie, body, status }) => {
+      const { enable } = body;
+      const token = cookie[sessionCookieName]?.value as string | undefined;
+      const session = await validateSessionToken(token);
+      if (!session) {
+        return status(401, { error: 'Unauthorized' });
+      }
 
-    if (enable && !localCreds.totpSecret) {
-      return status(400, { error: 'TOTP is not set up for this user' });
-    }
+      const localCreds = await db.query.localCredentials.findFirst({
+        where: {
+          userId: session.userId,
+        },
+      });
+      if (!localCreds) {
+        return status(404, { error: 'User not found' });
+      }
 
-    await db.update(localCredentials).set({
-      mfaOptions: enable
-        ? sql`array_append(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`
-        : sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
-    }).where(eq(localCredentials.userId, session.userId));
+      if (enable && !localCreds.totpSecret) {
+        return status(400, { error: 'TOTP is not set up for this user' });
+      }
 
-    return { success: true, message: `TOTP MFA ${enable ? 'enabled' : 'disabled'} successfully` };
-  }, {
-    body: t.Object({
-      enable: t.Boolean(),
-    }),
-    response: {
-      200: z.object({
-        success: z.boolean(),
-        message: z.string(),
-      }),
-      400: genericResponseErrorSchema,
-      401: genericResponseErrorSchema,
-      404: genericResponseErrorSchema,
+      await db
+        .update(localCredentials)
+        .set({
+          mfaOptions: enable
+            ? sql`array_append(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`
+            : sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
+        })
+        .where(eq(localCredentials.userId, session.userId));
+
+      return { success: true, message: `TOTP MFA ${enable ? 'enabled' : 'disabled'} successfully` };
     },
-  }).delete('/mfa/totp', async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
-    if (!session) {
-      return status(401, { error: 'Unauthorized' });
-    }
-
-    const localCreds = await db.query.localCredentials.findFirst({
-      where: {
-        userId: session.userId,
+    {
+      body: t.Object({
+        enable: t.Boolean(),
+      }),
+      response: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
       },
-    });
-    if (!localCreds) {
-      return status(404, { error: 'User not found' });
     }
-    if (!localCreds.totpSecret) {
-      return status(400, { error: 'TOTP is not set up for this user' });
-    }
+  )
+  .delete(
+    '/mfa/totp',
+    async ({ cookie, status }) => {
+      const token = cookie[sessionCookieName]?.value as string | undefined;
+      const session = await validateSessionToken(token);
+      if (!session) {
+        return status(401, { error: 'Unauthorized' });
+      }
 
-    await db.update(localCredentials).set({
-      totpSecret: null,
-      mfaOptions: sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
-    }).where(eq(localCredentials.userId, session.userId));
+      const localCreds = await db.query.localCredentials.findFirst({
+        where: {
+          userId: session.userId,
+        },
+      });
+      if (!localCreds) {
+        return status(404, { error: 'User not found' });
+      }
+      if (!localCreds.totpSecret) {
+        return status(400, { error: 'TOTP is not set up for this user' });
+      }
 
-    return { success: true, message: 'TOTP MFA disabled successfully' };
-  }, {
-    response: {
-      200: z.object({
-        success: z.boolean(),
-        message: z.string(),
-      }),
-      400: genericResponseErrorSchema,
-      401: genericResponseErrorSchema,
-      404: genericResponseErrorSchema,
+      await db
+        .update(localCredentials)
+        .set({
+          totpSecret: null,
+          mfaOptions: sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
+        })
+        .where(eq(localCredentials.userId, session.userId));
+
+      return { success: true, message: 'TOTP MFA disabled successfully' };
     },
-  })
-  .get('/mfa', async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
-    if (!session) {
-      return status(401, { error: 'Unauthorized' });
-    }
-
-    const localCreds = await db.query.localCredentials.findFirst({
-      where: {
-        userId: session.userId,
+    {
+      response: {
+        200: z.object({
+          success: z.boolean(),
+          message: z.string(),
+        }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
       },
-    });
-    if (!localCreds) {
-      return status(404, { error: 'User not found' });
     }
+  )
+  .get(
+    '/mfa',
+    async ({ cookie, status }) => {
+      const token = cookie[sessionCookieName]?.value as string | undefined;
+      const session = await validateSessionToken(token);
+      if (!session) {
+        return status(401, { error: 'Unauthorized' });
+      }
 
-    return { mfaOptions: localCreds.mfaOptions };
-  }, {
-    response: {
-      200: z.object({
-        mfaOptions: z.array(mfaMethodSchema),
-      }),
-      401: genericResponseErrorSchema,
-      404: genericResponseErrorSchema,
+      const localCreds = await db.query.localCredentials.findFirst({
+        where: {
+          userId: session.userId,
+        },
+      });
+      if (!localCreds) {
+        return status(404, { error: 'User not found' });
+      }
+
+      return { mfaOptions: localCreds.mfaOptions };
     },
-  });
+    {
+      response: {
+        200: z.object({
+          mfaOptions: z.array(mfaMethodSchema),
+        }),
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  );
 
 export function userResponse(user: Parameters<typeof publicUser>[0], email: string | null = null) {
   const { userId: id, ...profile } = publicUser(user);

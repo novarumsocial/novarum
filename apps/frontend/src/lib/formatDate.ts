@@ -1,4 +1,4 @@
-import { settings } from "./settings.svelte";
+import { settings } from './settings.svelte';
 
 export function formatTime(date: Date): string {
   if (settings.value.timeFormat === 'auto') {

@@ -15,7 +15,7 @@
     if (Capacitor.isNativePlatform()) {
       void checkForUpdates();
     }
-  })
+  });
 
   $effect(() => {
     const root = document.documentElement;

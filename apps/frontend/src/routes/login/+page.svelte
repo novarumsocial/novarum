@@ -21,6 +21,7 @@
     LoaderCircle,
     Mail,
     Smartphone,
+    LogIn,
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { safeRedirect } from '$lib/safeRedirect';
@@ -174,22 +175,23 @@
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.6)_100%)]"
   ></div>
 
+  <div class="absolute top-6 left-6 z-20 flex items-center gap-2.5 select-none">
+    <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
+      <img src={Logo} alt="novarum" class="absolute size-5" />
+    </div>
+    <span class="text-lg font-semibold tracking-tight">novarum</span>
+  </div>
+
   <div class="relative flex min-h-svh items-center justify-center p-4">
     <Card.Root
       class="w-full max-w-md border-white/10 bg-card/70 shadow-2xl shadow-black/50 ring-1 ring-white/5 backdrop-blur-xl"
     >
       <Card.Header class="space-y-3">
-        <div class="flex items-center gap-2.5">
-          <div class="flex size-9 items-center justify-center bg-primary text-primary-foreground">
-            <img src={Logo} alt="novarum" class="absolute size-5" />
-          </div>
-          <span class="text-lg font-semibold tracking-tight">novarum</span>
-        </div>
-        <div class="space-y-1">
-          <Card.Title class="text-xl">
+        <div class="space-y-1 mt-1.5">
+          <Card.Title class="text-xl text-center">
             {mfaChallenge ? 'Verify it’s you' : 'Welcome back'}
           </Card.Title>
-          <Card.Description>
+          <Card.Description class="text-center">
             {mfaChallenge
               ? mfaMethod === 'EMAIL'
                 ? emailSent
@@ -204,7 +206,6 @@
       <Card.Content>
         {#if mfaChallenge}
           <form class="space-y-5" onsubmit={verifyMfa}>
-
             {#if showLoginOptions}
               <div class="space-y-2 rounded-lg border border-white/10 bg-background/35 p-2">
                 <p class="px-2 pt-1 text-xs font-medium text-muted-foreground">
@@ -249,7 +250,8 @@
               >
                 <Mail class="mx-auto size-6 text-primary" />
                 <p class="text-sm text-muted-foreground">
-                  Ready? Click that fancy button below to send a one-time code to the email on your account.
+                  Ready? Click that fancy button below to send a one-time code to the email on your
+                  account.
                 </p>
                 <Button
                   type="button"
@@ -348,6 +350,8 @@
                     <Server
                       class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
+
+                    <!-- TODO: when possible, instead of placeholder="novarum.me" remember last logged in instance from localstorage -->
                     <Input
                       {...props}
                       bind:value={$formData.homeServer}
@@ -426,8 +430,8 @@
                 <LoaderCircle class="size-4 animate-spin" />
                 <span>Signing in…</span>
               {:else}
-                <span>Continue</span>
-                <ArrowRight class="size-4" />
+                <span>Sign in</span>
+                <LogIn class="size-4" />
               {/if}
             </Form.Button>
 

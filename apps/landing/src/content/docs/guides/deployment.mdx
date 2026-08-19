@@ -215,11 +215,11 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to               |
-| ----------------- | ----------------------- |
-| piedpiper.com     |   http://localhost:5049 |
-| lk.piedpiper.com  |   http://localhost:7880 |
-| cdn.piedpiper.com |   http://localhost:3900 |
+| Domain            | Points to             |
+| ----------------- | --------------------- |
+| piedpiper.com     | http://localhost:5049 |
+| lk.piedpiper.com  | http://localhost:7880 |
+| cdn.piedpiper.com | http://localhost:3900 |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 
@@ -229,6 +229,7 @@ Anchor sometimes needs to be hosted on a different host than what the homeserver
 For example, the `novarum.me` Anchor isn't hosted in the same place, and is instead on `anchor.novarum.me`.
 
 It should be relatively simple to handle these cases:
+
 1. Run the Anchor on another host, such as `anchor.novarum.me`.
 2. Proxy only the `/.well-known/anchor/info` endpoint to `novarum.me`, so clients can discover the actual homeserver URL. We use Cloudflare Workers to do this.
 3. Set `homeserver` to `novarum.me` and `base_url` to `https://anchor.novarum.me` in the `config.toml` file.

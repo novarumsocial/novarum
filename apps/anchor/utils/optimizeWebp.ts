@@ -50,8 +50,6 @@ export async function processImage(
       .toBuffer();
     return { data, animated: true };
   }
-  const data = await sharp(Buffer.from(imageBuffer))
-    .webp({ quality })
-    .toBuffer();
+  const data = await sharp(Buffer.from(imageBuffer)).webp({ quality }).toBuffer();
   return { data, animated: false };
 }
