@@ -128,9 +128,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
 
       using decoder = await Decoder.create(video);
       using scaler = new Scaler();
-
-      if (input.duration > 0) await input.seek(input.duration * 0.1, video.index);
-
+      
       for await (const frame of decoder.frames(input.packets(video.index))) {
         if (!frame) continue;
         const scale = Math.min(1, 320 / frame.width, 240 / frame.height);
