@@ -1,6 +1,5 @@
 import Elysia, { t } from 'elysia';
 import { eq } from 'drizzle-orm';
-import type { NetworkSink } from 'bun';
 import {
   isAllowedAttachmentType,
   maxAttachmentSize,
@@ -11,7 +10,16 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { randomString } from '../../utils/randomString';
-import { storage, publicPresign, noStoreRedirect } from '../../utils/services/storage';
+import {
+  storage,
+  publicPresign,
+  noStoreRedirect,
+  awsS3,
+  s3Bucket,
+  s3Endpoint,
+  s3PublicEndpoint,
+  s3VirtualHostedStyle,
+} from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { attachments, db } from '../../src/db';
 import { z } from 'zod';
@@ -23,11 +31,77 @@ import { getConfig } from '../../utils/config';
 import { AV_AFD_4_3 } from 'node-av';
 
 const remoteErrorSchema = z.object({ error: z.string() });
-const multipartStartSchema = z.object({ attachmentId: z.string() });
+const multipartStartSchema = z.object({
+  attachmentId: z.string(),
+  uploadId: z.string(),
+  partSize: z.number(),
+  parts: z.array(z.object({ partNumber: z.number(), url: z.string() })),
+});
 const okSchema = z.object({ ok: z.literal(true) });
 const multipartPartSize = 5 * 1024 * 1024;
 
-const activeMultipartUploads = new Map<string, { writer: NetworkSink; size: number }>();
+const activeMultipartUploads = new Map<string, { uploadId: string; key: string }>();
+
+function s3ObjectUrl(key: string, endpoint: string, search?: Record<string, string>) {
+  const url = new URL(endpoint);
+  if (s3VirtualHostedStyle) {
+    url.hostname = `${s3Bucket}.${url.hostname}`;
+    url.pathname = `/${key}`;
+  } else {
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/${s3Bucket}/${key}`;
+  }
+  for (const [k, v] of Object.entries(search ?? {})) url.searchParams.set(k, v);
+  return url;
+}
+
+export async function createS3Multipart(key: string, contentType: string) {
+  const res = await awsS3.fetch(s3ObjectUrl(key, s3Endpoint!, { uploads: '' }), {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+  });
+  if (!res.ok) throw new Error(`S3 create multipart failed: ${res.status}`);
+  const uploadId = /<UploadId>(.*?)<\/UploadId>/.exec(await res.text())?.[1];
+  if (!uploadId) throw new Error('S3 create multipart returned no upload id');
+  return uploadId;
+}
+
+export async function presignPartUrl(key: string, uploadId: string, partNumber: number) {
+  const url = s3ObjectUrl(
+    key,
+    s3PublicEndpoint ?? s3Endpoint!,
+    { partNumber: String(partNumber), uploadId }
+  );
+  const signed = await awsS3.sign(url, { method: 'PUT', aws: { signQuery: true } });
+  return signed.url;
+}
+
+export async function completeS3Multipart(
+  key: string,
+  uploadId: string,
+  parts: { partNumber: number; etag: string }[]
+) {
+  const xml = `<CompleteMultipartUpload>${parts
+    .map(
+      (p) =>
+        `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag.replace(
+          /[<>&"]/g,
+          (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!
+        )}</ETag></Part>`
+    )
+    .join('')}</CompleteMultipartUpload>`;
+  const res = await awsS3.fetch(s3ObjectUrl(key, s3Endpoint!, { uploadId }), {
+    method: 'POST',
+    headers: { 'content-type': 'application/xml' },
+    body: xml,
+  });
+  if (!res.ok) throw new Error(`S3 complete multipart failed: ${res.status}`);
+}
+
+export function abortS3Multipart(key: string, uploadId: string) {
+  return awsS3
+    .fetch(s3ObjectUrl(key, s3Endpoint!, { uploadId }), { method: 'DELETE' })
+    .catch(() => {});
+}
 
 async function requireUploadAccess(
   channelId: string,
@@ -255,15 +329,30 @@ export const upload = new Elysia({ tags: ['Upload'] })
         size: body.size,
       });
 
-      const writer = storage
-        .file(`attachments/${access.channel.guildId}/${access.channel.id}/${pending.attachmentId}`)
-        .writer({ type: body.contentType, partSize: multipartPartSize, queueSize: 3 });
-      activeMultipartUploads.set(pending.attachmentId, {
-        writer,
-        size: body.size,
-      });
+      const key = `attachments/${access.channel.guildId}/${access.channel.id}/${pending.attachmentId}`;
+      try {
+        const uploadId = await createS3Multipart(key, body.contentType);
+        const partCount = Math.ceil(body.size / multipartPartSize);
+        const parts = await Promise.all(
+          Array.from({ length: partCount }, (_, i) => presignPartUrl(key, uploadId, i + 1))
+        );
 
-      return { attachmentId: pending.attachmentId };
+        activeMultipartUploads.set(pending.attachmentId, {
+          uploadId,
+          key,
+        });
+
+        return {
+          attachmentId: pending.attachmentId,
+          uploadId,
+          partSize: multipartPartSize,
+          parts: parts.map((url, i) => ({ partNumber: i + 1, url })),
+        };
+      } catch (error) {
+        await db.delete(attachments).where(eq(attachments.id, pending.attachmentId)).catch(() => {});
+        console.error('Failed to start multipart upload', error);
+        return status(502, { error: 'Could not prepare remote upload' });
+      }
     },
     {
       body: t.Object({
@@ -279,40 +368,33 @@ export const upload = new Elysia({ tags: ['Upload'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         415: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
       },
     }
   )
   .post(
-    '/upload/multipart/:attachmentId',
-    async ({ params, request, status }) => {
+    '/upload/multipart/:attachmentId/complete',
+    async ({ params, body, status }) => {
       const upload = activeMultipartUploads.get(params.attachmentId);
       if (!upload) return status(404, { error: 'Upload not found' });
-      if (!request.body) return status(400, { error: 'Missing request body' });
 
-      let received = 0;
       try {
-        for await (const chunk of request.body) {
-          received += chunk.byteLength;
-          await upload.writer.write(chunk);
-        }
-        if (received !== upload.size) {
-          throw new Error(`Expected ${upload.size} bytes, received ${received}`);
-        }
-
-        activeMultipartUploads.delete(params.attachmentId);
-        await upload.writer.end();
-
-        return { ok: true };
+        await completeS3Multipart(upload.key, upload.uploadId, body.parts);
       } catch (error) {
-        activeMultipartUploads.delete(params.attachmentId);
-        await Promise.resolve(upload.writer.end(new Error('Multipart upload failed'))).catch(
-          () => {}
-        );
-        await db.delete(attachments).where(eq(attachments.id, params.attachmentId)).catch(() => {});
+        console.error('Failed to complete multipart upload', error);
         return status(400, { error: 'Upload failed' });
       }
+
+      activeMultipartUploads.delete(params.attachmentId);
+      return { ok: true };
     },
     {
+      body: t.Object({
+        parts: t.Array(
+          t.Object({ partNumber: t.Integer({ minimum: 1 }), etag: t.String({ minLength: 1 }) }),
+          { minItems: 1 }
+        ),
+      }),
       response: {
         200: okSchema,
         400: genericResponseErrorSchema,
@@ -327,7 +409,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
       if (!upload) return status(404, { error: 'Upload not found' });
 
       activeMultipartUploads.delete(params.attachmentId);
-      await upload.writer.end(new Error('Multipart upload aborted'));
+      await abortS3Multipart(upload.key, upload.uploadId);
       await db.delete(attachments).where(eq(attachments.id, params.attachmentId));
 
       return { ok: true };

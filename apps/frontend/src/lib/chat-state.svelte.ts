@@ -574,23 +574,35 @@ class ChatState {
       throw new Error(`Could not start upload for ${file.name}`);
     }
 
-    const attachmentId = started.data.attachmentId;
+    const { attachmentId, parts, partSize } = started.data;
     try {
-      await this.xhrUpload(
-        `${anchor.baseUrl}/upload/multipart/${encodeURIComponent(attachmentId)}`,
-        'POST',
-        null,
-        file,
-        file.size,
-        0,
-        index
-      );
+      const completed: { partNumber: number; etag: string }[] = [];
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const etag = await this.xhrUpload(
+          part.url,
+          'PUT',
+          null,
+          file.slice(i * partSize, Math.min(file.size, (i + 1) * partSize)),
+          file.size,
+          i * partSize,
+          index
+        );
+        if (!etag) throw new Error('Missing ETag for part');
+        completed.push({ partNumber: part.partNumber, etag });
+      }
+
+      const done = await anchor.client.upload
+        .multipart({ attachmentId })
+        .complete.post({ parts: completed });
+      if (done.error || !done.data || 'error' in done.data) {
+        throw new Error(`Could not finish upload for ${file.name}`);
+      }
+      return attachmentId;
     } catch (error) {
       void anchor.client.upload.multipart({ attachmentId }).delete();
       throw error;
     }
-
-    return attachmentId;
   }
 
   private xhrUpload(
@@ -602,7 +614,7 @@ class ChatState {
     offset: number,
     index: number
   ) {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<string | null>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open(method, url);
       for (const [name, value] of Object.entries(headers ?? {})) {
@@ -614,7 +626,7 @@ class ChatState {
         }
       };
       xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.getResponseHeader('ETag'));
         else reject(new Error('Upload failed'));
       };
       xhr.onerror = () => reject(new Error('Upload failed'));
