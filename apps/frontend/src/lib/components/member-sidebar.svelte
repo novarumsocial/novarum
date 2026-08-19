@@ -4,9 +4,7 @@
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
   import { settings } from '$lib/settings.svelte';
-  import { Input } from '$lib/components/ui/input/index.js';
   import type { Server } from '$lib/types/chat';
-  import { useSession } from '$lib/session.svelte';
 
   let {
     server,
@@ -18,12 +16,6 @@
 
   const online = $derived(members.filter((member) => member.status !== 'OFFLINE'));
   const offline = $derived(members.filter((member) => member.status === 'OFFLINE'));
-  const isSelf = $derived(
-    (member: Author) =>
-      Boolean(useSession().user) &&
-      member.username === useSession().user?.username &&
-      member.server === useSession().user?.homeserver
-  );
 
   function nameFor(member: Author) {
     return member.displayName || member.username;
