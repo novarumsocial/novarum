@@ -366,7 +366,7 @@ export async function createPendingAttachment(input: {
 
   return {
     attachmentId,
-    uploadUrl: storage.presign(objectKey, {
+    uploadUrl: publicPresign(objectKey, {
       method: 'PUT',
       expiresIn: 5 * 60,
       type: input.contentType,
