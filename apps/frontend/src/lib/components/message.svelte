@@ -185,41 +185,12 @@
   const audioAttachments = $derived(
     message.attachments.filter((attachment) => attachment.contentType.startsWith('audio/'))
   );
-  const nonMediaAttachments = $derived(
+  const gridAttachments = $derived(
     message.attachments.filter(
       (attachment) =>
         !attachment.contentType.startsWith('video/') && !attachment.contentType.startsWith('audio/')
     )
   );
-  // A single image gets a big, video-sized preview instead of being squeezed into the grid.
-  const soloImage = $derived(
-    nonMediaAttachments.length === 1 && nonMediaAttachments[0].contentType.startsWith('image/')
-      ? nonMediaAttachments[0]
-      : null
-  );
-  const gridAttachments = $derived(soloImage ? [] : nonMediaAttachments);
-  const IMG_MAX_WIDTH = 400;
-  const IMG_MAX_HEIGHT = 300;
-  // Safety cap so a tiny icon (e.g. 16x16) doesn't get blown up into a blurry 400px block.
-  const IMG_MAX_UPSCALE = 4;
-
-  let soloImgEl = $state<HTMLImageElement | null>(null);
-  let soloImageDims = $state<{ width: number; height: number } | null>(null);
-
-  function measureSoloImage(img: HTMLImageElement) {
-    const { naturalWidth: w, naturalHeight: h } = img;
-    if (!w || !h) return;
-    const scale = Math.min(IMG_MAX_WIDTH / w, IMG_MAX_HEIGHT / h, IMG_MAX_UPSCALE);
-    soloImageDims = { width: Math.round(w * scale), height: Math.round(h * scale) };
-  }
-
-  $effect(() => {
-    // Reset and re-measure whenever the solo image itself changes.
-    soloImage;
-    soloImageDims = null;
-    if (soloImgEl?.complete) measureSoloImage(soloImgEl);
-  });
-
   let viewerOpen = $state(false);
   let viewerIndex = $state(0);
 
@@ -491,33 +462,13 @@
                 <AudioPlayer {attachment} {hovered} />
               </div>
             {/each}
-            {#if soloImage}
-              <Button
-                variant="outline"
-                class="group relative mt-2 h-auto w-fit min-w-0 overflow-hidden p-0 text-left"
-                aria-label={`View ${soloImage.filename}`}
-                onclick={() => viewAttachment(soloImage.id)}
-              >
-                <img
-                  bind:this={soloImgEl}
-                  src={soloImage.previewUrl}
-                  alt={soloImage.filename}
-                  loading="lazy"
-                  onload={(event) => measureSoloImage(event.currentTarget as HTMLImageElement)}
-                  style={soloImageDims
-                    ? `width:${soloImageDims.width}px;height:${soloImageDims.height}px;`
-                    : `max-width:${IMG_MAX_WIDTH}px;max-height:${IMG_MAX_HEIGHT}px;`}
-                  class="block object-contain cursor-pointer"
-                />
-              </Button>
-            {/if}
             {#if gridAttachments.length > 0}
               <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
                 {#each gridAttachments as attachment (attachment.id)}
                   {#if attachment.contentType.startsWith('image/')}
                     <Button
                       variant="outline"
-                      class="group relative h-auto min-w-0 overflow-hidden p-0 text-left"
+                      class="group relative aspect-[4/3] h-auto min-w-0 overflow-hidden p-0 text-left"
                       aria-label={`View ${attachment.filename}`}
                       onclick={() => viewAttachment(attachment.id)}
                     >
@@ -525,7 +476,7 @@
                         src={attachment.previewUrl}
                         alt={attachment.filename}
                         loading="lazy"
-                        class="size-full max-h-64 object-contain cursor-pointer"
+                        class="size-full object-cover transition-transform group-hover:scale-[1.02]"
                       />
                     </Button>
                   {:else if attachment.contentType === 'application/pdf'}
