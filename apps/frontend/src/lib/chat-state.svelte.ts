@@ -68,6 +68,7 @@ const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const multipartThreshold = 10 * 1024 * 1024;
 
 async function stripImageMetadata(file: File) {
   if (!reencodedImageTypes.has(file.type)) return file;
@@ -191,6 +192,7 @@ class ChatState {
 
   editingMessage = $state<boolean>(false);
   editingMessageId = $state<string | null>(null);
+  uploadProgress = $state<Record<number, number>>({});
 
   get currentServer() {
     return this.activeServer
@@ -500,28 +502,16 @@ class ChatState {
     const nonce = messageNonce();
     const attachmentIds: string[] = [];
 
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
       const uploadFile = await stripImageMetadata(file);
-      const contentType = uploadFile.type || 'application/octet-stream';
-      const presign = await anchor.client.upload.presign.post({
-        channelId,
-        filename: uploadFile.name,
-        contentType,
-        size: uploadFile.size,
-      });
 
-      if (presign.error || !presign.data || 'error' in presign.data) {
-        throw new Error(`Could not prepare ${file.name} for upload`);
+      try {
+        const attachmentId = await this.uploadAttachment(channelId, uploadFile, index);
+        attachmentIds.push(attachmentId);
+      } finally {
+        const { [index]: _removed, ...rest } = this.uploadProgress;
+        this.uploadProgress = rest;
       }
-
-      const uploaded = await fetch(presign.data.uploadUrl, {
-        method: 'PUT',
-        headers: presign.data.headers,
-        body: uploadFile,
-      });
-      if (!uploaded.ok) throw new Error(`Could not upload ${file.name}`);
-
-      attachmentIds.push(presign.data.attachmentId);
     }
 
     const result = await anchor.client.message.send.post({
@@ -538,6 +528,98 @@ class ChatState {
       console.error('Failed to send message', result.error ?? result.data);
       throw new Error('Failed to send message');
     }
+  }
+
+  private async uploadAttachment(channelId: string, file: File, index: number) {
+    const contentType = file.type || 'application/octet-stream';
+
+    if (file.size >= multipartThreshold) {
+      try {
+        return await this.multipartUpload(channelId, file, contentType, index);
+      } catch (error) {
+        console.warn(`Multipart upload of ${file.name} failed, falling back to single upload`, error);
+      }
+    }
+
+    const presign = await anchor.client.upload.presign.post({
+      channelId,
+      filename: file.name,
+      contentType,
+      size: file.size,
+    });
+    if (presign.error || !presign.data || 'error' in presign.data) {
+      throw new Error(`Could not prepare ${file.name} for upload`);
+    }
+
+    await this.xhrUpload(
+      presign.data.uploadUrl,
+      'PUT',
+      presign.data.headers,
+      file,
+      file.size,
+      0,
+      index
+    );
+    return presign.data.attachmentId;
+  }
+
+  private async multipartUpload(channelId: string, file: File, contentType: string, index: number) {
+    const started = await anchor.client.upload.multipart.post({
+      channelId,
+      filename: file.name,
+      contentType,
+      size: file.size,
+    });
+    if (started.error || !started.data || 'error' in started.data) {
+      throw new Error(`Could not start upload for ${file.name}`);
+    }
+
+    const attachmentId = started.data.attachmentId;
+    try {
+      await this.xhrUpload(
+        `${anchor.baseUrl}/upload/multipart/${encodeURIComponent(attachmentId)}`,
+        'POST',
+        null,
+        file,
+        file.size,
+        0,
+        index
+      );
+    } catch (error) {
+      void anchor.client.upload.multipart({ attachmentId }).delete();
+      throw error;
+    }
+
+    return attachmentId;
+  }
+
+  private xhrUpload(
+    url: string,
+    method: string,
+    headers: Record<string, string> | null,
+    body: Blob,
+    size: number,
+    offset: number,
+    index: number
+  ) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
+      for (const [name, value] of Object.entries(headers ?? {})) {
+        xhr.setRequestHeader(name, value);
+      }
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          this.uploadProgress = { ...this.uploadProgress, [index]: (offset + event.loaded) / size };
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error('Upload failed'));
+      };
+      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.send(body);
+    });
   }
 
   async deleteMessage(channelId: string, messageId: string) {
@@ -657,11 +739,17 @@ class ChatState {
     }
   }
 
-  setTyping(channelId: string, userId: string, name: string) {
+  setTyping(channelId: string, userId: string, username: string, homeserver: string, name: string) {
     const session = useSession();
 
     if (!session.user) return;
     if (userId === session.user.id) return;
+    if (
+      username === session.user.username &&
+      homeserver.toLowerCase() === session.user.homeserver.toLowerCase()
+    ) {
+      return;
+    }
 
     const expiresAt = Date.now() + typingExpiryMs;
     const typing = this.typingByChannel[channelId] ?? [];

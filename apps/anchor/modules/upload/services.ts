@@ -1,4 +1,6 @@
 import Elysia, { t } from 'elysia';
+import { eq } from 'drizzle-orm';
+import type { NetworkSink } from 'bun';
 import {
   isAllowedAttachmentType,
   maxAttachmentSize,
@@ -21,6 +23,35 @@ import { getConfig } from '../../utils/config';
 import { AV_AFD_4_3 } from 'node-av';
 
 const remoteErrorSchema = z.object({ error: z.string() });
+const multipartStartSchema = z.object({ attachmentId: z.string() });
+const okSchema = z.object({ ok: z.literal(true) });
+const multipartPartSize = 5 * 1024 * 1024;
+
+const activeMultipartUploads = new Map<string, { writer: NetworkSink; size: number }>();
+
+async function requireUploadAccess(
+  channelId: string,
+  contentType: string,
+  token: unknown
+) {
+  const session = await validateSessionToken(typeof token === 'string' ? token : undefined);
+  if (!session) return { ok: false as const, status: 401 as const, error: 'Unauthorized' };
+  if (!isAllowedAttachmentType(contentType)) {
+    return { ok: false as const, status: 415 as const, error: 'Unsupported file type' };
+  }
+
+  const channel = await db.query.channels.findFirst({
+    where: { id: channelId },
+  });
+  if (!channel) return { ok: false as const, status: 404 as const, error: 'Channel not found' };
+
+  const membership = await db.query.guildMembers.findFirst({
+    where: { guildId: channel.guildId, userId: session.userId },
+  });
+  if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+
+  return { ok: true as const, session, channel };
+}
 
 export const upload = new Elysia({ tags: ['Upload'] })
   .get(
@@ -132,23 +163,14 @@ export const upload = new Elysia({ tags: ['Upload'] })
   .post(
     '/upload/presign',
     async ({ body, cookie, status }) => {
-      const token = cookie[sessionCookieName]?.value as string | undefined;
-      const session = await validateSessionToken(token);
-      if (!session) return status(401, { error: 'Unauthorized' });
-      if (!isAllowedAttachmentType(body.contentType)) {
-        return status(415, { error: 'Unsupported file type' });
-      }
+      const access = await requireUploadAccess(
+        body.channelId,
+        body.contentType,
+        cookie[sessionCookieName]?.value
+      );
+      if (!access.ok) return status(access.status, { error: access.error });
 
-      const channel = await db.query.channels.findFirst({
-        where: { id: body.channelId },
-      });
-      if (!channel) return status(404, { error: 'Channel not found' });
-
-      const membership = await db.query.guildMembers.findFirst({
-        where: { guildId: channel.guildId, userId: session.userId },
-      });
-      if (!membership) return status(403, { error: 'Forbidden' });
-
+      const session = access.session;
       const federatedChannel = parseFederatedChannelId(body.channelId);
       if (federatedChannel) {
         const result = await postSignedFederationJson(
@@ -181,8 +203,8 @@ export const upload = new Elysia({ tags: ['Upload'] })
       }
 
       return createPendingAttachment({
-        channelId: channel.id,
-        guildId: channel.guildId,
+        channelId: access.channel.id,
+        guildId: access.channel.guildId,
         uploaderId: session.userId,
         filename: body.filename,
         contentType: body.contentType,
@@ -204,6 +226,116 @@ export const upload = new Elysia({ tags: ['Upload'] })
         404: genericResponseErrorSchema,
         415: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/upload/multipart',
+    async ({ body, cookie, status }) => {
+      const access = await requireUploadAccess(
+        body.channelId,
+        body.contentType,
+        cookie[sessionCookieName]?.value
+      );
+      if (!access.ok) return status(access.status, { error: access.error });
+
+      if (parseFederatedChannelId(body.channelId)) {
+        return status(400, { error: 'Multipart uploads are not supported on federated channels' });
+      }
+      if (body.size < multipartPartSize * 2) {
+        return status(400, { error: 'File is too small for a multipart upload' });
+      }
+
+      const pending = await createPendingAttachment({
+        channelId: access.channel.id,
+        guildId: access.channel.guildId,
+        uploaderId: access.session.userId,
+        filename: body.filename,
+        contentType: body.contentType,
+        size: body.size,
+      });
+
+      const writer = storage
+        .file(`attachments/${access.channel.guildId}/${access.channel.id}/${pending.attachmentId}`)
+        .writer({ type: body.contentType, partSize: multipartPartSize, queueSize: 3 });
+      activeMultipartUploads.set(pending.attachmentId, {
+        writer,
+        size: body.size,
+      });
+
+      return { attachmentId: pending.attachmentId };
+    },
+    {
+      body: t.Object({
+        channelId: t.String({ minLength: 1 }),
+        filename: t.String({ minLength: 1, maxLength: 255 }),
+        contentType: t.String({ minLength: 1, maxLength: 255 }),
+        size: t.Integer({ minimum: 1, maximum: maxAttachmentSize }),
+      }),
+      response: {
+        200: multipartStartSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        415: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/upload/multipart/:attachmentId',
+    async ({ params, request, status }) => {
+      const upload = activeMultipartUploads.get(params.attachmentId);
+      if (!upload) return status(404, { error: 'Upload not found' });
+      if (!request.body) return status(400, { error: 'Missing request body' });
+
+      let received = 0;
+      try {
+        for await (const chunk of request.body) {
+          received += chunk.byteLength;
+          await upload.writer.write(chunk);
+        }
+        if (received !== upload.size) {
+          throw new Error(`Expected ${upload.size} bytes, received ${received}`);
+        }
+
+        activeMultipartUploads.delete(params.attachmentId);
+        await upload.writer.end();
+
+        return { ok: true };
+      } catch (error) {
+        activeMultipartUploads.delete(params.attachmentId);
+        await Promise.resolve(upload.writer.end(new Error('Multipart upload failed'))).catch(
+          () => {}
+        );
+        await db.delete(attachments).where(eq(attachments.id, params.attachmentId)).catch(() => {});
+        return status(400, { error: 'Upload failed' });
+      }
+    },
+    {
+      response: {
+        200: okSchema,
+        400: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .delete(
+    '/upload/multipart/:attachmentId',
+    async ({ params, status }) => {
+      const upload = activeMultipartUploads.get(params.attachmentId);
+      if (!upload) return status(404, { error: 'Upload not found' });
+
+      activeMultipartUploads.delete(params.attachmentId);
+      await upload.writer.end(new Error('Multipart upload aborted'));
+      await db.delete(attachments).where(eq(attachments.id, params.attachmentId));
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: okSchema,
+        404: genericResponseErrorSchema,
       },
     }
   );

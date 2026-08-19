@@ -1,7 +1,7 @@
 import {
   anchorUrlFromHomeServer,
   createAnchorClient,
-  discoverAnchor,
+  getAnchorInfo,
   normalizeHomeServer,
 } from '$lib/api';
 
@@ -23,16 +23,32 @@ function getInitialBaseUrl(homeServer: string) {
 class AnchorState {
   homeServer = $state(getInitialHomeServer());
   baseUrl = $state(getInitialBaseUrl(this.homeServer));
+  maxFileSize = $state(10);
   client = $derived(createAnchorClient(this.baseUrl));
+
+  constructor() {
+    void this.refreshInfo();
+  }
 
   async setHomeServer(homeServer: string) {
     const normalizedHomeServer = normalizeHomeServer(homeServer);
-    const baseUrl = await discoverAnchor(normalizedHomeServer);
+    const info = await getAnchorInfo(normalizedHomeServer);
 
     this.homeServer = normalizedHomeServer;
-    this.baseUrl = baseUrl;
+    this.baseUrl = info.baseUrl.replace(/\/+$/, '');
+    this.maxFileSize = info.maxFileSize;
     localStorage.setItem(homeServerStorageKey, normalizedHomeServer);
-    localStorage.setItem(anchorBaseUrlStorageKey, baseUrl);
+    localStorage.setItem(anchorBaseUrlStorageKey, this.baseUrl);
+  }
+
+  private async refreshInfo() {
+    try {
+      const info = await getAnchorInfo(this.homeServer);
+      this.baseUrl = info.baseUrl.replace(/\/+$/, '');
+      this.maxFileSize = info.maxFileSize;
+    } catch {
+      // offline or unreachable — keep cached values
+    }
   }
 }
 

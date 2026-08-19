@@ -1,0 +1,294 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Download the Novarum desktop and Android apps."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Download - Novarum</title>
+
+    <script is:inline>
+      const storedTheme = localStorage.getItem('starlight-theme');
+      const systemTheme = matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark';
+
+      document.documentElement.dataset.theme =
+        storedTheme === 'light' || storedTheme === 'dark'
+          ? storedTheme
+          : systemTheme;
+    </script>
+  </head>
+  <body class="m-0 bg-white dark:bg-gray-950 dark:text-white">
+    <main class="mx-auto flex w-full max-w-4xl flex-col items-center px-6 py-16 text-center">
+      <a
+        href="/"
+        class="mb-8 inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+      >
+        <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="m15 18-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        Home
+      </a>
+
+      <h1 class="mb-2 text-4xl font-bold">Download Novarum</h1>
+      <p class="mb-10 text-lg text-gray-600 dark:text-gray-300">
+        Pick your platform! Updates will be automatic.
+      </p>
+
+      <div class="grid w-full gap-6 text-left md:grid-cols-2">
+        <section
+          class="flex flex-col rounded-[2rem] border-2 border-gray-900 p-6 dark:border-gray-200 sm:p-8"
+          aria-labelledby="desktop-title"
+        >
+          <div class="mb-2 flex items-baseline justify-between gap-4">
+            <h2 id="desktop-title" class="text-xl font-semibold">Desktop</h2>
+            <span class="version"><span data-version="desktop" class="loading">…</span></span>
+          </div>
+
+          <ul class="divide-y divide-gray-200 dark:divide-gray-800">
+            <li class="py-3.5">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="font-medium">Windows</p>
+                <a class="btn" data-desktop="windows" href="https://github.com/novarumsocial/novarum/releases">.exe</a>
+              </div>
+              <p class="sub mt-0.5">x64 installer<span data-size="windows"></span></p>
+            </li>
+            <li class="py-3.5">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="font-medium">macOS</p>
+                <a class="btn" data-desktop="macos" href="https://github.com/novarumsocial/novarum/releases">.dmg</a>
+              </div>
+              <p class="sub mt-0.5">Apple Silicon<span data-size="macos"></span></p>
+            </li>
+            <li class="py-3.5">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="font-medium">Linux</p>
+                <div class="flex gap-2">
+                  <a class="btn" data-desktop="deb" href="https://github.com/novarumsocial/novarum/releases">.deb</a>
+                  <a class="btn" data-desktop="linux" href="https://github.com/novarumsocial/novarum/releases">.AppImage</a>
+                </div>
+              </div>
+              <p class="sub mt-0.5">Debian / AppImage<span data-size="linux"></span></p>
+            </li>
+          </ul>
+        </section>
+
+        <section
+          class="flex flex-col rounded-[2rem] border-2 border-gray-900 p-6 dark:border-gray-200 sm:p-8"
+          aria-labelledby="android-title"
+        >
+          <div class="mb-2 flex items-baseline justify-between gap-4">
+            <h2 id="android-title" class="text-xl font-semibold">Android</h2>
+            <span class="version"><span data-version="android" class="loading">…</span></span>
+          </div>
+
+          <p class="sub my-auto py-6">
+            Just an APK you can sideload. It's not very optimized, but we're on it!
+          </p>
+
+          <div class="flex justify-center">
+            <a class="cta" data-android href="https://github.com/novarumsocial/novarum/releases">
+              Download APK<span data-android-size></span>
+            </a>
+          </div>
+        </section>
+      </div>
+
+      <p class="mt-8 text-sm gap-1 flex text-gray-500 dark:text-gray-400">
+        For development builds see 
+        <a class="foot-link" href="https://github.com/novarumsocial/novarum/releases">GitHub Releases</a>
+      </p>
+    </main>
+
+    <footer class="bg-gray-900 [&_a]:text-accent-500 [&_a:hover]:text-accent-400">
+      <div class="mx-auto w-full max-w-7xl p-4 py-6 lg:py-8">
+        <div class="md:flex md:justify-between">
+          <div class="mb-6 md:mb-0">
+            <a href="https://novarum.me/" class="flex items-center">
+              <img src={'/favicon.svg'} class="h-7 me-3" alt="Novarum Logo" />
+              <span class="text-heading self-center text-2xl font-semibold whitespace-nowrap">Novarum</span>
+            </a>
+          </div>
+          <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3">
+            <div>
+              <h2 class="mb-6 text-sm font-semibold text-heading uppercase">Resources</h2>
+              <ul class="text-body font-medium">
+                <li class="mb-4">
+                  <a href="/docs">Documentation</a>
+                </li>
+                <li class="mb-4">
+                  <a href="/download">Download</a>
+                </li>
+                <li>
+                  <a href="/guides/deployment">Deploying an Anchor</a>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h2 class="mb-6 text-sm font-semibold text-heading uppercase">On the net</h2>
+              <ul class="text-body font-medium">
+                <li class="mb-4">
+                  <a href="https://github.com/novarumsocial/novarum">Github</a>
+                </li>
+                <li>
+                  <a href="#">HCB (soon?)</a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <hr class="my-6 border-default sm:mx-auto lg:my-8" />
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <span class="text-sm text-body sm:text-center">© 2026 <a href="https://novarum.me/">Novarum</a>, under GNU AGPL v3.0 license. All Rights Reserved.
+          </span>
+        </div>
+      </div>
+    </footer>
+
+    <script is:inline>
+      const base = 'https://github.com/novarumsocial/novarum/releases/download/';
+
+      const mb = (bytes) => ` · ${Math.round(bytes / 1024 / 1024)} MB`;
+
+      fetch('https://cors.notesnook.com/https://api.github.com/repos/novarumsocial/novarum/releases?per_page=100')
+        .then((res) => res.json())
+        .then((releases) => {
+          const desktop = releases.find((r) => /^v\d/.test(r.tag_name));
+          const mobile = releases.find((r) => /^mobile-v/.test(r.tag_name));
+
+          if (desktop) {
+            const v = desktop.tag_name.slice(1);
+            const names = {
+              windows: `Novarum-${v}-x64.exe`,
+              macos: `Novarum-${v}-arm64.dmg`,
+              linux: `Novarum-${v}-x86_64.AppImage`,
+              deb: `Novarum-${v}-amd64.deb`,
+            };
+            document.querySelectorAll('[data-desktop]').forEach((a) => {
+              const asset = desktop.assets.find((x) => x.name === names[a.dataset.desktop]);
+              if (asset) {
+                a.href = `${base}${desktop.tag_name}/${asset.name}`;
+                const size = a.closest('li')?.querySelector('[data-size]');
+                if (size) size.textContent = mb(asset.size);
+              }
+            });
+          }
+
+          if (mobile) {
+            const asset = mobile.assets.find((x) => x.name === 'app-release-signed.apk');
+            if (asset) {
+              document.querySelectorAll('[data-android]').forEach((a) => {
+                a.href = `${base}${mobile.tag_name}/${asset.name}`;
+              });
+              const size = document.querySelector('[data-android-size]');
+              if (size) size.textContent = mb(asset.size);
+            }
+          }
+
+          [
+            ['desktop', desktop?.tag_name],
+            ['android', mobile?.tag_name],
+          ].forEach(([key, tag]) => {
+            const el = document.querySelector(`[data-version="${key}"]`);
+            if (el) {
+              el.textContent = tag ?? 'unavailable';
+              el.classList.remove('loading');
+            }
+          });
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>
+
+<style>
+  .sub {
+    font-size: 0.8125rem;
+    color: var(--color-gray-500, oklch(0.45 0.02 323));
+  }
+
+  [data-theme='dark'] .sub {
+    color: var(--color-gray-400, oklch(0.542 0.034 322.5));
+  }
+
+  .version {
+    font-size: 0.8125rem;
+    color: var(--color-gray-500, oklch(0.45 0.02 323));
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-theme='dark'] .version {
+    color: var(--color-gray-400, oklch(0.542 0.034 322.5));
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+    border: 1px solid var(--color-gray-300, oklch(0.711 0.019 323));
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      border-color 0.15s,
+      color 0.15s;
+  }
+
+  [data-theme='dark'] .btn {
+    border-color: var(--color-gray-700, oklch(0.263 0.024 320));
+  }
+
+  .btn:hover {
+    border-color: var(--color-accent-500, oklch(0.53 0.11 218));
+    color: var(--color-accent-500, oklch(0.53 0.11 218));
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--color-accent-600, oklch(0.45 0.085 224));
+    color: var(--color-accent-50, oklch(0.984 0.019 200));
+    border-radius: 999rem;
+    padding: 0.75rem 1.75rem;
+    font-weight: 600;
+    transition: filter 0.15s;
+  }
+
+  .cta:hover {
+    filter: brightness(1.1);
+  }
+
+  .foot-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .foot-link:hover {
+    color: var(--color-accent-500, oklch(0.53 0.11 218));
+  }
+
+  .loading {
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  * {
+    text-decoration: none;
+  }
+</style>

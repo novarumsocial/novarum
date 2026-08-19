@@ -1,8 +1,10 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Progress } from '$lib/components/ui/progress/index.js';
   import { realtime } from '$lib/realtime.svelte';
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
 
@@ -35,7 +37,7 @@
       .slice(0, 8);
   });
   const maxFiles = 5;
-  const maxFileSize = 10 * 1024 * 1024;
+  const maxFileSize = $derived(anchor.maxFileSize * 1024 * 1024);
   let {
     placeholder = 'Send a message',
     onSend = () => {},
@@ -197,7 +199,7 @@
     const oversized = unique.find((file) => file.size > maxFileSize);
 
     if (oversized) {
-      sendError = `${oversized.name} exceeds the 10 MB limit.`;
+      sendError = `${oversized.name} exceeds the ${anchor.maxFileSize} MB limit.`;
       return;
     }
 
@@ -341,25 +343,34 @@
 
   {#if files.length > 0}
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
-      {#each files as file (`${file.name}:${file.size}:${file.lastModified}`)}
-        <div
-          class="flex max-w-56 shrink-0 items-center gap-2 border border-border bg-muted/30 py-1.5 pr-1 pl-2"
-        >
-          <FileText class="size-3.5 shrink-0 text-primary" />
-          <div class="min-w-0">
-            <p class="truncate text-[11px] font-medium text-foreground">{file.name}</p>
-            <p class="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-              {(file.size / 1024).toFixed(file.size < 1024 * 10 ? 1 : 0)} KB
-            </p>
+      {#each files as file, index (`${file.name}:${file.size}:${file.lastModified}`)}
+        <div class="flex w-56 shrink-0 flex-col gap-1.5 border border-border bg-muted/30 p-2">
+          <div class="flex items-center gap-2">
+            <FileText class="size-3.5 shrink-0 text-primary" />
+            <div class="min-w-0">
+              <p class="truncate text-[11px] font-medium text-foreground">{file.name}</p>
+              <p class="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                {(file.size / 1024).toFixed(file.size < 1024 * 10 ? 1 : 0)} KB
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              disabled={sending}
+              aria-label={`Remove ${file.name}`}
+              onclick={() => (files = files.filter((item) => item !== file))}
+            >
+              <X class="size-3" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Remove ${file.name}`}
-            onclick={() => (files = files.filter((item) => item !== file))}
-          >
-            <X class="size-3" />
-          </Button>
+          {#if chat.uploadProgress[index] !== undefined}
+            <Progress
+              value={chat.uploadProgress[index]}
+              class="w-full"
+              aria-hidden="true"
+              max={1}
+            />
+          {/if}
         </div>
       {/each}
     </div>

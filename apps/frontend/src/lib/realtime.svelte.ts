@@ -376,6 +376,8 @@ class RealtimeState {
         chat.setTyping(
           event.data.channelId,
           event.data.userId,
+          event.data.username,
+          event.data.homeserver,
           event.data.displayName ?? event.data.username
         );
       }

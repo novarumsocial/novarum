@@ -189,7 +189,7 @@
             >
               {#if t.state.screenTrack}
                 <video
-                  class="size-full object-cover"
+                  class="size-full object-contain"
                   autoplay
                   playsinline
                   muted={t.identity === voice.localIdentity}
@@ -222,7 +222,7 @@
               >
                 {#if t.state.cameraTrack}
                   <video
-                    class="size-full object-cover"
+                    class="size-full object-contain"
                     autoplay
                     playsinline
                     muted={t.identity === voice.localIdentity}

@@ -12,6 +12,7 @@ const anchorInfoSchema = z.object({
       description: z.string().optional(),
     })
     .optional(),
+  maxFileSize: z.number(),
   homeserver: z.string(),
   baseUrl: z.url(),
   version: z.string().optional(),

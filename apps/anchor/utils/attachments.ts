@@ -10,6 +10,8 @@ const allowedContentTypes = new Set([
   'application/zip',
   'audio/mpeg',
   'audio/ogg',
+  'audio/flac',
+  'audio/wav',
   'image/gif',
   'image/jpeg',
   'image/png',

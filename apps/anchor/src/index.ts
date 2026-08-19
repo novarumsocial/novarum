@@ -25,10 +25,6 @@ if (argv[2] === 'cli') {
   await import('./cli/index.ts');
 }
 
-await configureStorageCors();
-await writeEmojis();
-await clearOnlineUsers();
-
 console.log('[DB] Running migrations...');
 await migrate(db, {
   migrationsFolder: './drizzle',
@@ -37,6 +33,12 @@ await migrate(db, {
   exit(1);
 });
 console.log('[DB] Migrations complete!');
+
+if (!getConfig().files.s3_disable_cors) {
+  await configureStorageCors();
+}
+await writeEmojis();
+await clearOnlineUsers();
 
 const app = new Elysia()
   .use(cors({ credentials: true, origin: getConfig().files.s3_cors_origins }))

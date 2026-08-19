@@ -61,6 +61,17 @@ Novarum is a FOSS chat platform that aims to provide a simple yet effective way 
 
 It is selfhostable, federated and respects your privacy.
 
+Some of its features inclode:
+
+- Guilds
+- Text channels
+- Voice channels
+- Pinging
+- File uploads
+- Friends
+
+Please open the [Web app](https://app.novarum.me) to see the current state of the project! I'm really bad at writing and keeping readmes updated, so that's the best way to see if you like it :)
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
