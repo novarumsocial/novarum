@@ -385,9 +385,11 @@
                 >
               </div>
             </div>
-          {:else if message.content?.trim()}
+          {:else if message.content?.trim() || message.edited}
             <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-              <EmojiText content={message.content} links />
+              {#if message.content?.trim()}
+                <EmojiText content={message.content} links />
+              {/if}
               {#if message.edited}
                 <Tooltip.Root>
                   <Tooltip.Trigger>

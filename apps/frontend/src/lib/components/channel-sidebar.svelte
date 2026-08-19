@@ -68,9 +68,10 @@
   let createCategory = $state<ChannelCategory | null>(null);
   let editOpen = $state(false);
   let editChannel = $state<Channel | null>(null);
-  let deleteChannelText = $state('Delete Channel');
-  let deleteChannelFirstClick = $state(false);
+  let deleteChannelText = $state<Record<string, string>>({});
+  let armedChannelId = $state<string | null>(null);
   let deletingChannel = $state(false);
+  let deleteConfirmTimer: ReturnType<typeof setTimeout> | null = null;
   let shiftPressed = $state(false);
 
   let createInviteOpen = $state(false);
@@ -173,25 +174,25 @@
   async function deleteChannel(channel: Channel) {
     if (deletingChannel) return;
 
-    if (!shiftPressed && !deleteChannelFirstClick) {
-      deleteChannelText = 'You sure?';
-      deleteChannelFirstClick = true;
-      await new Promise((resolve) =>
-        setTimeout(() => {
-          deleteChannelText = 'Delete Channel';
-          deleteChannelFirstClick = false;
-          resolve(void 0);
-        }, 3000)
-      );
+    if (!shiftPressed && armedChannelId !== channel.id) {
+      deleteChannelText[channel.id] = 'You sure?';
+      armedChannelId = channel.id;
+      if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+      deleteConfirmTimer = setTimeout(() => {
+        deleteChannelText[channel.id] = 'Delete Channel';
+        armedChannelId = null;
+      }, 3000);
       return;
     }
 
+    if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer);
+    deleteConfirmTimer = null;
     deletingChannel = true;
-    deleteChannelText = 'Deleting...';
+    deleteChannelText[channel.id] = 'Deleting...';
     // TODO: implement deleteChannel
     deletingChannel = false;
-    deleteChannelText = 'Delete Channel';
-    deleteChannelFirstClick = false;
+    deleteChannelText[channel.id] = 'Delete Channel';
+    armedChannelId = null;
   }
 
   function avatarBg(id: string) {
@@ -491,7 +492,7 @@
                       disabled={deletingChannel}
                     >
                       <Trash2 class="size-4" />
-                      {deleteChannelText}
+                      {deleteChannelText[ch.id] ?? 'Delete Channel'}
                     </ContextMenu.Item>
                   {/if}
 
