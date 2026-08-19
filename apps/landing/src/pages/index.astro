@@ -108,16 +108,23 @@ const features = [
         A calm place to talk.
       </p>
 
-      <div class="flex space-x-4">
-        <LinkButton href="/docs" variant="secondary">
-          Documentation
-        </LinkButton>
-        <LinkButton href="https://app.novarum.me" variant="primary">
-          Open App
-        </LinkButton>
-        <LinkButton href={githubUrl} variant="secondary">
-          GitHub
-        </LinkButton>
+      <div class="flex flex-col items-center gap-2">
+        <div class="flex gap-2">
+          <LinkButton href="https://app.novarum.me" variant="primary">
+            Open App
+          </LinkButton>
+          <LinkButton href="/download" variant="secondary">
+            Download
+          </LinkButton>
+        </div>
+        <div class="flex justify-center gap-6">
+          <LinkButton href="/docs" variant="minimal">
+            Documentation
+          </LinkButton>
+          <LinkButton href={githubUrl} variant="minimal">
+            GitHub
+          </LinkButton>
+        </div>
       </div>
     </main>
 
@@ -136,6 +143,9 @@ const features = [
                       <ul class="text-body font-medium">
                           <li class="mb-4">
                               <a href="/docs">Documentation</a>
+                          </li>
+                          <li class="mb-4">
+                              <a href="/download">Download</a>
                           </li>
                           <li>
                               <a href="/guides/deployment">Deploying an Anchor</a>
