@@ -26,7 +26,6 @@ export const storage = new S3Client({
 export const s3Bucket = s3_bucket;
 export const s3Endpoint = s3_endpoint;
 export const s3PublicEndpoint = s3_public_endpoint;
-export const s3PublicHostRewrite = s3_public_host_rewrite;
 export const s3VirtualHostedStyle = s3_virtual_hosted_style;
 
 export const awsS3 = new AwsClient({

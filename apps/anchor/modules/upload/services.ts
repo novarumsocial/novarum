@@ -18,7 +18,6 @@ import {
   s3Bucket,
   s3Endpoint,
   s3PublicEndpoint,
-  s3PublicHostRewrite,
   s3VirtualHostedStyle,
 } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
@@ -67,12 +66,12 @@ export async function createS3Multipart(key: string, contentType: string) {
 }
 
 export async function presignPartUrl(key: string, uploadId: string, partNumber: number) {
-  const url = s3ObjectUrl(key, s3Endpoint!, { partNumber: String(partNumber), uploadId });
+  const url = s3ObjectUrl(
+    key,
+    s3PublicEndpoint ?? s3Endpoint!,
+    { partNumber: String(partNumber), uploadId }
+  );
   const signed = await awsS3.sign(url, { method: 'PUT', aws: { signQuery: true } });
-  if (s3PublicHostRewrite && s3PublicEndpoint) {
-    const strip = (u: string) => u.replace(/\/+$/, '');
-    return signed.url.replace(strip(s3Endpoint!), strip(s3PublicEndpoint));
-  }
   return signed.url;
 }
 
