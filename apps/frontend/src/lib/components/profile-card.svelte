@@ -7,6 +7,8 @@
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
   import {
+    MessageSquare,
+    Phone,
     UserRoundArrowLeft,
     UserRoundCheck,
     UserRoundCog,
@@ -141,14 +143,46 @@
             {user.about}
           </p>
         {/if}
-        <!--
         <Separator class="mt-3 mb-3" />
-        <div class="flex">
-          <Button variant="outline" class="w-[50%]">Message</Button>
-          <Button variant="outline" class="w-[50%]">Call</Button>
-        </div>
+        {#if isSelf}
+          <Button variant="outline" class="w-full">Edit profile</Button>
+        {:else if friendStatus === 'FRIEND'}
+          <div class="flex gap-2">
+            <Button variant="outline" class="flex-1">
+              <MessageSquare class="size-4" />
+              Message
+            </Button>
+            <Button variant="outline" class="flex-1">
+              <Phone class="size-4" />
+              Call
+            </Button>
+          </div>
+        {:else if canAddFriend && !user.isBot}
+          <div class="flex gap-2">
+            <Button variant="outline" class="flex-1" onclick={friendAction.run}>
+              {#if friendStatus === 'INCOMING'}
+                <UserRoundArrowLeft class="size-4" />
+                Incoming
+              {:else if friendStatus === 'OUTGOING'}
+                <UserRoundCog class="size-4" />
+                Pending
+              {:else if friendStatus === 'FRIEND'}
+                <UserRoundCheck class="size-4" />
+                Friends
+              {:else}
+                <UserRoundPlus class="size-4" />
+                Add friend
+              {/if}
+            </Button>
+            <Button variant="outline" size="icon" onclick={() => (location.href = '/guilds')}>
+              <MessageSquare class="size-4" />
+            </Button>
+            <Button variant="outline" size="icon">
+              <Phone class="size-4" />
+            </Button>
+          </div>
+        {/if}
       </div>
-      -->
     </Drawer.Content>
   </Drawer.Root>
 {:else}
