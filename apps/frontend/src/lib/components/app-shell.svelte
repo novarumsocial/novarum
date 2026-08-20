@@ -18,6 +18,7 @@
   import DmSidebar from './dm-sidebar.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
+  import { device } from '$lib/device.svelte';
 
   const session = useSession();
 
@@ -122,8 +123,8 @@
 
     if (mobileNavigationOpen && x < 0) mobileNavigationOpen = false;
     else if (mobileMembersOpen && x > 0) mobileMembersOpen = false;
-    else if (x > 0 && window.innerWidth < 768) openNavigation();
-    else if (x < 0 && window.innerWidth < 1024 && chat.route.kind === 'guild') {
+    else if (x > 0 && device.isPhone) openNavigation();
+    else if (x < 0 && !device.isComputer && chat.route.kind === 'guild') {
       openMembers();
     }
   }
