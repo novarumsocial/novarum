@@ -35,7 +35,7 @@
         /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]|[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(:\d{1,5})?$/,
         'Enter a valid server address.'
       )
-      .default('novarum.me'),
+      .default(localStorage.getItem('novarum:home-server') ?? 'novarum.me'),
     username: z
       .string()
       .trim()
@@ -351,12 +351,11 @@
                       class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
 
-                    <!-- TODO: when possible, instead of placeholder="novarum.me" remember last logged in instance from localstorage -->
                     <Input
                       {...props}
                       bind:value={$formData.homeServer}
                       name="homeServer"
-                      placeholder="novarum.me"
+                      placeholder={localStorage.getItem('novarum:home-server') ?? 'novarum.me'}
                       class="pl-8"
                       autocomplete="url"
                       spellcheck="false"
