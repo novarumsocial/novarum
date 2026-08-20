@@ -168,7 +168,6 @@
         }}
       ></button>
     {/if}
-    <!--
     {#if mobileMembersOpen}
       <button
         class="fixed inset-0 z-30 bg-black/60 lg:hidden"
@@ -176,7 +175,6 @@
         onclick={() => (mobileMembersOpen = false)}
       ></button>
     {/if}
--->
     <div
       class="fixed inset-y-0 left-0 z-40 flex max-w-[calc(100vw-3rem)] shrink-0 flex-col bg-sidebar transition-transform md:static md:z-auto md:max-w-none md:translate-x-0"
       class:-translate-x-full={!mobileNavigationOpen}
