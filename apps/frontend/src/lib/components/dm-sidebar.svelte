@@ -75,7 +75,7 @@
 
     <p class="text-xs text-muted-foreground flex items-center justify-center text-center px-2 mt-4 select-none pointer-events-none">
       Sorry, DMs are not implemented yet D:
-      You should go create (or join) a guild, that's where I've been focusing for the last two months
+      You should go create (or join) a guild, that's where I've been focusing for the last few months
     </p>
   </div>
 </aside>
