@@ -5,6 +5,7 @@
   import { Hash, LoaderCircle, Plus, Users } from '@lucide/svelte';
   import type { Server } from '$lib/types/chat';
   import { settings } from '$lib/settings.svelte';
+  import { device } from '$lib/device.svelte';
 
   let {
     open = $bindable(false),
@@ -102,9 +103,11 @@
       {/if}
 
       <Dialog.Footer class="border-t border-border pt-3">
+        {#if device.isComputer}
         <Button type="button" variant="ghost" class="mr-auto" onclick={() => (open = false)}
           >Cancel</Button
         >
+        {/if}
         <Button type="submit" disabled={loading || !name.trim()}>
           {#if loading}
             <LoaderCircle class="size-4 animate-spin" />
