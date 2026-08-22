@@ -18,5 +18,5 @@ export type {
   EmojiPickerFooterPropsWithoutHTML,
   EmojiPickerFooterProps,
   EmojiPickerSkinPropsWithoutHTML,
-  EmojiPickerSkinProps
+  EmojiPickerSkinProps,
 } from './types';

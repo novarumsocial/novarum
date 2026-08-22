@@ -13,7 +13,7 @@ type EmojiPickerState = {
 
 const defaultState: EmojiPickerState = {
   search: '',
-  active: null
+  active: null,
 };
 
 type EmojiPickerRootProps = WritableBoxedValues<{
@@ -56,7 +56,7 @@ class EmojiPickerRootState {
     const selected = {
       emoji: emojiData.emojis[name].skins[skin].native,
       data: emojiData.emojis[name],
-      skin
+      skin,
     };
 
     this.opts.value.current = selected.emoji;
@@ -80,7 +80,7 @@ class EmojiPickerRootState {
       this.emojiPickerState.active = {
         emoji: data.skins[0].native,
         data: data,
-        skin: 0
+        skin: 0,
       };
       return;
     }
@@ -88,7 +88,7 @@ class EmojiPickerRootState {
     this.emojiPickerState.active = {
       emoji: data.skins[emojiSkin].native,
       data: data,
-      skin: emojiSkin
+      skin: emojiSkin,
     };
   }
 }

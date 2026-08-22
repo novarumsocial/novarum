@@ -31,7 +31,7 @@
     recentsKey: box.with(() => recentsKey),
     maxRecents: box.with(() => maxRecents),
     onSelect: box.with(() => onSelect),
-    onSkinChange: box.with(() => onSkinChange)
+    onSkinChange: box.with(() => onSkinChange),
   });
 </script>
 
@@ -40,7 +40,10 @@
   data-slot="emoji-picker"
   columns={6}
   shouldFilter={false}
-  class={cn('bg-popover text-popover-foreground max-w-[232px] rounded-none overflow-hidden', className)}
+  class={cn(
+    'bg-popover text-popover-foreground max-w-[232px] rounded-none overflow-hidden',
+    className
+  )}
   onValueChange={state.onValueChange}
 >
   {@render children?.()}

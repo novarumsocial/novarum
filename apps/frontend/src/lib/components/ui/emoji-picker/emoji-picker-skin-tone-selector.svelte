@@ -15,7 +15,7 @@
   }: EmojiPickerSkinProps = $props();
 
   const skinState = useEmojiPickerSkinToneSelector({
-    previewEmoji: box.with(() => previewEmoji)
+    previewEmoji: box.with(() => previewEmoji),
   });
 </script>
 

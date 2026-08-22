@@ -31,7 +31,7 @@ export class UseFrecency {
 
     this.#items.current[key] = {
       uses: 1 + (item?.uses ?? 0),
-      lastUsage: Date.now()
+      lastUsage: Date.now(),
     };
   }
 

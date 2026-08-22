@@ -19,7 +19,7 @@
     value: box.with(
       () => value,
       (v) => (value = v)
-    )
+    ),
   });
 </script>
 

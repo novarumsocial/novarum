@@ -5,6 +5,10 @@
   let { class: className, children, ...rest }: HTMLAttributes<HTMLDivElement> = $props();
 </script>
 
-<div {...rest} data-slot="emoji-picker-viewport" class={cn('border-border rounded-none border', className)}>
+<div
+  {...rest}
+  data-slot="emoji-picker-viewport"
+  class={cn('border-border rounded-none border', className)}
+>
   {@render children?.()}
 </div>

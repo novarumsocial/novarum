@@ -8,6 +8,10 @@
   const footerState = useEmojiPickerFooter();
 </script>
 
-<div {...rest} data-slot="emoji-picker-footer" class={cn('border-border relative max-w-full border-t p-2', className)}>
+<div
+  {...rest}
+  data-slot="emoji-picker-footer"
+  class={cn('border-border relative max-w-full border-t p-2', className)}
+>
   {@render children?.({ active: footerState.root.emojiPickerState.active })}
 </div>

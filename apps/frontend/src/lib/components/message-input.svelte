@@ -299,7 +299,7 @@
     <div
       id="emoji-search-results"
       role="listbox"
-        aria-label="Emoji search results"
+      aria-label="Emoji search results"
       class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
     >
       {#if emojiResults.length}
