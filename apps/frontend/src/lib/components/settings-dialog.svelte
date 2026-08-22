@@ -53,7 +53,12 @@
     { value: 'security', label: 'Security', desc: 'MFA, authenticator app', icon: ShieldCheck },
     { value: 'appearance', label: 'Appearance', desc: 'Dark mode, QuickCSS, icons', icon: Palette },
     { value: 'notifications', label: 'Notifications', desc: 'Push, sounds, preview', icon: Bell },
-    { value: 'voice', label: 'Voice & Audio', desc: 'Devices, volume, noise suppression', icon: Volume2 },
+    {
+      value: 'voice',
+      label: 'Voice & Audio',
+      desc: 'Devices, volume, noise suppression',
+      icon: Volume2,
+    },
     { value: 'langt', label: 'Language & Time', desc: 'Language, time format', icon: Languages },
   ];
 
@@ -136,7 +141,10 @@
       { re: /[.#][a-zA-Z_-][\w-]*/g, cls: 'text-blue-600 dark:text-blue-400 font-medium' },
       { re: /\b[a-zA-Z-]+(?=\s*:)/g, cls: 'text-amber-600 dark:text-amber-400' },
       { re: /#[0-9a-fA-F]{3,8}\b/g, cls: 'text-pink-600 dark:text-pink-400' },
-      { re: /\b\d+(\.\d+)?(px|rem|em|%|vh|vw|s|ms|deg)?\b/g, cls: 'text-pink-600 dark:text-pink-400' },
+      {
+        re: /\b\d+(\.\d+)?(px|rem|em|%|vh|vw|s|ms|deg)?\b/g,
+        cls: 'text-pink-600 dark:text-pink-400',
+      },
       { re: /!important/g, cls: 'text-red-600 dark:text-red-400 font-semibold' },
     ];
 
@@ -615,7 +623,7 @@
     if (device.isPhonePortrait) {
       loadTotpSetup();
     }
-	});
+  });
 </script>
 
 {#snippet accountContent()}
@@ -668,9 +676,7 @@
       </div>
 
       <div class="px-4 pb-4">
-        <div
-          class="pointer-events-none relative z-10 -mt-9 flex items-end justify-between gap-3"
-        >
+        <div class="pointer-events-none relative z-10 -mt-9 flex items-end justify-between gap-3">
           <input
             bind:this={avatarInput}
             type="file"
@@ -743,11 +749,7 @@
                         disabled={avatarColorLoading}
                         onclick={() => (avatarColorOpen = false)}>Cancel</Button
                       >
-                      <Button
-                        size="xs"
-                        disabled={avatarColorLoading}
-                        onclick={saveAvatarColor}
-                      >
+                      <Button size="xs" disabled={avatarColorLoading} onclick={saveAvatarColor}>
                         {avatarColorLoading ? 'Saving...' : 'Save color'}
                       </Button>
                     </div>
@@ -793,11 +795,7 @@
                         disabled={avatarColorLoading}
                         onclick={() => (speakingRingOpen = false)}>Cancel</Button
                       >
-                      <Button
-                        size="xs"
-                        disabled={avatarColorLoading}
-                        onclick={saveAvatarColor}
-                      >
+                      <Button size="xs" disabled={avatarColorLoading} onclick={saveAvatarColor}>
                         {avatarColorLoading ? 'Saving...' : 'Save color'}
                       </Button>
                     </div>
@@ -930,8 +928,7 @@
       {#if totpLoading && totpState === 'idle'}
         <div class="flex min-h-20 items-center justify-center gap-2 px-4 py-4">
           <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
-          <span class="text-xs text-muted-foreground">Preparing authenticator setup...</span
-          >
+          <span class="text-xs text-muted-foreground">Preparing authenticator setup...</span>
         </div>
       {:else if totpState === 'enabled'}
         <div class="flex items-center justify-between gap-4 px-4 py-3">
@@ -989,17 +986,13 @@
           <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
             <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
               {#if device.isComputer}
-              <img
-                src={totpQr}
-                alt="Authenticator setup QR code"
-                class="size-40 not-hover:blur-xs transition not-hover:blur-none"
-              />
+                <img
+                  src={totpQr}
+                  alt="Authenticator setup QR code"
+                  class="size-40 not-hover:blur-xs transition not-hover:blur-none"
+                />
               {:else}
-              <img
-                src={totpQr}
-                alt="Authenticator setup QR code"
-                class="size-40"
-              />
+                <img src={totpQr} alt="Authenticator setup QR code" class="size-40" />
               {/if}
             </div>
 
@@ -1012,18 +1005,16 @@
               </div>
               <div class="flex items-stretch border bg-muted/40">
                 {#if device.isComputer}
-                <code
-                  class="min-w-0 flex-1 break-all px-2 py-2 font-mono text-[13px] not-hover:blur-xs transition blur-none"
-                >
-                  {totpSecret}
-                </code>
+                  <code
+                    class="min-w-0 flex-1 break-all px-2 py-2 font-mono text-[13px] not-hover:blur-xs transition blur-none"
+                  >
+                    {totpSecret}
+                  </code>
                 {:else}
-                <!-- not-hover:blur-xs transition blur-none -->
-                <code
-                  class="min-w-0 flex-1 break-all px-2 py-2 font-mono text-[13px]"
-                >
-                  {totpSecret}
-                </code>
+                  <!-- not-hover:blur-xs transition blur-none -->
+                  <code class="min-w-0 flex-1 break-all px-2 py-2 font-mono text-[13px]">
+                    {totpSecret}
+                  </code>
                 {/if}
                 <Button
                   variant="ghost"
@@ -1110,8 +1101,7 @@
         <pre
           bind:this={quickCssPre}
           aria-hidden="true"
-          class="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap break-words p-2 font-mono text-xs leading-relaxed [tab-size:2]"
-        >{@html quickCssHighlighted}</pre>
+          class="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre-wrap break-words p-2 font-mono text-xs leading-relaxed [tab-size:2]">{@html quickCssHighlighted}</pre>
         <textarea
           bind:this={quickCssTextarea}
           bind:value={css}
@@ -1169,26 +1159,19 @@
           Receive notifications for mentions and replies
         </p>
       </div>
-      <Switch
-        checked={settings.value.pushNotifications}
-        onCheckedChange={setPushNotifications}
-      />
+      <Switch checked={settings.value.pushNotifications} onCheckedChange={setPushNotifications} />
     </div>
     <div class="flex items-center justify-between">
       <div>
         <p class="text-xs font-medium">Message Preview</p>
-        <p class="text-[11px] text-muted-foreground">
-          Show message content in notifications
-        </p>
+        <p class="text-[11px] text-muted-foreground">Show message content in notifications</p>
       </div>
       <Switch bind:checked={settings.value.messagePreview} />
     </div>
     <div class="flex items-center justify-between">
       <div>
         <p class="text-xs font-medium">Mention Sound</p>
-        <p class="text-[11px] text-muted-foreground">
-          Play a sound when someone mentions you
-        </p>
+        <p class="text-[11px] text-muted-foreground">Play a sound when someone mentions you</p>
       </div>
       <Switch bind:checked={mentionSound} />
     </div>
@@ -1228,9 +1211,8 @@
         <Select.Trigger
           >{settings.value.voiceInputDeviceId === 'default'
             ? 'Default microphone'
-            : audioDevices.input.find(
-                (d) => d.deviceId === settings.value.voiceInputDeviceId
-              )?.label}</Select.Trigger
+            : audioDevices.input.find((d) => d.deviceId === settings.value.voiceInputDeviceId)
+                ?.label}</Select.Trigger
         >
         <Select.Content>
           <Select.Item value="default">Default microphone</Select.Item>
@@ -1252,9 +1234,8 @@
         <Select.Trigger
           >{settings.value.voiceOutputDeviceId === 'default'
             ? 'Default output'
-            : audioDevices.output.find(
-                (d) => d.deviceId === settings.value.voiceOutputDeviceId
-              )?.label}</Select.Trigger
+            : audioDevices.output.find((d) => d.deviceId === settings.value.voiceOutputDeviceId)
+                ?.label}</Select.Trigger
         >
         <Select.Content>
           <Select.Item value="default">Default output</Select.Item>
@@ -1306,9 +1287,7 @@
     <div class="flex items-center justify-between">
       <div>
         <p class="text-xs font-medium">Automatic Gain Control</p>
-        <p class="text-[11px] text-muted-foreground">
-          Automatically balances microphone volume.
-        </p>
+        <p class="text-[11px] text-muted-foreground">Automatically balances microphone volume.</p>
       </div>
       <Switch
         checked={settings.value.voiceAutoGainControl}
@@ -1335,10 +1314,7 @@
     <p class="text-[11px] text-muted-foreground">
       Choose your preferred language for Novarum to use.
     </p>
-    <div
-      class="mt-2"
-      class:mb-3={device.isPhonePortrait}
-    >
+    <div class="mt-2" class:mb-3={device.isPhonePortrait}>
       <Select.Root
         type="single"
         value={settings.value.language}
@@ -1400,7 +1376,10 @@
               class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent active:bg-accent"
               onclick={() => (mobileView = item.value)}
             >
-              <div class="flex size-9 shrink-0 items-center justify-center bg-muted" class:rounded-full={settings.value.circleIcons}>
+              <div
+                class="flex size-9 shrink-0 items-center justify-center bg-muted"
+                class:rounded-full={settings.value.circleIcons}
+              >
                 <item.icon class="size-4.5" />
               </div>
               <div class="min-w-0 flex-1">
@@ -1438,11 +1417,7 @@
         </Button>
       {:else}
         <div class="flex items-center gap-3 pb-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onclick={() => (mobileView = 'menu')}
-          >
+          <Button variant="ghost" size="icon-sm" onclick={() => (mobileView = 'menu')}>
             <ArrowLeft class="size-4" />
           </Button>
           <div class="min-w-0">

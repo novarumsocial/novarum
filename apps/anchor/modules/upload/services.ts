@@ -29,11 +29,7 @@ const multipartPartSize = 5 * 1024 * 1024;
 
 const activeMultipartUploads = new Map<string, { writer: NetworkSink; size: number }>();
 
-async function requireUploadAccess(
-  channelId: string,
-  contentType: string,
-  token: unknown
-) {
+async function requireUploadAccess(channelId: string, contentType: string, token: unknown) {
   const session = await validateSessionToken(typeof token === 'string' ? token : undefined);
   if (!session) return { ok: false as const, status: 401 as const, error: 'Unauthorized' };
   if (!isAllowedAttachmentType(contentType)) {
@@ -128,7 +124,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
 
       using decoder = await Decoder.create(video);
       using scaler = new Scaler();
-      
+
       for await (const frame of decoder.frames(input.packets(video.index))) {
         if (!frame) continue;
         const scale = Math.min(1, 320 / frame.width, 240 / frame.height);
@@ -306,7 +302,10 @@ export const upload = new Elysia({ tags: ['Upload'] })
         await Promise.resolve(upload.writer.end(new Error('Multipart upload failed'))).catch(
           () => {}
         );
-        await db.delete(attachments).where(eq(attachments.id, params.attachmentId)).catch(() => {});
+        await db
+          .delete(attachments)
+          .where(eq(attachments.id, params.attachmentId))
+          .catch(() => {});
         return status(400, { error: 'Upload failed' });
       }
     },

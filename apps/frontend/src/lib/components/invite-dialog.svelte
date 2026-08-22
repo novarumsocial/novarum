@@ -97,12 +97,7 @@
       </div>
 
       <Dialog.Footer class="border-t border-border pt-3">
-        <Button
-          variant="outline"
-          class="mr-auto"
-          onclick={regenerateInvite}
-          disabled={loading}
-        >
+        <Button variant="outline" class="mr-auto" onclick={regenerateInvite} disabled={loading}>
           <RefreshCw class="size-4" />
           <span>Regenerate</span>
         </Button>

@@ -538,7 +538,10 @@ class ChatState {
       try {
         return await this.multipartUpload(channelId, file, contentType, index);
       } catch (error) {
-        console.warn(`Multipart upload of ${file.name} failed, falling back to single upload`, error);
+        console.warn(
+          `Multipart upload of ${file.name} failed, falling back to single upload`,
+          error
+        );
       }
     }
 

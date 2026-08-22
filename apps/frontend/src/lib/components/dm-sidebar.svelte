@@ -25,10 +25,7 @@
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
-  <div
-    class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2"
-    class:mt-2={device.isComputer}
-  >
+  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2" class:mt-2={device.isComputer}>
     {#if device.isComputer}
       <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
         <Users class="size-4 shrink-0" />
@@ -48,7 +45,8 @@
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="Create direct message"
       >
-        <a href="#"> <!-- does nothing -->
+        <a href="#">
+          <!-- does nothing -->
           <Plus class="size-3.5" />
         </a>
       </button>
@@ -67,15 +65,18 @@
           bgColor={entry.user.avatarColor}
         />
         <span class="flex-1 truncate">{name}</span>
-        <a href="#"> <!-- does nothing -->
+        <a href="#">
+          <!-- does nothing -->
           <X class="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
         </a>
       </button>
     {/each}
 
-    <p class="text-xs text-muted-foreground flex items-center justify-center text-center px-2 mt-4 select-none pointer-events-none">
-      Sorry, DMs are not implemented yet D:
-      You should go create (or join) a guild, that's where I've been focusing for the last few months
+    <p
+      class="text-xs text-muted-foreground flex items-center justify-center text-center px-2 mt-4 select-none pointer-events-none"
+    >
+      Sorry, DMs are not implemented yet D: You should go create (or join) a guild, that's where
+      I've been focusing for the last few months
     </p>
   </div>
 </aside>

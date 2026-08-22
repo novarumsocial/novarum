@@ -104,9 +104,9 @@
 
       <Dialog.Footer class="border-t border-border pt-3">
         {#if device.isComputer}
-        <Button type="button" variant="ghost" class="mr-auto" onclick={() => (open = false)}
-          >Cancel</Button
-        >
+          <Button type="button" variant="ghost" class="mr-auto" onclick={() => (open = false)}
+            >Cancel</Button
+          >
         {/if}
         <Button type="submit" disabled={loading || !name.trim()}>
           {#if loading}
