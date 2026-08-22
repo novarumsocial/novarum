@@ -1,8 +1,10 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import { Progress } from '$lib/components/ui/progress/index.js';
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import * as EmojiPicker from '$lib/components/ui/emoji-picker/index.js';
   import { realtime } from '$lib/realtime.svelte';
-  import { FileText, Paperclip, Send, X } from '@lucide/svelte';
+  import { FileText, FaceSlightlySmiling, Paperclip, Send, X } from '@lucide/svelte';
   import { chat } from '$lib/chat-state.svelte';
   import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
@@ -16,6 +18,7 @@
   let sendError = $state('');
   let dragDepth = $state(0);
   let draggingFiles = $state(false);
+  let emojiPickerOpen = $state(false);
   let emojiQuery = $state('');
   let emojiStart = $state<number | null>(null);
   let selectedEmoji = $state(0);
@@ -188,6 +191,17 @@
     });
   }
 
+  function insertPickerEmoji(emoji: string) {
+    const cursor = textarea.selectionStart;
+    const nextCursor = cursor + emoji.length;
+    content = `${content.slice(0, cursor)}${emoji} ${content.slice(cursor)}`;
+    emojiPickerOpen = false;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
   function fileKey(file: File) {
     return `${file.name}:${file.size}:${file.lastModified}`;
   }
@@ -285,7 +299,7 @@
     <div
       id="emoji-search-results"
       role="listbox"
-      aria-label="Emoji search results"
+        aria-label="Emoji search results"
       class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
     >
       {#if emojiResults.length}
@@ -425,6 +439,29 @@
       rows="1"
       class="min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
     ></textarea>
+    <Popover.Root bind:open={emojiPickerOpen}>
+      <Popover.Trigger>
+        {#snippet child({ props })}
+          <Button
+            {...props}
+            variant="ghost"
+            size="icon-lg"
+            class="self-center text-muted-foreground hover:text-foreground"
+            aria-label="Open emoji picker"
+          >
+            <FaceSlightlySmiling class="size-4" />
+          </Button>
+        {/snippet}
+      </Popover.Trigger>
+      <Popover.Content class="w-auto p-0" align="start" side="top">
+        <EmojiPicker.Root onSelect={(e) => insertPickerEmoji(e.emoji)}>
+          <EmojiPicker.Search />
+          <EmojiPicker.Viewport>
+            <EmojiPicker.List />
+          </EmojiPicker.Viewport>
+        </EmojiPicker.Root>
+      </Popover.Content>
+    </Popover.Root>
     <Button
       onclick={handleSend}
       size="icon-lg"
