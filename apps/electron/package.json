@@ -56,7 +56,9 @@
       "category": "Network",
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "flatpak",
+        "rpm"
       ]
     },
     "mac": {
