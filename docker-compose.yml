@@ -1,0 +1,6 @@
+services:
+  frontend:
+    image: ghcr.io/novarumsocial/frontend:latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

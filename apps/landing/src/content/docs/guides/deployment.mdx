@@ -1,9 +1,11 @@
 ---
 title: Deployment
-description: Deploy your own Novarum Anchor homeserver.
+description: Deploy your own Novarum infrastructure!
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Code } from '@astrojs/starlight/components';
+
+# Hosting an Anchor instance
 
 This guide will walk you through the steps to deploy your own Anchor instance, the Novarum homeserver.
 
@@ -215,11 +217,11 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to             |
-| ----------------- | --------------------- |
-| piedpiper.com     | http://localhost:5049 |
-| lk.piedpiper.com  | http://localhost:7880 |
-| cdn.piedpiper.com | http://localhost:3900 |
+| Domain            | Points to              |
+| ----------------- | ---------------------- |
+| piedpiper.com     | http://localhost:5049  |
+| lk.piedpiper.com  | http://localhost:7880  |
+| cdn.piedpiper.com | http://localhost:3900  |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 
@@ -234,6 +236,55 @@ It should be relatively simple to handle these cases:
 2. Proxy only the `/.well-known/anchor/info` endpoint to `novarum.me`, so clients can discover the actual homeserver URL. We use Cloudflare Workers to do this.
 3. Set `homeserver` to `novarum.me` and `base_url` to `https://anchor.novarum.me` in the `config.toml` file.
 
+# (Optional) Hosting the frontend
+
+Novarum's frontend is a simple SvelteKit app with the `static` adapter. [app.novarum.me](https://app.novarum.me) is hosted on Vercel.  
+Because it's a single-page app, you need to redirect any request to `index.html` so that the frontend can handle routing. The guides below are adapted for this!
+
+One last note: `novarum.me` is only set up to support CORS at `localhost:8080`. Keep this in mind so you can test the app after deploying it.
+
+## Hosting on Vercel
+
+1. Fork the repo
+2. Open the Vercel dashboard and create a new project.
+3. Select the forked repo and change the "Root Directory" to `apps/frontend`.
+4. Enjoy!
+
+## Hosting with Docker
+
+The following docker image is based on the Caddy hosting guide below, but packaged in a fancy Docker image.
+
+<Code
+  lang="yml"
+  title="docker-compose.yml"
+  code={`services:
+  frontend:
+    image: ghcr.io/novarumsocial/frontend:latest
+    ports:
+      - '8080:8080'
+    restart: unless-stopped`}
+/>
+
+## Hosting on Caddy
+
+1. Clone the repo and `cd apps/frontend`
+2. Install all dependencies with `bun install`
+3. Build the website with `bun build`
+4. Run the caddy server with `caddy run -c Caddyfile`
+5. Access the website at `http://localhost:8080`
+
+## Hosting with `npx serve`
+
+1. Clone the repo and `cd apps/frontend`
+2. Install all dependencies with `bun install`
+3. Build the website with `bun build`
+4. Run the server with `bunx serve ./build/ -p 8080 -s`
+5. Access the website at `http://localhost:8080`
+
 ---
 
 Great job! Gilfoyle would be proud.
+
+```
+
+```
