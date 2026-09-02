@@ -89,6 +89,8 @@
   let mentionSound = $state(true);
   let showOnlineStatus = $state(true);
   let logoutLoading = $state(false);
+  let confirmLogout = $state(false);
+  let confirmLogoutTimer: ReturnType<typeof setTimeout> | undefined;
   let audioDevices = $state<{ input: MediaDeviceInfo[]; output: MediaDeviceInfo[] }>({
     input: [],
     output: [],
@@ -362,6 +364,17 @@
     } finally {
       avatarColorLoading = false;
     }
+  }
+
+  function requestLogout() {
+    if (!confirmLogout) {
+      confirmLogout = true;
+      confirmLogoutTimer = setTimeout(() => (confirmLogout = false), 5000);
+      return;
+    }
+    clearTimeout(confirmLogoutTimer);
+    confirmLogout = false;
+    void logout();
   }
 
   async function logout() {
@@ -1410,10 +1423,10 @@
           size="sm"
           class="w-full"
           disabled={logoutLoading}
-          onclick={logout}
+          onclick={requestLogout}
         >
           <LogOut class="size-3.5" />
-          Logout
+          {confirmLogout ? 'You sure?' : 'Logout'}
         </Button>
       {:else}
         <div class="flex items-center gap-3 pb-3">
@@ -1524,10 +1537,10 @@
             size="sm"
             class="w-full rounded-none"
             disabled={logoutLoading}
-            onclick={logout}
+            onclick={requestLogout}
           >
             <LogOut class="size-3.5" />
-            Logout
+            {confirmLogout ? 'You sure?' : 'Logout'}
           </Button>
         </div>
 
