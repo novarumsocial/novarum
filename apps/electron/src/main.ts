@@ -125,7 +125,17 @@ function configurePermissions() {
       cancelId: sources.length,
     });
 
-    callback(response === sources.length ? {} : { video: sources[response] });
+    if (response === sources.length) return callback({});
+
+    // system audio loopback is only wired up by chromium on windows and macos 13+
+    // (via the coreaudio tap api on 14.2+) - linux has no equivalent yet, so screen
+    // shares there stay video-only until chromium adds pipewire audio support.
+    const supportsAudioLoopback = process.platform === 'win32' || process.platform === 'darwin';
+
+    callback({
+      video: sources[response],
+      audio: request.audioRequested && supportsAudioLoopback ? 'loopback' : undefined,
+    });
   });
 }
 

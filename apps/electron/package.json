@@ -63,7 +63,10 @@
     },
     "mac": {
       "icon": "icons/macos/icon.icns",
-      "artifactName": "Novarum-${version}-${arch}.${ext}"
+      "artifactName": "Novarum-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Novarum needs permission to capture system audio so it can be included when you share your screen."
+      }
     },
     "win": {
       "icon": "icons/windows/icon.ico",
