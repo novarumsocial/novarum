@@ -1,0 +1,24 @@
+port: 7880
+bind_addresses:
+  - ''
+rtc:
+  tcp_port: 7881
+  port_range_start: 50100
+  port_range_end: 50200
+  # use_external_ip: true
+  enable_loopback_candidate: true # maybe change to false?
+audio:
+  active_level: 35
+  min_percentile: 30
+  update_interval: 100
+  smooth_intervals: 1
+turn:
+  enabled: true
+  udp_port: 3478
+  relay_range_start: 50300
+  relay_range_end: 50400
+  domain: livekit.example.com
+keys:
+  APIiryyTrg49jyP: G7V46jh4HtfX6jB5ns4nBma5xkadhfzxqSawkTjdNTY
+  # replace these with your key-secret pair. Example:
+  # APIUxUnMnSkuFWV: t93ZVjPeoEdyx7Wbet3kG4L3NGZIZVEFvqe0UuiVc22A

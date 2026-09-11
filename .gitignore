@@ -36,6 +36,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 testing/
 dev/*
 !dev/compose.yml
+!dev/garage.toml
+!dev/livekit.yaml
 
 apps/anchor/benchmarks/report
 apps/electron/.electron
