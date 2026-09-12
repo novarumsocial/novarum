@@ -69,7 +69,6 @@ const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const multipartThreshold = 10 * 1024 * 1024;
 
 async function stripImageMetadata(file: File) {
   if (!reencodedImageTypes.has(file.type)) return file;
@@ -532,86 +531,30 @@ class ChatState {
   }
 
   private async uploadAttachment(channelId: string, file: File, index: number) {
-    const contentType = file.type || 'application/octet-stream';
-
-    if (file.size >= multipartThreshold) {
-      try {
-        return await this.multipartUpload(channelId, file, contentType, index);
-      } catch (error) {
-        console.warn(`Multipart upload of ${file.name} failed, falling back to single upload`, error);
-      }
-    }
-
     const presign = await anchor.client.upload.presign.post({
       channelId,
       filename: file.name,
-      contentType,
+      contentType: file.type || 'application/octet-stream',
       size: file.size,
     });
     if (presign.error || !presign.data || 'error' in presign.data) {
       throw new Error(`Could not prepare ${file.name} for upload`);
     }
 
-    await this.xhrUpload(
-      presign.data.uploadUrl,
-      'PUT',
-      presign.data.headers,
-      file,
-      file.size,
-      0,
-      index
-    );
+    await this.xhrUpload(presign.data.uploadUrl, presign.data.headers, file, index);
     return presign.data.attachmentId;
   }
 
-  private async multipartUpload(channelId: string, file: File, contentType: string, index: number) {
-    const started = await anchor.client.upload.multipart.post({
-      channelId,
-      filename: file.name,
-      contentType,
-      size: file.size,
-    });
-    if (started.error || !started.data || 'error' in started.data) {
-      throw new Error(`Could not start upload for ${file.name}`);
-    }
-
-    const attachmentId = started.data.attachmentId;
-    try {
-      await this.xhrUpload(
-        `${anchor.baseUrl}/upload/multipart/${encodeURIComponent(attachmentId)}`,
-        'POST',
-        null,
-        file,
-        file.size,
-        0,
-        index
-      );
-    } catch (error) {
-      void anchor.client.upload.multipart({ attachmentId }).delete();
-      throw error;
-    }
-
-    return attachmentId;
-  }
-
-  private xhrUpload(
-    url: string,
-    method: string,
-    headers: Record<string, string> | null,
-    body: Blob,
-    size: number,
-    offset: number,
-    index: number
-  ) {
+  private xhrUpload(url: string, headers: Record<string, string>, body: Blob, index: number) {
     return new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open(method, url);
-      for (const [name, value] of Object.entries(headers ?? {})) {
+      xhr.open('PUT', url);
+      for (const [name, value] of Object.entries(headers)) {
         xhr.setRequestHeader(name, value);
       }
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
-          this.uploadProgress = { ...this.uploadProgress, [index]: (offset + event.loaded) / size };
+          this.uploadProgress = { ...this.uploadProgress, [index]: event.loaded / event.total };
         }
       };
       xhr.onload = () => {

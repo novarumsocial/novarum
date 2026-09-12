@@ -133,9 +133,10 @@ A few files must be created. Hopefully it's not much :')
     ```
 
     A few notes:
-      - `s3_endpoint` is the internal Garage address the server uses for its own requests and must bypass any proxy/CDN in front of Garage. `s3_public_endpoint` is only used to build the presigned URLs handed to clients and should be the public CDN URL. If they are the same, omit `s3_public_endpoint`.
+      - `s3_endpoint` is the internal Garage address the server uses for its own requests and must bypass any proxy/CDN in front of Garage. `s3_public_endpoint` is only used to build the presigned download URLs handed to clients and should be the public CDN URL. If they are the same, omit `s3_public_endpoint`.
       - Keep in mind that, automatically, a S3 CORS origin will be added to enable Novarum Desktop uploads. There is currently no way to disable it, though we highly doubt you would want to.
       - We recommend using Resend for email delivery because its free plan is very generous and probably enough for most deployments, though feel free to swap the SMTP credentials with your own.
+      - 5GB is logistically the current upload limit as multipart presigned uploads haven't been implemented yet. That's the ceiling for a single presigned PUT; if uploads still go through a proxy, its body size limit applies first.
 
   </TabItem>
   <TabItem label="livekit.yaml">
@@ -217,11 +218,11 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to              |
-| ----------------- | ---------------------- |
-| piedpiper.com     | http://localhost:5049  |
-| lk.piedpiper.com  | http://localhost:7880  |
-| cdn.piedpiper.com | http://localhost:3900  |
+| Domain            | Points to             |
+| ----------------- | --------------------- |
+| piedpiper.com     | http://localhost:5049 |
+| lk.piedpiper.com  | http://localhost:7880 |
+| cdn.piedpiper.com | http://localhost:3900 |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 

@@ -12,6 +12,7 @@ const {
   s3_cors_origins,
   s3_public_endpoint,
   s3_public_host_rewrite,
+  s3_upload_endpoint,
 } = getConfig().files;
 
 export const storage = new S3Client({
@@ -30,6 +31,16 @@ export function publicPresign(key: string, options?: S3FilePresignOptions) {
     return url.replace(stripTrailingSlash(s3_endpoint), stripTrailingSlash(s3_public_endpoint));
   }
   return storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint });
+}
+
+// A CDN in front of storage only earns its keep on downloads, and proxying uploads through it
+// inherits the proxy's request body size limit. Operators whose storage is directly reachable can
+// point uploads past it; everyone else keeps the download endpoint, which may be internal-only.
+export function uploadPresign(key: string, options?: S3FilePresignOptions) {
+  if (s3_upload_endpoint) {
+    return storage.presign(key, { ...options, endpoint: s3_upload_endpoint });
+  }
+  return publicPresign(key, options);
 }
 
 export function noStoreRedirect(url: string) {
