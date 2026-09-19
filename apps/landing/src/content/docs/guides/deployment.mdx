@@ -130,6 +130,10 @@ A few files must be created. Hopefully it's not much :')
     # controls if the server saves attachment thumbnails.
     # this is here in case you want to save space by getting it cached through a CDN
     save_attachment_thumbnails = true
+
+    # optional: see "Routing outbound requests through a proxy or VPN" below
+    [network]
+    proxy_url = "http://proxy:3128"
     ```
 
     A few notes:
@@ -236,6 +240,74 @@ It should be relatively simple to handle these cases:
 1. Run the Anchor on another host, such as `anchor.novarum.me`.
 2. Proxy only the `/.well-known/anchor/info` endpoint to `novarum.me`, so clients can discover the actual homeserver URL. We use Cloudflare Workers to do this.
 3. Set `homeserver` to `novarum.me` and `base_url` to `https://anchor.novarum.me` in the `config.toml` file.
+
+## Routing outbound requests through a proxy or VPN
+
+Some hosts restrict or censor outbound internet access. Anchor makes outbound requests for
+federation (talking to other Anchors), the emoji CDN, S3-compatible storage, and LiveKit's REST
+API — all over HTTP(S). If any of that gets blocked, you have two options:
+
+<Tabs>
+  <TabItem label="Forward proxy (HTTP-only)">
+    Set `proxy_url` under `[network]` in `config.toml` to any HTTP(S) forward proxy Anchor can
+    reach (a `tinyproxy`/`privoxy` container, a proxy your VPN provider exposes, etc). Every
+    outbound `fetch` and S3 request Anchor makes will go through it:
+    ```toml
+    [network]
+    proxy_url = "http://proxy:3128"
+    ```
+    This is the lightest option, but it only covers HTTP(S) traffic. Postgres and SMTP use raw
+    sockets, not `fetch`, so they're unaffected — the database and mail server still need to be
+    reachable directly.
+  </TabItem>
+  <TabItem label="Full tunnel (VPN or Cloudflare WARP)">
+    To route *everything* Anchor sends — Postgres, SMTP, and HTTP(S) alike — put the `anchor`
+    container on a VPN container's network namespace instead, with `network_mode: "service:<vpn
+    service>"`. Sharing a network namespace this way means Anchor uses that container's routes
+    and interfaces directly, so no `config.toml` changes are needed.
+
+    For Cloudflare WARP specifically, generate a free WireGuard profile for it with
+    [`wgcf`](https://github.com/ViRb3/wgcf) (`wgcf register && wgcf generate`, which writes
+    `wgcf-profile.conf`), then feed that profile into a standard WireGuard container, such as
+    [`linuxserver/wireguard`](https://github.com/linuxserver/docker-wireguard) run as a client:
+    ```yml
+    services:
+      wireguard:
+        image: lscr.io/linuxserver/wireguard:latest
+        container_name: wireguard
+        restart: unless-stopped
+        cap_add:
+          - NET_ADMIN
+        environment:
+          - PUID=1000
+          - PGID=1000
+          - TZ=Etc/UTC
+        volumes:
+          # wgcf-profile.conf goes in here, renamed to wg_confs/wg0.conf
+          - ./wireguard:/config
+        sysctls:
+          - net.ipv4.conf.all.src_valid_mark=1
+
+      anchor:
+        image: ghcr.io/novarumsocial/anchor:latest
+        container_name: anchor
+        restart: unless-stopped
+        network_mode: 'service:wireguard'
+        depends_on:
+          - wireguard
+          - postgres
+          - livekit
+        volumes:
+          - ./config.toml:/app/config.toml:ro
+          - ./keys:/app/keys
+    ```
+    Don't set `PEERS` on the `wireguard` service — that switches it into server mode. Because
+    `anchor` shares `wireguard`'s network namespace, its published ports (`5049`, etc.) also move
+    to the `wireguard` service — point your reverse proxy there instead. Any other VPN's Docker
+    client (a commercial provider's image, Tailscale, …) works the same way: start it as its own
+    service and set `network_mode: "service:<that service>"` on `anchor`.
+  </TabItem>
+</Tabs>
 
 # (Optional) Hosting the frontend
 

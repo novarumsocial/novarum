@@ -62,14 +62,33 @@ const schema = z.object({
     otp_pepper: z.string().min(1),
     save_attachment_thumbnails: z.boolean().optional().default(true),
   }),
+  network: z
+    .object({
+      // routes all outbound fetch/S3 traffic (federation, storage, LiveKit, the emoji CDN) through
+      // an HTTP(S) forward proxy. Useful when the host's own internet access is restricted or
+      // censored; point this at a proxy reachable through a VPN or Cloudflare WARP. Doesn't cover
+      // Postgres or SMTP, which use raw sockets, not fetch.
+      proxy_url: z.string().url().optional(),
+    })
+    .optional()
+    .default({}),
 });
 
 export type Config = z.infer<typeof schema>;
+
+let proxyApplied = false;
 
 export function getConfig() {
   // doing readfilesync so its not a pain to work with.
   const config = schema.parse(TOML.parse(readFileSync('./config.toml').toString()));
   // pushes base url because we need that now (don't ask, s3 is black magic)
   config.files.s3_cors_origins.push(config.server.base_url);
+
+  if (config.network.proxy_url && !proxyApplied) {
+    process.env.HTTP_PROXY = config.network.proxy_url;
+    process.env.HTTPS_PROXY = config.network.proxy_url;
+    proxyApplied = true;
+  }
+
   return config;
 }
