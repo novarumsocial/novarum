@@ -64,11 +64,7 @@ const schema = z.object({
   }),
   network: z
     .object({
-      // routes all outbound fetch/S3 traffic (federation, storage, LiveKit, the emoji CDN) through
-      // an HTTP(S) forward proxy. Useful when the host's own internet access is restricted or
-      // censored; point this at a proxy reachable through a VPN or Cloudflare WARP. Doesn't cover
-      // Postgres or SMTP, which use raw sockets, not fetch.
-      proxy_url: z.string().url().optional(),
+      proxy_url: z.url().optional(),
     })
     .optional()
     .default({}),

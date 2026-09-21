@@ -131,7 +131,7 @@ A few files must be created. Hopefully it's not much :')
     # this is here in case you want to save space by getting it cached through a CDN
     save_attachment_thumbnails = true
 
-    # optional: see "Routing outbound requests through a proxy or VPN" below
+    # optional, see below
     [network]
     proxy_url = "http://proxy:3128"
     ```
@@ -222,11 +222,11 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to             |
-| ----------------- | --------------------- |
-| piedpiper.com     | http://localhost:5049 |
-| lk.piedpiper.com  | http://localhost:7880 |
-| cdn.piedpiper.com | http://localhost:3900 |
+| Domain            | Points to               |
+| ----------------- | ----------------------- |
+| piedpiper.com     | <http://localhost:5049> |
+| lk.piedpiper.com  | <http://localhost:7880> |
+| cdn.piedpiper.com | <http://localhost:3900> |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 
@@ -243,33 +243,20 @@ It should be relatively simple to handle these cases:
 
 ## Routing outbound requests through a proxy or VPN
 
-Some hosts restrict or censor outbound internet access. Anchor makes outbound requests for
-federation (talking to other Anchors), the emoji CDN, S3-compatible storage, and LiveKit's REST
-API — all over HTTP(S). If any of that gets blocked, you have two options:
+This has been built to circumvent network restrictions, such as firewalls or [censorship in democratic countries](https://laligagate.com/)
 
 <Tabs>
   <TabItem label="Forward proxy (HTTP-only)">
-    Set `proxy_url` under `[network]` in `config.toml` to any HTTP(S) forward proxy Anchor can
-    reach (a `tinyproxy`/`privoxy` container, a proxy your VPN provider exposes, etc). Every
-    outbound `fetch` and S3 request Anchor makes will go through it:
+    Set `proxy_url` under `[network]` to any http forward proxy Anchor can reach.
     ```toml
     [network]
     proxy_url = "http://proxy:3128"
     ```
-    This is the lightest option, but it only covers HTTP(S) traffic. Postgres and SMTP use raw
-    sockets, not `fetch`, so they're unaffected — the database and mail server still need to be
-    reachable directly.
+    This is the lightest option, but it only covers http traffic.
   </TabItem>
   <TabItem label="Full tunnel (VPN or Cloudflare WARP)">
-    To route *everything* Anchor sends — Postgres, SMTP, and HTTP(S) alike — put the `anchor`
-    container on a VPN container's network namespace instead, with `network_mode: "service:<vpn
-    service>"`. Sharing a network namespace this way means Anchor uses that container's routes
-    and interfaces directly, so no `config.toml` changes are needed.
-
     For Cloudflare WARP specifically, generate a free WireGuard profile for it with
-    [`wgcf`](https://github.com/ViRb3/wgcf) (`wgcf register && wgcf generate`, which writes
-    `wgcf-profile.conf`), then feed that profile into a standard WireGuard container, such as
-    [`linuxserver/wireguard`](https://github.com/linuxserver/docker-wireguard) run as a client:
+    [`wgcf`](https://github.com/ViRb3/wgcf) (`wgcf register && wgcf generate`
     ```yml
     services:
       wireguard:
@@ -301,11 +288,10 @@ API — all over HTTP(S). If any of that gets blocked, you have two options:
           - ./config.toml:/app/config.toml:ro
           - ./keys:/app/keys
     ```
-    Don't set `PEERS` on the `wireguard` service — that switches it into server mode. Because
-    `anchor` shares `wireguard`'s network namespace, its published ports (`5049`, etc.) also move
-    to the `wireguard` service — point your reverse proxy there instead. Any other VPN's Docker
-    client (a commercial provider's image, Tailscale, …) works the same way: start it as its own
-    service and set `network_mode: "service:<that service>"` on `anchor`.
+
+    After setting up the Wireguard container, you'll need to point the opened ports
+    of the Anchor container to Wireguard for the proxy to still work.
+
   </TabItem>
 </Tabs>
 
