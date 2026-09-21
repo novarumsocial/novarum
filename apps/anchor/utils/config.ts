@@ -62,14 +62,29 @@ const schema = z.object({
     otp_pepper: z.string().min(1),
     save_attachment_thumbnails: z.boolean().optional().default(true),
   }),
+  network: z
+    .object({
+      proxy_url: z.url().optional(),
+    })
+    .optional()
+    .default({}),
 });
 
 export type Config = z.infer<typeof schema>;
+
+let proxyApplied = false;
 
 export function getConfig() {
   // doing readfilesync so its not a pain to work with.
   const config = schema.parse(TOML.parse(readFileSync('./config.toml').toString()));
   // pushes base url because we need that now (don't ask, s3 is black magic)
   config.files.s3_cors_origins.push(config.server.base_url);
+
+  if (config.network.proxy_url && !proxyApplied) {
+    process.env.HTTP_PROXY = config.network.proxy_url;
+    process.env.HTTPS_PROXY = config.network.proxy_url;
+    proxyApplied = true;
+  }
+
   return config;
 }

@@ -130,6 +130,10 @@ A few files must be created. Hopefully it's not much :')
     # controls if the server saves attachment thumbnails.
     # this is here in case you want to save space by getting it cached through a CDN
     save_attachment_thumbnails = true
+
+    # optional, see below
+    [network]
+    proxy_url = "http://proxy:3128"
     ```
 
     A few notes:
@@ -218,8 +222,8 @@ A few secrets must be generated:
 
 We recommend running everything though a reverse proxy, such as Caddy, but the demo server runs on Cloudflare Tunnels, so we'll be demonstrating that.
 
-| Domain            | Points to             |
-| ----------------- | --------------------- |
+| Domain            | Points to               |
+| ----------------- | ----------------------- |
 | piedpiper.com     | http://localhost:5049 |
 | lk.piedpiper.com  | http://localhost:7880 |
 | cdn.piedpiper.com | http://localhost:3900 |
@@ -236,6 +240,60 @@ It should be relatively simple to handle these cases:
 1. Run the Anchor on another host, such as `anchor.novarum.me`.
 2. Proxy only the `/.well-known/anchor/info` endpoint to `novarum.me`, so clients can discover the actual homeserver URL. We use Cloudflare Workers to do this.
 3. Set `homeserver` to `novarum.me` and `base_url` to `https://anchor.novarum.me` in the `config.toml` file.
+
+## Routing outbound requests through a proxy or VPN
+
+This has been built to circumvent network restrictions, such as firewalls or [censorship in democratic countries](https://laligagate.com/)
+
+<Tabs>
+  <TabItem label="Forward proxy (HTTP-only)">
+    Set `proxy_url` under `[network]` to any http forward proxy Anchor can reach.
+    ```toml
+    [network]
+    proxy_url = "http://proxy:3128"
+    ```
+    This is the lightest option, but it only covers http traffic.
+  </TabItem>
+  <TabItem label="Full tunnel (VPN or Cloudflare WARP)">
+    For Cloudflare WARP specifically, generate a free WireGuard profile for it with
+    [`wgcf`](https://github.com/ViRb3/wgcf) (`wgcf register && wgcf generate`
+    ```yml
+    services:
+      wireguard:
+        image: lscr.io/linuxserver/wireguard:latest
+        container_name: wireguard
+        restart: unless-stopped
+        cap_add:
+          - NET_ADMIN
+        environment:
+          - PUID=1000
+          - PGID=1000
+          - TZ=Etc/UTC
+        volumes:
+          # wgcf-profile.conf goes in here, renamed to wg_confs/wg0.conf
+          - ./wireguard:/config
+        sysctls:
+          - net.ipv4.conf.all.src_valid_mark=1
+
+      anchor:
+        image: ghcr.io/novarumsocial/anchor:latest
+        container_name: anchor
+        restart: unless-stopped
+        network_mode: 'service:wireguard'
+        depends_on:
+          - wireguard
+          - postgres
+          - livekit
+        volumes:
+          - ./config.toml:/app/config.toml:ro
+          - ./keys:/app/keys
+    ```
+
+    After setting up the Wireguard container, you'll need to point the opened ports
+    of the Anchor container to Wireguard for the proxy to still work.
+
+  </TabItem>
+</Tabs>
 
 # (Optional) Hosting the frontend
 
