@@ -134,7 +134,7 @@ function configurePermissions() {
 
     callback({
       video: sources[response],
-      audio: request.audioRequested && supportsAudioLoopback ? 'loopback' : undefined,
+      ...(request.audioRequested && supportsAudioLoopback ? { audio: 'loopback' as const } : {}),
     });
   });
 }

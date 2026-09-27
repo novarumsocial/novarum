@@ -23,6 +23,8 @@
   import { type VoiceTile } from '$lib/voice-layout';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import { Slider } from '$lib/components/ui/slider/index.js';
   import { settings } from '$lib/settings.svelte';
   import VoiceStage from './voice-stage.svelte';
 
@@ -89,6 +91,15 @@
     if (focusedKey && tiles.some((tile) => tile.key === focusedKey)) return focusedKey;
     return manualGrid ? null : autoSpotlightKey;
   });
+
+  // Discord-style stream volume: only shown while spotlit on someone else's
+  // screen share, and only affects that share's audio, not their mic.
+  const spotlightScreenShare = $derived(
+    tiles.find(
+      (tile) =>
+        tile.key === spotlightKey && tile.kind === 'screen' && tile.identity !== voice.localIdentity
+    ) ?? null
+  );
 
   // A newly started screen share takes over the stage, even if the user had chosen grid.
   let lastAutoKey: string | null = null;
@@ -327,6 +338,38 @@
           </Tooltip.Trigger>
           <Tooltip.Content>{screenLabel}</Tooltip.Content>
         </Tooltip.Root>
+
+        {#if spotlightScreenShare}
+          {@const identity = spotlightScreenShare.identity}
+          <Popover.Root>
+            <Popover.Trigger
+              class={cn(
+                controlClass,
+                'inline-flex items-center justify-center rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              )}
+              aria-label={`Stream volume for ${spotlightScreenShare.name}`}
+              title="Stream volume"
+            >
+              <Volume2 class="size-4" />
+            </Popover.Trigger>
+            <Popover.Content side="top" align="center" class="w-48 flex-col items-start gap-2">
+              <p class="flex w-full justify-between text-sm">
+                <span>Stream volume</span>
+                <span>{Math.round(voice.participantScreenVolume(identity) * 100)}%</span>
+              </p>
+              <Slider
+                type="single"
+                aria-label={`Stream volume for ${spotlightScreenShare.name}`}
+                min={0}
+                max={300}
+                step={1}
+                value={voice.participantScreenVolume(identity) * 100}
+                onValueChange={(volume) => voice.setParticipantScreenVolume(identity, volume / 100)}
+                onThumbDblClick={() => voice.setParticipantScreenVolume(identity, 1)}
+              />
+            </Popover.Content>
+          </Popover.Root>
+        {/if}
 
         <div class="mx-1 h-6 w-px shrink-0 bg-border"></div>
 
