@@ -5,10 +5,11 @@ import { getConfig } from './config';
 import {
   makeFederatedChannelId,
   makeFederatedGuildId,
+  parseFederatedChannelId,
   parseFederatedGuildId,
 } from './federationIds';
 import type { RealtimeEvent } from './types';
-import { publishRealtime } from './publishRealtime';
+import { publishRealtime, publishToChannel } from './publishRealtime';
 import { publicUserSchema } from './publicUser';
 import {
   attachmentResponseSchema,
@@ -20,7 +21,7 @@ import {
 const activeBridges = new Map<string, WebSocket | null>();
 
 const messageEventDataSchema = messageResponseBaseSchema.extend({
-  guildId: z.string(),
+  guildId: z.string().nullable(),
   replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentResponseSchema),
@@ -57,7 +58,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     data: z.object({
       id: z.string(),
       channelId: z.string(),
-      guildId: z.string(),
+      guildId: z.string().nullable(),
     }),
   }),
   z.object({
@@ -122,14 +123,52 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
 
 export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId: string) {
   const federatedGuild = parseFederatedGuildId(guildId);
-  if (!federatedGuild || activeBridges.has(guildId)) return;
+  if (!federatedGuild) return;
 
-  activeBridges.set(guildId, null);
+  await ensureBridge(
+    guildId,
+    federatedGuild.homeserver,
+    `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`,
+    (event) =>
+      publishRealtime(
+        server,
+        `guildEvents:${guildId}`,
+        mapFederatedRealtimeEvent(event, federatedGuild.homeserver)
+      )
+  );
+}
+
+// same idea as the guild bridge, but a DM has no shared topic of its own to
+// publish to: publishToChannel fans the event out to each local participant.
+export async function ensureFederatedDmRealtimeBridge(server: Server, channelId: string) {
+  const federatedChannel = parseFederatedChannelId(channelId);
+  if (!federatedChannel) return;
+
+  await ensureBridge(
+    channelId,
+    federatedChannel.homeserver,
+    `/federation/realtime/dms/${encodeURIComponent(federatedChannel.id)}`,
+    (event) =>
+      publishToChannel(
+        server,
+        { id: channelId, guildId: null },
+        mapFederatedRealtimeEvent(event, federatedChannel.homeserver)
+      )
+  );
+}
+
+async function ensureBridge(
+  id: string,
+  homeserver: string,
+  path: string,
+  onEvent: (event: RealtimeEvent) => void
+) {
+  if (activeBridges.has(id)) return;
+  activeBridges.set(id, null);
 
   let socket: WebSocket;
   try {
-    const remote = await discoverRemoteAnchor(federatedGuild.homeserver);
-    const path = `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`;
+    const remote = await discoverRemoteAnchor(homeserver);
     const url = new URL(path, remote.baseUrl);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
@@ -145,25 +184,19 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
     }
 
     socket = new WebSocket(url);
-    activeBridges.set(guildId, socket);
+    activeBridges.set(id, socket);
   } catch (error) {
-    if (activeBridges.get(guildId) === null) activeBridges.delete(guildId);
+    if (activeBridges.get(id) === null) activeBridges.delete(id);
     throw error;
   }
 
   socket.addEventListener('message', (message) => {
     const event = parseRealtimeEvent(message.data);
-    if (!event) return;
-
-    publishRealtime(
-      server,
-      `guildEvents:${guildId}`,
-      mapFederatedRealtimeEvent(event, federatedGuild.homeserver)
-    );
+    if (event) onEvent(event);
   });
 
   socket.addEventListener('close', () => {
-    if (activeBridges.get(guildId) === socket) activeBridges.delete(guildId);
+    if (activeBridges.get(id) === socket) activeBridges.delete(id);
   });
 
   socket.addEventListener('error', () => {
@@ -210,24 +243,13 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
     };
   }
 
-  if (event.type === 'message.created') {
+  if (event.type === 'message.created' || event.type === 'message.updated') {
     return {
       ...event,
       data: {
         ...event.data,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
-      },
-    };
-  }
-
-  if (event.type === 'message.updated') {
-    return {
-      ...event,
-      data: {
-        ...event.data,
-        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
       },
     };
   }
@@ -238,7 +260,7 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       data: {
         ...event.data,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
       },
     };
   }

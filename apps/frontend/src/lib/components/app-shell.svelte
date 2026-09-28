@@ -5,6 +5,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { dms } from '$lib/dms.svelte';
   import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
@@ -43,6 +44,7 @@
       ])
     )
   );
+  const hasUnreadDms = $derived(dms.list.some((dm) => dm.unread));
 
   const voice = new Voice();
 
@@ -186,6 +188,7 @@
           servers={chat.servers}
           activeId={chat.activeServer}
           mentions={guildMentions}
+          {hasUnreadDms}
           onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}
           onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
@@ -197,7 +200,11 @@
             activeChannel={chat.activeChannel}
             onSelectChannel={selectChannel}
             onCreateChannel={async (channel: Channel) =>
-              await chat.createChannel(currentServer.id, channel, channel.type)}
+              await chat.createChannel(
+                currentServer.id,
+                channel,
+                channel.type === 'VOICE' ? 'VOICE' : 'TEXT'
+              )}
             onReorderChannels={(channelIds) => chat.reorderChannels(currentServer.id, channelIds)}
             onSaveChannelOrder={async (channelIds) =>
               await chat.saveChannelOrder(currentServer.id, channelIds)}
@@ -207,7 +214,7 @@
             voiceStates={chat.voiceStates}
           />
         {/if}
-        {#if chat.route.kind === 'home'}
+        {#if chat.route.kind === 'home' || chat.route.kind === 'dms'}
           <DmSidebar />
         {/if}
       </div>
@@ -216,7 +223,7 @@
 
     {#if chat.route.kind === 'home'}
       <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-    {:else if currentChannel && currentChannel.type === 'TEXT'}
+    {:else if currentChannel && (currentChannel.type === 'TEXT' || currentChannel.type === 'DM')}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
@@ -247,8 +254,13 @@
           Browse channels
         </button>
         <div class="max-w-sm text-center">
-          <p class="text-sm font-medium text-foreground">No channel selected</p>
-          <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
+          {#if chat.route.kind === 'dms'}
+            <p class="text-sm font-medium text-foreground">No conversation selected</p>
+            <p class="mt-1 text-sm text-muted-foreground">Pick a direct message to begin.</p>
+          {:else}
+            <p class="text-sm font-medium text-foreground">No channel selected</p>
+            <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
+          {/if}
         </div>
       </main>
     {/if}

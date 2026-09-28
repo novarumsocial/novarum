@@ -13,6 +13,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import type { FriendEntry } from '$lib/friends.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { dms } from '$lib/dms.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Button } from '$lib/components/ui/button';
   import Avatar from './avatar.svelte';
@@ -135,6 +136,8 @@
                     variant="secondary"
                     size="sm"
                     class={settings.value.circleIcons ? 'rounded-full' : ''}
+                    onclick={() => dms.open(entry.user.userId)}
+                    aria-label="Message {name}"
                   >
                     <MessageSquare />
                   </Button>

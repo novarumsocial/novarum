@@ -4,6 +4,7 @@ import { anchor } from '$lib/anchor.svelte';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from '$lib/types/chat';
 import { useSession } from './session.svelte';
 import type { PublicUser } from 'anchor/public-user';
+import { dms, dmPath } from './dms.svelte';
 
 function initialsFor(name: string) {
   const initials = name
@@ -126,6 +127,23 @@ function channelTypeFor(type: string | undefined): Channel['type'] {
   return 'TEXT';
 }
 
+// builds the synthetic Channel the UI expects out of a DM's participants.
+function dmChannel(entry: import('./dms.svelte').DmEntry | null): Channel | null {
+  if (!entry) return null;
+
+  const other = entry.participants[0];
+  return {
+    id: entry.id,
+    name: other ? other.displayName || other.username : 'Direct Message',
+    unread: entry.unread,
+    lastReadMessageId: null,
+    mention: 0,
+    type: 'DM',
+    avatarUrl: other?.avatarUrl ?? null,
+    avatarColor: other?.avatarColor ?? null,
+  };
+}
+
 function guildPath(serverId?: string, channelId?: string, messageId?: string) {
   if (!serverId) return '/guilds';
 
@@ -136,11 +154,6 @@ function guildPath(serverId?: string, channelId?: string, messageId?: string) {
 
   return `/guilds/${path}`;
 }
-function dmPath(userId: string) {
-  // pretty sure theres no need to uri encode but thanks copilot i guess
-  return `/guilds/dms/${encodeURIComponent(userId)}`;
-}
-
 function errorStatus(error: unknown) {
   if (!error || typeof error !== 'object' || !('status' in error)) return null;
 
@@ -158,9 +171,8 @@ function sendToGuildsIfFederatedServerDown(error: unknown) {
 function currentRoute(): ChatRoute {
   const [first, second, third] = (page.params.path ?? '').split('/').filter(Boolean);
 
-  // will eventually be replaced by dms
   if (!first) return { kind: 'home' };
-  if (first === 'dms') return { kind: 'dms', userId: second ?? null };
+  if (first === 'dms') return { kind: 'dms', channelId: second ?? null };
 
   return {
     kind: 'guild',
@@ -186,9 +198,10 @@ class ChatState {
 
   route = $derived(currentRoute());
   activeServer = $derived(this.route.kind === 'guild' ? this.route.serverId : null);
-  activeChannel = $derived(this.route.kind === 'guild' ? this.route.channelId : null);
+  activeChannel = $derived(
+    this.route.kind === 'guild' || this.route.kind === 'dms' ? this.route.channelId : null
+  );
   activeMessage = $derived(this.route.kind === 'guild' ? this.route.messageId : null);
-  activeDMUser = $derived(this.route.kind === 'dms' ? this.route.userId : null);
 
   editingMessage = $state<boolean>(false);
   editingMessageId = $state<string | null>(null);
@@ -204,8 +217,10 @@ class ChatState {
     return this.activeServer ? (this.channelsByServer[this.activeServer] ?? []) : [];
   }
 
-  get currentChannel() {
+  get currentChannel(): Channel | null {
     if (!this.activeChannel) return null;
+
+    if (this.route.kind === 'dms') return dmChannel(dms.get(this.activeChannel));
 
     for (const category of this.currentCategories) {
       const channel = category.channels.find((item) => item.id === this.activeChannel);
@@ -241,15 +256,13 @@ class ChatState {
   }
 
   messagePath(id: string) {
+    if (this.route.kind === 'dms' && this.activeChannel) return dmPath(this.activeChannel);
     return guildPath(this.activeServer ?? undefined, this.activeChannel ?? undefined, id);
   }
 
   existingChannelPath() {
+    if (this.route.kind === 'dms' && this.activeChannel) return dmPath(this.activeChannel);
     return guildPath(this.activeServer ?? undefined, this.activeChannel ?? undefined);
-  }
-
-  selectDm(userId: string) {
-    return goto(dmPath(userId));
   }
 
   syncActiveChannel() {
@@ -799,7 +812,8 @@ class ChatState {
     if (!result.error && result.data && !('error' in result.data)) {
       const latestMessage = this.messagesByChannel[channelId]?.at(-1);
       if (latestMessage?.id === messageId) {
-        this.setChannelUnread(channelId, false, messageId, 0);
+        if (dms.get(channelId)) dms.markRead(channelId);
+        else this.setChannelUnread(channelId, false, messageId, 0);
       }
     }
   }
@@ -865,13 +879,13 @@ class ChatState {
   }
 
   async loadInitialData() {
-    await this.loadGuilds();
+    await Promise.all([this.loadGuilds(), dms.load()]);
     await this.selectInitialChannel();
     await this.loadCurrentChannel();
   }
 
   async recoverRealtimeState() {
-    await this.loadGuilds();
+    await Promise.all([this.loadGuilds(), dms.load()]);
     await this.loadCurrentChannel();
   }
 
@@ -898,12 +912,14 @@ class ChatState {
       return;
     }
 
+    const isDm = this.route.kind === 'dms';
     const [lastMessage] = await Promise.all([
       this.loadMessages(channelId),
-      this.loadMembers(channelId),
+      isDm ? Promise.resolve() : this.loadMembers(channelId),
     ]);
     if (!lastMessage) {
-      this.setChannelUnread(channelId, false, undefined, 0);
+      if (isDm) dms.markRead(channelId);
+      else this.setChannelUnread(channelId, false, undefined, 0);
       return;
     }
 

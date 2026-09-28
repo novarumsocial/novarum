@@ -11,6 +11,7 @@ import {
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
+import { canAccessChannel } from '../../utils/channelAccess';
 import { db, users } from '../../src/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -159,12 +160,9 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       const channel = await db.query.channels.findFirst({
         where: { id: message.channelId },
       });
-      if (!channel || channel.type !== 'VOICE') return;
+      if (!channel || channel.type !== 'VOICE' || !channel.guildId) return;
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: { guildId: channel.guildId, userId: session.userId },
-      });
-      if (!membership) return;
+      if (!(await canAccessChannel(channel, session.userId))) return;
 
       const previous = removeVoicePresence(session.userId);
       if (previous && previous.channelId !== channel.id) publishVoiceState(ws, previous, false);

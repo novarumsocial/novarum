@@ -16,6 +16,7 @@ import {
   noStoreRedirect,
 } from '../../utils/services/storage';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { canAccessChannel } from '../../utils/channelAccess';
 import { attachments, db } from '../../src/db';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -39,10 +40,9 @@ async function requireUploadAccess(channelId: string, contentType: string, token
   });
   if (!channel) return { ok: false as const, status: 404 as const, error: 'Channel not found' };
 
-  const membership = await db.query.guildMembers.findFirst({
-    where: { guildId: channel.guildId, userId: session.userId },
-  });
-  if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+  if (!(await canAccessChannel(channel, session.userId))) {
+    return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+  }
 
   return { ok: true as const, session, channel };
 }
@@ -224,14 +224,14 @@ export const upload = new Elysia({ tags: ['Upload'] })
 
 export async function createPendingAttachment(input: {
   channelId: string;
-  guildId: string;
+  guildId: string | null;
   uploaderId: string;
   filename: string;
   contentType: string;
   size: number;
 }) {
   const attachmentId = randomString();
-  const objectKey = `attachments/${input.guildId}/${input.channelId}/${attachmentId}`;
+  const objectKey = `attachments/${input.guildId ?? 'dm'}/${input.channelId}/${attachmentId}`;
   const filename = safeAttachmentFilename(input.filename);
 
   await db.insert(attachments).values({

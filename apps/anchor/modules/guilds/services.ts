@@ -365,7 +365,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
 
               return {
                 id: channel.id,
-                guildId: channel.guildId,
+                guildId: channel.guildId!,
                 name: channel.name,
                 position: channel.position,
                 type: channel.type as 'TEXT' | 'VOICE',

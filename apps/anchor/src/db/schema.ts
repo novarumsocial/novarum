@@ -170,15 +170,19 @@ export const channels = pgTable(
   {
     id: text('id').primaryKey(),
 
-    guildId: text('guildId')
-      .notNull()
-      .references(() => guilds.id, {
-        onDelete: 'cascade',
-      }),
+    // null for DM/GROUP_DM channels, which have no guild.
+    guildId: text('guildId').references(() => guilds.id, {
+      onDelete: 'cascade',
+    }),
 
     name: text('name').notNull(),
+    // TEXT, VOICE, DM, GROUP_DM
     type: text('type').notNull().default('TEXT'),
-    position: integer('position').notNull(),
+    position: integer('position').notNull().default(0),
+
+    // sorted "userIdA:userIdB" for a 1:1 DM, so opening a DM is idempotent.
+    // null for guild channels and group DMs.
+    dmKey: text('dmKey').unique(),
 
     createdAt: date('createdAt').notNull().defaultNow(),
 
@@ -191,6 +195,41 @@ export const channels = pgTable(
     unique('channel_guildId_name_unique').on(table.guildId, table.name),
 
     index('channel_guildId_position_idx').on(table.guildId, table.position),
+
+    check(
+      'channel_guild_or_dm_check',
+      sql`${table.guildId} IS NOT NULL OR ${table.type} IN ('DM', 'GROUP_DM')`
+    ),
+  ]
+);
+
+export const channelMembers = pgTable(
+  'channel_member',
+  {
+    channelId: text('channelId')
+      .notNull()
+      .references(() => channels.id, {
+        onDelete: 'cascade',
+      }),
+
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, {
+        onDelete: 'cascade',
+      }),
+
+    // hides the DM from the sidebar until a new message reopens it.
+    closed: boolean('closed').notNull().default(false),
+
+    joinedAt: date('joinedAt').notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'channel_member_pkey',
+      columns: [table.channelId, table.userId],
+    }),
+
+    index('channel_member_userId_idx').on(table.userId),
   ]
 );
 

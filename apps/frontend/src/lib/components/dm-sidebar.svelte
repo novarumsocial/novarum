@@ -1,36 +1,35 @@
 <script lang="ts">
   import { Plus, Users, X } from '@lucide/svelte';
-  import { friends } from '$lib/friends.svelte';
+  import { goto } from '$app/navigation';
+  import { dms } from '$lib/dms.svelte';
+  import { chat } from '$lib/chat-state.svelte';
   import Avatar from './avatar.svelte';
+  import NewDmDialog from './new-dm-dialog.svelte';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { device } from '$lib/device.svelte';
 
   const entries = $derived(
-    [...friends.accepted].sort(
-      (b, a) =>
-        new Date(a.acceptedAt ?? a.createdAt).getTime() -
-        new Date(b.acceptedAt ?? b.createdAt).getTime()
+    [...dms.list].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? b.joinedAt).getTime() -
+        new Date(a.lastMessageAt ?? a.joinedAt).getTime()
     )
   );
 
-  // ponytail: selection is visual only, no DM backend yet — wire to chat route when DMs exist
-  let selected = $state<string | null>('friends');
+  let newDmOpen = $state(false);
 
-  const itemClass = (id: string) =>
+  const itemClass = (active: boolean) =>
     `flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors ${
-      selected === id
+      active
         ? 'bg-primary/10 text-sidebar-foreground'
         : 'text-muted-foreground hover:text-sidebar-foreground'
     }`;
 </script>
 
 <aside class="flex w-60 flex-col bg-sidebar">
-  <div
-    class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2"
-    class:mt-2={device.isComputer}
-  >
+  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2" class:mt-2={device.isComputer}>
     {#if device.isComputer}
-      <button class={itemClass('friends')} onclick={() => (selected = 'friends')}>
+      <button class={itemClass(chat.route.kind === 'home')} onclick={() => goto('/guilds')}>
         <Users class="size-4 shrink-0" />
         <span class="flex-1 truncate">Friends</span>
       </button>
@@ -46,36 +45,61 @@
       </span>
       <button
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
-        aria-label="Create direct message"
+        aria-label="Start a direct message"
+        onclick={() => (newDmOpen = true)}
       >
-        <a href="#"> <!-- does nothing -->
-          <Plus class="size-3.5" />
-        </a>
+        <Plus class="size-3.5" />
       </button>
     </div>
 
-    {#each entries as entry (entry.user.userId)}
-      {@const name = entry.user.displayName || entry.user.username}
-      <button
-        class={itemClass(entry.user.userId) + ' group cursor-pointer'}
-        onclick={() => (selected = entry.user.userId)}
+    {#each entries as entry (entry.id)}
+      {@const other = entry.participants[0]}
+      {@const name = other ? other.displayName || other.username : 'Direct Message'}
+      {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
+      <div
+        role="button"
+        tabindex="0"
+        class={itemClass(active) + ' group cursor-pointer'}
+        onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}
+        onkeydown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            goto(`/guilds/dms/${encodeURIComponent(entry.id)}`);
+          }
+        }}
       >
         <Avatar
-          src={entry.user.avatarUrl}
+          src={other?.avatarUrl}
           {name}
           class="size-6 text-[10px]"
-          bgColor={entry.user.avatarColor}
+          bgColor={other?.avatarColor}
         />
-        <span class="flex-1 truncate">{name}</span>
-        <a href="#"> <!-- does nothing -->
-          <X class="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
-        </a>
-      </button>
+        <span class="flex-1 truncate" class:font-semibold={entry.unread}>{name}</span>
+        {#if entry.unread}
+          <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
+        {/if}
+        <button
+          class="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
+          aria-label="Close direct message"
+          onclick={(event) => {
+            event.stopPropagation();
+            void dms.close(entry.id);
+            if (active) void goto('/guilds/dms');
+          }}
+        >
+          <X class="size-3.5" />
+        </button>
+      </div>
     {/each}
 
-    <p class="text-xs text-muted-foreground flex items-center justify-center text-center px-2 mt-4 select-none pointer-events-none">
-      Sorry, DMs are not implemented yet D:
-      You should go create (or join) a guild, that's where I've been focusing for the last two months
-    </p>
+    {#if entries.length === 0}
+      <p
+        class="pointer-events-none mt-4 flex items-center justify-center px-2 text-center text-xs text-muted-foreground select-none"
+      >
+        No direct messages yet. Start one from a friend's profile.
+      </p>
+    {/if}
   </div>
 </aside>
+
+<NewDmDialog bind:open={newDmOpen} />

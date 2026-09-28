@@ -8,6 +8,7 @@ import { publicUserSchema } from 'anchor/public-user';
 import type { RealtimeEvent } from 'anchor';
 import { getNotificationPermission, sendNotification } from './notifications';
 import { friends } from './friends.svelte';
+import { dms, dmPath } from './dms.svelte';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -50,17 +51,30 @@ const channelSchema = z.object({
   guildId: z.string(),
 });
 
+// eden revives ISO date strings in ws payloads into Date objects, so every date field
+// below has to accept both.
+const isoDateSchema = z.union([z.string(), z.date().transform((date) => date.toISOString())]);
+const dmParticipantsSchema = z.array(publicUserSchema);
+const dmChannelSchema = z.object({
+  id: z.string(),
+  type: z.enum(['DM', 'GROUP_DM']),
+  participants: dmParticipantsSchema,
+  lastMessageAt: isoDateSchema.nullable(),
+  unread: z.boolean(),
+  joinedAt: isoDateSchema,
+});
+
 const messageEventDataSchema = z.object({
   id: z.string(),
   channelId: z.string(),
-  guildId: z.string(),
+  guildId: z.string().nullable(),
   content: z.string().nullable(),
   nonce: z.string(),
   replyTo: z.string().nullable().default(null),
   editedTime: z.string().optional(),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentSchema),
-  createdAt: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
+  createdAt: isoDateSchema,
   author: publicUserSchema,
 });
 
@@ -93,8 +107,12 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     data: z.object({
       id: z.string(),
       channelId: z.string(),
-      guildId: z.string(),
+      guildId: z.string().nullable(),
     }),
+  }),
+  z.object({
+    type: z.literal('dm.created'),
+    data: dmChannelSchema,
   }),
   z.object({
     type: z.literal('user.status.changed'),
@@ -144,7 +162,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       username: z.string(),
       displayName: z.string().nullable(),
       homeserver: z.string(),
-      time: z.union([z.string(), z.date().transform((date) => date.toISOString())]),
+      time: isoDateSchema,
     }),
   }),
   z.object({
@@ -327,12 +345,18 @@ class RealtimeState {
       }
       if (event.type === 'message.created') {
         const user = useSession().user;
+        const isDm = event.data.guildId === null;
+        const isActive = chat.activeChannel === event.data.channelId;
+        const notifyWorthy = isDm
+          ? !isActive
+          : event.data.pingedHandles.some(
+              (handle) => handle.toLowerCase() === user?.handle.toLowerCase()
+            );
+
         if (
           user &&
           event.data.author.userId !== user.id &&
-          event.data.pingedHandles.some(
-            (handle) => handle.toLowerCase() === user.handle.toLowerCase()
-          ) &&
+          notifyWorthy &&
           settings.value.pushNotifications &&
           (await getNotificationPermission()) === 'granted'
         ) {
@@ -340,13 +364,17 @@ class RealtimeState {
             title: event.data.author.displayName || event.data.author.username,
             body: settings.value.messagePreview
               ? (event.data.content ?? 'Sent an attachment')
-              : 'Mentioned you',
+              : isDm
+                ? 'Sent you a message'
+                : 'Mentioned you',
             tag: event.data.channelId,
             onClick: () => {
               void goto(
-                `/guilds/${[event.data.guildId, event.data.channelId, event.data.id]
-                  .map(encodeURIComponent)
-                  .join('/')}`
+                isDm
+                  ? dmPath(event.data.channelId)
+                  : `/guilds/${[event.data.guildId!, event.data.channelId, event.data.id]
+                      .map(encodeURIComponent)
+                      .join('/')}`
               );
             },
           });
@@ -354,6 +382,13 @@ class RealtimeState {
 
         chat.addMessage(event.data);
         chat.clearTyping(event.data.channelId, event.data.author.userId);
+
+        if (isDm) {
+          dms.handleMessage(event.data.channelId, event.data.createdAt, {
+            active: isActive,
+            fromSelf: user ? event.data.author.userId === user.id : false,
+          });
+        }
       }
       if (event.type === 'message.updated') {
         chat.updateMessage(event.data.channelId, { ...event.data, edited: true });
@@ -390,6 +425,9 @@ class RealtimeState {
       }
       if (event.type === 'user.updated') {
         chat.updateUserProfile(event.data.user.userId, event.data.user);
+      }
+      if (event.type === 'dm.created') {
+        dms.upsert(event.data);
       }
     });
   }

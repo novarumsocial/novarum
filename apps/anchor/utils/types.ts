@@ -41,8 +41,12 @@ export type RealtimeEvent =
       data: {
         id: string;
         channelId: string;
-        guildId: string;
+        guildId: string | null;
       };
+    }
+  | {
+      type: 'dm.created';
+      data: DmChannel;
     }
   | {
       type: 'user.status.changed';
@@ -113,7 +117,7 @@ export type AttachmentPayload = {
 export type MessageEventData = {
   id: string;
   channelId: string;
-  guildId: string;
+  guildId: string | null;
   content: string | null;
   nonce: string;
   replyTo: string | null;
@@ -121,6 +125,15 @@ export type MessageEventData = {
   attachments: AttachmentPayload[];
   createdAt: string;
   author: PublicUser;
+};
+
+export type DmChannel = {
+  id: string;
+  type: 'DM' | 'GROUP_DM';
+  participants: PublicUser[];
+  lastMessageAt: string | null;
+  unread: boolean;
+  joinedAt: string;
 };
 
 export type VoicePresence = {

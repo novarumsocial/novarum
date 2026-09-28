@@ -11,6 +11,7 @@ import { invite } from '../modules/invite/services';
 import { federation } from '../modules/federation/services';
 import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
+import { dm } from '../modules/dm/services';
 import { configureStorageCors } from '../utils/services/storage';
 import { writeEmojis } from '../utils/emojiWriter';
 import { clearOnlineUsers } from '../utils/clearOnlineUsers';
@@ -58,6 +59,7 @@ const app = new Elysia()
           { name: 'Upload', description: 'the upload/ routes' },
           { name: 'User', description: 'the user/ routes' },
           { name: 'Friends', description: 'the friends/ routes' },
+          { name: 'DM', description: 'the dm/ routes' },
         ],
       },
     })
@@ -73,6 +75,7 @@ const app = new Elysia()
   .use(upload)
   .use(user)
   .use(friends)
+  .use(dm)
   .get('/', () => 'this is anchor')
   .listen(getConfig().server.listen_port);
 

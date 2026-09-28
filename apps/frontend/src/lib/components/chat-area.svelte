@@ -6,6 +6,7 @@
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
+  import Avatar from './avatar.svelte';
   import { formatDate } from '$lib/formatDate';
 
   let {
@@ -158,6 +159,13 @@
     </Button>
     {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />
+    {:else if channel.type === 'DM'}
+      <Avatar
+        src={channel.avatarUrl}
+        name={channel.name}
+        class="size-6 text-[10px]"
+        bgColor={channel.avatarColor}
+      />
     {:else}
       <Hash class="size-5 text-muted-foreground" />
     {/if}
@@ -166,15 +174,17 @@
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      class="ml-auto lg:hidden"
-      onclick={onOpenMembers}
-      aria-label="Open members"
-    >
-      <Users class="size-5" />
-    </Button>
+    {#if channel.type !== 'DM'}
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        class="ml-auto lg:hidden"
+        onclick={onOpenMembers}
+        aria-label="Open members"
+      >
+        <Users class="size-5" />
+      </Button>
+    {/if}
   </div>
 
   <div
@@ -193,11 +203,27 @@
           {@render skeletonRows(5)}
         </div>
       {:else if messages.length === 0}
-        <div class="mb-4 max-w-md border border-dashed border-border p-4 select-none">
-          <p class="text-sm font-medium text-foreground">No messages yet</p>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Start the conversation in #{channel.name}.
-          </p>
+        <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
+          {#if channel.type === 'DM'}
+            <Avatar
+              src={channel.avatarUrl}
+              name={channel.name}
+              class="size-14 text-lg"
+              bgColor={channel.avatarColor}
+            />
+          {/if}
+          <div class="border border-dashed border-border p-4">
+            <p class="text-sm font-medium text-foreground">
+              {channel.type === 'DM'
+                ? `This is the beginning of your conversation with ${channel.name}.`
+                : 'No messages yet'}
+            </p>
+            {#if channel.type !== 'DM'}
+              <p class="mt-1 text-sm text-muted-foreground">
+                Start the conversation in #{channel.name}.
+              </p>
+            {/if}
+          </div>
         </div>
       {:else}
         <div>
@@ -286,7 +312,7 @@
   {/if}
 
   <MessageInput
-    placeholder="Message #{channel.name}"
+    placeholder={channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`}
     onSend={sendMessage}
     onTyping={() => chat.onTyping()}
   />
