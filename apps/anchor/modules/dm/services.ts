@@ -29,10 +29,11 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
   .get(
     '/',
     async ({ session, server }) => {
-      const memberships = await db.query.channelMembers.findMany({
+      const allMemberships = await db.query.channelMembers.findMany({
         where: { userId: session.userId, closed: false },
         with: { channel: { with: { members: { with: { user: true } } } } },
       });
+      const memberships = allMemberships.filter((m) => m.channel.members.length > 1);
 
       const channelIds = memberships.map((m) => m.channelId);
       const readStates = channelIds.length
@@ -167,7 +168,10 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
       );
 
       const shadowId = makeFederatedChannelId(target.homeserver, opened.data.id);
-      const membership = await upsertDmShadow(shadowId, session.userId);
+      const membership = await upsertDmShadow(shadowId, session.userId, [
+        session.userId,
+        ...refreshed.map((user) => user.id),
+      ]);
       if (server) void ensureFederatedDmRealtimeBridge(server, shadowId).catch(() => null);
 
       return dmResponse({ id: shadowId, type: 'DM' }, membership.joinedAt, [
@@ -263,7 +267,11 @@ export async function openLocalDm(userOneId: string, userTwoId: string) {
 
 // makes sure a shadow row exists locally for a DM that's actually hosted on another
 // homeserver, so the local participant can see and use it like any other DM.
-export async function upsertDmShadow(channelId: string, localUserId: string) {
+export async function upsertDmShadow(
+  channelId: string,
+  localUserId: string,
+  participantIds: string[] = [localUserId]
+) {
   const existing = await db.query.channels.findFirst({ where: { id: channelId } });
   if (!existing) {
     await db
@@ -272,7 +280,10 @@ export async function upsertDmShadow(channelId: string, localUserId: string) {
       .onConflictDoNothing();
   }
 
-  await db.insert(channelMembers).values({ channelId, userId: localUserId }).onConflictDoNothing();
+  await db
+    .insert(channelMembers)
+    .values(participantIds.map((userId) => ({ channelId, userId })))
+    .onConflictDoNothing();
 
   const membership = await db.query.channelMembers.findFirst({
     where: { channelId, userId: localUserId },

@@ -64,8 +64,11 @@ class DmsState {
   }
 
   async close(channelId: string) {
+    const closed = this.get(channelId);
     this.list = this.list.filter((dm) => dm.id !== channelId);
-    await anchor.client.dm({ id: channelId }).close.post();
+
+    const result = await anchor.client.dm({ id: channelId }).close.post();
+    if (result.error && closed) this.upsert(closed);
   }
 
   upsert(dm: DmEntry) {
@@ -80,7 +83,10 @@ class DmsState {
     createdAt: string,
     { active, fromSelf }: { active: boolean; fromSelf: boolean }
   ) {
-    if (!this.get(channelId)) return;
+    if (!this.get(channelId)) {
+      void this.load();
+      return;
+    }
 
     this.list = this.list.map((dm) =>
       dm.id === channelId

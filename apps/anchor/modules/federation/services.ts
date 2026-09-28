@@ -1225,6 +1225,13 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const local = participants.data.find((p) => p.homeserver.toLowerCase() === localHomeserver);
       if (!local) return status(400, { error: 'No local participant in this DM' });
 
+      if (
+        friendAuthority(parsed.origin.homeserver, getConfig().server.homeserver) !==
+        parsed.origin.homeserver.toLowerCase()
+      ) {
+        return status(403, { error: 'This homeserver is not authoritative for this DM' });
+      }
+
       const localUser = await db.query.users.findFirst({
         where: { username: local.username, homeserver: getConfig().server.homeserver },
       });
@@ -1236,8 +1243,19 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
           .map(upsertFederatedUser)
       );
 
+      const actor = others[0];
+      if (!actor) return status(400, { error: 'No remote participant in this DM' });
+
+      const friendship = await findFriendship(localUser.id, actor.id);
+      if (friendship?.status !== 'ACCEPTED') {
+        return status(403, { error: 'Users are not friends' });
+      }
+
       const shadowId = makeFederatedChannelId(parsed.origin.homeserver, channelId);
-      const membership = await upsertDmShadow(shadowId, localUser.id);
+      const membership = await upsertDmShadow(shadowId, localUser.id, [
+        localUser.id,
+        ...others.map((user) => user.id),
+      ]);
 
       if (server) {
         publishRealtime(server, `userEvents:${localUser.id}`, {
@@ -1260,6 +1278,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         200: okResponseSchema,
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
