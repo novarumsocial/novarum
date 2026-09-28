@@ -3,13 +3,13 @@ name: Build Anchor image
 on:
   push:
     branches:
-      - main
+      - '**'
     paths:
       - 'apps/anchor/**'
       - '.github/workflows/anchor-image.yml'
 
 concurrency:
-  group: anchor-image
+  group: anchor-image-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -33,9 +33,20 @@ jobs:
       - name: Set up Docker builder
         uses: useblacksmith/setup-docker-builder@v1
 
-      - name: Set image tag
+      - name: Set image tags
         id: image
-        run: echo "short-sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        run: |
+          branch="${GITHUB_REF_NAME//\//-}"
+          sha="${GITHUB_SHA::7}"
+          tags=("ghcr.io/novarumsocial/anchor:${branch}" "ghcr.io/novarumsocial/anchor:${branch}-${sha}")
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            tags+=("ghcr.io/novarumsocial/anchor:latest")
+          fi
+          {
+            echo "tags<<EOF"
+            printf '%s\n' "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push Anchor image
         uses: useblacksmith/build-push-action@v2
@@ -43,6 +54,4 @@ jobs:
           context: .
           file: apps/anchor/Dockerfile
           push: true
-          tags: |
-            ghcr.io/novarumsocial/anchor:${{ steps.image.outputs.short-sha }}
-            ghcr.io/novarumsocial/anchor:latest
+          tags: ${{ steps.image.outputs.tags }}
