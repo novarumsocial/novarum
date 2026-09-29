@@ -19,13 +19,11 @@ type SignupInput = {
 };
 
 type SessionResult =
-  | { ok: true; user: SessionUser }
-  | { ok: false; error: string; cookieMissing?: boolean };
+  { ok: true; user: SessionUser } | { ok: false; error: string; cookieMissing?: boolean };
 
 export type MfaMethod = 'EMAIL' | 'TOTP';
 export type LoginResult =
-  | SessionResult
-  | { ok: true; mfa: { challenge: string; methods: MfaMethod[] } };
+  SessionResult | { ok: true; mfa: { challenge: string; methods: MfaMethod[] } };
 
 export function getErrorMessage(error: unknown, fallback: string) {
   const stringError = z.string().safeParse(error);
@@ -40,8 +38,23 @@ export function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+const accountsStorageKey = 'novarum:accounts';
+const accountsSchema = z.array(z.object({ homeServer: z.string(), username: z.string() }));
+export type Account = z.infer<typeof accountsSchema>[number];
+
+function getStoredAccounts() {
+  if (typeof localStorage === 'undefined') return [];
+
+  const stored = accountsSchema.safeParse(
+    JSON.parse(localStorage.getItem(accountsStorageKey) ?? 'null')
+  );
+  return stored.success ? stored.data : [];
+}
+
 class SessionState {
   user = $state<SessionUser | null>(null);
+  // one per homeserver: the session cookie is shared by every account on the same server
+  accounts = $state<Account[]>(getStoredAccounts());
   loading = $state(false);
   initialized = $state(false);
   error = $state<string | null>(null);
@@ -55,6 +68,7 @@ class SessionState {
     try {
       const me = await anchor.client.auth.me.get();
       this.user = me.data?.user ?? null;
+      if (this.user) this.remember(this.user);
       return this.user;
     } catch {
       this.user = null;
@@ -170,6 +184,28 @@ class SessionState {
     }
   }
 
+  async switchAccount(homeServer: string) {
+    await anchor.setHomeServer(homeServer);
+    window.location.href = '/';
+  }
+
+  forget(homeServer: string) {
+    this.setAccounts(this.accounts.filter((account) => account.homeServer !== homeServer));
+  }
+
+  private remember(user: SessionUser) {
+    const account = { homeServer: anchor.homeServer, username: user.username };
+    this.setAccounts([
+      ...this.accounts.filter((other) => other.homeServer !== account.homeServer),
+      account,
+    ]);
+  }
+
+  private setAccounts(accounts: Account[]) {
+    this.accounts = accounts;
+    localStorage.setItem(accountsStorageKey, JSON.stringify(accounts));
+  }
+
   async logout() {
     this.loading = true;
     this.error = null;
@@ -213,6 +249,7 @@ class SessionState {
       }
 
       this.user = data.user;
+      this.remember(data.user);
       this.initialized = true;
       return { ok: true, user: data.user };
     } catch (error) {

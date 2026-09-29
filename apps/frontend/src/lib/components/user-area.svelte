@@ -8,6 +8,8 @@
     PhoneOff,
     Settings,
     Signal,
+    Check,
+    Plus,
   } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
   import MicLevelMeter from './mic-level-meter.svelte';
@@ -19,8 +21,10 @@
   import Label from './ui/label/label.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { settings } from '$lib/settings.svelte';
-  import type { SessionUser } from '$lib/session.svelte';
+  import { session, type SessionUser } from '$lib/session.svelte';
+  import { anchor } from '$lib/anchor.svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { goto } from '$app/navigation';
 
   let {
     voice,
@@ -34,6 +38,10 @@
     onLeaveVoice: () => void;
   } = $props();
   let settingsOpen = $state(false);
+  let acctSwitcherOpen = $state(false);
+  const otherAccounts = $derived(
+    session.accounts.filter((account) => account.homeServer !== anchor.homeServer)
+  );
   let loopbackPending = $state(false);
   let loopbackError = $state<string | null>(null);
 
@@ -173,30 +181,80 @@
   {/if}
 
   <div class="flex h-14 items-center gap-2.5 px-3">
-    <div class="relative shrink-0">
-      <Avatar
-        src={user.avatarUrl}
-        name={user.displayName || user.username}
-        bgColor={user.avatarColor}
-        class="size-8 text-xs"
-      />
-      {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
-        <div
-          class="pointer-events-none absolute inset-0"
-          style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ?? '#00d492'}, inset 0 0 0
-          2.5px var(--color-sidebar)"
-          class:rounded-full={settings.value.circleIcons}
-        ></div>
-      {/if}
-    </div>
-    <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
-        {user.displayName || user.username}
-      </p>
-      <p class="truncate text-[11px] text-muted-foreground">
-        @{user.username}:{user.homeserver}
-      </p>
-    </div>
+    <Popover.Root bind:open={acctSwitcherOpen}>
+      <Popover.Trigger
+        class="-ml-1.5 flex min-w-0 flex-1 items-center gap-2.5 px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent"
+        aria-label="Switch account"
+      >
+        <div class="relative shrink-0">
+          <Avatar
+            src={user.avatarUrl}
+            name={user.displayName || user.username}
+            bgColor={user.avatarColor}
+            class="size-8 text-xs"
+          />
+          {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
+            <div
+              class="pointer-events-none absolute inset-0"
+              style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ?? '#00d492'}, inset 0 0 0
+              2.5px var(--color-sidebar)"
+              class:rounded-full={settings.value.circleIcons}
+            ></div>
+          {/if}
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
+            {user.displayName || user.username}
+          </p>
+          <p class="truncate text-[11px] text-muted-foreground">
+            @{user.username}:{user.homeserver}
+          </p>
+        </div>
+      </Popover.Trigger>
+      <Popover.Content side="top" align="start" class="w-64 gap-0 p-1">
+        <p class="px-2 py-1.5 text-[11px] font-medium text-muted-foreground">Accounts</p>
+        <div class="flex items-center gap-2.5 bg-accent/50 px-2 py-1.5">
+          <Avatar
+            src={user.avatarUrl}
+            name={user.displayName || user.username}
+            bgColor={user.avatarColor}
+            class="size-7 text-[11px]"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-xs font-medium">{user.displayName || user.username}</p>
+            <p class="truncate text-[11px] text-muted-foreground">{user.homeserver}</p>
+          </div>
+          <Check class="size-4 text-primary" />
+        </div>
+        {#each otherAccounts as account (account.homeServer)}
+          <button
+            type="button"
+            class="flex w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors hover:bg-accent"
+            onclick={() => {
+              session.switchAccount(account.homeServer);
+              acctSwitcherOpen = false;
+            }}
+          >
+            <Avatar name={account.username} class="size-7 text-[11px]" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-xs font-medium">{account.username}</p>
+              <p class="truncate text-[11px] text-muted-foreground">{account.homeServer}</p>
+            </div>
+          </button>
+        {/each}
+        <div class="my-1 border-t border-border"></div>
+        <button
+          type="button"
+          class="flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+          onclick={() => goto('/login?add')}
+        >
+          <span class="flex size-7 items-center justify-center text-muted-foreground">
+            <Plus class="size-4" />
+          </span>
+          Add account
+        </button>
+      </Popover.Content>
+    </Popover.Root>
     <div class="flex items-center gap-0.5">
       <button
         class={cn(

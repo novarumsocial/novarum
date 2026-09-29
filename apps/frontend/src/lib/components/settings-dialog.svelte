@@ -276,6 +276,7 @@
   async function logout() {
     logoutLoading = true;
     await anchor.client.auth.logout.post();
+    session.forget(anchor.homeServer);
     const me = await anchor.client.auth.me.get();
     if (!me.data) {
       window.location.href = '/login';
