@@ -12,6 +12,7 @@ import {
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
 import { channelTopics } from '../../utils/publishRealtime';
+import { bridgedVoicePresenceFor } from '../../utils/federationRealtime';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { db, users } from '../../src/db';
@@ -21,6 +22,7 @@ import type { VoicePresence } from '../../utils/types';
 
 const activeRealtimeConnections = new Map<string, number>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
+const voiceSocketByUser = new Map<string, string>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
     guildId: z.string().nullable(),
@@ -83,7 +85,10 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
   ]),
   async open(ws) {
     const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+    // @ts-ignore messages can arrive before open finishes, so they await this instead
+    ws.data.sessionReady = validateSessionToken(token);
+    // @ts-ignore same
+    const session = (await ws.data.sessionReady) as SessionWithUser | null;
     if (!session) {
       ws.close(1008, 'Unauthorized');
       return;
@@ -102,9 +107,9 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     }
 
     const guildIds = memberships.map((membership) => membership.guildId);
-    const dmMemberships = await db.query.channelMembers.findMany({
-      where: { userId: session.userId },
-    });
+    const dmIds = (
+      await db.query.channelMembers.findMany({ where: { userId: session.userId } })
+    ).map((membership) => membership.channelId);
     ws.send(
       JSON.stringify({
         type: 'voice.states.snapshot',
@@ -112,7 +117,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
           guildIds,
           states: [
             ...voicePresenceForGuilds(guildIds),
-            ...voicePresenceForChannels(dmMemberships.map((membership) => membership.channelId)),
+            ...voicePresenceForChannels(dmIds),
+            ...bridgedVoicePresenceFor([...guildIds, ...dmIds]),
           ],
         },
       })
@@ -135,10 +141,11 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
   },
   async message(ws, message) {
     // @ts-ignore stored during open
-    const session = ws.data.session as SessionWithUser | undefined;
+    const session = (await ws.data.sessionReady) as SessionWithUser | null;
     if (!session) return;
 
     if (message.type === 'voice.leave') {
+      voiceSocketByUser.delete(session.userId);
       const previous = removeVoicePresence(session.userId);
       if (previous) {
         await publishVoiceState(ws, previous, false);
@@ -164,6 +171,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
           await publishVoiceState(ws, previous, false);
         leaveFederatedVoice(session, message.channelId);
         federatedVoiceChannelsByUser.set(session.userId, message.channelId);
+        voiceSocketByUser.set(session.userId, ws.id);
         return;
       }
 
@@ -187,6 +195,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
         name: session.user.displayName || session.user.username,
       };
       setVoicePresence(state);
+      voiceSocketByUser.set(session.userId, ws.id);
       await publishVoiceState(ws, state, true);
       return;
     }
@@ -231,7 +240,13 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     ws.send(
       JSON.stringify({
         type: 'voice.states.snapshot',
-        data: { guildIds: [message.guildId], states: voicePresenceForGuilds([message.guildId]) },
+        data: {
+          guildIds: [message.guildId],
+          states: [
+            ...voicePresenceForGuilds([message.guildId]),
+            ...bridgedVoicePresenceFor([message.guildId]),
+          ],
+        },
       })
     );
   },
@@ -240,9 +255,13 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     const session = ws.data.session as SessionWithUser;
     if (!session) return;
 
-    const previous = removeVoicePresence(session.userId);
-    if (previous) await publishVoiceState(ws, previous, false);
-    leaveFederatedVoice(session);
+    // only the socket that joined the call ends it; a stale or second socket closing shouldn't.
+    if (voiceSocketByUser.get(session.userId) === ws.id) {
+      voiceSocketByUser.delete(session.userId);
+      const previous = removeVoicePresence(session.userId);
+      if (previous) await publishVoiceState(ws, previous, false);
+      leaveFederatedVoice(session);
+    }
 
     const becameOffline = removeUserConnection(session.userId);
     if (!becameOffline) return;

@@ -555,6 +555,14 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       if (!userId) return { ok: true };
 
       if (event.event === 'participant_left') {
+        // a reconnect joins the new participant before the old one's leave arrives.
+        const participants = event.room?.name
+          ? await livekitServiceClient.listParticipants(event.room.name).catch(() => [])
+          : [];
+        if (participants.some((participant) => participant.identity === userId)) {
+          return { ok: true };
+        }
+
         const previous = removeVoicePresence(userId);
         if (previous && server) {
           await publishToChannel(

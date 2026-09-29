@@ -8,7 +8,7 @@ import {
   parseFederatedChannelId,
   parseFederatedGuildId,
 } from './federationIds';
-import type { RealtimeEvent } from './types';
+import type { RealtimeEvent, VoicePresence } from './types';
 import { publishRealtime, publishToChannel } from './publishRealtime';
 import { publicUserSchema } from './publicUser';
 import {
@@ -19,6 +19,26 @@ import {
 } from '../src/db/zod';
 
 const activeBridges = new Map<string, WebSocket | null>();
+const bridgedVoicePresence = new Map<string, Map<string, VoicePresence>>();
+
+// presence for remote guilds/DMs lives on their homeserver, so we keep what the bridges relay
+// to include it in the snapshot local clients get when they connect.
+export function bridgedVoicePresenceFor(ids: string[]) {
+  return ids.flatMap((id) => [...(bridgedVoicePresence.get(id)?.values() ?? [])]);
+}
+
+function trackBridgedVoicePresence(id: string, event: RealtimeEvent) {
+  if (event.type === 'voice.states.snapshot') {
+    bridgedVoicePresence.set(id, new Map(event.data.states.map((state) => [state.userId, state])));
+  }
+  if (event.type === 'voice.state.changed') {
+    const { connected, ...state } = event.data;
+    const states = bridgedVoicePresence.get(id) ?? new Map<string, VoicePresence>();
+    if (connected) states.set(state.userId, state);
+    else states.delete(state.userId);
+    bridgedVoicePresence.set(id, states);
+  }
+}
 
 const messageEventDataSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
@@ -129,12 +149,7 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
     guildId,
     federatedGuild.homeserver,
     `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`,
-    (event) =>
-      publishRealtime(
-        server,
-        `guildEvents:${guildId}`,
-        mapFederatedRealtimeEvent(event, federatedGuild.homeserver)
-      )
+    (event) => publishRealtime(server, `guildEvents:${guildId}`, event)
   );
 }
 
@@ -148,12 +163,7 @@ export async function ensureFederatedDmRealtimeBridge(server: Server, channelId:
     channelId,
     federatedChannel.homeserver,
     `/federation/realtime/dms/${encodeURIComponent(federatedChannel.id)}`,
-    (event) =>
-      publishToChannel(
-        server,
-        { id: channelId, guildId: null },
-        mapFederatedRealtimeEvent(event, federatedChannel.homeserver)
-      )
+    (event) => publishToChannel(server, { id: channelId, guildId: null }, event)
   );
 }
 
@@ -192,11 +202,22 @@ async function ensureBridge(
 
   socket.addEventListener('message', (message) => {
     const event = parseRealtimeEvent(message.data);
-    if (event) onEvent(event);
+    if (!event) return;
+
+    const mapped = mapFederatedRealtimeEvent(event, homeserver);
+    trackBridgedVoicePresence(id, mapped);
+    onEvent(mapped);
   });
 
   socket.addEventListener('close', () => {
-    if (activeBridges.get(id) === socket) activeBridges.delete(id);
+    if (activeBridges.get(id) !== socket) return;
+    activeBridges.delete(id);
+
+    // updates stop with the bridge, so don't leave clients showing people in a call forever.
+    for (const state of bridgedVoicePresenceFor([id])) {
+      onEvent({ type: 'voice.state.changed', data: { ...state, connected: false } });
+    }
+    bridgedVoicePresence.delete(id);
   });
 
   socket.addEventListener('error', () => {
