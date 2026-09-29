@@ -235,9 +235,14 @@
               acctSwitcherOpen = false;
             }}
           >
-            <Avatar name={account.username} class="size-7 text-[11px]" />
+            <Avatar
+              src={account.avatarUrl}
+              name={account.displayName || account.username}
+              bgColor={account.avatarColor}
+              class="size-7 text-[11px]"
+            />
             <div class="min-w-0 flex-1">
-              <p class="truncate text-xs font-medium">{account.username}</p>
+              <p class="truncate text-xs font-medium">{account.displayName || account.username}</p>
               <p class="truncate text-[11px] text-muted-foreground">{account.homeServer}</p>
             </div>
           </button>

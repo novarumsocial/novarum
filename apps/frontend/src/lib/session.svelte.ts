@@ -39,7 +39,15 @@ export function getErrorMessage(error: unknown, fallback: string) {
 }
 
 const accountsStorageKey = 'novarum:accounts';
-const accountsSchema = z.array(z.object({ homeServer: z.string(), username: z.string() }));
+const accountsSchema = z.array(
+  z.object({
+    homeServer: z.string(),
+    username: z.string(),
+    displayName: z.string().nullish(),
+    avatarUrl: z.string().nullish(),
+    avatarColor: z.string().nullish(),
+  })
+);
 export type Account = z.infer<typeof accountsSchema>[number];
 
 function getStoredAccounts() {
@@ -194,7 +202,13 @@ class SessionState {
   }
 
   private remember(user: SessionUser) {
-    const account = { homeServer: anchor.homeServer, username: user.username };
+    const account = {
+      homeServer: anchor.homeServer,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      avatarColor: user.avatarColor,
+    };
     this.setAccounts([
       ...this.accounts.filter((other) => other.homeServer !== account.homeServer),
       account,
