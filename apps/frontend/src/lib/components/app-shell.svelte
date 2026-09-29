@@ -6,6 +6,7 @@
   import { realtime } from '$lib/realtime.svelte';
   import { friends } from '$lib/friends.svelte';
   import { dms } from '$lib/dms.svelte';
+  import { device } from '$lib/device.svelte';
   import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
@@ -62,6 +63,8 @@
   let callExpanded = $state(false);
 
   function startCall(id: string) {
+    // phones have no room for the call and the chat side by side, so start it expanded.
+    if (!device.isComputer) callExpanded = true;
     void voice.join(id).catch(() => null);
   }
 

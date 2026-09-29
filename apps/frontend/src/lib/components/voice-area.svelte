@@ -154,6 +154,25 @@
     idleTimer = setTimeout(() => (controlsVisible = false), 2500);
   }
 
+  // on touch, a tap while the controls are hidden only brings them back, instead of also
+  // spotlighting whatever tile happened to be under the finger.
+  let revealTap = false;
+
+  function onStagePointerDown(event: PointerEvent) {
+    revealTap = event.pointerType !== 'mouse' && !showControls;
+    wakeControls();
+  }
+
+  function onStageClickCapture(event: MouseEvent) {
+    if (!revealTap) return;
+    revealTap = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const canScreenShare = !!navigator.mediaDevices?.getDisplayMedia;
+  const canFullscreen = document.fullscreenEnabled;
+
   function hideControls() {
     clearTimeout(idleTimer);
     controlsVisible = false;
@@ -193,7 +212,7 @@
       {/if}
 
       <div class="ml-auto flex items-center gap-1">
-        {#if active}
+        {#if active && canFullscreen}
           <Tooltip.Root>
             <Tooltip.Trigger>
               {#snippet child({ props })}
@@ -235,7 +254,8 @@
     role="region"
     aria-label="Call"
     onpointermove={wakeControls}
-    onpointerdown={wakeControls}
+    onpointerdown={onStagePointerDown}
+    onclickcapture={onStageClickCapture}
     onpointerleave={(event) => event.pointerType === 'mouse' && hideControls()}
   >
     {#if fullscreen}
@@ -363,16 +383,18 @@
           {/if}
         </Button>
 
-        <Button
-          variant={voice.selfScreenShare ? 'default' : 'secondary'}
-          size="icon"
-          class={controlClass}
-          aria-label={screenLabel}
-          aria-pressed={voice.selfScreenShare}
-          onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
-        >
-          <MonitorUp class="size-3.5" />
-        </Button>
+        {#if canScreenShare}
+          <Button
+            variant={voice.selfScreenShare ? 'default' : 'secondary'}
+            size="icon"
+            class={controlClass}
+            aria-label={screenLabel}
+            aria-pressed={voice.selfScreenShare}
+            onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
+          >
+            <MonitorUp class="size-3.5" />
+          </Button>
+        {/if}
 
         {#if spotlightScreenShare}
           {@const identity = spotlightScreenShare.identity}

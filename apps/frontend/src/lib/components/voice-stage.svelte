@@ -98,7 +98,7 @@
               'absolute z-10 flex h-7 items-center gap-1.5 bg-black/60 px-2 text-xs font-medium text-white backdrop-blur transition-opacity hover:bg-black/75 focus-visible:opacity-100',
               sideStrip ? 'top-2 right-2' : 'right-2 bottom-2',
               settings.value.circleIcons && 'rounded-full',
-              !stripCollapsed && 'sm:opacity-0 sm:group-hover:opacity-100'
+              !stripCollapsed && 'pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100'
             )}
             aria-label={stripCollapsed ? 'Show participants (H)' : 'Hide participants (H)'}
             title={stripCollapsed ? 'Show participants (H)' : 'Hide participants (H)'}

@@ -201,15 +201,17 @@
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
     {#if channel.type === 'DM'}
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        class="ml-auto"
-        onclick={onCall}
-        aria-label="Start call"
-      >
-        <Phone class="size-5" />
-      </Button>
+      {#if !call}
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="ml-auto"
+          onclick={onCall}
+          aria-label="Start call"
+        >
+          <Phone class="size-5" />
+        </Button>
+      {/if}
     {:else}
       <Button
         variant="ghost"
@@ -236,7 +238,7 @@
           role="separator"
           aria-orientation="horizontal"
           aria-label="Resize call"
-          class="absolute inset-x-0 -bottom-1 z-10 h-2 cursor-row-resize touch-none transition-colors hover:bg-primary/40"
+          class="absolute inset-x-0 -bottom-1 z-10 h-2 cursor-row-resize touch-none transition-colors hover:bg-primary/40 pointer-coarse:-bottom-2.5 pointer-coarse:h-5"
           onpointerdown={resizeCall}
         ></div>
       {/if}
