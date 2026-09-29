@@ -8,18 +8,20 @@
     voice,
     identity,
     name,
+    class: className,
     children,
   }: {
     voice?: Voice | null;
     identity: string;
     name: string;
+    class?: string;
     children: Snippet;
   } = $props();
 </script>
 
 {#if voice && voice.connected}
   <ContextMenu.Root>
-    <ContextMenu.Trigger>
+    <ContextMenu.Trigger class={className}>
       {@render children()}
     </ContextMenu.Trigger>
     <ContextMenu.Content class="overflow-y-hidden">

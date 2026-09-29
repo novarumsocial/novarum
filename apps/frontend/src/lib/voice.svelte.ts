@@ -65,7 +65,10 @@ export class Voice {
   audioPlaybackBlocked = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
-  private participantAudio = new SvelteMap<string, { volume: number; muted: boolean }>();
+  private participantAudio = new SvelteMap<
+    string,
+    { volume: number; muted: boolean; screenVolume: number }
+  >();
   private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
   private endedTrackListeners = new WeakSet<VoiceVideoTrack>();
 
@@ -321,16 +324,34 @@ export class Voice {
     return this.participantAudio.get(identity)?.muted ?? false;
   }
 
+  participantScreenVolume(identity: string) {
+    return this.participantAudio.get(identity)?.screenVolume ?? 1;
+  }
+
   setParticipantVolume(identity: string, volume: number) {
     this.participantAudio.set(identity, {
       volume: Math.max(0, Math.min(3, volume)),
       muted: this.participantMuted(identity),
+      screenVolume: this.participantScreenVolume(identity),
     });
     this.updateParticipantAudio(identity);
   }
 
   setParticipantMuted(identity: string, muted: boolean) {
-    this.participantAudio.set(identity, { volume: this.participantVolume(identity), muted });
+    this.participantAudio.set(identity, {
+      volume: this.participantVolume(identity),
+      muted,
+      screenVolume: this.participantScreenVolume(identity),
+    });
+    this.updateParticipantAudio(identity);
+  }
+
+  setParticipantScreenVolume(identity: string, volume: number) {
+    this.participantAudio.set(identity, {
+      volume: this.participantVolume(identity),
+      muted: this.participantMuted(identity),
+      screenVolume: Math.max(0, Math.min(3, volume)),
+    });
     this.updateParticipantAudio(identity);
   }
 
@@ -391,8 +412,7 @@ export class Voice {
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
     const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-      | LocalAudioTrack
-      | undefined;
+      LocalAudioTrack | undefined;
     if (!(track instanceof LocalAudioTrack)) return;
     if (this.noiseProcessorTrack === track) return;
 
@@ -486,8 +506,7 @@ export class Voice {
       .catch(() => undefined)
       .then(async () => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-          | LocalAudioTrack
-          | undefined;
+          LocalAudioTrack | undefined;
         if (this.room !== room || !(track instanceof LocalAudioTrack)) return;
 
         await this.removeNoiseCancellation();
@@ -568,8 +587,9 @@ export class Voice {
       .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const speakingSet = new Set(speakers.map((s) => s.identity));
         for (const [identity, state] of this.voiceStates) {
-          state.speaking = speakingSet.has(identity);
-          this.voiceStates.set(identity, { ...state });
+          const speaking = speakingSet.has(identity);
+          if (state.speaking === speaking) continue;
+          this.voiceStates.set(identity, { ...state, speaking });
         }
       });
   }
@@ -666,9 +686,15 @@ export class Voice {
   }
 
   private updateParticipantAudio(identity: string) {
-    this.room?.remoteParticipants
-      .get(identity)
-      ?.setVolume(this.participantMuted(identity) ? 0 : this.participantVolume(identity));
+    const participant = this.room?.remoteParticipants.get(identity);
+    if (!participant) return;
+
+    const muted = this.participantMuted(identity);
+    participant.setVolume(muted ? 0 : this.participantVolume(identity), Track.Source.Microphone);
+    participant.setVolume(
+      muted ? 0 : this.participantScreenVolume(identity),
+      Track.Source.ScreenShareAudio
+    );
   }
 
   private detachRemoteAudio(track?: RemoteTrack) {
