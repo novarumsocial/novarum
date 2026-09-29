@@ -1,7 +1,7 @@
 # build
 FROM oven/bun:1 AS build
 WORKDIR /app
-COPY package.json bun.lock* ./
+COPY package.json bun.lock* tsconfig.json ./
 COPY apps/ apps/
 RUN bun install
 RUN bun run --filter frontend prepare
