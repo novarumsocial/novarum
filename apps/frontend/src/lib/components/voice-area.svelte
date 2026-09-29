@@ -133,10 +133,33 @@
     manualGrid = true;
   }
 
-  const controlClass = $derived(cn('size-10', settings.value.circleIcons && 'rounded-full'));
+  const controlClass = $derived(
+    cn('size-10 sm:size-8', settings.value.circleIcons && 'rounded-full')
+  );
   const micLabel = $derived(voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute');
   const cameraLabel = $derived(voice.selfCamera ? 'Turn camera off' : 'Turn camera on');
   const screenLabel = $derived(voice.selfScreenShare ? 'Stop sharing screen' : 'Share screen');
+
+  // Controls fade out after a few seconds without pointer movement, or as soon as the
+  // pointer leaves the call; hovering them or having the volume popover open keeps them up.
+  let controlsVisible = $state(true);
+  let hoveringControls = $state(false);
+  let volumeOpen = $state(false);
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const showControls = $derived(controlsVisible || hoveringControls || volumeOpen);
+
+  function wakeControls() {
+    controlsVisible = true;
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => (controlsVisible = false), 2500);
+  }
+
+  function hideControls() {
+    clearTimeout(idleTimer);
+    controlsVisible = false;
+  }
+
+  $effect(() => () => clearTimeout(idleTimer));
 
   async function toggleFullscreen() {
     if (document.fullscreenElement) {
@@ -209,6 +232,11 @@
   <div
     bind:this={stageElement}
     class="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+    role="region"
+    aria-label="Call"
+    onpointermove={wakeControls}
+    onpointerdown={wakeControls}
+    onpointerleave={(event) => event.pointerType === 'mouse' && hideControls()}
   >
     {#if fullscreen}
       <Tooltip.Root>
@@ -279,109 +307,84 @@
 
     {#if active}
       <div
-        class="relative flex shrink-0 items-center justify-center gap-1.5 border-t border-border bg-sidebar/60 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-2"
+        class={cn(
+          'absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 border border-border bg-sidebar/80 p-2 shadow-lg backdrop-blur transition-opacity duration-300 focus-within:pointer-events-auto focus-within:opacity-100 sm:bottom-4',
+          !showControls && 'pointer-events-none opacity-0',
+          settings.value.circleIcons && 'rounded-full'
+        )}
+        role="group"
+        aria-label="Call controls"
+        onpointerenter={() => (hoveringControls = true)}
+        onpointerleave={() => (hoveringControls = false)}
       >
-        <Tooltip.Root>
-          <Tooltip.Trigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                variant={voice.selfMuted ? 'destructive' : 'secondary'}
-                size="icon"
-                class={controlClass}
-                aria-label={micLabel}
-                aria-pressed={voice.selfMuted}
-                onclick={() =>
-                  voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted)}
-              >
-                {#if voice.selfMuted}
-                  <MicOff class="size-4" />
-                {:else}
-                  <Mic class="size-4" />
-                {/if}
-              </Button>
-            {/snippet}
-          </Tooltip.Trigger>
-          <Tooltip.Content>{micLabel}</Tooltip.Content>
-        </Tooltip.Root>
+        <Button
+          variant={voice.selfMuted ? 'destructive' : 'secondary'}
+          size="icon"
+          class={controlClass}
+          aria-label={micLabel}
+          aria-pressed={voice.selfMuted}
+          onclick={() =>
+            voice.selfDeafened ? voice.setDeafened(false) : voice.setMuted(!voice.selfMuted)}
+        >
+          {#if voice.selfMuted}
+            <MicOff class="size-3.5" />
+          {:else}
+            <Mic class="size-3.5" />
+          {/if}
+        </Button>
 
-        <Tooltip.Root>
-          <Tooltip.Trigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                variant={voice.selfDeafened ? 'destructive' : 'secondary'}
-                size="icon"
-                class={controlClass}
-                aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
-                aria-pressed={voice.selfDeafened}
-                onclick={() => voice.setDeafened(!voice.selfDeafened)}
-              >
-                {#if voice.selfDeafened}
-                  <HeadphoneOff class="size-4" />
-                {:else}
-                  <Headphones class="size-4" />
-                {/if}
-              </Button>
-            {/snippet}
-          </Tooltip.Trigger>
-          <Tooltip.Content>{voice.selfDeafened ? 'Undeafen' : 'Deafen'}</Tooltip.Content>
-        </Tooltip.Root>
+        <Button
+          variant={voice.selfDeafened ? 'destructive' : 'secondary'}
+          size="icon"
+          class={controlClass}
+          aria-label={voice.selfDeafened ? 'Undeafen' : 'Deafen'}
+          aria-pressed={voice.selfDeafened}
+          onclick={() => voice.setDeafened(!voice.selfDeafened)}
+        >
+          {#if voice.selfDeafened}
+            <HeadphoneOff class="size-3.5" />
+          {:else}
+            <Headphones class="size-3.5" />
+          {/if}
+        </Button>
 
-        <Tooltip.Root>
-          <Tooltip.Trigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                variant={voice.selfCamera ? 'default' : 'secondary'}
-                size="icon"
-                class={controlClass}
-                aria-label={cameraLabel}
-                aria-pressed={voice.selfCamera}
-                onclick={() => voice.setCamera(!voice.selfCamera)}
-              >
-                {#if voice.selfCamera}
-                  <Video class="size-4" />
-                {:else}
-                  <VideoOff class="size-4" />
-                {/if}
-              </Button>
-            {/snippet}
-          </Tooltip.Trigger>
-          <Tooltip.Content>{cameraLabel}</Tooltip.Content>
-        </Tooltip.Root>
+        <Button
+          variant={voice.selfCamera ? 'default' : 'secondary'}
+          size="icon"
+          class={controlClass}
+          aria-label={cameraLabel}
+          aria-pressed={voice.selfCamera}
+          onclick={() => voice.setCamera(!voice.selfCamera)}
+        >
+          {#if voice.selfCamera}
+            <Video class="size-3.5" />
+          {:else}
+            <VideoOff class="size-3.5" />
+          {/if}
+        </Button>
 
-        <Tooltip.Root>
-          <Tooltip.Trigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                variant={voice.selfScreenShare ? 'default' : 'secondary'}
-                size="icon"
-                class={controlClass}
-                aria-label={screenLabel}
-                aria-pressed={voice.selfScreenShare}
-                onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
-              >
-                <MonitorUp class="size-4" />
-              </Button>
-            {/snippet}
-          </Tooltip.Trigger>
-          <Tooltip.Content>{screenLabel}</Tooltip.Content>
-        </Tooltip.Root>
+        <Button
+          variant={voice.selfScreenShare ? 'default' : 'secondary'}
+          size="icon"
+          class={controlClass}
+          aria-label={screenLabel}
+          aria-pressed={voice.selfScreenShare}
+          onclick={() => voice.setScreenShare(!voice.selfScreenShare)}
+        >
+          <MonitorUp class="size-3.5" />
+        </Button>
 
         {#if spotlightScreenShare}
           {@const identity = spotlightScreenShare.identity}
-          <Popover.Root>
+          <Popover.Root bind:open={volumeOpen}>
             <Popover.Trigger
               class={cn(
                 controlClass,
-                'inline-flex items-center justify-center rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                'inline-flex items-center justify-center bg-secondary text-secondary-foreground hover:bg-secondary/80'
               )}
               aria-label={`Stream volume for ${spotlightScreenShare.name}`}
-              title="Stream volume"
             >
-              <Volume2 class="size-4" />
+              <Volume2 class="size-3.5" />
             </Popover.Trigger>
             <Popover.Content side="top" align="center" class="w-48 flex-col items-start gap-2">
               <p class="flex w-full justify-between text-sm">
@@ -402,41 +405,38 @@
           </Popover.Root>
         {/if}
 
-        <div class="mx-1 h-6 w-px shrink-0 bg-border"></div>
-
-        <Tooltip.Root>
-          <Tooltip.Trigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                size="icon"
-                class={cn(controlClass, 'bg-destructive text-white hover:bg-destructive/90')}
-                aria-label="Leave call"
-                onclick={onLeave}
-              >
-                <PhoneOff class="size-4" />
-              </Button>
-            {/snippet}
-          </Tooltip.Trigger>
-          <Tooltip.Content>Leave call</Tooltip.Content>
-        </Tooltip.Root>
-
-        {#if onToggleExpand}
-          <Button
-            variant="ghost"
-            size="icon"
-            class={cn(controlClass, 'absolute right-2 text-muted-foreground hover:text-foreground')}
-            onclick={onToggleExpand}
-            aria-label={expanded ? 'Show messages' : 'Expand call'}
-          >
-            {#if expanded}
-              <Minimize2 class="size-4" />
-            {:else}
-              <Maximize2 class="size-4" />
-            {/if}
-          </Button>
-        {/if}
+        <Button
+          variant="destructive"
+          size="icon"
+          class={controlClass}
+          aria-label="Leave call"
+          onclick={onLeave}
+        >
+          <PhoneOff class="size-3.5" />
+        </Button>
       </div>
+
+      {#if onToggleExpand}
+        <Button
+          variant="ghost"
+          size="icon"
+          class={cn(
+            controlClass,
+            'absolute right-3 bottom-5 z-10 text-muted-foreground transition-opacity duration-300 hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 sm:right-4 sm:bottom-6',
+            !showControls && 'pointer-events-none opacity-0'
+          )}
+          onclick={onToggleExpand}
+          onpointerenter={() => (hoveringControls = true)}
+          onpointerleave={() => (hoveringControls = false)}
+          aria-label={expanded ? 'Show messages' : 'Expand call'}
+        >
+          {#if expanded}
+            <Minimize2 class="size-4" />
+          {:else}
+            <Maximize2 class="size-4" />
+          {/if}
+        </Button>
+      {/if}
     {/if}
   </div>
 </div>

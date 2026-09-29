@@ -13,6 +13,7 @@
     width,
     height,
     compact = false,
+    fitWithin,
     onSelect,
     ariaLabel,
   }: {
@@ -21,6 +22,8 @@
     width?: number;
     height?: number;
     compact?: boolean;
+    // Size the tile to its video's own aspect ratio inside this box, instead of stretching.
+    fitWithin?: { width: number; height: number };
     // Passed for a clickable tile: grid/filmstrip tiles spotlight on click, the
     // spotlighted tile itself exits back to the grid. Left undefined where a tile
     // isn't clickable.
@@ -32,6 +35,19 @@
   const isScreen = $derived(tile.kind === 'screen');
   const track = $derived(isScreen ? tile.state.screenTrack : tile.state.cameraTrack);
   const ringColor = $derived(tile.member?.speakingRingColor ?? '#00d492');
+
+  let videoAspect = $state(16 / 9);
+  const box = $derived.by(() => {
+    if (!fitWithin) return { width, height };
+    const aspect = track ? videoAspect : 16 / 9;
+    const fitted = Math.min(fitWithin.width, fitWithin.height * aspect);
+    return { width: Math.floor(fitted), height: Math.floor(fitted / aspect) };
+  });
+
+  function readAspect(event: Event & { currentTarget: HTMLVideoElement }) {
+    const { videoWidth, videoHeight } = event.currentTarget;
+    if (videoWidth && videoHeight) videoAspect = videoWidth / videoHeight;
+  }
 
   function attachVideo(node: HTMLVideoElement, current: VoiceVideoTrack) {
     current.attach(node);
@@ -61,10 +77,10 @@
       isScreen && 'bg-black',
       onSelect &&
         'cursor-pointer transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2',
-      width === undefined && 'size-full'
+      box.width === undefined && 'size-full'
     )}
-    style:width={width === undefined ? undefined : `${width}px`}
-    style:height={height === undefined ? undefined : `${height}px`}
+    style:width={box.width === undefined ? undefined : `${box.width}px`}
+    style:height={box.height === undefined ? undefined : `${box.height}px`}
     onclick={onSelect}
     aria-label={onSelect ? (ariaLabel ?? `Spotlight ${tile.name}`) : undefined}
   >
@@ -76,6 +92,8 @@
         playsinline
         muted={isSelf}
         use:attachVideo={track}
+        onloadedmetadata={readAspect}
+        onresize={readAspect}
       ></video>
     {:else}
       <div
