@@ -10,5 +10,5 @@ RUN bun run --filter frontend build
 FROM caddy:2-alpine
 WORKDIR /srv
 COPY --from=build /app/apps/frontend/build ./build
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY apps/frontend/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080
