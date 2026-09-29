@@ -206,7 +206,30 @@
     </div>
   {/if}
 
-  <div bind:this={stageElement} class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+  <div
+    bind:this={stageElement}
+    class="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+  >
+    {#if fullscreen}
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="secondary"
+              size="icon-lg"
+              class="absolute right-2 top-2 z-20 shadow-md"
+              onclick={toggleFullscreen}
+              aria-label="Exit fullscreen"
+            >
+              <Minimize2 class="size-4" />
+            </Button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content>Exit fullscreen</Tooltip.Content>
+      </Tooltip.Root>
+    {/if}
+
     {#if reconnecting}
       <div
         class="flex shrink-0 items-center gap-2 border-b border-border bg-amber-500/10 px-3 py-2 text-xs text-amber-400"

@@ -40,6 +40,12 @@ window.addEventListener('DOMContentLoaded', () => {
 const api: ElectronAPI = {
   getAudioDevices: () => ipcRenderer.invoke('voice:get-audio-devices'),
   getVersion: () => ipcRenderer.invoke('version:get'),
+  platform: process.platform,
+  venmic: {
+    isAvailable: () => ipcRenderer.invoke('venmic:available'),
+    link: () => ipcRenderer.invoke('venmic:link'),
+    unlink: () => ipcRenderer.invoke('venmic:unlink'),
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', api);

@@ -40,6 +40,10 @@ const microphoneCaptureOptions = () => ({
   deviceId: settings.value.voiceInputDeviceId,
 });
 
+// the fixed device label @vencord/venmic gives the virtual mic it patches system
+// audio into on linux - baked into the native addon, not something we control.
+export const VENMIC_DEVICE_LABEL = 'vencord-screen-share';
+
 const joinSound = new Sound(JoinEffect);
 const leaveSound = new Sound(Leave);
 const muteSound = new Sound(Mute);
@@ -63,6 +67,7 @@ export class Voice {
   selfCamera = $state<boolean>(false);
   selfScreenShare = $state<boolean>(false);
   audioPlaybackBlocked = $state<boolean>(false);
+  linuxSystemAudioAvailable = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
   private participantAudio = new SvelteMap<
@@ -86,6 +91,21 @@ export class Voice {
   private audioLoopbackContext: AudioContext | null = null;
   private audioLoopbackDeafenedBefore = false;
   private audioLoopbackOperation: Promise<void> = Promise.resolve();
+
+  private screenShareAudioTrack: MediaStreamTrack | null = null;
+  private screenShareAudioStream: MediaStream | null = null;
+
+  constructor() {
+    void this.detectLinuxSystemAudio();
+  }
+
+  private async detectLinuxSystemAudio() {
+    try {
+      this.linuxSystemAudioAvailable = (await window.electron?.venmic.isAvailable()) ?? false;
+    } catch {
+      this.linuxSystemAudioAvailable = false;
+    }
+  }
 
   get participantCount() {
     return this.voiceStates.size;
@@ -178,6 +198,7 @@ export class Voice {
     const channelId = this.channelId;
     await this.setAudioLoopbackTesting(false);
     await this.removeNoiseCancellation();
+    await this.stopScreenShareAudio();
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
@@ -378,7 +399,16 @@ export class Voice {
     if (!this.room) return;
 
     try {
-      await this.room.localParticipant.setScreenShareEnabled(enabled, { audio: true });
+      if (enabled) {
+        await this.room.localParticipant.setScreenShareEnabled(true, {
+          audio: settings.value.screenShareSystemAudio,
+        });
+        await this.startScreenShareAudio();
+      } else {
+        await this.stopScreenShareAudio();
+        await this.room.localParticipant.setScreenShareEnabled(false);
+      }
+
       this.selfScreenShare = enabled;
       if (enabled) {
         screenSound.play();
@@ -386,11 +416,83 @@ export class Voice {
         screenOffSound.play();
       }
     } catch {
+      await this.stopScreenShareAudio();
       screenOffSound.play();
       this.selfScreenShare = false;
     }
 
     this.syncParticipant(this.room.localParticipant, this.channelId!);
+  }
+
+  setScreenShareSystemAudio(enabled: boolean) {
+    settings.value.screenShareSystemAudio = enabled;
+  }
+
+  /**
+   * On windows/macOS, chromium captures system audio itself (granted as loopback
+   * by the main process), so `setScreenShareEnabled(true, { audio: true })` above
+   * is enough. Linux has no such loopback support, so instead we ask the main
+   * process to patch system audio into a venmic virtual mic, then publish that as
+   * a second, separate track.
+   */
+  private async startScreenShareAudio() {
+    if (!this.room) return;
+    if (!settings.value.screenShareSystemAudio) return;
+    if (window.electron?.platform !== 'linux' || !this.linuxSystemAudioAvailable) return;
+
+    try {
+      if (!(await window.electron.venmic.link())) return;
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const device = devices.find(
+        (d) => d.kind === 'audioinput' && d.label === VENMIC_DEVICE_LABEL
+      );
+      if (!device) {
+        await window.electron.venmic.unlink();
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: device.deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      const track = stream.getAudioTracks()[0];
+      if (!track) {
+        stream.getTracks().forEach((t) => t.stop());
+        await window.electron.venmic.unlink();
+        return;
+      }
+
+      this.screenShareAudioStream = stream;
+      this.screenShareAudioTrack = track;
+      await this.room.localParticipant.publishTrack(track, {
+        name: 'screen-share-audio',
+        source: Track.Source.ScreenShareAudio,
+      });
+    } catch (error) {
+      console.error('could not capture linux system audio for screen share', error);
+      await window.electron?.venmic.unlink().catch(() => undefined);
+    }
+  }
+
+  private async stopScreenShareAudio() {
+    const track = this.screenShareAudioTrack;
+    const stream = this.screenShareAudioStream;
+    this.screenShareAudioTrack = null;
+    this.screenShareAudioStream = null;
+
+    if (track && this.room) {
+      await this.room.localParticipant.unpublishTrack(track).catch(() => undefined);
+    }
+    stream?.getTracks().forEach((t) => t.stop());
+
+    if (window.electron?.platform === 'linux') {
+      await window.electron.venmic.unlink().catch(() => undefined);
+    }
   }
 
   private async syncLocalMicrophone(room: Room) {
@@ -543,6 +645,7 @@ export class Voice {
 
         void this.setAudioLoopbackTesting(false);
         void this.removeNoiseCancellation();
+        void this.stopScreenShareAudio();
         this.room = null;
         this.channelId = null;
         this.connectionState = ConnectionState.Disconnected;
@@ -668,6 +771,9 @@ export class Voice {
     track.on(TrackEvent.Ended, () => {
       if (this.channelId !== channelId) return;
 
+      // the user can also stop sharing from the OS/browser's own share bar,
+      // which ends this track without going through setScreenShare(false)
+      if (participant.isLocal) void this.stopScreenShareAudio();
       this.syncParticipant(participant, channelId);
     });
   }

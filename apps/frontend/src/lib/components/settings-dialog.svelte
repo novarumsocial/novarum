@@ -30,7 +30,7 @@
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
   import { settings, type TimeFormat } from '$lib/settings.svelte';
-  import type { Voice } from '$lib/voice.svelte';
+  import { VENMIC_DEVICE_LABEL, type Voice } from '$lib/voice.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import {
     getNotificationPermission,
@@ -494,7 +494,10 @@
       const devices = await navigator.mediaDevices.enumerateDevices();
       audioDevices = {
         input: devices.filter(
-          (device) => device.kind === 'audioinput' && device.deviceId !== 'default'
+          (device) =>
+            device.kind === 'audioinput' &&
+            device.deviceId !== 'default' &&
+            device.label !== VENMIC_DEVICE_LABEL
         ),
         output: devices.filter(
           (device) => device.kind === 'audiooutput' && device.deviceId !== 'default'
@@ -1306,6 +1309,18 @@
               <Switch
                 checked={settings.value.noiseCancellation}
                 onCheckedChange={(enabled) => voice.setNoiseCancellation(enabled)}
+              />
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium">Share System Audio</p>
+                <p class="text-[11px] text-muted-foreground">
+                  Include your computer's audio when you share your screen.
+                </p>
+              </div>
+              <Switch
+                checked={settings.value.screenShareSystemAudio}
+                onCheckedChange={(enabled) => voice.setScreenShareSystemAudio(enabled)}
               />
             </div>
           </div>

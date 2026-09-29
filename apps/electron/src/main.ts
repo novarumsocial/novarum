@@ -16,6 +16,7 @@ import {
   Tray,
 } from 'electron';
 import electronUpdater from 'electron-updater';
+import { registerVenmicHandlers, shutdownVenmic } from './venmic';
 
 // apparently i need to do this pattern bc of commonjs, thanks commonjs
 const { autoUpdater } = electronUpdater;
@@ -32,6 +33,14 @@ protocol.registerSchemesAsPrivileged([
 const devUrl = 'http://localhost:5173';
 const appOrigin = 'app://novarum';
 const resourcesPath = app.isPackaged ? process.resourcesPath : app.getAppPath();
+
+// on wayland, desktopCapturer.getSources() itself goes through the compositor's
+// xdg-desktop-portal screencast picker (and, per electron's own docs, only ever
+// returns that single already-chosen source when pipewire is in use) - so our own
+// picker dialog below would just be a redundant second prompt on top of it.
+const isWayland =
+  process.platform === 'linux' &&
+  (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
 
 function isInternalUrl(value: string) {
   const url = new URL(value);
@@ -100,7 +109,7 @@ function configurePermissions() {
     }
   };
   const allowedPermission = (permission: string) =>
-    permission === 'media' || permission === 'notifications';
+    permission === 'media' || permission === 'notifications' || permission === 'fullscreen';
 
   session.defaultSession.setPermissionCheckHandler(
     (webContents, permission, requestingOrigin) =>
@@ -117,25 +126,33 @@ function configurePermissions() {
       types: ['screen', 'window'],
       fetchWindowIcons: true,
     });
-    const { response } = await dialog.showMessageBox({
-      type: 'question',
-      title: 'Share your screen',
-      message: 'Choose a screen or window to share',
-      buttons: [...sources.map((source) => source.name), 'Cancel'],
-      cancelId: sources.length,
-    });
 
-    if (response === sources.length) return callback({});
+    let source;
+    if (isWayland) {
+      source = sources[0];
+    } else {
+      const { response } = await dialog.showMessageBox({
+        type: 'question',
+        title: 'Share your screen',
+        message: 'Choose a screen or window to share',
+        buttons: [...sources.map((s) => s.name), 'Cancel'],
+        cancelId: sources.length,
+      });
+      source = response === sources.length ? undefined : sources[response];
+    }
+
+    if (!source) return callback({});
 
     // system audio loopback is only wired up by chromium on windows and macos 13+
     // (via the coreaudio tap api on 14.2+) - linux has no equivalent yet, so screen
     // shares there stay video-only until chromium adds pipewire audio support.
+    // note: electron validates `audio` if the key is present at all, even as
+    // `undefined`, so it must be omitted entirely rather than set to undefined.
     const supportsAudioLoopback = process.platform === 'win32' || process.platform === 'darwin';
+    const streams: Parameters<typeof callback>[0] = { video: source };
+    if (request.audioRequested && supportsAudioLoopback) streams.audio = 'loopback';
 
-    callback({
-      video: sources[response],
-      ...(request.audioRequested && supportsAudioLoopback ? { audio: 'loopback' as const } : {}),
-    });
+    callback(streams);
   });
 }
 
@@ -286,6 +303,7 @@ app.whenReady().then(() => {
 
   registerAppProtocol();
   configurePermissions();
+  registerVenmicHandlers();
   const window = createWindow();
   createTray(window);
   configureAutoUpdater(window);
@@ -298,6 +316,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  shutdownVenmic();
 });
 
 app.on('window-all-closed', () => {
