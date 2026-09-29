@@ -12,6 +12,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import {
   removeVoicePresence,
   setVoicePresence,
+  voicePresenceForChannels,
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
 import {
@@ -1067,8 +1068,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
 
       const access = await getFederatedChannelAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
-      // voice presence is guild-only for now; DM calls will need their own presence model.
-      if (access.channel.type !== 'VOICE' || !access.channel.guildId) {
+      if (access.channel.type !== 'VOICE' && access.channel.type !== 'DM') {
         return status(404, { error: 'Channel not right' });
       }
 
@@ -1083,7 +1083,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       else removeVoicePresence(state.userId);
 
       if (server) {
-        publishRealtime(server, `guildEvents:${state.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'voice.state.changed',
           data: { ...state, connected },
         });
@@ -1095,7 +1095,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       response: {
         200: z.object({
           state: z.object({
-            guildId: z.string(),
+            guildId: z.string().nullable(),
             channelId: z.string(),
             userId: z.string(),
             name: z.string(),
@@ -1325,6 +1325,12 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       }
 
       ws.subscribe(`dmEvents:${ws.data.params.id}`);
+      ws.send(
+        JSON.stringify({
+          type: 'voice.states.snapshot',
+          data: { guildIds: [], states: voicePresenceForChannels([ws.data.params.id]) },
+        })
+      );
     },
     message() {
       // server-to-server realtime is publish-only for now.

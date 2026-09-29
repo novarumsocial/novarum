@@ -557,10 +557,11 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       if (event.event === 'participant_left') {
         const previous = removeVoicePresence(userId);
         if (previous && server) {
-          publishRealtime(server, `guildEvents:${previous.guildId}`, {
-            type: 'voice.state.changed',
-            data: { ...previous, connected: false },
-          });
+          await publishToChannel(
+            server,
+            { id: previous.channelId, guildId: previous.guildId },
+            { type: 'voice.state.changed', data: { ...previous, connected: false } }
+          );
         }
         return { ok: true };
       }
@@ -580,8 +581,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           id: channelId,
         },
       });
-      // voice presence is guild-only for now; DM calls will need their own presence model.
-      if (!channel || !channel.guildId) return { ok: true };
+      if (!channel) return { ok: true };
 
       const state = {
         guildId: channel.guildId,
@@ -592,7 +592,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
 
       setVoicePresence(state);
       if (server) {
-        publishRealtime(server, `guildEvents:${state.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'voice.state.changed',
           data: { ...state, connected: true },
         });

@@ -137,7 +137,7 @@ export type DmChannel = {
 };
 
 export type VoicePresence = {
-  guildId: string;
+  guildId: string | null;
   channelId: string;
   userId: string;
   name: string | null;

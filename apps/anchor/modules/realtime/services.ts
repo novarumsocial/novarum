@@ -8,19 +8,22 @@ import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
 import {
   removeVoicePresence,
   setVoicePresence,
+  voicePresenceForChannels,
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
+import { channelTopics } from '../../utils/publishRealtime';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { db, users } from '../../src/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import type { VoicePresence } from '../../utils/types';
 
 const activeRealtimeConnections = new Map<string, number>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
-    guildId: z.string(),
+    guildId: z.string().nullable(),
     channelId: z.string(),
     userId: z.string(),
     name: z.string().nullable(),
@@ -99,10 +102,19 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     }
 
     const guildIds = memberships.map((membership) => membership.guildId);
+    const dmMemberships = await db.query.channelMembers.findMany({
+      where: { userId: session.userId },
+    });
     ws.send(
       JSON.stringify({
         type: 'voice.states.snapshot',
-        data: { guildIds, states: voicePresenceForGuilds(guildIds) },
+        data: {
+          guildIds,
+          states: [
+            ...voicePresenceForGuilds(guildIds),
+            ...voicePresenceForChannels(dmMemberships.map((membership) => membership.channelId)),
+          ],
+        },
       })
     );
 
@@ -129,7 +141,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     if (message.type === 'voice.leave') {
       const previous = removeVoicePresence(session.userId);
       if (previous) {
-        publishVoiceState(ws, previous, false);
+        await publishVoiceState(ws, previous, false);
       }
 
       leaveFederatedVoice(session);
@@ -149,7 +161,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
 
         const previous = removeVoicePresence(session.userId);
         if (previous && previous.channelId !== message.channelId)
-          publishVoiceState(ws, previous, false);
+          await publishVoiceState(ws, previous, false);
         leaveFederatedVoice(session, message.channelId);
         federatedVoiceChannelsByUser.set(session.userId, message.channelId);
         return;
@@ -160,12 +172,13 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       const channel = await db.query.channels.findFirst({
         where: { id: message.channelId },
       });
-      if (!channel || channel.type !== 'VOICE' || !channel.guildId) return;
+      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) return;
 
       if (!(await canAccessChannel(channel, session.userId))) return;
 
       const previous = removeVoicePresence(session.userId);
-      if (previous && previous.channelId !== channel.id) publishVoiceState(ws, previous, false);
+      if (previous && previous.channelId !== channel.id)
+        await publishVoiceState(ws, previous, false);
 
       const state = {
         guildId: channel.guildId,
@@ -174,7 +187,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
         name: session.user.displayName || session.user.username,
       };
       setVoicePresence(state);
-      publishVoiceState(ws, state, true);
+      await publishVoiceState(ws, state, true);
       return;
     }
 
@@ -228,7 +241,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     if (!session) return;
 
     const previous = removeVoicePresence(session.userId);
-    if (previous) publishVoiceState(ws, previous, false);
+    if (previous) await publishVoiceState(ws, previous, false);
     leaveFederatedVoice(session);
 
     const becameOffline = removeUserConnection(session.userId);
@@ -243,9 +256,9 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
   },
 });
 
-function publishVoiceState(
+async function publishVoiceState(
   ws: { publish(topic: string, data: string): void; send(data: string): void },
-  state: { guildId: string; channelId: string; userId: string; name: string | null },
+  state: VoicePresence,
   connected: boolean
 ) {
   const event = JSON.stringify({
@@ -253,7 +266,9 @@ function publishVoiceState(
     data: { ...state, connected },
   });
 
-  ws.publish(`guildEvents:${state.guildId}`, event);
+  for (const topic of await channelTopics({ id: state.channelId, guildId: state.guildId })) {
+    ws.publish(topic, event);
+  }
   ws.send(event);
 }
 

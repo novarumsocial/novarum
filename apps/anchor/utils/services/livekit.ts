@@ -29,5 +29,13 @@ export function removeVoicePresence(userId: string) {
 export function voicePresenceForGuilds(guildIds: string[]) {
   const allowedGuilds = new Set(guildIds);
 
-  return [...voicePresenceByUser.values()].filter((state) => allowedGuilds.has(state.guildId));
+  return [...voicePresenceByUser.values()].filter(
+    (state) => state.guildId && allowedGuilds.has(state.guildId)
+  );
+}
+
+export function voicePresenceForChannels(channelIds: string[]) {
+  const allowedChannels = new Set(channelIds);
+
+  return [...voicePresenceByUser.values()].filter((state) => allowedChannels.has(state.channelId));
 }

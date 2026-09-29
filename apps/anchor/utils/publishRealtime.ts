@@ -15,17 +15,14 @@ export async function publishToChannel(
   channel: { id: string; guildId: string | null },
   event: RealtimeEvent
 ) {
-  if (channel.guildId) {
-    publishRealtime(server, `guildEvents:${channel.guildId}`, event);
-    return;
-  }
+  for (const topic of await channelTopics(channel)) publishRealtime(server, topic, event);
+}
 
-  publishRealtime(server, `dmEvents:${channel.id}`, event);
+export async function channelTopics(channel: { id: string; guildId: string | null }) {
+  if (channel.guildId) return [`guildEvents:${channel.guildId}`];
 
   const members = await db.query.channelMembers.findMany({
     where: { channelId: channel.id },
   });
-  for (const member of members) {
-    publishRealtime(server, `userEvents:${member.userId}`, event);
-  }
+  return [`dmEvents:${channel.id}`, ...members.map((member) => `userEvents:${member.userId}`)];
 }

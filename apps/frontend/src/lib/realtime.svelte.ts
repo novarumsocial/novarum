@@ -136,7 +136,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildIds: z.array(z.string()),
       states: z.array(
         z.object({
-          guildId: z.string(),
+          guildId: z.string().nullable(),
           channelId: z.string(),
           userId: z.string(),
           name: z.string().nullable(),
@@ -147,7 +147,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('voice.state.changed'),
     data: z.object({
-      guildId: z.string(),
+      guildId: z.string().nullable(),
       channelId: z.string(),
       userId: z.string(),
       name: z.string().nullable(),

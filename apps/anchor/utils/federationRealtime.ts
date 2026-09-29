@@ -83,7 +83,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildIds: z.array(z.string()),
       states: z.array(
         z.object({
-          guildId: z.string(),
+          guildId: z.string().nullable(),
           channelId: z.string(),
           userId: z.string(),
           name: z.string().nullable(),
@@ -94,7 +94,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('voice.state.changed'),
     data: z.object({
-      guildId: z.string(),
+      guildId: z.string().nullable(),
       channelId: z.string(),
       userId: z.string(),
       name: z.string().nullable(),
@@ -282,7 +282,7 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
         guildIds: event.data.guildIds.map((guildId) => makeFederatedGuildId(homeserver, guildId)),
         states: event.data.states.map((state) => ({
           ...state,
-          guildId: makeFederatedGuildId(homeserver, state.guildId),
+          guildId: state.guildId ? makeFederatedGuildId(homeserver, state.guildId) : null,
           channelId: makeFederatedChannelId(homeserver, state.channelId),
         })),
       },
@@ -294,7 +294,7 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       ...event,
       data: {
         ...event.data,
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
       },
     };

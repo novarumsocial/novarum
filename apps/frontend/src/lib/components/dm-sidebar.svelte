@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Plus, Users, X } from '@lucide/svelte';
+  import { Phone, Plus, Users, X } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { dms } from '$lib/dms.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -75,6 +75,9 @@
           bgColor={other?.avatarColor}
         />
         <span class="flex-1 truncate" class:font-semibold={entry.unread}>{name}</span>
+        {#if chat.voiceStates[entry.id]?.length}
+          <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
+        {/if}
         {#if entry.unread}
           <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
         {/if}

@@ -40,6 +40,7 @@
   } = $props();
 
   let callHeight = $state(320);
+  const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
 
   function resizeCall(event: PointerEvent) {
     event.preventDefault();
@@ -224,6 +225,19 @@
       </Button>
     {/if}
   </div>
+
+  {#if !call && callers.length}
+    <div class="flex shrink-0 items-center gap-2 border-b border-border bg-primary/5 px-4 py-2">
+      <Phone class="size-4 shrink-0 animate-pulse text-green-500" />
+      <span class="flex-1 truncate text-sm text-foreground">
+        {callers.map((state) => state.name ?? 'Someone').join(', ')}
+        {callers.length === 1 ? 'is' : 'are'} in the call
+      </span>
+      <Button size="sm" class="bg-green-600 text-white hover:bg-green-700" onclick={onCall}>
+        Join
+      </Button>
+    </div>
+  {/if}
 
   {#if call}
     <div

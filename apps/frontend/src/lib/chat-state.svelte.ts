@@ -54,7 +54,7 @@ type ChannelMemberInput = PublicUser & {
 };
 
 type VoicePresenceInput = {
-  guildId: string;
+  guildId: string | null;
   channelId: string;
   userId: string;
   name: string | null;
@@ -465,7 +465,7 @@ class ChatState {
     const guildSet = new Set(guildIds);
     const next = Object.fromEntries(
       Object.entries(this.voiceStates).filter(([, channelStates]) =>
-        channelStates.some((state) => !guildSet.has(state.guildId))
+        channelStates.some((state) => !state.guildId || !guildSet.has(state.guildId))
       )
     );
 
