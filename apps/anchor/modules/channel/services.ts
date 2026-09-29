@@ -402,7 +402,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           id: params.id,
         },
       });
-      if (!channel || channel.type !== 'VOICE') {
+      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) {
         return status(404, { error: 'Channel not right' });
       }
 

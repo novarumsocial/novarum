@@ -11,6 +11,8 @@
     VideoOff,
     MonitorUp,
     Menu,
+    Maximize2,
+    Minimize2,
     Users,
   } from '@lucide/svelte';
   import { cn } from '$lib/utils';
@@ -29,6 +31,9 @@
     onLeave,
     onOpenNavigation,
     onOpenMembers,
+    embedded = false,
+    expanded = false,
+    onToggleExpand,
   }: {
     channel: Channel;
     voice: Voice;
@@ -37,6 +42,9 @@
     onLeave: () => void;
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
+    embedded?: boolean;
+    expanded?: boolean;
+    onToggleExpand?: () => void;
   } = $props();
 
   const participants = $derived(Array.from(voice.voiceStates.entries()));
@@ -126,31 +134,38 @@
 </script>
 
 <div class="relative flex flex-1 flex-col bg-background">
-  <!-- header -->
-  <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      class="md:hidden"
-      onclick={onOpenNavigation}
-      aria-label="Open channels"
-    >
-      <Menu class="size-5" />
-    </Button>
-    <Volume2 class="size-5 text-muted-foreground" />
-    <span class="text-sm font-semibold text-foreground">{channel.name}</span>
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      class="ml-auto lg:hidden"
-      onclick={onOpenMembers}
-      aria-label="Open members"
-    >
-      <Users class="size-5" />
-    </Button>
-  </div>
+  {#if !embedded}
+    <!-- header -->
+    <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        class="md:hidden"
+        onclick={onOpenNavigation}
+        aria-label="Open channels"
+      >
+        <Menu class="size-5" />
+      </Button>
+      <Volume2 class="size-5 text-muted-foreground" />
+      <span class="text-sm font-semibold text-foreground">{channel.name}</span>
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        class="ml-auto lg:hidden"
+        onclick={onOpenMembers}
+        aria-label="Open members"
+      >
+        <Users class="size-5" />
+      </Button>
+    </div>
+  {/if}
 
-  <div class="min-h-0 flex-1 overflow-y-auto px-2 py-3 pb-24 sm:px-4 sm:py-4">
+  <div
+    class={cn(
+      'min-h-0 flex-1 px-2 py-3 sm:px-4 sm:py-4',
+      embedded ? 'overflow-hidden pb-20 sm:pb-20' : 'overflow-y-auto pb-24'
+    )}
+  >
     {#if !active}
       <div class="flex size-full flex-col items-center justify-center gap-4 text-center">
         <div>
@@ -273,7 +288,15 @@
         {/if}
       {/snippet}
 
-      {#if focusTile}
+      {#if embedded}
+        <div class="flex size-full items-center justify-center gap-3">
+          {#each tiles as t (t.key)}
+            <div class="aspect-video h-full min-w-0">
+              {@render tile(t)}
+            </div>
+          {/each}
+        </div>
+      {:else if focusTile}
         <div class="flex size-full flex-col gap-3 sm:flex-row">
           <div
             class="min-h-0 flex-1 cursor-pointer p-1"
@@ -375,6 +398,25 @@
         <PhoneOff class="size-3" />
       </Button>
     </div>
+  {/if}
+
+  {#if active && onToggleExpand}
+    <Button
+      variant="ghost"
+      size="icon"
+      class="absolute right-3 bottom-3 size-10 text-muted-foreground hover:text-foreground sm:right-4 sm:bottom-4 sm:size-8 {settings
+        .value.circleIcons
+        ? 'rounded-full'
+        : ''}"
+      onclick={onToggleExpand}
+      aria-label={expanded ? 'Show messages' : 'Expand call'}
+    >
+      {#if expanded}
+        <Minimize2 class="size-4" />
+      {:else}
+        <Maximize2 class="size-4" />
+      {/if}
+    </Button>
   {/if}
 </div>
 

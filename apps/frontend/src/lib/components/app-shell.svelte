@@ -46,13 +46,32 @@
   );
   const hasUnreadDms = $derived(dms.list.some((dm) => dm.unread));
 
+  const callMembers = $derived(
+    chat.route.kind === 'dms' && currentUser
+      ? [
+          { ...currentUser, userId: currentUser.id, server: currentUser.homeserver },
+          ...(dms
+            .get(chat.activeChannel ?? '')
+            ?.participants.map(({ homeserver, ...user }) => ({ ...user, server: homeserver })) ??
+            []),
+        ]
+      : chat.members
+  );
+
   const voice = new Voice();
+  let callExpanded = $state(false);
+
+  function startCall(id: string) {
+    void voice.join(id).catch(() => null);
+  }
 
   const voiceChannelName = $derived(
     Object.values(chat.channelsByServer)
       .flatMap((categories) => categories)
       .flatMap((category) => category.channels)
-      .find((channel) => channel.id === voice.channelId)?.name ?? null
+      .find((channel) => channel.id === voice.channelId)?.name ??
+      (voice.channelId ? dms.get(voice.channelId)?.participants[0]?.username : null) ??
+      null
   );
 
   $effect(() => {
@@ -234,7 +253,27 @@
         onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
+        onCall={() => startCall(currentChannel.id)}
+        call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
+          ? dmCall
+          : undefined}
+        {callExpanded}
       />
+      {#snippet dmCall()}
+        <VoiceArea
+          channel={currentChannel!}
+          {voice}
+          members={callMembers}
+          onJoin={() => startCall(currentChannel!.id)}
+          onLeave={() => {
+            callExpanded = false;
+            leaveVoice();
+          }}
+          embedded
+          expanded={callExpanded}
+          onToggleExpand={() => (callExpanded = !callExpanded)}
+        />
+      {/snippet}
     {:else if currentChannel && currentChannel.type === 'VOICE'}
       <VoiceArea
         channel={currentChannel}

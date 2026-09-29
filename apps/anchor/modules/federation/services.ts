@@ -1011,7 +1011,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
 
       const access = await getFederatedChannelAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
-      if (access.channel.type !== 'VOICE') return status(404, { error: 'Channel not right' });
+      if (access.channel.type !== 'VOICE' && access.channel.type !== 'DM') {
+        return status(404, { error: 'Channel not right' });
+      }
 
       const voiceConfig = getConfig().voice;
       const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
