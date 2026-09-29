@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 COPY apps/ apps/
 RUN bun install
+RUN bun run --filter frontend prepare
 RUN bun run --filter frontend build
 
 # serve
