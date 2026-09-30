@@ -41,13 +41,18 @@
   }
 
   const visible = $derived(
-    friends.accepted.filter((entry) => {
-      const q = query.trim().toLowerCase();
-      return (
-        !q || nameFor(entry).toLowerCase().includes(q) || handleFor(entry).toLowerCase().includes(q)
-      );
-    })
+    friends.accepted
+      .filter((entry) => {
+        const q = query.trim().toLowerCase();
+        return (
+          !q ||
+          nameFor(entry).toLowerCase().includes(q) ||
+          handleFor(entry).toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => Number(b.status === 'ONLINE') - Number(a.status === 'ONLINE'))
   );
+  const onlineCount = $derived(friends.accepted.filter((e) => e.status === 'ONLINE').length);
 </script>
 
 <main class="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
@@ -114,17 +119,28 @@
               <p class="mt-1 text-xs text-muted-foreground">Try a different name or handle.</p>
             </div>
           {:else}
-            <div class="mt-6 divide-y divide-border border-y border-border">
+            <p class="mt-6 pb-2 text-xs font-semibold text-muted-foreground select-none">
+              Online - {onlineCount}
+            </p>
+            <div class="divide-y divide-border border-y border-border">
               {#each visible as entry (entry.user.userId)}
                 {@const name = nameFor(entry)}
                 <div class="flex items-center gap-3 py-2.5">
                   <!--<ProfileCard user={profileFor(entry)}>-->
-                  <Avatar
-                    src={entry.user.avatarUrl}
-                    {name}
-                    class="size-9 text-sm"
-                    bgColor={entry.user.avatarColor}
-                  />
+                  <div class="relative">
+                    <Avatar
+                      src={entry.user.avatarUrl}
+                      {name}
+                      class="size-9 text-sm"
+                      bgColor={entry.user.avatarColor}
+                    />
+                    {#if entry.status === 'ONLINE'}
+                      <span
+                        class="absolute -right-px -bottom-px size-3 border-2 border-background bg-emerald-500"
+                        class:rounded-full={settings.value.circleIcons}
+                      ></span>
+                    {/if}
+                  </div>
                   <!--</ProfileCard>-->
                   <div class="min-w-0 flex-1 select-none">
                     <p class="truncate text-sm font-medium">{name}</p>

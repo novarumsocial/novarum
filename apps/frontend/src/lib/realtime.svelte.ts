@@ -402,6 +402,7 @@ class RealtimeState {
       }
       if (event.type === 'user.status.changed') {
         chat.updateMemberStatus(event.data.userId, event.data.status);
+        friends.updateStatus(event.data.userId, event.data.status);
       }
       if (event.type === 'member.joined') {
         chat.addOrUpdateMember(event.data.guildId, event.data.user);

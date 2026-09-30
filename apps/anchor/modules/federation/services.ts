@@ -1109,6 +1109,62 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     }
   )
   .post(
+    '/friends/status',
+    async ({ request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const nextStatus = getObjectProperty(parsed.body, 'status');
+      if (nextStatus !== 'ONLINE' && nextStatus !== 'OFFLINE') {
+        return status(400, { error: 'Invalid federation user status' });
+      }
+
+      const [remote] = await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            eq(users.username, userPayload.username),
+            sql`lower(${users.homeserver}) = ${parsed.origin.homeserver}`
+          )
+        )
+        .limit(1);
+      if (!remote) return status(404, { error: 'Unknown user' });
+
+      await db.update(users).set({ status: nextStatus }).where(eq(users.id, remote.id));
+
+      const friendships = await db.query.friendRelationships.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [{ userOneId: remote.id }, { userTwoId: remote.id }],
+        },
+      });
+      for (const { userOneId, userTwoId } of friendships) {
+        if (server)
+          publishRealtime(server, `userEvents:${userOneId === remote.id ? userTwoId : userOneId}`, {
+            type: 'user.status.changed',
+            data: { userId: remote.id, status: nextStatus },
+          });
+      }
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: okResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
     '/guilds/:id/users/status',
     async ({ params, request, server, status }) => {
       const parsed = await verifiedFederationJsonBody(request);

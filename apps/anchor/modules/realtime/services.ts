@@ -18,6 +18,7 @@ import { canAccessChannel } from '../../utils/channelAccess';
 import { db, users } from '../../src/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { getConfig } from '../../utils/config';
 import type { VoicePresence } from '../../utils/types';
 import { publicUser } from '../../utils/publicUser';
 
@@ -341,6 +342,30 @@ async function publishUserStatus(
   memberships: { guildId: string }[],
   status: 'ONLINE' | 'OFFLINE'
 ) {
+  const friendships = await db.query.friendRelationships.findMany({
+    where: {
+      status: 'ACCEPTED',
+      OR: [{ userOneId: session.userId }, { userTwoId: session.userId }],
+    },
+    with: { userOne: true, userTwo: true },
+  });
+  const statusEvent = JSON.stringify({
+    type: 'user.status.changed',
+    data: { userId: session.userId, status },
+  });
+  const localHomeserver = getConfig().server.homeserver.toLowerCase();
+  for (const { userOne, userTwo } of friendships) {
+    const friend = userOne.id === session.userId ? userTwo : userOne;
+    if (friend.homeserver.toLowerCase() === localHomeserver) {
+      ws.publish(`userEvents:${friend.id}`, statusEvent);
+    } else {
+      void postSignedFederationJson(friend.homeserver, '/federation/friends/status', {
+        user: federationUserPayload(session),
+        status,
+      }).catch(() => null);
+    }
+  }
+
   for (const membership of memberships) {
     ws.publish(
       `guildEvents:${membership.guildId}`,

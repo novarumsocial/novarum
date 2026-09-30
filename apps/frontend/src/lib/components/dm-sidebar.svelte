@@ -2,6 +2,8 @@
   import { Phone, Plus, Users, X } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { dms } from '$lib/dms.svelte';
+  import { friends } from '$lib/friends.svelte';
+  import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import Avatar from './avatar.svelte';
   import NewDmDialog from './new-dm-dialog.svelte';
@@ -68,12 +70,20 @@
           }
         }}
       >
-        <Avatar
-          src={other?.avatarUrl}
-          {name}
-          class="size-6 text-[10px]"
-          bgColor={other?.avatarColor}
-        />
+        <div class="relative shrink-0">
+          <Avatar
+            src={other?.avatarUrl}
+            {name}
+            class="size-6 text-[10px]"
+            bgColor={other?.avatarColor}
+          />
+          {#if other && friends.isOnline(other.userId)}
+            <span
+              class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+              class:rounded-full={settings.value.circleIcons}
+            ></span>
+          {/if}
+        </div>
         <span class="flex-1 truncate" class:font-semibold={entry.unread}>{name}</span>
         {#if chat.voiceStates[entry.id]?.length}
           <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />

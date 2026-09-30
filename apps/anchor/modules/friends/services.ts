@@ -31,9 +31,10 @@ import {
 import { friendRelationshipResponseSchema, friendStatusSchema } from '../../src/db/zod';
 
 const federationErrorSchema = z.object({ error: z.string() });
+const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
 const friendEntrySchema = friendRelationshipResponseSchema
   .pick({ createdAt: true, acceptedAt: true })
-  .extend({ user: publicUserSchema });
+  .extend({ user: publicUserSchema, status: userStatusSchema });
 const friendsResponseSchema = z.object({
   accepted: z.array(friendEntrySchema),
   incoming: z.array(friendEntrySchema),
@@ -68,13 +69,16 @@ export const friends = new Elysia({ prefix: '/friends', tags: ['Friends'] })
         with: { userOne: true, userTwo: true },
       });
 
-      const response = (relationship: (typeof relationships)[number]) => ({
-        user: publicUser(
-          relationship.userOneId === session.userId ? relationship.userTwo : relationship.userOne
-        ),
-        createdAt: relationship.createdAt.toISOString(),
-        acceptedAt: relationship.acceptedAt?.toISOString() ?? null,
-      });
+      const response = (relationship: (typeof relationships)[number]) => {
+        const other =
+          relationship.userOneId === session.userId ? relationship.userTwo : relationship.userOne;
+        return {
+          user: publicUser(other),
+          status: userStatusSchema.parse(other.status),
+          createdAt: relationship.createdAt.toISOString(),
+          acceptedAt: relationship.acceptedAt?.toISOString() ?? null,
+        };
+      };
 
       return {
         accepted: relationships.filter(({ status }) => status === 'ACCEPTED').map(response),

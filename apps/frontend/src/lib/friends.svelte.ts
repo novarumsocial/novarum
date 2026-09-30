@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 export type FriendEntry = {
   user: PublicUser;
+  status: 'ONLINE' | 'OFFLINE';
   createdAt: string | Date;
   acceptedAt: string | Date | null;
 };
@@ -65,6 +66,16 @@ class FriendsState {
     } finally {
       if (generation === this.loadGeneration) this.loading = false;
     }
+  }
+
+  isOnline(userId: string) {
+    return this.accepted.some((entry) => entry.user.userId === userId && entry.status === 'ONLINE');
+  }
+
+  updateStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {
+    this.accepted = this.accepted.map((entry) =>
+      entry.user.userId === userId ? { ...entry, status } : entry
+    );
   }
 
   request(userId: string, username: string, homeserver: string) {
