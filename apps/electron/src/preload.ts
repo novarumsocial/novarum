@@ -39,6 +39,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
 const api: ElectronAPI = {
   getAudioDevices: () => ipcRenderer.invoke('voice:get-audio-devices'),
+  getLaunchPrefs: () => ipcRenderer.invoke('launch:get'),
+  setLaunchPrefs: (prefs) => ipcRenderer.invoke('launch:set', prefs),
   getVersion: () => ipcRenderer.invoke('version:get'),
 };
 
