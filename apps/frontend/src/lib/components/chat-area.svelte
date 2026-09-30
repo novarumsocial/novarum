@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { Hash, Menu, Phone, Users, Volume2, X } from '@lucide/svelte';
+  import { BellRing, Hash, Menu, Phone, Users, Volume2, X } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { tick, type Snippet } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { dms } from '$lib/dms.svelte';
+  import { settings } from '$lib/settings.svelte';
+  import { cn } from '$lib/utils';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
@@ -19,6 +22,7 @@
     onOpenNavigation,
     onOpenMembers,
     onCall,
+    onRing,
     call,
     callExpanded = false,
   }: {
@@ -35,12 +39,14 @@
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
     onCall?: () => void;
+    onRing?: () => void;
     call?: Snippet;
     callExpanded?: boolean;
   } = $props();
 
   let callHeight = $state(320);
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
+  const ringing = $derived(!!call && dms.outgoingCall === channel.id);
 
   function resizeCall(event: PointerEvent) {
     event.preventDefault();
@@ -212,6 +218,17 @@
         >
           <Phone class="size-5" />
         </Button>
+      {:else if callers.length <= 1 && !ringing}
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="ml-auto"
+          onclick={onRing}
+          aria-label="Ring"
+          title="Ring"
+        >
+          <BellRing class="size-5" />
+        </Button>
       {/if}
     {:else}
       <Button
@@ -247,6 +264,24 @@
       style:height={callExpanded ? null : `${callHeight}px`}
     >
       {@render call()}
+      {#if ringing}
+        <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4">
+          <div
+            class={cn(
+              'flex min-w-0 items-center gap-2 border border-border bg-sidebar/80 py-1.5 pr-3 pl-1.5 text-sm text-foreground shadow-lg backdrop-blur',
+              settings.value.circleIcons && 'rounded-full'
+            )}
+          >
+            <Avatar
+              src={channel.avatarUrl}
+              name={channel.name}
+              class="size-6 animate-pulse text-[10px]"
+              bgColor={channel.avatarColor}
+            />
+            <span class="truncate">Ringing {channel.name}…</span>
+          </div>
+        </div>
+      {/if}
       {#if !callExpanded}
         <div
           role="separator"

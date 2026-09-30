@@ -122,6 +122,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('call.ringing'),
+    data: z.object({ channelId: z.string(), user: publicUserSchema, ringing: z.boolean() }),
+  }),
+  z.object({
     type: z.literal('channel.typing'),
     data: z.object({
       channelId: z.string(),
@@ -318,6 +322,13 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
         guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
       },
+    };
+  }
+
+  if (event.type === 'call.ringing') {
+    return {
+      ...event,
+      data: { ...event.data, channelId: makeFederatedChannelId(homeserver, event.data.channelId) },
     };
   }
 

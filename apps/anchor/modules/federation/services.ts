@@ -1285,6 +1285,44 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       },
     }
   )
+  .post(
+    '/channels/:id/ring',
+    async ({ params, request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const ringing = getObjectProperty(parsed.body, 'ringing');
+      if (typeof ringing !== 'boolean') return status(400, { error: 'Invalid ring state' });
+
+      const access = await getFederatedChannelAccess(params.id, userPayload);
+      if (!access.ok) return status(access.status, { error: access.error });
+      if (access.channel.type !== 'DM') return status(404, { error: 'Channel not right' });
+
+      if (server) {
+        await publishToChannel(server, access.channel, {
+          type: 'call.ringing',
+          data: { channelId: access.channel.id, user: publicUser(access.user), ringing },
+        });
+      }
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: z.object({ ok: z.boolean() }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
   .ws('/realtime/dms/:id', {
     async open(ws) {
       const headers = new Headers();

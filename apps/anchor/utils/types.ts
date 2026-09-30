@@ -78,6 +78,14 @@ export type RealtimeEvent =
       };
     }
   | {
+      type: 'call.ringing';
+      data: {
+        channelId: string;
+        user: PublicUser;
+        ringing: boolean;
+      };
+    }
+  | {
       type: 'channel.typing';
       data: {
         channelId: string;

@@ -11,6 +11,8 @@ export type DmEntry = {
   joinedAt: string;
 };
 
+export const RING_TIMEOUT = 30_000;
+
 export function dmPath(channelId: string) {
   return `/guilds/dms/${encodeURIComponent(channelId)}`;
 }
@@ -19,6 +21,8 @@ class DmsState {
   list = $state<DmEntry[]>([]);
   loading = $state(false);
   error = $state<string | null>(null);
+  incomingCall = $state<{ channelId: string; user: PublicUser } | null>(null);
+  outgoingCall = $state<string | null>(null);
 
   get(channelId: string) {
     return this.list.find((dm) => dm.id === channelId) ?? null;

@@ -155,6 +155,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('call.ringing'),
+    data: z.object({ channelId: z.string(), user: publicUserSchema, ringing: z.boolean() }),
+  }),
+  z.object({
     type: z.literal('channel.typing'),
     data: z.object({
       channelId: z.string(),
@@ -408,6 +412,30 @@ class RealtimeState {
       if (event.type === 'voice.state.changed') {
         chat.updateVoiceState(event.data);
       }
+      if (event.type === 'call.ringing') {
+        const user = useSession().user;
+        const { channelId, user: caller, ringing } = event.data;
+        const self =
+          caller.username === user?.username &&
+          caller.homeserver.toLowerCase() === user.homeserver.toLowerCase();
+
+        if (!ringing) {
+          // declined on another of my devices, or the other person declined my call.
+          if (dms.incomingCall?.channelId === channelId) dms.incomingCall = null;
+          if (!self && dms.outgoingCall === channelId) dms.outgoingCall = null;
+        } else if (!self) {
+          dms.incomingCall = { channelId, user: caller };
+          if (document.hidden && settings.value.pushNotifications) {
+            void sendNotification({
+              title: caller.displayName || caller.username,
+              body: 'Is calling you',
+              icon: caller.avatarUrl ?? undefined,
+              tag: `call:${channelId}`,
+              onClick: () => void goto(dmPath(channelId)),
+            });
+          }
+        }
+      }
       if (event.type === 'channel.typing') {
         chat.setTyping(
           event.data.channelId,
@@ -499,6 +527,11 @@ class RealtimeState {
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'voice.join', channelId });
+  }
+
+  ringCall(channelId: string, ringing = true) {
+    this.socket?.send({ type: 'call.ring', channelId, ringing });
+    if (ringing) dms.outgoingCall = channelId;
   }
 
   leaveVoice() {

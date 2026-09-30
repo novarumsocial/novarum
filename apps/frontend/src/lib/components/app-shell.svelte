@@ -5,7 +5,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { friends } from '$lib/friends.svelte';
-  import { dms } from '$lib/dms.svelte';
+  import { dms, dmPath } from '$lib/dms.svelte';
   import { device } from '$lib/device.svelte';
   import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
@@ -18,6 +18,7 @@
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
   import DmSidebar from './dm-sidebar.svelte';
+  import CallRinging from './call-ringing.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -65,7 +66,13 @@
   function startCall(id: string) {
     // phones have no room for the call and the chat side by side, so start it expanded.
     if (!device.isComputer) callExpanded = true;
-    void voice.join(id).catch(() => null);
+    const ring = !chat.voiceStates[id]?.length;
+    void voice
+      .join(id)
+      .then(() => {
+        if (ring && voice.channelId === id) realtime.ringCall(id);
+      })
+      .catch(() => null);
   }
 
   const voiceChannelName = $derived(
@@ -257,6 +264,7 @@
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
         onCall={() => startCall(currentChannel.id)}
+        onRing={() => realtime.ringCall(currentChannel.id)}
         call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
           ? dmCall
           : undefined}
@@ -324,4 +332,11 @@
       </div>
     {/if}
   </div>
+  <CallRinging
+    {voice}
+    onAccept={(id) => {
+      void goto(dmPath(id));
+      startCall(id);
+    }}
+  />
 {/if}

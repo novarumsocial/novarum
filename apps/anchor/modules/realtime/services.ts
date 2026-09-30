@@ -19,6 +19,7 @@ import { db, users } from '../../src/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { VoicePresence } from '../../utils/types';
+import { publicUser } from '../../utils/publicUser';
 
 const activeRealtimeConnections = new Map<string, number>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
@@ -70,6 +71,11 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     }),
     t.Object({
       type: t.Literal('voice.leave'),
+    }),
+    t.Object({
+      type: t.Literal('call.ring'),
+      channelId: t.String(),
+      ringing: t.Boolean(),
     }),
     t.Object({
       type: t.Literal('emoji.search'),
@@ -197,6 +203,29 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       setVoicePresence(state);
       voiceSocketByUser.set(session.userId, ws.id);
       await publishVoiceState(ws, state, true);
+      return;
+    }
+
+    if (message.type === 'call.ring') {
+      const federatedChannel = parseFederatedChannelId(message.channelId);
+      if (federatedChannel) {
+        void postSignedFederationJson(
+          federatedChannel.homeserver,
+          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/ring`,
+          { user: federationUserPayload(session), ringing: message.ringing }
+        ).catch(() => null);
+        return;
+      }
+
+      const channel = await db.query.channels.findFirst({ where: { id: message.channelId } });
+      if (!channel || channel.type !== 'DM') return;
+      if (!(await canAccessChannel(channel, session.userId))) return;
+
+      const event = JSON.stringify({
+        type: 'call.ringing',
+        data: { channelId: channel.id, user: publicUser(session.user), ringing: message.ringing },
+      });
+      for (const topic of await channelTopics(channel)) ws.publish(topic, event);
       return;
     }
 
