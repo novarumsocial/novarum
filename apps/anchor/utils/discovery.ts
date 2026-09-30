@@ -10,6 +10,7 @@ import { like } from 'drizzle-orm';
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 const discoveryCacheTtlMs = 5 * 60 * 1000;
 const discoveryFailureCacheTtlMs = 30 * 1000;
+export const federationRequestTimeoutMs = 10 * 1000;
 
 class DiscoveryError extends Error {
   constructor(message: string) {
@@ -97,6 +98,7 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       headers: {
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(federationRequestTimeoutMs),
     });
 
     if (!response.ok) {
@@ -201,6 +203,7 @@ export async function postSignedFederationJson(homeserver: string, path: string,
       accept: 'application/json',
     },
     body: requestBody,
+    signal: AbortSignal.timeout(federationRequestTimeoutMs),
   });
 
   const data = await response.json().catch(() => null);

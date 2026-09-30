@@ -181,14 +181,30 @@ export async function ensureFederatedDmRealtimeBridge(server: Server, channelId:
   );
 }
 
+const maxReconnectDelayMs = 5 * 60 * 1000;
+
 async function ensureBridge(
   id: string,
   homeserver: string,
   path: string,
-  onEvent: (event: RealtimeEvent) => void
+  handler: (event: RealtimeEvent) => void | Promise<void>,
+  attempt = 0
 ) {
   if (activeBridges.has(id)) return;
   activeBridges.set(id, null);
+
+  const onEvent = (event: RealtimeEvent) =>
+    Promise.resolve()
+      .then(() => handler(event))
+      .catch((error) => console.warn(`Failed to handle bridged event for ${id}:`, error));
+
+  // clients never ask for a bridge again once connected, so keep retrying with backoff
+  // (reset once the remote actually accepts the connection).
+  const reconnect = () =>
+    setTimeout(
+      () => void ensureBridge(id, homeserver, path, handler, attempt + 1).catch(() => null),
+      Math.min(1000 * 2 ** attempt, maxReconnectDelayMs)
+    );
 
   let socket: WebSocket;
   try {
@@ -211,8 +227,13 @@ async function ensureBridge(
     activeBridges.set(id, socket);
   } catch (error) {
     if (activeBridges.get(id) === null) activeBridges.delete(id);
+    reconnect();
     throw error;
   }
+
+  socket.addEventListener('open', () => {
+    attempt = 0;
+  });
 
   socket.addEventListener('message', (message) => {
     const event = parseRealtimeEvent(message.data);
@@ -232,6 +253,7 @@ async function ensureBridge(
       onEvent({ type: 'voice.state.changed', data: { ...state, connected: false } });
     }
     bridgedVoicePresence.delete(id);
+    reconnect();
   });
 
   socket.addEventListener('error', () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, users } from '../src/db';
-import { discoverRemoteAnchor } from './discovery';
+import { discoverRemoteAnchor, federationRequestTimeoutMs } from './discovery';
 import { publicUser, publicUserSchema, userProfile } from './publicUser';
 import { randomString } from './randomString';
 
@@ -17,7 +17,11 @@ export async function fetchFederatedUser(homeserver: string, username: string) {
   const expectedHomeserver = homeserver.toLowerCase();
   const remote = await discoverRemoteAnchor(expectedHomeserver);
   const url = new URL(`/federation/users/${encodeURIComponent(username)}`, remote.baseUrl);
-  const response = await fetch(url, { headers: { accept: 'application/json' }, redirect: 'error' });
+  const response = await fetch(url, {
+    headers: { accept: 'application/json' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(federationRequestTimeoutMs),
+  });
   if (!response.ok) return null;
 
   const result = z.object({ user: federationUserSchema }).safeParse(await response.json());
