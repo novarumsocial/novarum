@@ -35,6 +35,9 @@ const schema = z.object({
     // browser-facing endpoint for upload PUTs; only set this if it is publicly reachable.
     // defaults to the download endpoint, so uploads inherit any CDN in front of it.
     s3_upload_endpoint: z.string().min(1).optional(),
+    // shared with a CDN that caches by path (like worker/), which then checks cdn_exp/cdn_sig
+    // so cached files stop being served once their link expires.
+    cdn_signing_secret: z.string().min(1).optional(),
     s3_region: z.string().min(1).optional(),
     s3_virtual_hosted_style: z.boolean().optional().default(false),
     s3_cors_origins: z

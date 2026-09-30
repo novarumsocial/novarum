@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { S3Client, type S3FilePresignOptions } from 'bun';
 import { AwsClient } from 'aws4fetch';
 import { getConfig } from '../config';
@@ -13,6 +14,7 @@ const {
   s3_public_endpoint,
   s3_public_host_rewrite,
   s3_upload_endpoint,
+  cdn_signing_secret,
 } = getConfig().files;
 
 export const storage = new S3Client({
@@ -28,9 +30,29 @@ export function publicPresign(key: string, options?: S3FilePresignOptions) {
   if (s3_public_host_rewrite && s3_endpoint && s3_public_endpoint) {
     const url = storage.presign(key, { ...options, endpoint: s3_endpoint });
     const stripTrailingSlash = (u: string) => u.replace(/\/+$/, '');
-    return url.replace(stripTrailingSlash(s3_endpoint), stripTrailingSlash(s3_public_endpoint));
+    return signForCdn(
+      url.replace(stripTrailingSlash(s3_endpoint), stripTrailingSlash(s3_public_endpoint)),
+      options?.expiresIn
+    );
   }
-  return storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint });
+  return signForCdn(
+    storage.presign(key, { ...options, endpoint: s3_public_endpoint ?? s3_endpoint }),
+    options?.expiresIn
+  );
+}
+
+// a CDN that caches by path never shows the storage signature to storage on a cache hit,
+// so it checks this one instead (and strips it before forwarding).
+function signForCdn(presigned: string, expiresIn = 24 * 60 * 60) {
+  if (!cdn_signing_secret) return presigned;
+
+  // appended as-is: re-serializing the query could change the storage signature's encoding.
+  const exp = Math.floor(Date.now() / 1000) + expiresIn;
+  const sig = crypto
+    .createHmac('sha256', cdn_signing_secret)
+    .update(`${new URL(presigned).pathname}:${exp}`)
+    .digest('hex');
+  return `${presigned}${presigned.includes('?') ? '&' : '?'}cdn_exp=${exp}&cdn_sig=${sig}`;
 }
 
 // A CDN in front of storage only earns its keep on downloads, and proxying uploads through it
