@@ -129,3 +129,9 @@ export const dmResponseSchema = z.object({
 export const dmOpenResponseSchema = dmResponseSchema.pick({ id: true, type: true }).extend({
   participants: z.array(publicUserSchema),
 });
+
+export const dmLatestResponseSchema = z.object({
+  channels: z.array(
+    z.object({ channelId: z.string(), id: z.string(), createdAt: isoDateSchema, own: z.boolean() })
+  ),
+});

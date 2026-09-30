@@ -2,6 +2,8 @@ import type { Server } from 'elysia/universal';
 import { z } from 'zod';
 import { discoverRemoteAnchor, signFederationRequest } from './discovery';
 import { getConfig } from './config';
+import { db, channelMembers } from '../src/db';
+import { eq } from 'drizzle-orm';
 import {
   makeFederatedChannelId,
   makeFederatedGuildId,
@@ -167,7 +169,15 @@ export async function ensureFederatedDmRealtimeBridge(server: Server, channelId:
     channelId,
     federatedChannel.homeserver,
     `/federation/realtime/dms/${encodeURIComponent(federatedChannel.id)}`,
-    (event) => publishToChannel(server, { id: channelId, guildId: null }, event)
+    async (event) => {
+      if (event.type === 'message.created') {
+        await db
+          .update(channelMembers)
+          .set({ closed: false })
+          .where(eq(channelMembers.channelId, channelId));
+      }
+      await publishToChannel(server, { id: channelId, guildId: null }, event);
+    }
   );
 }
 

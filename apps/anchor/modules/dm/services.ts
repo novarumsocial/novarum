@@ -2,13 +2,13 @@ import Elysia, { t } from 'elysia';
 import { z } from 'zod';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
-import { db, channels, channelMembers, channelReadStates } from '../../src/db';
-import { and, eq } from 'drizzle-orm';
+import { db, channels, channelMembers, messages } from '../../src/db';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { publicUser } from '../../utils/publicUser';
 import { findFriendship, friendAuthority } from '../friends/model';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { dmOpenResponseSchema, dmResponseSchema } from '../../src/db/zod';
+import { dmLatestResponseSchema, dmOpenResponseSchema, dmResponseSchema } from '../../src/db/zod';
 import { getConfig } from '../../utils/config';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload, upsertFederatedUser } from '../../utils/federationPayload';
@@ -30,10 +30,11 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
     '/',
     async ({ session, server }) => {
       const allMemberships = await db.query.channelMembers.findMany({
-        where: { userId: session.userId, closed: false },
+        where: { userId: session.userId },
         with: { channel: { with: { members: { with: { user: true } } } } },
       });
-      const memberships = allMemberships.filter((m) => m.channel.members.length > 1);
+      const dmMemberships = allMemberships.filter((m) => m.channel.members.length > 1);
+      const memberships = dmMemberships.filter((m) => !m.closed);
 
       const channelIds = memberships.map((m) => m.channelId);
       const readStates = channelIds.length
@@ -43,46 +44,67 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
         : [];
       const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
 
-      const dms = await Promise.all(
-        memberships.map(async (membership) => {
-          const { channel } = membership;
-          const latestMessage = await db.query.messages.findFirst({
-            where: { channelId: channel.id },
-            orderBy: { createdAt: 'desc', id: 'desc' },
-          });
-          const readState = readStateByChannel.get(channel.id);
+      const latestByChannel = new Map<string, { createdAt: Date; id: string; own: boolean }>();
+      for (const message of await latestMessages(channelIds)) {
+        latestByChannel.set(message.channelId, {
+          createdAt: message.createdAt,
+          id: message.id,
+          own: message.authorId === session.userId,
+        });
+      }
 
-          if (latestMessage && !readState) {
-            await db
-              .insert(channelReadStates)
-              .values({
-                userId: session.userId,
-                channelId: channel.id,
-                lastReadCreatedAt: latestMessage.createdAt,
-                lastReadMessageId: latestMessage.id,
-              })
-              .onConflictDoNothing();
+      const remoteIdsByHomeserver = new Map<string, string[]>();
+      for (const id of channelIds) {
+        const remote = parseFederatedChannelId(id);
+        if (remote) {
+          remoteIdsByHomeserver.set(remote.homeserver, [
+            ...(remoteIdsByHomeserver.get(remote.homeserver) ?? []),
+            remote.id,
+          ]);
+        }
+      }
+      await Promise.all(
+        [...remoteIdsByHomeserver].map(async ([homeserver, ids]) => {
+          const result = await postSignedFederationJson(homeserver, '/federation/dms/latest', {
+            user: federationUserPayload(session),
+            channelIds: ids,
+          }).catch(() => null);
+          const latest = dmLatestResponseSchema.safeParse(result?.data);
+          if (!result?.response.ok || !latest.success) return;
+          for (const message of latest.data.channels) {
+            latestByChannel.set(makeFederatedChannelId(homeserver, message.channelId), {
+              createdAt: new Date(message.createdAt),
+              id: message.id,
+              own: message.own,
+            });
           }
-
-          return {
-            id: channel.id,
-            type: channel.type as 'DM' | 'GROUP_DM',
-            participants: channel.members
-              .filter((member) => member.userId !== session.userId)
-              .map((member) => publicUser(member.user)),
-            lastMessageAt: latestMessage ? latestMessage.createdAt.toISOString() : null,
-            unread: Boolean(
-              latestMessage &&
-              readState &&
-              isMessageAfter(
-                { createdAt: latestMessage.createdAt, id: latestMessage.id },
-                { createdAt: readState.lastReadCreatedAt, id: readState.lastReadMessageId }
-              )
-            ),
-            joinedAt: membership.joinedAt.toISOString(),
-          };
         })
       );
+
+      const dms = memberships.map(({ channel, joinedAt }) => {
+        const latest = latestByChannel.get(channel.id);
+        const readState = readStateByChannel.get(channel.id);
+        return {
+          id: channel.id,
+          type: channel.type as 'DM' | 'GROUP_DM',
+          participants: channel.members
+            .filter((member) => member.userId !== session.userId)
+            .map((member) => publicUser(member.user)),
+          lastMessageAt: latest ? latest.createdAt.toISOString() : null,
+          unread: Boolean(
+            latest &&
+            !latest.own &&
+            isMessageAfter(
+              latest,
+              readState && {
+                createdAt: readState.lastReadCreatedAt,
+                id: readState.lastReadMessageId,
+              }
+            )
+          ),
+          joinedAt: joinedAt.toISOString(),
+        };
+      });
 
       dms.sort(
         (a, b) =>
@@ -90,8 +112,9 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
           new Date(a.lastMessageAt ?? a.joinedAt).getTime()
       );
 
+      // closed DMs still need their bridge, or a new message could never reopen them.
       if (server) {
-        for (const { channel } of memberships) {
+        for (const { channel } of dmMemberships) {
           if (parseFederatedChannelId(channel.id)) {
             void ensureFederatedDmRealtimeBridge(server, channel.id).catch(() => null);
           }
@@ -216,7 +239,7 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
     }
   );
 
-function dmResponse(
+export function dmResponse(
   channel: { id: string; type: string },
   joinedAt: Date,
   participants: Parameters<typeof publicUser>[0][]
@@ -257,9 +280,7 @@ export async function openLocalDm(userOneId: string, userTwoId: string) {
     ])
     .onConflictDoNothing();
 
-  const membership = await db.query.channelMembers.findFirst({
-    where: { channelId: channel.id, userId: userOneId },
-  });
+  const membership = await reopenDm(channel.id, userOneId);
   if (!membership) throw new Error('Could not create DM membership');
 
   return { channel, joinedAt: membership.joinedAt, created };
@@ -285,10 +306,26 @@ export async function upsertDmShadow(
     .values(participantIds.map((userId) => ({ channelId, userId })))
     .onConflictDoNothing();
 
-  const membership = await db.query.channelMembers.findFirst({
-    where: { channelId, userId: localUserId },
-  });
+  const membership = await reopenDm(channelId, localUserId);
   if (!membership) throw new Error('Could not create DM shadow membership');
 
   return membership;
+}
+
+async function reopenDm(channelId: string, userId: string) {
+  const [membership] = await db
+    .update(channelMembers)
+    .set({ closed: false })
+    .where(and(eq(channelMembers.channelId, channelId), eq(channelMembers.userId, userId)))
+    .returning();
+  return membership;
+}
+
+export async function latestMessages(channelIds: string[]) {
+  if (!channelIds.length) return [];
+  return db
+    .selectDistinctOn([messages.channelId])
+    .from(messages)
+    .where(inArray(messages.channelId, channelIds))
+    .orderBy(messages.channelId, desc(messages.createdAt), desc(messages.id));
 }

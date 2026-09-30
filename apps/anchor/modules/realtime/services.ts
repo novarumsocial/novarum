@@ -189,7 +189,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       });
       if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) return;
 
-      if (!(await canAccessChannel(channel, session.userId))) return;
+      if (!(await canAccessChannel(channel, session.userId, true))) return;
 
       const previous = removeVoicePresence(session.userId);
       if (previous && previous.channelId !== channel.id)
@@ -220,7 +220,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
 
       const channel = await db.query.channels.findFirst({ where: { id: message.channelId } });
       if (!channel || channel.type !== 'DM') return;
-      if (!(await canAccessChannel(channel, session.userId))) return;
+      if (!(await canAccessChannel(channel, session.userId, true))) return;
 
       const event = JSON.stringify({
         type: 'call.ringing',
@@ -354,16 +354,18 @@ async function publishUserStatus(
     data: { userId: session.userId, status },
   });
   const localHomeserver = getConfig().server.homeserver.toLowerCase();
+  const remoteHomeservers = new Set<string>();
   for (const { userOne, userTwo } of friendships) {
     const friend = userOne.id === session.userId ? userTwo : userOne;
-    if (friend.homeserver.toLowerCase() === localHomeserver) {
-      ws.publish(`userEvents:${friend.id}`, statusEvent);
-    } else {
-      void postSignedFederationJson(friend.homeserver, '/federation/friends/status', {
-        user: federationUserPayload(session),
-        status,
-      }).catch(() => null);
-    }
+    const homeserver = friend.homeserver.toLowerCase();
+    if (homeserver === localHomeserver) ws.publish(`userEvents:${friend.id}`, statusEvent);
+    else remoteHomeservers.add(homeserver);
+  }
+  for (const homeserver of remoteHomeservers) {
+    void postSignedFederationJson(homeserver, '/federation/friends/status', {
+      user: federationUserPayload(session),
+      status,
+    }).catch(() => null);
   }
 
   for (const membership of memberships) {

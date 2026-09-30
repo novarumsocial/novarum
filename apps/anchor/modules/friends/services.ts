@@ -28,10 +28,13 @@ import {
   type FriendRelationship,
   type User,
 } from './model';
-import { friendRelationshipResponseSchema, friendStatusSchema } from '../../src/db/zod';
+import {
+  friendRelationshipResponseSchema,
+  friendStatusSchema,
+  userStatusSchema,
+} from '../../src/db/zod';
 
 const federationErrorSchema = z.object({ error: z.string() });
-const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
 const friendEntrySchema = friendRelationshipResponseSchema
   .pick({ createdAt: true, acceptedAt: true })
   .extend({ user: publicUserSchema, status: userStatusSchema });

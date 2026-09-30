@@ -7,7 +7,8 @@ import { randomString } from '../../utils/randomString';
 import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { makeFederatedChannelId } from '../../utils/federationIds';
-import { openLocalDm, upsertDmShadow } from '../dm/services';
+import { dmResponse, latestMessages, openLocalDm, upsertDmShadow } from '../dm/services';
+import { ensureFederatedDmRealtimeBridge } from '../../utils/federationRealtime';
 import { AccessToken } from 'livekit-server-sdk';
 import {
   removeVoicePresence,
@@ -59,10 +60,12 @@ import {
   attachmentResponseSchema,
   channelResponseSchema,
   channelUsersResponseSchema,
+  dmLatestResponseSchema,
   dmOpenResponseSchema,
   federatedGuildResponseSchema,
   guildInviteResponseSchema,
   messageResponseBaseSchema,
+  userStatusSchema,
 } from '../../src/db/zod';
 
 const federatedMessagePageSize = 50;
@@ -578,7 +581,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(400, { error: 'Message content or an attachment is required' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       const replyTarget = replyTo
@@ -653,6 +656,14 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
             messageId: created.id,
             userId: recipient.userId,
           });
+        }
+
+        // a new message reopens the DM for everyone who had closed it.
+        if (!access.channel.guildId) {
+          await tx
+            .update(channelMembers)
+            .set({ closed: false })
+            .where(eq(channelMembers.channelId, params.id));
         }
 
         return {
@@ -844,7 +855,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(415, { error: 'Unsupported file type' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       return createPendingAttachment({
@@ -969,7 +980,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       if (server) {
@@ -1010,7 +1021,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
       if (access.channel.type !== 'VOICE' && access.channel.type !== 'DM') {
         return status(404, { error: 'Channel not right' });
@@ -1120,10 +1131,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const nextStatus = getObjectProperty(parsed.body, 'status');
-      if (nextStatus !== 'ONLINE' && nextStatus !== 'OFFLINE') {
-        return status(400, { error: 'Invalid federation user status' });
-      }
+      const statusResult = userStatusSchema.safeParse(getObjectProperty(parsed.body, 'status'));
+      if (!statusResult.success) return status(400, { error: 'Invalid federation user status' });
+      const nextStatus = statusResult.data;
 
       const [remote] = await db
         .select()
@@ -1176,10 +1186,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const nextStatus = getObjectProperty(parsed.body, 'status');
-      if (nextStatus !== 'ONLINE' && nextStatus !== 'OFFLINE') {
-        return status(400, { error: 'Invalid federation user status' });
-      }
+      const statusResult = userStatusSchema.safeParse(getObjectProperty(parsed.body, 'status'));
+      if (!statusResult.success) return status(400, { error: 'Invalid federation user status' });
+      const nextStatus = statusResult.data;
 
       const access = await getFederatedGuildAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
@@ -1217,7 +1226,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
   )
   .post(
     '/dms/open',
-    async ({ request, status }) => {
+    async ({ request, server, status }) => {
       const parsed = await verifiedFederationJsonBody(request);
       if (!parsed.ok) return status(parsed.status, { error: parsed.error });
 
@@ -1228,8 +1237,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       }
       if (userPayload.isBot) return status(403, { error: 'Bots cannot open DMs' });
 
-      const peerUsername = getObjectProperty(parsed.body, 'peerUsername');
-      if (typeof peerUsername !== 'string') return status(400, { error: 'Invalid peer username' });
+      const peerResult = z.string().safeParse(getObjectProperty(parsed.body, 'peerUsername'));
+      if (!peerResult.success) return status(400, { error: 'Invalid peer username' });
+      const peerUsername = peerResult.data;
 
       const localHomeserver = getConfig().server.homeserver;
       if (
@@ -1247,7 +1257,13 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const friendship = await findFriendship(actor.id, target.id);
       if (friendship?.status !== 'ACCEPTED') return status(403, { error: 'Users are not friends' });
 
-      const dm = await openLocalDm(target.id, actor.id);
+      const dm = await openLocalDm(actor.id, target.id);
+      if (dm.created && server) {
+        publishRealtime(server, `userEvents:${target.id}`, {
+          type: 'dm.created',
+          data: dmResponse(dm.channel, dm.joinedAt, [actor]),
+        });
+      }
 
       return {
         id: dm.channel.id,
@@ -1271,8 +1287,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const parsed = await verifiedFederationJsonBody(request);
       if (!parsed.ok) return status(parsed.status, { error: parsed.error });
 
-      const channelId = getObjectProperty(parsed.body, 'channelId');
-      if (typeof channelId !== 'string') return status(400, { error: 'Invalid channel ID' });
+      const channelResult = z.string().safeParse(getObjectProperty(parsed.body, 'channelId'));
+      if (!channelResult.success) return status(400, { error: 'Invalid channel ID' });
+      const channelId = channelResult.data;
 
       const participants = z
         .array(federationUserSchema)
@@ -1282,6 +1299,13 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const localHomeserver = getConfig().server.homeserver.toLowerCase();
       const local = participants.data.find((p) => p.homeserver.toLowerCase() === localHomeserver);
       if (!local) return status(400, { error: 'No local participant in this DM' });
+      const remotes = participants.data.filter((p) => p !== local);
+      if (
+        participants.data.length !== 2 ||
+        remotes.some((p) => p.homeserver.toLowerCase() !== parsed.origin.homeserver)
+      ) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
 
       if (
         friendAuthority(parsed.origin.homeserver, getConfig().server.homeserver) !==
@@ -1295,14 +1319,8 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       });
       if (!localUser) return status(404, { error: 'User not found' });
 
-      const others = await Promise.all(
-        participants.data
-          .filter((p) => p.homeserver.toLowerCase() !== localHomeserver)
-          .map(upsertFederatedUser)
-      );
-
-      const actor = others[0];
-      if (!actor) return status(400, { error: 'No remote participant in this DM' });
+      const others = await Promise.all(remotes.map(upsertFederatedUser));
+      const actor = others[0]!;
 
       const friendship = await findFriendship(localUser.id, actor.id);
       if (friendship?.status !== 'ACCEPTED') {
@@ -1318,15 +1336,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       if (server) {
         publishRealtime(server, `userEvents:${localUser.id}`, {
           type: 'dm.created',
-          data: {
-            id: shadowId,
-            type: 'DM',
-            participants: others.map(publicUser),
-            lastMessageAt: null,
-            unread: false,
-            joinedAt: membership.joinedAt.toISOString(),
-          },
+          data: dmResponse({ id: shadowId, type: 'DM' }, membership.joinedAt, others),
         });
+        void ensureFederatedDmRealtimeBridge(server, shadowId).catch(() => null);
       }
 
       return { ok: true };
@@ -1337,6 +1349,52 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/dms/latest',
+    async ({ request, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const channelIds = z
+        .array(z.string())
+        .max(500)
+        .safeParse(getObjectProperty(parsed.body, 'channelIds'));
+      if (!channelIds.success) return status(400, { error: 'Invalid channel IDs' });
+
+      const user = await db.query.users.findFirst({
+        where: { username: userPayload.username, homeserver: userPayload.homeserver },
+      });
+      if (!user || !channelIds.data.length) return { channels: [] };
+
+      const memberships = await db.query.channelMembers.findMany({
+        where: { userId: user.id, channelId: { in: channelIds.data } },
+      });
+      const latest = await latestMessages(memberships.map((m) => m.channelId));
+
+      return {
+        channels: latest.map((message) => ({
+          channelId: message.channelId,
+          id: message.id,
+          createdAt: message.createdAt.toISOString(),
+          own: message.authorId === user.id,
+        })),
+      };
+    },
+    {
+      response: {
+        200: dmLatestResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
@@ -1353,10 +1411,11 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const ringing = getObjectProperty(parsed.body, 'ringing');
-      if (typeof ringing !== 'boolean') return status(400, { error: 'Invalid ring state' });
+      const ringResult = z.boolean().safeParse(getObjectProperty(parsed.body, 'ringing'));
+      if (!ringResult.success) return status(400, { error: 'Invalid ring state' });
+      const ringing = ringResult.data;
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
       if (access.channel.type !== 'DM') return status(404, { error: 'Channel not right' });
 
@@ -1590,7 +1649,11 @@ async function fetchFederatedMessagePage(
     limit: limit + 1,
   });
 }
-async function getFederatedChannelAccess(channelId: string, userPayload: FederationUserPayload) {
+async function getFederatedChannelAccess(
+  channelId: string,
+  userPayload: FederationUserPayload,
+  write = false
+) {
   const channel = await db.query.channels.findFirst({
     where: { id: channelId },
   });
@@ -1612,7 +1675,7 @@ async function getFederatedChannelAccess(channelId: string, userPayload: Federat
     })
     .where(eq(users.id, user.id));
 
-  if (!(await canAccessChannel(channel, user.id))) {
+  if (!(await canAccessChannel(channel, user.id, write))) {
     return { ok: false as const, status: 403 as const, error: 'Forbidden' };
   }
 

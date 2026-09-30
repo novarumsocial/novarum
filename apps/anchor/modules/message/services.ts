@@ -173,7 +173,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         return status(404, { error: 'Channel not found' });
       }
 
-      if (!(await canAccessChannel(channel, session.userId))) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(403, { error: 'Forbidden' });
       }
 

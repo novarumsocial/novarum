@@ -40,7 +40,7 @@ async function requireUploadAccess(channelId: string, contentType: string, token
   });
   if (!channel) return { ok: false as const, status: 404 as const, error: 'Channel not found' };
 
-  if (!(await canAccessChannel(channel, session.userId))) {
+  if (!(await canAccessChannel(channel, session.userId, true))) {
     return { ok: false as const, status: 403 as const, error: 'Forbidden' };
   }
 

@@ -406,7 +406,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         return status(404, { error: 'Channel not right' });
       }
 
-      if (!(await canAccessChannel(channel, session.userId))) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(401, { error: 'Unauthorized' });
       }
 
@@ -457,7 +457,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         return status(404, { error: 'Channel not found' });
       }
 
-      if (!(await canAccessChannel(channel, session.userId))) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(401, { error: 'Unauthorized' });
       }
 
