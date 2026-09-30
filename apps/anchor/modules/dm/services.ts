@@ -29,87 +29,17 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
   .get(
     '/',
     async ({ session, server }) => {
-      const allMemberships = await db.query.channelMembers.findMany({
-        where: { userId: session.userId },
-        with: { channel: { with: { members: { with: { user: true } } } } },
-      });
-      const dmMemberships = allMemberships.filter((m) => m.channel.members.length > 1);
-      const memberships = dmMemberships.filter((m) => !m.closed);
+      const dmMemberships = await dmMembershipsOf(session.userId);
+      const open = dmMemberships.filter((m) => !m.closed);
 
-      const channelIds = memberships.map((m) => m.channelId);
-      const readStates = channelIds.length
-        ? await db.query.channelReadStates.findMany({
-            where: { userId: session.userId, channelId: { in: channelIds } },
-          })
-        : [];
-      const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
-
-      const latestByChannel = new Map<string, { createdAt: Date; id: string; own: boolean }>();
-      for (const message of await latestMessages(channelIds)) {
-        latestByChannel.set(message.channelId, {
-          createdAt: message.createdAt,
-          id: message.id,
-          own: message.authorId === session.userId,
-        });
-      }
-
-      const remoteIdsByHomeserver = new Map<string, string[]>();
-      for (const id of channelIds) {
-        const remote = parseFederatedChannelId(id);
-        if (remote) {
-          remoteIdsByHomeserver.set(remote.homeserver, [
-            ...(remoteIdsByHomeserver.get(remote.homeserver) ?? []),
-            remote.id,
-          ]);
-        }
-      }
-      await Promise.all(
-        [...remoteIdsByHomeserver].map(async ([homeserver, ids]) => {
-          const result = await postSignedFederationJson(homeserver, '/federation/dms/latest', {
-            user: federationUserPayload(session),
-            channelIds: ids,
-          }).catch(() => null);
-          const latest = dmLatestResponseSchema.safeParse(result?.data);
-          if (!result?.response.ok || !latest.success) return;
-          for (const message of latest.data.channels) {
-            latestByChannel.set(makeFederatedChannelId(homeserver, message.channelId), {
-              createdAt: new Date(message.createdAt),
-              id: message.id,
-              own: message.own,
-            });
-          }
-        })
-      );
-
-      const dms = memberships.map(({ channel, joinedAt }) => {
-        const latest = latestByChannel.get(channel.id);
-        const readState = readStateByChannel.get(channel.id);
-        return {
-          id: channel.id,
-          type: channel.type as 'DM' | 'GROUP_DM',
-          participants: channel.members
-            .filter((member) => member.userId !== session.userId)
-            .map((member) => publicUser(member.user)),
-          lastMessageAt: latest ? latest.createdAt.toISOString() : null,
-          unread: Boolean(
-            latest &&
-            !latest.own &&
-            isMessageAfter(
-              latest,
-              readState && {
-                createdAt: readState.lastReadCreatedAt,
-                id: readState.lastReadMessageId,
-              }
-            )
-          ),
-          joinedAt: joinedAt.toISOString(),
-        };
-      });
-
-      dms.sort(
-        (a, b) =>
-          new Date(b.lastMessageAt ?? b.joinedAt).getTime() -
-          new Date(a.lastMessageAt ?? a.joinedAt).getTime()
+      // DMs hosted on other homeservers need a remote round trip for their latest message,
+      // so the client fetches those per homeserver instead of waiting on the slowest one here.
+      const pending = [
+        ...new Set(open.flatMap((m) => parseFederatedChannelId(m.channelId)?.homeserver ?? [])),
+      ];
+      const dms = await buildDms(
+        session,
+        open.filter((m) => !parseFederatedChannelId(m.channelId))
       );
 
       // closed DMs still need their bridge, or a new message could never reopen them.
@@ -121,7 +51,22 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
         }
       }
 
-      return { dms };
+      return { dms, pending };
+    },
+    {
+      response: {
+        200: dmListResponseSchema.extend({ pending: z.array(z.string()) }),
+        401: genericResponseErrorSchema,
+      },
+    }
+  )
+  .get(
+    '/homeserver/:homeserver',
+    async ({ session, params }) => {
+      const open = (await dmMembershipsOf(session.userId)).filter(
+        (m) => !m.closed && parseFederatedChannelId(m.channelId)?.homeserver === params.homeserver
+      );
+      return { dms: await buildDms(session, open, params.homeserver) };
     },
     {
       response: {
@@ -328,4 +273,78 @@ export async function latestMessages(channelIds: string[]) {
     .from(messages)
     .where(inArray(messages.channelId, channelIds))
     .orderBy(messages.channelId, desc(messages.createdAt), desc(messages.id));
+}
+
+async function dmMembershipsOf(userId: string) {
+  const memberships = await db.query.channelMembers.findMany({
+    where: { userId },
+    with: { channel: { with: { members: { with: { user: true } } } } },
+  });
+  return memberships.filter((m) => m.channel.members.length > 1);
+}
+
+// latest messages come from our db, or from `homeserver` when the DMs are hosted there.
+async function buildDms(
+  session: NonNullable<Awaited<ReturnType<typeof validateSessionToken>>>,
+  memberships: Awaited<ReturnType<typeof dmMembershipsOf>>,
+  homeserver?: string
+) {
+  const channelIds = memberships.map((m) => m.channelId);
+  if (!channelIds.length) return [];
+
+  const readStates = await db.query.channelReadStates.findMany({
+    where: { userId: session.userId, channelId: { in: channelIds } },
+  });
+  const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
+
+  const latestByChannel = new Map<string, { createdAt: Date; id: string; own: boolean }>();
+  if (homeserver) {
+    const result = await postSignedFederationJson(homeserver, '/federation/dms/latest', {
+      user: federationUserPayload(session),
+      channelIds: channelIds.map((id) => parseFederatedChannelId(id)!.id),
+    }).catch(() => null);
+    const latest = dmLatestResponseSchema.safeParse(result?.data);
+    for (const message of result?.response.ok && latest.success ? latest.data.channels : []) {
+      latestByChannel.set(makeFederatedChannelId(homeserver, message.channelId), {
+        createdAt: new Date(message.createdAt),
+        id: message.id,
+        own: message.own,
+      });
+    }
+  } else {
+    for (const message of await latestMessages(channelIds)) {
+      latestByChannel.set(message.channelId, {
+        createdAt: message.createdAt,
+        id: message.id,
+        own: message.authorId === session.userId,
+      });
+    }
+  }
+
+  return memberships
+    .map(({ channel, joinedAt }) => {
+      const latest = latestByChannel.get(channel.id);
+      const readState = readStateByChannel.get(channel.id);
+      return {
+        ...dmResponse(
+          channel,
+          joinedAt,
+          channel.members.filter((m) => m.userId !== session.userId).map((m) => m.user)
+        ),
+        lastMessageAt: latest ? latest.createdAt.toISOString() : null,
+        unread: Boolean(
+          latest &&
+          !latest.own &&
+          isMessageAfter(
+            latest,
+            readState && { createdAt: readState.lastReadCreatedAt, id: readState.lastReadMessageId }
+          )
+        ),
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? b.joinedAt).getTime() -
+        new Date(a.lastMessageAt ?? a.joinedAt).getTime()
+    );
 }

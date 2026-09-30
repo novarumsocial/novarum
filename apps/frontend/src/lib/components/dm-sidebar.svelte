@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Phone, Plus, Users, X } from '@lucide/svelte';
+  import { LoaderCircle, Phone, Plus, Users, X } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { dms } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
@@ -105,7 +105,14 @@
       </div>
     {/each}
 
-    {#if entries.length === 0}
+    {#each dms.pending as homeserver (homeserver)}
+      <div class="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground select-none">
+        <LoaderCircle class="size-3.5 shrink-0 animate-spin" />
+        <span class="flex-1 truncate">Waiting for {homeserver}…</span>
+      </div>
+    {/each}
+
+    {#if entries.length === 0 && dms.pending.length === 0}
       <p
         class="pointer-events-none mt-4 flex items-center justify-center px-2 text-center text-xs text-muted-foreground select-none"
       >

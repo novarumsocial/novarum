@@ -21,6 +21,9 @@ class DmsState {
   list = $state<DmEntry[]>([]);
   loading = $state(false);
   error = $state<string | null>(null);
+  // homeservers whose DMs are still on their way; each one fills in on its own.
+  pending = $state<string[]>([]);
+  #generation = 0;
   incomingCall = $state<{ channelId: string; user: PublicUser } | null>(null);
   outgoingCall = $state<string | null>(null);
 
@@ -44,12 +47,27 @@ class DmsState {
         return;
       }
 
+      const generation = ++this.#generation;
       this.list = result.data.dms;
+      this.pending = result.data.pending;
+      for (const homeserver of result.data.pending)
+        void this.#loadHomeserver(homeserver, generation);
     } catch {
       this.error = 'Could not load your direct messages.';
     } finally {
       this.loading = false;
     }
+  }
+
+  async #loadHomeserver(homeserver: string, generation: number) {
+    const result = await anchor.client.dm
+      .homeserver({ homeserver })
+      .get()
+      .catch(() => null);
+    if (generation !== this.#generation) return;
+
+    for (const dm of result?.data?.dms ?? []) this.upsert(dm);
+    this.pending = this.pending.filter((item) => item !== homeserver);
   }
 
   async open(userId: string) {
