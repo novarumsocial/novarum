@@ -13,6 +13,10 @@ export type DmEntry = {
 
 export const RING_TIMEOUT = 30_000;
 
+// federated DM ids look like fed:channel:<homeserver>:<id> (see anchor's federationIds.ts)
+const isFromHomeserver = (dm: DmEntry, homeserver: string) =>
+  dm.id.startsWith(`fed:channel:${encodeURIComponent(homeserver)}:`);
+
 export function dmPath(channelId: string) {
   return `/guilds/dms/${encodeURIComponent(channelId)}`;
 }
@@ -40,16 +44,24 @@ class DmsState {
     this.loading = true;
     this.error = null;
 
+    const generation = ++this.#generation;
     try {
       const result = await anchor.client.dm.get();
+      if (generation !== this.#generation) return;
       if (result.error || !result.data) {
         this.error = 'Could not load your direct messages.';
         return;
       }
 
-      const generation = ++this.#generation;
-      this.list = result.data.dms;
-      this.pending = result.data.pending;
+      const { dms, pending } = result.data;
+      // keep showing federated DMs until their homeserver's fetch replaces them.
+      this.list = [
+        ...dms,
+        ...this.list.filter((dm) =>
+          pending.some((homeserver: string) => isFromHomeserver(dm, homeserver))
+        ),
+      ];
+      this.pending = pending;
       for (const homeserver of result.data.pending)
         void this.#loadHomeserver(homeserver, generation);
     } catch {
@@ -66,7 +78,10 @@ class DmsState {
       .catch(() => null);
     if (generation !== this.#generation) return;
 
-    for (const dm of result?.data?.dms ?? []) this.upsert(dm);
+    if (result?.data) {
+      this.list = this.list.filter((dm) => !isFromHomeserver(dm, homeserver));
+      for (const dm of result.data.dms) this.upsert(dm);
+    }
     this.pending = this.pending.filter((item) => item !== homeserver);
   }
 

@@ -461,11 +461,13 @@ class ChatState {
     this.members = this.members.map((item, index) => (index === existing ? nextMember : item));
   }
 
-  setVoiceStates(guildIds: string[], states: VoicePresenceInput[]) {
+  setVoiceStates(guildIds: string[], states: VoicePresenceInput[], dmIds: string[] = []) {
     const guildSet = new Set(guildIds);
     const next = Object.fromEntries(
-      Object.entries(this.voiceStates).filter(([, channelStates]) =>
-        channelStates.some((state) => !state.guildId || !guildSet.has(state.guildId))
+      Object.entries(this.voiceStates).filter(
+        ([channelId, channelStates]) =>
+          !dmIds.includes(channelId) &&
+          channelStates.some((state) => !state.guildId || !guildSet.has(state.guildId))
       )
     );
 

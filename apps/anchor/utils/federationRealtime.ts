@@ -244,7 +244,7 @@ async function ensureBridge(
     onEvent(mapped);
   });
 
-  socket.addEventListener('close', () => {
+  socket.addEventListener('close', (event) => {
     if (activeBridges.get(id) !== socket) return;
     activeBridges.delete(id);
 
@@ -253,7 +253,9 @@ async function ensureBridge(
       onEvent({ type: 'voice.state.changed', data: { ...state, connected: false } });
     }
     bridgedVoicePresence.delete(id);
-    reconnect();
+    // 1008 means the remote refused us (left the guild, DM gone): retrying won't help, and
+    // the next GET /dm or /guilds starts a fresh bridge if access comes back.
+    if (event.code !== 1008) reconnect();
   });
 
   socket.addEventListener('error', () => {

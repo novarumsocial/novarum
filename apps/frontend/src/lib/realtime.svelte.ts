@@ -134,6 +134,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     type: z.literal('voice.states.snapshot'),
     data: z.object({
       guildIds: z.array(z.string()),
+      dmIds: z.array(z.string()).optional(),
       states: z.array(
         z.object({
           guildId: z.string().nullable(),
@@ -408,7 +409,7 @@ class RealtimeState {
         chat.addOrUpdateMember(event.data.guildId, event.data.user);
       }
       if (event.type === 'voice.states.snapshot') {
-        chat.setVoiceStates(event.data.guildIds, event.data.states);
+        chat.setVoiceStates(event.data.guildIds, event.data.states, event.data.dmIds);
       }
       if (event.type === 'voice.state.changed') {
         chat.updateVoiceState(event.data);

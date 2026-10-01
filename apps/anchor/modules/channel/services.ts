@@ -9,6 +9,7 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { getConfig } from '../../utils/config';
 import { AccessToken } from 'livekit-server-sdk';
 import {
+  getVoicePresence,
   livekitServiceClient,
   livekitWebhookReceiver,
   removeVoicePresence,
@@ -560,6 +561,10 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           ? await livekitServiceClient.listParticipants(event.room.name).catch(() => [])
           : [];
         if (participants.some((participant) => participant.identity === userId)) {
+          return { ok: true };
+        }
+        // the user may have already moved to another call; only clear presence for this room.
+        if (`voice:${getVoicePresence(userId)?.channelId}` !== event.room?.name) {
           return { ok: true };
         }
 

@@ -122,6 +122,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
         type: 'voice.states.snapshot',
         data: {
           guildIds,
+          dmIds,
           states: [
             ...voicePresenceForGuilds(guildIds),
             ...voicePresenceForChannels(dmIds),

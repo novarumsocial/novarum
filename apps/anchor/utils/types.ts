@@ -68,6 +68,8 @@ export type RealtimeEvent =
       type: 'voice.states.snapshot';
       data: {
         guildIds: string[];
+        // DM channels this snapshot is authoritative for (only sent on connect)
+        dmIds?: string[];
         states: VoicePresence[];
       };
     }

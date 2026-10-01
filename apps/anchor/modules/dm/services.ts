@@ -97,9 +97,9 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
       if (isHost) {
         const { channel, joinedAt, created } = await openLocalDm(session.userId, target.id);
 
-        // this side is authoritative for the DM; if the other participant is remote and this
-        // is a brand new DM, give their homeserver a heads up so it shows up for them too.
-        if (created && isRemote) {
+        // this side is authoritative for the DM; if the other participant is remote, give their
+        // homeserver a heads up so it shows up for them too (every time, in case a notify failed).
+        if (isRemote) {
           void postSignedFederationJson(target.homeserver, '/federation/dms/notify', {
             channelId: channel.id,
             participants: [federationUserPayload(session), federationUserPayload({ user: target })],

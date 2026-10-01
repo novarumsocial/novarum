@@ -392,7 +392,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const user = await db.query.users.findFirst({
         where: {
           username: userPayload.username,
-          homeserver: userPayload.homeserver,
+          homeserver: userPayload.homeserver.toLowerCase(),
         },
       });
       if (!user) return status(403, { error: 'Forbidden' });
@@ -1372,7 +1372,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       if (!channelIds.success) return status(400, { error: 'Invalid channel IDs' });
 
       const user = await db.query.users.findFirst({
-        where: { username: userPayload.username, homeserver: userPayload.homeserver },
+        where: { username: userPayload.username, homeserver: userPayload.homeserver.toLowerCase() },
       });
       if (!user || !channelIds.data.length) return { channels: [] };
 
@@ -1662,7 +1662,7 @@ async function getFederatedChannelAccess(
   const user = await db.query.users.findFirst({
     where: {
       username: userPayload.username,
-      homeserver: userPayload.homeserver,
+      homeserver: userPayload.homeserver.toLowerCase(),
     },
   });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
@@ -1698,7 +1698,7 @@ async function getFederatedGuildAccess(guildId: string, userPayload: FederationU
   const user = await db.query.users.findFirst({
     where: {
       username: userPayload.username,
-      homeserver: userPayload.homeserver,
+      homeserver: userPayload.homeserver.toLowerCase(),
     },
   });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };

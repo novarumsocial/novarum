@@ -19,6 +19,10 @@ export function setVoicePresence(state: VoicePresence) {
   voicePresenceByUser.set(state.userId, state);
 }
 
+export function getVoicePresence(userId: string) {
+  return voicePresenceByUser.get(userId);
+}
+
 export function removeVoicePresence(userId: string) {
   const state = voicePresenceByUser.get(userId) ?? null;
   voicePresenceByUser.delete(userId);
