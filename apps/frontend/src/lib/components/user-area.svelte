@@ -8,6 +8,10 @@
     PhoneOff,
     Settings,
     Signal,
+    SignalHigh,
+    SignalLow,
+    SignalMedium,
+    SignalZero,
   } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
   import MicLevelMeter from './mic-level-meter.svelte';
@@ -20,6 +24,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { settings } from '$lib/settings.svelte';
   import type { SessionUser } from '$lib/session.svelte';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { chat } from '$lib/chat-state.svelte';
 
   let {
@@ -36,6 +41,29 @@
   let settingsOpen = $state(false);
   let loopbackPending = $state(false);
   let loopbackError = $state<string | null>(null);
+  let latency = $state<number | null>(null);
+
+  const tiers = [
+    { max: 60, icon: Signal, color: 'bg-emerald-500/10 text-emerald-400' },
+    { max: 120, icon: SignalHigh, color: 'bg-lime-500/10 text-lime-400' },
+    { max: 200, icon: SignalMedium, color: 'bg-amber-500/10 text-amber-400' },
+    { max: Infinity, icon: SignalLow, color: 'bg-rose-500/10 text-rose-400' },
+  ];
+  const tier = $derived(
+    voice.connecting
+      ? { icon: SignalZero, color: 'bg-amber-500/10 text-amber-400' }
+      : (tiers.find((t) => (latency ?? 0) < t.max) ?? tiers[0])
+  );
+
+  $effect(() => {
+    const room = voice.connected ? voice.room : null;
+    latency = null;
+    if (!room) return;
+    const update = () => (latency = room.engine.client.rtt || null);
+    update();
+    const timer = setInterval(update, 2000);
+    return () => clearInterval(timer);
+  });
 
   async function toggleAudioLoopback() {
     loopbackPending = true;
@@ -55,13 +83,16 @@
   {#if voice.connected || voice.connecting}
     <div class="border-b border-border/80 px-3 py-2">
       <div class="flex items-center gap-2">
-        <div
-          class="flex size-8 items-center justify-center {voice.connecting
-            ? 'bg-amber-500/10 text-amber-400'
-            : 'bg-emerald-500/10 text-emerald-400'} text-xs font-bold"
-        >
-          <Signal class="size-4" />
-        </div>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="flex size-8 items-center justify-center text-xs font-bold transition-colors {tier.color}"
+          >
+            <tier.icon class="size-4" />
+          </Tooltip.Trigger>
+          {#if latency !== null}
+            <Tooltip.Content side="top">{latency} ms</Tooltip.Content>
+          {/if}
+        </Tooltip.Root>
         <div class="min-w-0 flex-1">
           <p
             class="truncate text-xs font-semibold uppercase tracking-wide {voice.connecting
