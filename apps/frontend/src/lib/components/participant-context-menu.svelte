@@ -54,6 +54,12 @@
             onThumbDblClick={() => voice?.setParticipantVolume(identity, 1)}
           />
         </ContextMenu.Item>
+        {#if voice.watchedStreams.has(identity)}
+          <ContextMenu.Separator />
+          <ContextMenu.Item onSelect={() => voice?.stopWatchingStream(identity)}>
+            Stop watching stream
+          </ContextMenu.Item>
+        {/if}
       {/if}
     </ContextMenu.Content>
   </ContextMenu.Root>

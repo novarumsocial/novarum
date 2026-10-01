@@ -95,6 +95,15 @@
         onloadedmetadata={readAspect}
         onresize={readAspect}
       ></video>
+    {:else if isScreen && !isSelf}
+      <div class="flex size-full flex-col items-center justify-center gap-2 text-white">
+        <MonitorUp class={compact ? 'size-5' : 'size-8'} />
+        {#if !compact}
+          <span class="bg-white/10 px-3 py-1.5 text-sm font-medium group-hover/tile:bg-white/20">
+            Watch Stream
+          </span>
+        {/if}
+      </div>
     {:else}
       <div
         class={cn(

@@ -15,6 +15,7 @@
     Maximize2,
     Minimize2,
     TriangleAlert,
+    MonitorOff,
   } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
   import { cn } from '$lib/utils';
@@ -70,7 +71,7 @@
     const entries = Array.from(voice.voiceStates.entries());
     const build = (kind: 'screen' | 'participant') =>
       entries
-        .filter(([, state]) => (kind === 'screen' ? state.screenTrack : true))
+        .filter(([, state]) => (kind === 'screen' ? state.screenShare : true))
         .map(([identity, state]) => ({
           key: kind === 'screen' ? `screen:${identity}` : identity,
           identity,
@@ -91,7 +92,10 @@
   let fullscreen = $state(false);
   let stageElement = $state<HTMLElement | null>(null);
 
-  const autoSpotlightKey = $derived(tiles.find((tile) => tile.kind === 'screen')?.key ?? null);
+  // only streams that are actually playing take over the stage; unwatched ones wait for a click
+  const autoSpotlightKey = $derived(
+    tiles.find((tile) => tile.kind === 'screen' && tile.state.screenTrack)?.key ?? null
+  );
 
   const spotlightKey = $derived.by(() => {
     if (focusedKey && tiles.some((tile) => tile.key === focusedKey)) return focusedKey;
@@ -103,9 +107,27 @@
   const spotlightScreenShare = $derived(
     tiles.find(
       (tile) =>
-        tile.key === spotlightKey && tile.kind === 'screen' && tile.identity !== voice.localIdentity
+        tile.key === spotlightKey &&
+        tile.kind === 'screen' &&
+        tile.state.screenTrack &&
+        tile.identity !== voice.localIdentity
     ) ?? null
   );
+
+  // In a 1:1 DM call, tune into the other person's stream automatically, once per stream,
+  // so stopping it sticks until they share again.
+  const autoWatched = new Set<string>();
+  $effect(() => {
+    const dmOneOnOne = channel.type === 'DM' && voice.voiceStates.size === 2;
+    for (const [identity, state] of voice.voiceStates) {
+      if (identity === voice.localIdentity) continue;
+      if (!state.screenShare) autoWatched.delete(identity);
+      else if (dmOneOnOne && !autoWatched.has(identity)) {
+        autoWatched.add(identity);
+        voice.watchStream(identity);
+      }
+    }
+  });
 
   // A newly started screen share takes over the stage, even if the user had chosen grid.
   let lastAutoKey: string | null = null;
@@ -124,6 +146,8 @@
   // Clicking a tile in the grid or filmstrip spotlights it — a person with or
   // without a camera, or a screen share all work the same way.
   function focusTile(key: string) {
+    const tile = tiles.find((tile) => tile.key === key);
+    if (tile?.kind === 'screen' && !tile.state.screenTrack) voice.watchStream(tile.identity);
     focusedKey = key;
     manualGrid = false;
   }
@@ -425,6 +449,20 @@
               />
             </Popover.Content>
           </Popover.Root>
+
+          <Button
+            variant="secondary"
+            size="icon"
+            class={controlClass}
+            aria-label={`Stop watching ${spotlightScreenShare.name}`}
+            title="Stop watching"
+            onclick={() => {
+              voice.stopWatchingStream(identity);
+              showGrid();
+            }}
+          >
+            <MonitorOff class="size-3.5" />
+          </Button>
         {/if}
 
         <Button

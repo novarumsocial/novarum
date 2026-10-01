@@ -7,10 +7,10 @@ import {
   Track,
   TrackEvent,
 } from 'livekit-client';
-import { LocalAudioTrack, type RemoteTrack } from 'livekit-client';
+import { LocalAudioTrack, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { Sound } from 'svelte-sound';
 
 // sounds
@@ -70,6 +70,8 @@ export class Voice {
   linuxSystemAudioAvailable = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
+  // remote screen shares are only subscribed to once the user chooses to watch them
+  watchedStreams = new SvelteSet<string>();
   private participantAudio = new SvelteMap<
     string,
     { volume: number; muted: boolean; screenVolume: number }
@@ -145,7 +147,7 @@ export class Voice {
     this.room = room;
     this.bindRoomEvents(room, channelId);
 
-    const connectPromise = room.connect(data.serverUrl, data.token);
+    const connectPromise = room.connect(data.serverUrl, data.token, { autoSubscribe: false });
     connectPromise.catch(() => null);
 
     try {
@@ -186,9 +188,33 @@ export class Voice {
     for (const participant of room.remoteParticipants.values()) {
       this.syncParticipant(participant, channelId);
       for (const publication of participant.trackPublications.values()) {
-        if (publication.track) this.attachRemoteAudio(publication.track, participant.identity);
+        this.syncSubscription(publication, participant.identity);
       }
     }
+  }
+
+  watchStream(identity: string) {
+    this.watchedStreams.add(identity);
+    this.syncStreamSubscriptions(identity);
+  }
+
+  stopWatchingStream(identity: string) {
+    this.watchedStreams.delete(identity);
+    this.syncStreamSubscriptions(identity);
+  }
+
+  private syncStreamSubscriptions(identity: string) {
+    const participant = this.room?.remoteParticipants.get(identity);
+    for (const publication of participant?.trackPublications.values() ?? []) {
+      this.syncSubscription(publication, identity);
+    }
+  }
+
+  private syncSubscription(publication: RemoteTrackPublication, identity: string) {
+    const isStream =
+      publication.source === Track.Source.ScreenShare ||
+      publication.source === Track.Source.ScreenShareAudio;
+    publication.setSubscribed(!isStream || this.watchedStreams.has(identity));
   }
 
   async leave() {
@@ -206,6 +232,7 @@ export class Voice {
     this.selfCamera = false;
     this.selfScreenShare = false;
     this.voiceStates.clear();
+    this.watchedStreams.clear();
     this.detachRemoteAudio();
 
     if (!room) return;
@@ -653,6 +680,7 @@ export class Voice {
         this.selfCamera = false;
         this.selfScreenShare = false;
         this.voiceStates.clear();
+        this.watchedStreams.clear();
         this.detachRemoteAudio();
         realtime.leaveVoice();
       })
@@ -665,6 +693,7 @@ export class Voice {
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.voiceStates.delete(participant.identity);
+        this.watchedStreams.delete(participant.identity);
         leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
@@ -673,7 +702,14 @@ export class Voice {
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
       })
+      .on(RoomEvent.TrackPublished, (publication, participant) => {
+        this.syncSubscription(publication, participant.identity);
+        this.syncParticipant(participant, channelId);
+      })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+        if (publication.source === Track.Source.ScreenShare) {
+          this.watchedStreams.delete(participant.identity);
+        }
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
@@ -745,7 +781,7 @@ export class Voice {
       serverMuted: false,
       camera: !!cameraTrack,
       cameraTrack,
-      screenShare: !!screenTrack,
+      screenShare: !!screenTrack || (!isLocal && !!screenPub && !screenPub.isMuted),
       screenTrack,
       speaking: participant.isSpeaking,
     });
