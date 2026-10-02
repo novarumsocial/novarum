@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import type { LaunchPrefs } from '$lib/electron-api';
   import { Switch } from '$lib/components/ui/switch/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
@@ -100,6 +101,9 @@
 
   let anchorVersion = $state<string | null>();
   const desktopVersion = await window.electron?.getVersion();
+  let launchPrefs = $state(await window.electron?.getLaunchPrefs());
+  const setLaunchPref = async (prefs: Partial<LaunchPrefs>) =>
+    (launchPrefs = await window.electron?.setLaunchPrefs(prefs));
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
 
@@ -276,6 +280,7 @@
   async function logout() {
     logoutLoading = true;
     await anchor.client.auth.logout.post();
+    session.forget(anchor.homeServer);
     const me = await anchor.client.auth.me.get();
     if (!me.data) {
       window.location.href = '/login';
@@ -1132,6 +1137,31 @@
               </div>
               <Switch bind:checked={settings.value.circleIcons} />
             </div>
+            {#if launchPrefs}
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-medium">Launch at startup</p>
+                  <p class="text-[11px] text-muted-foreground">Open Novarum when you log in</p>
+                </div>
+                <Switch
+                  checked={launchPrefs.autoLaunch}
+                  onCheckedChange={(autoLaunch) => setLaunchPref({ autoLaunch })}
+                />
+              </div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-medium">Start in background</p>
+                  <p class="text-[11px] text-muted-foreground">
+                    Keep the window hidden in the tray when launching at startup
+                  </p>
+                </div>
+                <Switch
+                  checked={launchPrefs.startHidden}
+                  disabled={!launchPrefs.autoLaunch}
+                  onCheckedChange={(startHidden) => setLaunchPref({ startHidden })}
+                />
+              </div>
+            {/if}
             <!-- tbd
             <div class="flex items-center justify-between">
               <div>

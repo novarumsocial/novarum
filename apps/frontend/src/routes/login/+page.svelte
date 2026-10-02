@@ -59,6 +59,8 @@
   const redirectParam = page.url.searchParams.get('redirect');
 
   onMount(() => {
+    if (page.url.searchParams.has('add')) return;
+
     void session.refresh().then(async (user) => {
       if (user) {
         await goto(safeRedirect(redirectParam));

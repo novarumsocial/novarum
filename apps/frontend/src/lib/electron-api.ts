@@ -1,5 +1,12 @@
+export interface LaunchPrefs {
+  autoLaunch: boolean;
+  startHidden: boolean;
+}
+
 export interface ElectronAPI {
   getAudioDevices(): Promise<MediaDeviceInfo[]>;
+  getLaunchPrefs(): Promise<LaunchPrefs>;
+  setLaunchPrefs(prefs: Partial<LaunchPrefs>): Promise<LaunchPrefs>;
   getVersion(): Promise<string>;
   /** `process.platform` from the main process, e.g. 'linux' | 'darwin' | 'win32'. */
   platform: string;

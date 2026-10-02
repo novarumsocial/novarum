@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -50,6 +51,31 @@ function isInternalUrl(value: string) {
 function openExternalUrl(value: string) {
   const url = new URL(value);
   if (url.protocol === 'http:' || url.protocol === 'https:') void shell.openExternal(url.href);
+}
+
+const prefsFile = path.join(app.getPath('userData'), 'launch-prefs.json');
+const readPrefs = () => {
+  try {
+    return { autoLaunch: false, startHidden: true, ...JSON.parse(readFileSync(prefsFile, 'utf8')) };
+  } catch {
+    return { autoLaunch: false, startHidden: true };
+  }
+};
+
+function applyAutoLaunch(enabled: boolean) {
+  if (!app.isPackaged) return;
+  if (process.platform !== 'linux') {
+    return app.setLoginItemSettings({ openAtLogin: enabled, args: ['--hidden'] });
+  }
+  // electron has no login items on linux, so use an XDG autostart entry
+  const entry = path.join(os.homedir(), '.config/autostart/novarum.desktop');
+  if (!enabled) return rmSync(entry, { force: true });
+  mkdirSync(path.dirname(entry), { recursive: true });
+  const exec = process.env.APPIMAGE ?? process.execPath;
+  writeFileSync(
+    entry,
+    `[Desktop Entry]\nType=Application\nName=Novarum\nExec="${exec}" --hidden\nIcon=novarum\n`
+  );
 }
 
 function showWindow(window: BrowserWindow) {
@@ -264,7 +290,9 @@ function createWindow() {
   });
 
   window.once('ready-to-show', () => {
-    window.show();
+    const atLogin =
+      process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin;
+    if (!(atLogin && readPrefs().startHidden)) window.show();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInternalUrl(url)) openExternalUrl(url);
@@ -293,6 +321,14 @@ app.whenReady().then(() => {
       symbolColor,
       height: 36,
     });
+  });
+
+  ipcMain.handle('launch:get', readPrefs);
+  ipcMain.handle('launch:set', (_event, prefs: { autoLaunch?: boolean; startHidden?: boolean }) => {
+    const next = { ...readPrefs(), ...prefs };
+    writeFileSync(prefsFile, JSON.stringify(next));
+    applyAutoLaunch(next.autoLaunch);
+    return next;
   });
 
   ipcMain.handle('version:get', () => app.getVersion());
