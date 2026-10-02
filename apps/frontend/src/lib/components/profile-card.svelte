@@ -4,6 +4,8 @@
   import * as Popover from '$lib/components/ui/popover/index.js';
   import { settings } from '$lib/settings.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { dms } from '$lib/dms.svelte';
+  import { chat } from '$lib/chat-state.svelte';
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
   import {
@@ -67,6 +69,15 @@
         };
     }
   });
+  let dmDraft = $state('');
+
+  async function sendDm() {
+    const content = dmDraft.trim();
+    if (!content || !friendshipUserId) return;
+    const channelId = await dms.open(friendshipUserId);
+    if (channelId) await chat.sendMessage(channelId, content);
+    dmDraft = '';
+  }
 </script>
 
 <Popover.Root>
@@ -170,13 +181,20 @@
           {user.about}
         </p>
       {/if}
-      {#if user.username && !isSelf}
+      {#if user.username && !isSelf && friendStatus === 'FRIEND'}
         <Input
           id="direct-message-person"
           placeholder="Message @{user.username}:{user.server}"
           class="mt-2.5"
           autocomplete="off"
           spellcheck="false"
+          bind:value={dmDraft}
+          onkeydown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void sendDm();
+            }
+          }}
         />
       {/if}
     </div>
