@@ -1166,7 +1166,7 @@
                 spellcheck="false"
                 class="min-h-56 w-full resize-y bg-transparent p-4 font-mono text-xs outline-none"
               ></textarea>
-            </SettingsGroup>
+</SettingsGroup>
           </Tabs.Content>
 
           <Tabs.Content value="notifications" class="space-y-6 outline-none">
