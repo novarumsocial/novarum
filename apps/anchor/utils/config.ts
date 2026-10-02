@@ -64,6 +64,7 @@ const schema = z.object({
   misc: z.object({
     otp_pepper: z.string().min(1),
     save_attachment_thumbnails: z.boolean().optional().default(true),
+    skip_emoji_download: z.boolean().optional().default(false),
   }),
   network: z
     .object({

@@ -42,7 +42,7 @@ function anchorUrlFromHomeserver(homeserver: string) {
   return `${protocol}://${clean}`;
 }
 
-function normalizeFederationHomeserver(homeserver: unknown) {
+export function normalizeFederationHomeserver(homeserver: unknown) {
   if (typeof homeserver !== 'string') {
     throw new DiscoveryError('Invalid homeserver name');
   }
@@ -249,11 +249,11 @@ function allowLocalFederationTargets() {
   }
 }
 
-function isLocalHostname(hostname: string) {
+export function isLocalHostname(hostname: string) {
   return hostname === 'localhost' || hostname.endsWith('.localhost');
 }
 
-function isPrivateIp(address: string) {
+export function isPrivateIp(address: string) {
   const version = net.isIP(address);
   if (version === 4) {
     const parts = address.split('.').map((part) => Number(part));

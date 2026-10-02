@@ -1,0 +1,16 @@
+# The only committed key material is placeholders: the test config and the dev-only Garage keys.
+title = "anchor"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test placeholders and dev-only keys"
+paths = [
+  '''apps/anchor/test/config\.toml''',
+  '''apps/anchor/test/compose\.yml''',
+  '''apps/anchor/test/federation/compose\.yml''',
+  '''apps/anchor/test/livekit\.yaml''',
+  '''dev/compose\.yml''',
+  '''dev/livekit\.yaml''',
+]

@@ -1,40 +1,36 @@
-# ORM migration benchmark
+# Query benchmarks
 
-This suite runs the same isolated fixture and query shapes against Prisma Next on `landmark/before-drizzle` and
-Drizzle on `refactor/drizzle`. It measures client-observed latency and concurrent throughput
+A small Drizzle-only suite for the queries anchor actually runs on hot paths. It measures client-observed latency (p50/p95/mean) and
+concurrent throughput, and `compare.ts` turns two runs into a regression gate.
 
-Use the same machine, database, Bun version, and environment values for both runs. Point
-`DATABASE_URL` at a disposable PostgreSQL database: the suite creates and removes its own rows,
-but it performs real writes.
+Point `DATABASE_URL` at a disposable PostgreSQL database. The suite applies the migrations, creates everything it needs
+under a throwaway `bench-*.invalid` homeserver and removes it again, but it performs real writes.
 
-## Disclaimer
+## Scenarios
 
-This suite has been completely AI generated with GPT-5.6 Sol for demonstration purposes only. It has not been reviewed by any maintainer. Use at your discretion.
+- user by primary key, membership by compound key, insert message, update user
+- a message page with author and attachments: the latest 50, and one at `offset 5000` on a 10k-message channel
+  (`/message/list` paginates by offset, so the deep page is the one that degrades as channels grow)
+- guild list for a user in 50 guilds, with read states and pings (`GET /guilds/list`)
+- federation nonce lookup + insert on a table pre-filled with 100k rows (every incoming federation request)
+- online-user scan on 5k users (the presence loop runs it every 3s)
 
 ## Usage
 
 ```sh
-# Run Drizzle from this branch.
-DATABASE_URL=postgresql://... \
-  BENCH_OUTPUT=/tmp/drizzle.json \
-  bun run --filter anchor bench
+DATABASE_URL=postgresql://... BENCH_OUTPUT=/tmp/current.json bun run --filter anchor bench
 
-# Keep the pre-Drizzle landmark checked out separately and give it the branch-neutral suite.
-git worktree add ../novarum-before-drizzle origin/landmark/before-drizzle
-cp -R apps/anchor/benchmarks ../novarum-before-drizzle/apps/anchor/
-(cd ../novarum-before-drizzle && bun install)
-(cd ../novarum-before-drizzle && DATABASE_URL=postgresql://... \
-  BENCH_OUTPUT=/tmp/prisma-next.json \
-  bun apps/anchor/benchmarks/run.ts)
-
-# From refactor/drizzle, generate blog-ready SVGs and a Markdown table.
-bun run --filter anchor bench:report \
-  /tmp/prisma-next.json /tmp/drizzle.json benchmarks/report
+# compare against a baseline (prints a Markdown table, exits 1 on a p95 regression)
+bun run --filter anchor bench:compare /tmp/baseline.json /tmp/current.json
+# keep the median of several runs
+bun apps/anchor/benchmarks/median.ts /tmp/median.json /tmp/run1.json /tmp/run2.json /tmp/run3.json
 ```
 
-The defaults are 20 warmups, 200 latency samples, and 500 throughput operations at concurrency 10. Override them with `BENCH_WARMUP`, `BENCH_SAMPLES`, `BENCH_THROUGHPUT_OPS`, and
-`BENCH_CONCURRENCY`. The report rejects runs with different settings.
+Defaults: 20 warmups, 200 latency samples, 500 throughput operations at concurrency 10. Override with `BENCH_WARMUP`,
+`BENCH_SAMPLES`, `BENCH_THROUGHPUT_OPS`, `BENCH_CONCURRENCY`, and the fixture sizes with `BENCH_CHANNEL_MESSAGES`,
+`BENCH_NONCES`, `BENCH_ONLINE_USERS`. `BENCH_MAX_REGRESSION` (default `0.2`) is the allowed p95 slowdown and
+`BENCH_REPORT_ONLY=1` makes `compare.ts` report without failing.
 
-For a publishable result, run each branch at least three times in alternating order and use the
-median run. Do not compare a local database with a remote one, or a cold database with a warmed
-one. Keep the generated JSON beside the blog post so readers can inspect the raw measurements.
+Only compare runs from the same machine class, database and Bun version. CI (`.github/workflows/anchor-test.yml`, weekly job)
+runs the suite three times against a fresh Postgres service, keeps the median per scenario, uploads `main` runs as the
+baseline artifact and compares other runs against the latest one.

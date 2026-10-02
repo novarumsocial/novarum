@@ -1,0 +1,9 @@
+{
+	auto_https off
+	skip_install_trust
+}
+
+https://b.test {
+	tls /certs/b.test.crt /certs/b.test.key
+	reverse_proxy 172.30.0.12:80
+}

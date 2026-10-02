@@ -45,3 +45,8 @@ config.toml
 keys/
 !test/config.toml
 test/.keys/
+
+# federation test CA and generated artifacts
+test/federation/certs/out/
+test/federation/artifacts/
+test/federation/.run/

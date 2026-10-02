@@ -39,7 +39,6 @@ dev/*
 !dev/garage.toml
 !dev/livekit.yaml
 
-apps/anchor/benchmarks/report
 apps/electron/.electron
 apps/mobile/android/keystore/
 

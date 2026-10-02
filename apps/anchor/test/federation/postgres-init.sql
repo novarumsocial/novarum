@@ -1,0 +1,5 @@
+CREATE DATABASE anchor_a;
+CREATE DATABASE anchor_b;
+CREATE DATABASE anchor_c;
+CREATE DATABASE anchor_p;
+CREATE DATABASE anchor_q;

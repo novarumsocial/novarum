@@ -1,0 +1,249 @@
+name: Anchor tests
+
+on:
+  pull_request:
+    paths:
+      - 'apps/anchor/**'
+      - '.github/workflows/anchor-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/anchor/**'
+      - '.github/workflows/anchor-test.yml'
+  schedule:
+    - cron: '0 3 * * *' # nightly: full federation, fuzz, production-like migration
+    - cron: '0 4 * * 0' # weekly: soak and benchmark regression
+  workflow_dispatch:
+    inputs:
+      weekly:
+        description: 'Also run the soak and benchmark jobs'
+        type: boolean
+        default: false
+
+concurrency:
+  group: anchor-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # the tests talk to the services below on their default ports (see apps/anchor/test/harness/env.ts)
+  ANCHOR_CONFIG: test/config.toml
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      migrations: ${{ steps.filter.outputs.migrations }}
+      federation: ${{ steps.filter.outputs.federation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'apps/anchor/drizzle/**'
+              - 'apps/anchor/src/db/**'
+              - 'apps/anchor/test/migrations/**'
+            federation:
+              - 'apps/anchor/modules/federation/**'
+              - 'apps/anchor/modules/dm/**'
+              - 'apps/anchor/modules/friends/**'
+              - 'apps/anchor/modules/invite/**'
+              - 'apps/anchor/utils/discovery.ts'
+              - 'apps/anchor/utils/keys.ts'
+              - 'apps/anchor/utils/federation*'
+              - 'apps/anchor/test/federation/**'
+              - 'apps/anchor/test/harness/**'
+              - 'apps/anchor/Dockerfile'
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - run: bun run --filter anchor check
+      - run: bun run --filter anchor test:unit
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - name: Start postgres, garage and mailpit
+        run: docker compose -f apps/anchor/test/compose.yml up -d --wait
+      - run: bun run --filter anchor test:integration
+      - name: Voice tests (livekit)
+        working-directory: apps/anchor
+        run: |
+          docker compose -f test/compose.yml --profile livekit up -d --wait livekit
+          ANCHOR_TEST_LIVEKIT=1 bun test test/integration/voice.test.ts
+      - name: Dump mailpit messages
+        if: failure()
+        run: curl -s http://127.0.0.1:8025/api/v1/messages > mailpit.json || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-debug
+          path: mailpit.json
+      - if: always()
+        run: docker compose -f apps/anchor/test/compose.yml down -v
+
+  migrations:
+    needs: changes
+    # always on nightly/manual runs; on PRs only when migrations or the schema changed
+    if: needs.changes.outputs.migrations == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the immutability check diffs drizzle/ against main
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - run: docker compose -f apps/anchor/test/compose.yml up -d --wait postgres
+      - run: bun run --filter anchor test:migrations
+      - if: always()
+        run: docker compose -f apps/anchor/test/compose.yml down -v
+
+  federation-smoke:
+    needs: changes
+    if: (needs.changes.outputs.federation == 'true' && github.event_name != 'schedule') || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - uses: docker/setup-buildx-action@v3
+      - name: Federation stack (smoke suite)
+        working-directory: apps/anchor
+        env:
+          FED_SUITE: smoke
+          FED_BUILD_CACHE: gha
+        run: bun test/federation/run.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: federation-smoke-logs
+          path: apps/anchor/test/federation/artifacts/
+
+  nightly:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - uses: docker/setup-buildx-action@v3
+      - name: Full federation (rebinding, egress proxy, hostile bodies, fuzz)
+        working-directory: apps/anchor
+        env:
+          FED_SUITE: full
+          FED_BUILD_CACHE: gha
+        run: bun test/federation/run.ts
+      - name: Production-like migration
+        run: |
+          docker compose -f apps/anchor/test/compose.yml up -d --wait postgres
+          bun apps/anchor/test/migrations/prodlike.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: nightly-logs
+          path: apps/anchor/test/federation/artifacts/
+      - if: always()
+        run: docker compose -f apps/anchor/test/compose.yml down -v
+
+  weekly-bench:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 0' || (github.event_name == 'workflow_dispatch' && inputs.weekly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - run: docker compose -f apps/anchor/test/compose.yml up -d --wait postgres
+      - name: Run the suite three times, keep the median
+        env:
+          DATABASE_URL: postgresql://novarum:novarum@127.0.0.1:15432/postgres
+        run: |
+          for i in 1 2 3; do
+            BENCH_OUTPUT=$RUNNER_TEMP/run$i.json bun run --filter anchor bench
+          done
+          bun apps/anchor/benchmarks/median.ts $RUNNER_TEMP/current.json $RUNNER_TEMP/run1.json $RUNNER_TEMP/run2.json $RUNNER_TEMP/run3.json
+      - name: Download the latest main baseline
+        id: baseline
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: anchor-test.yml
+          branch: main
+          name: anchor-bench-baseline
+          path: baseline
+          if_no_artifact_found: warn
+      - name: Compare
+        # report-only until a few weeks of runner noise are known; drop BENCH_REPORT_ONLY to gate
+        env:
+          BENCH_REPORT_ONLY: '1'
+        run: |
+          if [ -f baseline/current.json ]; then
+            bun apps/anchor/benchmarks/compare.ts baseline/current.json $RUNNER_TEMP/current.json | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No baseline yet; this run becomes the baseline." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: anchor-bench-baseline
+          path: ${{ runner.temp }}/current.json
+      - if: always()
+        run: docker compose -f apps/anchor/test/compose.yml down -v
+
+  weekly-soak:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 0' || (github.event_name == 'workflow_dispatch' && inputs.weekly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+      - run: bun install --frozen-lockfile
+      - uses: docker/setup-buildx-action@v3
+      - name: Federation soak (3 anchors, 200 users, 30 minutes)
+        working-directory: apps/anchor
+        env:
+          FED_SUITE: soak
+          FED_BUILD_CACHE: gha
+        run: bun test/federation/run.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-logs
+          path: apps/anchor/test/federation/artifacts/
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: apps/anchor/.gitleaks.toml

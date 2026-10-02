@@ -1,0 +1,10 @@
+port: 7880
+bind_addresses:
+  - ''
+rtc:
+  tcp_port: 7881
+  port_range_start: 50100
+  port_range_end: 50200
+  enable_loopback_candidate: true
+keys:
+  devkey: test-livekit-secret-not-real-0123456789

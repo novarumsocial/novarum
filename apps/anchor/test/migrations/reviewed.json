@@ -1,0 +1,17 @@
+{
+  "20260721183541_mute_blindfold": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260721184753_new-schema": "grandfathered, shipped before the lint existed (ALTER COLUMN TYPE, ADD CONSTRAINT UNIQUE)",
+  "20260725140444_careless_tag": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260726153501_plain_stature": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260726173228_spooky_nitro": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260730165038_white_switch": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260730213712_brainy_layla_miller": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260731212916_long_moondragon": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260802145339_sleepy_genesis": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260803103349_curious_scarlet_witch": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260806153815_sad_beyonder": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260806211613_shocking_nightshade": "grandfathered, shipped before the lint existed (ALTER COLUMN TYPE)",
+  "20260809151942_aspiring_typhoid_mary": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260811001924_exotic_risque": "grandfathered, shipped before the lint existed (no risky SQL)",
+  "20260927212232_add_dm_channels": "grandfathered, shipped before the lint existed (ADD CONSTRAINT UNIQUE)"
+}

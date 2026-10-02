@@ -287,5 +287,8 @@ function notify(server: Server, userId: string) {
   publishRealtime(server, `userEvents:${userId}`, { type: 'friends.changed', data: {} });
 }
 
-const syncTimer = setInterval(() => void retryPendingFriendSyncs(), 30_000);
-syncTimer.unref();
+export function startFriendSyncRetry() {
+  const timer = setInterval(() => void retryPendingFriendSyncs(), 30_000);
+  timer.unref();
+  return timer;
+}

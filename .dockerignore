@@ -74,3 +74,8 @@ apps/anchor/keys
 apps/anchor/drizzle/**/snapshot.json
 
 apps/frontend/.svelte-kit
+
+# keep the repo-root build context small (anchor image, test/federation)
+**/node_modules
+apps/anchor/test/federation/.run
+apps/anchor/test/federation/artifacts

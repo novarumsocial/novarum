@@ -35,10 +35,14 @@ const voiceStateResponseSchema = z.object({
   }),
 });
 
-setInterval(async () => {
-  const dbOnlineUsers = (await getOnlineUsers()).map((u) => u.id);
-  await clearOnlineUsers(dbOnlineUsers.filter((userId) => !activeRealtimeConnections.has(userId)));
-}, 3000);
+export function startPresenceCleanup() {
+  return setInterval(async () => {
+    const dbOnlineUsers = (await getOnlineUsers()).map((u) => u.id);
+    await clearOnlineUsers(
+      dbOnlineUsers.filter((userId) => !activeRealtimeConnections.has(userId))
+    );
+  }, 3000);
+}
 
 function addUserConnection(userId: string) {
   const nextCount = (activeRealtimeConnections.get(userId) ?? 0) + 1;

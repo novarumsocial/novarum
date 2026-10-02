@@ -51,7 +51,7 @@ const messageEventDataSchema = messageResponseBaseSchema.extend({
   author: publicUserSchema,
 });
 
-const realtimeEventSchema = z.discriminatedUnion('type', [
+export const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('guild.created'),
     data: z.object({
@@ -263,7 +263,7 @@ async function ensureBridge(
   });
 }
 
-function parseRealtimeEvent(data: unknown): RealtimeEvent | null {
+export function parseRealtimeEvent(data: unknown): RealtimeEvent | null {
   if (typeof data !== 'string') return null;
 
   try {
@@ -275,7 +275,7 @@ function parseRealtimeEvent(data: unknown): RealtimeEvent | null {
   }
 }
 
-function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): RealtimeEvent {
+export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): RealtimeEvent {
   if (event.type === 'guild.created') {
     return {
       ...event,

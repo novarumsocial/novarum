@@ -1,0 +1,47 @@
+# Throwaway infra for the anchor test suite. Everything lives on tmpfs, so every `up` starts clean.
+# Host ports can be moved with TEST_*_PORT env vars when dev/compose.yml is already running.
+name: anchor-test
+services:
+  postgres:
+    image: postgres:18-alpine
+    command: ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
+    environment:
+      POSTGRES_USER: novarum
+      POSTGRES_PASSWORD: novarum
+      POSTGRES_DB: postgres
+    ports:
+      - '127.0.0.1:${TEST_PG_PORT:-15432}:5432'
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U novarum']
+      interval: 1s
+      retries: 60
+  garage:
+    image: dxflrs/garage:v2.3.0
+    command: ['/garage', 'server', '--single-node', '--default-bucket']
+    environment:
+      GARAGE_RPC_SECRET: '3f853b06e69900febe57dc678a97fd083683d53e6d2733f7ab13fe24a8211871'
+      GARAGE_DEFAULT_ACCESS_KEY: 'test-access-key'
+      GARAGE_DEFAULT_SECRET_KEY: 'test-secret-key-0000'
+      GARAGE_DEFAULT_BUCKET: 'anchortest'
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+    ports:
+      - '127.0.0.1:${TEST_S3_PORT:-3900}:3900'
+    tmpfs:
+      - /var/lib/garage
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '127.0.0.1:${TEST_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${TEST_MAILPIT_API_PORT:-8025}:8025'
+  # only the @livekit tests need this one: `docker compose --profile livekit up`
+  livekit:
+    image: livekit/livekit-server:latest
+    profiles: ['livekit']
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - '127.0.0.1:${TEST_LIVEKIT_PORT:-7880}:7880'

@@ -15,11 +15,11 @@ nonce_max_age_seconds = 300
 [voice]
 livekit_url = "ws://127.0.0.1:7880"
 livekit_key = "devkey"
-livekit_secret = "test-livekit-secret-not-real"
+livekit_secret = "test-livekit-secret-not-real-0123456789"
 
 [files]
 s3_access_key = "test-access-key"
-s3_secret_key = "test-secret-key"
+s3_secret_key = "test-secret-key-0000"
 s3_bucket = "anchortest"
 s3_endpoint = "http://127.0.0.1:3900"
 s3_region = "garage"
@@ -36,3 +36,4 @@ from_email = "anchor@test.localhost"
 [misc]
 otp_pepper = "test-otp-pepper-not-real"
 save_attachment_thumbnails = false
+skip_emoji_download = true

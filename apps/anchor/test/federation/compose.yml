@@ -1,0 +1,242 @@
+# Federation test topology (TESTING_PLAN §5.1). `bun test/federation/run.ts` drives it; see README.md.
+# Needs FED_CONFIG_DIR (per-anchor configs <name>/config.toml, written by the harness) and test/federation/certs/out (certs/gen.sh).
+name: anchor-fed
+# Images are built by the harness (startStack): anchor-test:local from apps/anchor/Dockerfile with the repo root as
+# context, fed-tools:local from ./tools, smokescreen:local from ./proxy.
+
+x-anchor: &anchor
+  image: anchor-test:local
+  restart: 'no'
+  healthcheck:
+    test: ['CMD', 'bun', '-e', "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))"]
+    interval: 1s
+    timeout: 3s
+    retries: 60
+    start_period: 2s
+
+# bun + iproute2/iptables; harness code is bind-mounted, so no rebuild on edits
+x-tools: &tools
+  image: fed-tools:local
+  working_dir: /app/apps/anchor
+  restart: 'no'
+  volumes:
+    - ../..:/app/apps/anchor:ro
+    - ../../../../node_modules:/app/node_modules:ro
+    - ${FED_CERT_DIR:-./certs/out}:/certs:ro
+  healthcheck:
+    test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:$${ADMIN_PORT}/health >/dev/null']
+    interval: 1s
+    timeout: 3s
+    retries: 30
+
+networks:
+  fed:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  pub:
+    ipam:
+      config:
+        - subnet: 203.0.113.0/24
+  # fake cloud-metadata segment: the canary owns 169.254.169.254 here. (An iptables REDIRECT inside anchor-p's own
+  # namespace would be the alternative, but it needs nft_redir in the host kernel.)
+  meta:
+    ipam:
+      config:
+        - subnet: 169.254.169.0/24
+  egress:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    command: ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
+    environment:
+      POSTGRES_USER: novarum
+      POSTGRES_PASSWORD: novarum
+      POSTGRES_DB: postgres
+    volumes:
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U novarum -d anchor_q']
+      interval: 1s
+      retries: 60
+    networks:
+      fed: { ipv4_address: 172.30.0.5 }
+      egress: { ipv4_address: 172.31.0.5 }
+
+  garage:
+    image: dxflrs/garage:v2.3.0
+    command: ['/garage', 'server', '--single-node', '--default-bucket']
+    environment:
+      GARAGE_RPC_SECRET: '3f853b06e69900febe57dc678a97fd083683d53e6d2733f7ab13fe24a8211871'
+      GARAGE_DEFAULT_ACCESS_KEY: 'test-access-key'
+      GARAGE_DEFAULT_SECRET_KEY: 'test-secret-key-0000'
+      GARAGE_DEFAULT_BUCKET: 'anchortest'
+    volumes:
+      - ../garage.toml:/etc/garage.toml:ro
+    tmpfs:
+      - /var/lib/garage
+    healthcheck:
+      test: ['CMD', '/garage', 'status']
+      interval: 1s
+      retries: 60
+    networks:
+      fed: { ipv4_address: 172.30.0.6 }
+
+  mailpit:
+    image: axllent/mailpit:latest
+    networks:
+      fed: { ipv4_address: 172.30.0.7 }
+      egress: { ipv4_address: 172.31.0.7 }
+
+  anchor-a:
+    <<: *anchor
+    depends_on: { postgres: { condition: service_healthy }, garage: { condition: service_healthy }, mailpit: { condition: service_started } }
+    volumes:
+      - ${FED_CONFIG_DIR:?}/a/config.toml:/app/config.toml:ro
+    dns: [172.30.0.53]
+    networks:
+      fed: { ipv4_address: 172.30.0.11 }
+      meta: { ipv4_address: 169.254.169.11 }
+
+  anchor-b:
+    <<: *anchor
+    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
+    volumes:
+      - ${FED_CONFIG_DIR:?}/b/config.toml:/app/config.toml:ro
+    dns: [172.30.0.53]
+    networks:
+      fed: { ipv4_address: 172.30.0.12 }
+
+  anchor-c:
+    <<: *anchor
+    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
+    volumes:
+      - ${FED_CONFIG_DIR:?}/c/config.toml:/app/config.toml:ro
+    dns: [172.30.0.53]
+    networks:
+      fed: { ipv4_address: 172.30.0.13 }
+
+  # public mode, also on fed so private targets are routable; trusts the test CA
+  anchor-p:
+    <<: *anchor
+    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started }, dns: { condition: service_healthy } }
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ${FED_CONFIG_DIR:?}/p/config.toml:/app/config.toml:ro
+      - ${FED_CERT_DIR:-./certs/out}:/certs:ro
+    dns: [203.0.113.53]
+    networks:
+      pub: { ipv4_address: 203.0.113.10 }
+      fed: { ipv4_address: 172.30.0.20 }
+      meta: { ipv4_address: 169.254.169.20 }
+
+  # public mode behind the egress-only network; outbound goes through `proxy` (config network.proxy_url)
+  anchor-q:
+    <<: *anchor
+    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started }, dns: { condition: service_healthy }, proxy: { condition: service_healthy } }
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+      # Bun 1.3.9 only reads HTTP(S)_PROXY at process start, so the `network.proxy_url` that utils/config.ts exports into
+      # process.env later is ignored by fetch (checked: discovery then tries a direct connection). Set it for real here;
+      # `FED_Q_STARTUP_PROXY= bun test/federation/run.ts up` empties it to reproduce the gap.
+      HTTP_PROXY: ${FED_Q_STARTUP_PROXY-http://172.31.0.80:3128}
+      HTTPS_PROXY: ${FED_Q_STARTUP_PROXY-http://172.31.0.80:3128}
+    healthcheck:
+      test: ['CMD', 'env', '-u', 'HTTP_PROXY', '-u', 'HTTPS_PROXY', 'bun', '-e', "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+      start_period: 2s
+    volumes:
+      - ${FED_CONFIG_DIR:?}/q/config.toml:/app/config.toml:ro
+      - ${FED_CERT_DIR:-./certs/out}:/certs:ro
+    dns: [172.31.0.53]
+    networks:
+      egress: { ipv4_address: 172.31.0.10 }
+
+  fake:
+    <<: *tools
+    command: ['bun', 'test/harness/fakeAnchor.ts']
+    cap_add: [NET_ADMIN]
+    environment: { ADMIN_PORT: '9000', FAKE_CERT_DIR: /certs }
+    networks:
+      fed: { ipv4_address: 172.30.0.66 }
+      pub: { ipv4_address: 203.0.113.66 }
+
+  dns:
+    <<: *tools
+    command: ['bun', 'test/harness/dns.ts']
+    environment: { ADMIN_PORT: '9053', DNS_ADMIN_PORT: '9053' }
+    networks:
+      fed: { ipv4_address: 172.30.0.53 }
+      pub: { ipv4_address: 203.0.113.53 }
+      egress: { ipv4_address: 172.31.0.53 }
+
+  canary:
+    <<: *tools
+    command: ['bun', 'test/harness/canary.ts']
+    environment: { ADMIN_PORT: '9999' }
+    networks:
+      fed: { ipv4_address: 172.30.0.99 }
+
+  # cloud-metadata canary: 169.254.169.254:80, reachable from anchor-a and anchor-p over the `meta` network
+  canary-meta:
+    <<: *tools
+    command: ['bun', 'test/harness/canary.ts']
+    environment: { ADMIN_PORT: '9999', CANARY_LISTEN: '0.0.0.0:80=metadata,0.0.0.0:8080=metadata8080' }
+    networks:
+      meta: { ipv4_address: 169.254.169.254 }
+      fed: { ipv4_address: 172.30.0.98 }
+
+  # canaries inside anchor-a / anchor-p's network namespace: loopback hits become visible
+  canary-p: &canary-ns
+    <<: *tools
+    command: ['bun', 'test/harness/canary.ts']
+    network_mode: service:anchor-p
+    depends_on: { anchor-p: { condition: service_healthy } }
+    environment: &canary-ns-env
+      ADMIN_PORT: '9999'
+      CANARY_LISTEN: '127.0.0.1:8080=loopback8080,127.0.0.1:443=loopback443:tcp'
+
+  canary-a:
+    <<: *canary-ns
+    network_mode: service:anchor-a
+    depends_on: { anchor-a: { condition: service_healthy } }
+    environment: *canary-ns-env
+
+  # Caddy in front of anchor-b: the production reverse-proxy path (Host / X-Forwarded-*)
+  b-proxy:
+    image: caddy:2
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${FED_CERT_DIR:-./certs/out}:/certs:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 443']
+      interval: 1s
+      retries: 30
+    depends_on: { anchor-b: { condition: service_healthy } }
+    networks:
+      pub: { ipv4_address: 203.0.113.12 }
+      fed: { ipv4_address: 172.30.0.112 }
+
+  # smokescreen: denies private, loopback and link-local destinations. Also on fed so the harness can reach its logs/port.
+  proxy:
+    image: smokescreen:local
+    command: ['--listen-port', '3128', '--allow-range', '203.0.113.0/24', '--resolver-address', '203.0.113.53:53', '--statsd-address', '127.0.0.1:8200']
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 3128']
+      interval: 1s
+      retries: 30
+    depends_on: { dns: { condition: service_healthy } }
+    networks:
+      pub: { ipv4_address: 203.0.113.80 }
+      egress: { ipv4_address: 172.31.0.80 }
+      fed: { ipv4_address: 172.30.0.80 }
