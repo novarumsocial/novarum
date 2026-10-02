@@ -224,14 +224,6 @@
             bgColor={user.avatarColor}
             class="size-8 text-xs"
           />
-          {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
-            <div
-              class="pointer-events-none absolute inset-0"
-              style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ?? '#00d492'}, inset 0 0 0
-              2.5px var(--color-sidebar)"
-              class:rounded-full={settings.value.circleIcons}
-            ></div>
-          {/if}
         </div>
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
