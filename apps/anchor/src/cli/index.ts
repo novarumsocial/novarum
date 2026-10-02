@@ -5,6 +5,7 @@ import { getConfig } from '../../utils/config';
 import { getAverageColor } from 'fast-average-color-node';
 import { processImage } from '../../utils/optimizeWebp';
 import { storage } from '../../utils/services/storage';
+import { generateKeys } from '../../utils/keys';
 
 const { positionals } = parseArgs({
   args: Bun.argv.slice(3),
@@ -209,6 +210,14 @@ if (command === 'reprocess-webp') {
     'migration complete! note that you may need to refresh the frontend to get the migrated images'
   );
 
+  process.exit(0);
+}
+
+if (command === 'rotate-keys') {
+  const { id } = await generateKeys(getConfig().federation.key_dir);
+  console.log(
+    `generated federation key ${id}; remotes pick it up on their next unknown-key refresh.`
+  );
   process.exit(0);
 }
 

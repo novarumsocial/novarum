@@ -25,6 +25,7 @@ import { publicUser } from '../../utils/publicUser';
 const activeRealtimeConnections = new Map<string, number>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
 const voiceSocketByUser = new Map<string, string>();
+const pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
     guildId: z.string().nullable(),
@@ -132,20 +133,17 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       })
     );
 
+    pingIntervals.set(
+      ws.id,
+      setInterval(() => ws.send(JSON.stringify({ type: 'misc.ping' })), 30_000)
+    );
+
     const becameOnline = addUserConnection(session.userId);
     if (!becameOnline) return;
 
     await db.update(users).set({ status: 'ONLINE' }).where(eq(users.id, session.userId));
 
     await publishUserStatus(ws, session, memberships, 'ONLINE');
-
-    setInterval(() => {
-      ws.send(
-        JSON.stringify({
-          type: 'misc.ping',
-        })
-      );
-    }, 30_000);
   },
   async message(ws, message) {
     // @ts-ignore stored during open
@@ -282,6 +280,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     );
   },
   async close(ws) {
+    clearInterval(pingIntervals.get(ws.id));
+    pingIntervals.delete(ws.id);
     // @ts-ignore using it here
     const session = ws.data.session as SessionWithUser;
     if (!session) return;

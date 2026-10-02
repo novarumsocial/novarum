@@ -43,3 +43,5 @@ package-lock.json
 
 config.toml
 keys/
+!test/config.toml
+test/.keys/

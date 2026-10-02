@@ -1,0 +1,38 @@
+# Test-only config. Every value here is a placeholder; nothing is a real secret.
+# Unit tests load it via ANCHOR_CONFIG=test/config.toml. The harness writes its own
+# per-anchor configs from this shape, overriding database_url, homeserver, base_url and listen_port.
+
+[server]
+database_url = "postgresql://novarum:novarum@127.0.0.1:15432/anchor_test"
+homeserver = "localhost"
+base_url = "http://localhost:5049"
+listen_port = 5049
+
+[federation]
+key_dir = "./test/.keys"
+nonce_max_age_seconds = 300
+
+[voice]
+livekit_url = "ws://127.0.0.1:7880"
+livekit_key = "devkey"
+livekit_secret = "test-livekit-secret-not-real"
+
+[files]
+s3_access_key = "test-access-key"
+s3_secret_key = "test-secret-key"
+s3_bucket = "anchortest"
+s3_endpoint = "http://127.0.0.1:3900"
+s3_region = "garage"
+s3_disable_cors = true
+
+[email]
+smtp_host = "127.0.0.1"
+smtp_port = 1025
+smtp_secure = false
+smtp_user = "test"
+smtp_pass = "test"
+from_email = "anchor@test.localhost"
+
+[misc]
+otp_pepper = "test-otp-pepper-not-real"
+save_attachment_thumbnails = false

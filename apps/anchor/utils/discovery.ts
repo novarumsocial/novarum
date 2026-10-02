@@ -98,6 +98,7 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       headers: {
         Accept: 'application/json',
       },
+      redirect: 'error',
       signal: AbortSignal.timeout(federationRequestTimeoutMs),
     });
 
@@ -141,6 +142,8 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       publicKey: data.publicKey,
     };
   } catch (error) {
+    // network errors and timeouts mean the remote is down too, not just non-2xx responses
+    if (!(error instanceof DiscoveryError)) await markHomeserverGuildStatus(clean, false);
     const message = error instanceof Error ? error.message : String(error);
     const log = error instanceof DiscoveryError ? console.info : console.warn;
     log(`Remote anchor unavailable at ${discoveryUrl}: ${message}`);
@@ -203,7 +206,13 @@ export async function postSignedFederationJson(homeserver: string, path: string,
       accept: 'application/json',
     },
     body: requestBody,
+    redirect: 'error',
     signal: AbortSignal.timeout(federationRequestTimeoutMs),
+  }).catch(async (error) => {
+    // drop the cached discovery so the next call re-discovers and flips extAnchorDown back
+    discoveryCache.delete(remote.homeserver);
+    await markHomeserverGuildStatus(remote.homeserver, false);
+    throw error;
   });
 
   const data = await response.json().catch(() => null);
