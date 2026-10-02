@@ -24,7 +24,9 @@ export interface Channel {
   unread: boolean;
   lastReadMessageId: string | null;
   mention: number;
-  type: 'TEXT' | 'VOICE';
+  type: 'TEXT' | 'VOICE' | 'DM';
+  avatarUrl?: string | null;
+  avatarColor?: string | null;
 }
 
 export interface Author extends Omit<PublicUser, 'homeserver'> {
@@ -64,7 +66,7 @@ export interface VoiceUser {
 
 export type ChatRoute =
   | { kind: 'home' }
-  | { kind: 'dms'; userId: string | null }
+  | { kind: 'dms'; channelId: string | null }
   | {
       kind: 'guild';
       serverId: string | null;

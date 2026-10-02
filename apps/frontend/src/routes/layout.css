@@ -21,6 +21,7 @@
   --accent: oklch(0.94 0.01 320.12);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.019 200.873);
   --border: oklch(0 0 0 / 10%);
   --input: oklch(0 0 0 / 15%);
   --ring: oklch(0.542 0.034 322.5);
@@ -56,6 +57,7 @@
   --accent: oklch(0.263 0.024 320.12);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0.008 326);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.542 0.034 322.5);
@@ -74,11 +76,11 @@
   --sidebar-ring: oklch(0.542 0.034 322.5);
 }
 
-body:has([data-rounded='true']) {
+:root[data-rounded='true'] {
   --radius: 0.5rem;
 }
 
-body:has([data-rounded='true']) .rounded-none {
+:root[data-rounded='true'] .rounded-none {
   border-radius: var(--radius);
 }
 
@@ -103,6 +105,7 @@ body:has([data-rounded='true']) .rounded-none {
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);

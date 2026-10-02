@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { Hash, Menu, Users, Volume2, X } from '@lucide/svelte';
+  import { BellRing, Hash, Menu, Phone, Users, Volume2, X } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { dms } from '$lib/dms.svelte';
+  import { settings } from '$lib/settings.svelte';
+  import { cn } from '$lib/utils';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
   import MessageInput from './message-input.svelte';
+  import Avatar from './avatar.svelte';
   import { formatDate } from '$lib/formatDate';
 
   let {
@@ -17,6 +21,10 @@
     onEdit,
     onOpenNavigation,
     onOpenMembers,
+    onCall,
+    onRing,
+    call,
+    callExpanded = false,
   }: {
     channel: Channel;
     messages: Message[];
@@ -30,7 +38,33 @@
     onEdit: (messageId: string, content: string | null) => void | Promise<void>;
     onOpenNavigation?: () => void;
     onOpenMembers?: () => void;
+    onCall?: () => void;
+    onRing?: () => void;
+    call?: Snippet;
+    callExpanded?: boolean;
   } = $props();
+
+  let callHeight = $state(320);
+  const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
+  const ringing = $derived(!!call && dms.outgoingCall === channel.id);
+
+  function resizeCall(event: PointerEvent) {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = callHeight;
+    const move = (e: PointerEvent) => {
+      callHeight = Math.min(
+        Math.max(startHeight + e.clientY - startY, 160),
+        window.innerHeight * 0.7
+      );
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
   let olderLoading = $state(false);
@@ -158,6 +192,13 @@
     </Button>
     {#if channel.type === 'VOICE'}
       <Volume2 class="size-5 text-muted-foreground" />
+    {:else if channel.type === 'DM'}
+      <Avatar
+        src={channel.avatarUrl}
+        name={channel.name}
+        class="size-6 text-[10px]"
+        bgColor={channel.avatarColor}
+      />
     {:else}
       <Hash class="size-5 text-muted-foreground" />
     {/if}
@@ -166,128 +207,223 @@
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      class="ml-auto lg:hidden"
-      onclick={onOpenMembers}
-      aria-label="Open members"
-    >
-      <Users class="size-5" />
-    </Button>
-  </div>
-
-  <div
-    bind:this={scrollContainer}
-    class="min-h-0 min-w-0 flex-1 overflow-y-auto"
-    onscroll={onScroll}
-  >
-    {#if olderLoading}
-      <div class="space-y-5 px-3 pt-4 sm:px-4">
-        {@render skeletonRows(2)}
-      </div>
-    {/if}
-    <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
-      {#if loading}
-        <div class="space-y-5">
-          {@render skeletonRows(5)}
-        </div>
-      {:else if messages.length === 0}
-        <div class="mb-4 max-w-md border border-dashed border-border p-4 select-none">
-          <p class="text-sm font-medium text-foreground">No messages yet</p>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Start the conversation in #{channel.name}.
-          </p>
-        </div>
-      {:else}
-        <div>
-          {#each messages as msg, i}
-            {@const prev = messages[i - 1]}
-            {@const firstUnread = i === firstUnreadIndex}
-            {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
-            {@const grouped =
-              !firstUnread &&
-              prev !== undefined &&
-              prev.author.username === msg.author.username &&
-              prev.author.server === msg.author.server &&
-              msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
-            {@const dayDivider =
-              (i > 0 &&
-                msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
-              i === 0}
-            {#if dayDivider}
-              <div
-                class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
-                role="separator"
-                aria-label={msg.timestamp.toLocaleDateString()}
-              >
-                <span class="h-px flex-1 bg-muted-foreground/20"></span>
-                <span>{formatDate(msg.timestamp)}</span>
-              </div>
-            {/if}
-            {#if firstUnread}
-              <div
-                id={`unread-${channel.id}`}
-                class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
-                role="separator"
-                aria-label="New messages"
-              >
-                <span class="h-px flex-1 bg-destructive"></span>
-                <span>New</span>
-              </div>
-            {/if}
-            <MessageComponent
-              message={msg}
-              {repliedMessage}
-              {grouped}
-              {onDelete}
-              {onEdit}
-              onReply={() => (replyingTo = msg)}
-            />
-          {/each}
-        </div>
-      {/if}
-    </div>
-  </div>
-
-  {#if typingText}
-    <div
-      class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
-      aria-live="polite"
-    >
-      <span class="flex items-center gap-0.5 mr-2.5">
-        <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
-        ></span>
-        <span
-          class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
-        ></span>
-        <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
-      </span>
-      {typingText ?? ''}
-    </div>
-  {/if}
-
-  {#if replyingTo}
-    <div class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4">
-      <span class="min-w-0 flex-1 truncate text-muted-foreground">
-        Replying to <span class="font-medium text-foreground"
-          >{replyingTo.author.displayName || replyingTo.author.username}</span
+    {#if channel.type === 'DM'}
+      {#if !call}
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="ml-auto"
+          onclick={onCall}
+          aria-label="Start call"
         >
-      </span>
+          <Phone class="size-5" />
+        </Button>
+      {:else if callers.length <= 1 && !ringing}
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          class="ml-auto"
+          onclick={onRing}
+          aria-label="Ring"
+          title="Ring"
+        >
+          <BellRing class="size-5" />
+        </Button>
+      {/if}
+    {:else}
       <Button
         variant="ghost"
-        size="icon-xs"
-        aria-label="Cancel reply"
-        onclick={() => (replyingTo = null)}
+        size="icon-lg"
+        class="ml-auto lg:hidden"
+        onclick={onOpenMembers}
+        aria-label="Open members"
       >
-        <X class="size-3.5" />
+        <Users class="size-5" />
+      </Button>
+    {/if}
+  </div>
+
+  {#if !call && callers.length}
+    <div class="flex shrink-0 items-center gap-2 border-b border-border bg-primary/5 px-4 py-2">
+      <Phone class="size-4 shrink-0 animate-pulse text-green-500" />
+      <span class="flex-1 truncate text-sm text-foreground">
+        {callers.map((state) => state.name ?? 'Someone').join(', ')}
+        {callers.length === 1 ? 'is' : 'are'} in the call
+      </span>
+      <Button size="sm" class="bg-green-600 text-white hover:bg-green-700" onclick={onCall}>
+        Join
       </Button>
     </div>
   {/if}
 
-  <MessageInput
-    placeholder="Message #{channel.name}"
-    onSend={sendMessage}
-    onTyping={() => chat.onTyping()}
-  />
+  {#if call}
+    <div
+      class="relative flex border-b border-border"
+      class:flex-1={callExpanded}
+      class:shrink-0={!callExpanded}
+      style:height={callExpanded ? null : `${callHeight}px`}
+    >
+      {@render call()}
+      {#if ringing}
+        <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-4">
+          <div
+            class={cn(
+              'flex min-w-0 items-center gap-2 border border-border bg-sidebar/80 py-1.5 pr-3 pl-1.5 text-sm text-foreground shadow-lg backdrop-blur',
+              settings.value.circleIcons && 'rounded-full'
+            )}
+          >
+            <Avatar
+              src={channel.avatarUrl}
+              name={channel.name}
+              class="size-6 animate-pulse text-[10px]"
+              bgColor={channel.avatarColor}
+            />
+            <span class="truncate">Ringing {channel.name}…</span>
+          </div>
+        </div>
+      {/if}
+      {#if !callExpanded}
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize call"
+          class="absolute inset-x-0 -bottom-1 z-10 h-2 cursor-row-resize touch-none transition-colors hover:bg-primary/40 pointer-coarse:-bottom-2.5 pointer-coarse:h-5"
+          onpointerdown={resizeCall}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
+  <div class={call && callExpanded ? 'hidden' : 'contents'}>
+    <div
+      bind:this={scrollContainer}
+      class="min-h-0 min-w-0 flex-1 overflow-y-auto"
+      onscroll={onScroll}
+    >
+      {#if olderLoading}
+        <div class="space-y-5 px-3 pt-4 sm:px-4">
+          {@render skeletonRows(2)}
+        </div>
+      {/if}
+      <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
+        {#if loading}
+          <div class="space-y-5">
+            {@render skeletonRows(5)}
+          </div>
+        {:else if messages.length === 0}
+          <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
+            {#if channel.type === 'DM'}
+              <Avatar
+                src={channel.avatarUrl}
+                name={channel.name}
+                class="size-14 text-lg"
+                bgColor={channel.avatarColor}
+              />
+            {/if}
+            <div class="border border-dashed border-border p-4">
+              <p class="text-sm font-medium text-foreground">
+                {channel.type === 'DM'
+                  ? `This is the beginning of your conversation with ${channel.name}.`
+                  : 'No messages yet'}
+              </p>
+              {#if channel.type !== 'DM'}
+                <p class="mt-1 text-sm text-muted-foreground">
+                  Start the conversation in #{channel.name}.
+                </p>
+              {/if}
+            </div>
+          </div>
+        {:else}
+          <div>
+            {#each messages as msg, i}
+              {@const prev = messages[i - 1]}
+              {@const firstUnread = i === firstUnreadIndex}
+              {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
+              {@const grouped =
+                !firstUnread &&
+                prev !== undefined &&
+                prev.author.username === msg.author.username &&
+                prev.author.server === msg.author.server &&
+                msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
+              {@const dayDivider =
+                (i > 0 &&
+                  msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
+                i === 0}
+              {#if dayDivider}
+                <div
+                  class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
+                  role="separator"
+                  aria-label={msg.timestamp.toLocaleDateString()}
+                >
+                  <span class="h-px flex-1 bg-muted-foreground/20"></span>
+                  <span>{formatDate(msg.timestamp)}</span>
+                </div>
+              {/if}
+              {#if firstUnread}
+                <div
+                  id={`unread-${channel.id}`}
+                  class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
+                  role="separator"
+                  aria-label="New messages"
+                >
+                  <span class="h-px flex-1 bg-destructive"></span>
+                  <span>New</span>
+                </div>
+              {/if}
+              <MessageComponent
+                message={msg}
+                {repliedMessage}
+                {grouped}
+                {onDelete}
+                {onEdit}
+                onReply={() => (replyingTo = msg)}
+              />
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    {#if typingText}
+      <div
+        class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
+        aria-live="polite"
+      >
+        <span class="flex items-center gap-0.5 mr-2.5">
+          <span
+            class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
+          ></span>
+          <span
+            class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
+          ></span>
+          <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
+        </span>
+        {typingText ?? ''}
+      </div>
+    {/if}
+
+    {#if replyingTo}
+      <div class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4">
+        <span class="min-w-0 flex-1 truncate text-muted-foreground">
+          Replying to <span class="font-medium text-foreground"
+            >{replyingTo.author.displayName || replyingTo.author.username}</span
+          >
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Cancel reply"
+          onclick={() => (replyingTo = null)}
+        >
+          <X class="size-3.5" />
+        </Button>
+      </div>
+    {/if}
+
+    <MessageInput
+      placeholder={channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`}
+      onSend={sendMessage}
+      onTyping={() => chat.onTyping()}
+    />
+  </div>
 </div>

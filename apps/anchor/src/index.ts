@@ -11,11 +11,14 @@ import { invite } from '../modules/invite/services';
 import { federation } from '../modules/federation/services';
 import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
+import { dm } from '../modules/dm/services';
 import { configureStorageCors } from '../utils/services/storage';
 import { writeEmojis } from '../utils/emojiWriter';
 import { clearOnlineUsers } from '../utils/clearOnlineUsers';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
-import { db } from './db';
+import { db, channels } from './db';
+import { and, isNull, like } from 'drizzle-orm';
+import { ensureFederatedDmRealtimeBridge } from '../utils/federationRealtime';
 import { exit, argv } from 'process';
 import { friends } from '../modules/friends/services.ts';
 import openapi from '@elysia/openapi';
@@ -58,6 +61,7 @@ const app = new Elysia()
           { name: 'Upload', description: 'the upload/ routes' },
           { name: 'User', description: 'the user/ routes' },
           { name: 'Friends', description: 'the friends/ routes' },
+          { name: 'DM', description: 'the dm/ routes' },
         ],
       },
     })
@@ -73,8 +77,19 @@ const app = new Elysia()
   .use(upload)
   .use(user)
   .use(friends)
+  .use(dm)
   .get('/', () => 'this is anchor')
   .listen(getConfig().server.listen_port);
+
+// federated DM bridges otherwise only start from /dm, so after a restart new messages
+// in a closed DM would never reach us to reopen it.
+const federatedDms = await db
+  .select({ id: channels.id })
+  .from(channels)
+  .where(and(isNull(channels.guildId), like(channels.id, 'fed:channel:%')));
+for (const { id } of federatedDms) {
+  void ensureFederatedDmRealtimeBridge(app.server!, id).catch(() => null);
+}
 
 export type App = typeof app;
 export type { RealtimeEvent } from '../utils/types';

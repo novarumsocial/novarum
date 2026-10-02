@@ -17,6 +17,7 @@ type Settings = {
   voiceAutoGainControl: boolean;
   voiceInputDeviceId: string;
   voiceOutputDeviceId: string;
+  screenShareSystemAudio: boolean;
   notificationVolume?: number;
   timeFormat: TimeFormat;
   language: string;
@@ -37,6 +38,7 @@ const defaults: Settings = {
   voiceAutoGainControl: true,
   voiceInputDeviceId: 'default',
   voiceOutputDeviceId: 'default',
+  screenShareSystemAudio: true,
   notificationVolume: 0.5,
   timeFormat: 'auto',
   language: 'en',

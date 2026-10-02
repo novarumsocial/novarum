@@ -1,13 +1,15 @@
 import Elysia, { t } from 'elysia';
 import { randomString } from '../../utils/randomString';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
-import { publishRealtime } from '../../utils/publishRealtime';
+import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
+import { canAccessChannel } from '../../utils/channelAccess';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { getConfig } from '../../utils/config';
 import { AccessToken } from 'livekit-server-sdk';
 import {
+  getVoicePresence,
   livekitServiceClient,
   livekitWebhookReceiver,
   removeVoicePresence,
@@ -65,13 +67,9 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) return status(403, { error: 'Forbidden' });
+      if (!(await canAccessChannel(channel, session.userId))) {
+        return status(403, { error: 'Forbidden' });
+      }
 
       const createdAt = new Date(body.createdAt);
       if (!parseFederatedChannelId(params.id)) {
@@ -189,7 +187,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         name: channel.name,
         position: channel.position,
         type,
-        guildId: channel.guildId,
+        guildId: channel.guildId!,
       };
 
       if (server) {
@@ -292,13 +290,15 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           id: params.id,
         },
       });
-      if (!channel) {
+      // this route lists a guild roster; DMs use their own participants list instead.
+      if (!channel || !channel.guildId) {
         return status(404, { error: 'Channel not found' });
       }
+      const guildId = channel.guildId;
 
       const membership = await db.query.guildMembers.findFirst({
         where: {
-          guildId: channel.guildId,
+          guildId,
           userId: session.userId,
         },
       });
@@ -338,7 +338,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
 
       const members = await db.query.guildMembers.findMany({
         where: {
-          guildId: channel.guildId,
+          guildId,
         },
         with: {
           user: true,
@@ -403,17 +403,11 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           id: params.id,
         },
       });
-      if (!channel || channel.type !== 'VOICE') {
+      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) {
         return status(404, { error: 'Channel not right' });
       }
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(401, { error: 'Unauthorized' });
       }
 
@@ -464,13 +458,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         return status(404, { error: 'Channel not found' });
       }
 
-      const channelMembership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!channelMembership) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(401, { error: 'Unauthorized' });
       }
 
@@ -496,7 +484,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       }
 
       if (server) {
-        publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'channel.typing',
           data: {
             channelId: channel.id,
@@ -534,13 +522,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         return status(404, { error: 'Channel not right' });
       }
 
-      const channelMembership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!channelMembership) {
+      if (!(await canAccessChannel(channel, session.userId))) {
         return status(401, { error: 'Unauthorized' });
       }
 
@@ -574,12 +556,25 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       if (!userId) return { ok: true };
 
       if (event.event === 'participant_left') {
+        // a reconnect joins the new participant before the old one's leave arrives.
+        const participants = event.room?.name
+          ? await livekitServiceClient.listParticipants(event.room.name).catch(() => [])
+          : [];
+        if (participants.some((participant) => participant.identity === userId)) {
+          return { ok: true };
+        }
+        // the user may have already moved to another call; only clear presence for this room.
+        if (`voice:${getVoicePresence(userId)?.channelId}` !== event.room?.name) {
+          return { ok: true };
+        }
+
         const previous = removeVoicePresence(userId);
         if (previous && server) {
-          publishRealtime(server, `guildEvents:${previous.guildId}`, {
-            type: 'voice.state.changed',
-            data: { ...previous, connected: false },
-          });
+          await publishToChannel(
+            server,
+            { id: previous.channelId, guildId: previous.guildId },
+            { type: 'voice.state.changed', data: { ...previous, connected: false } }
+          );
         }
         return { ok: true };
       }
@@ -610,7 +605,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
 
       setVoicePresence(state);
       if (server) {
-        publishRealtime(server, `guildEvents:${state.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'voice.state.changed',
           data: { ...state, connected: true },
         });

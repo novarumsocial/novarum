@@ -42,6 +42,12 @@ const api: ElectronAPI = {
   getLaunchPrefs: () => ipcRenderer.invoke('launch:get'),
   setLaunchPrefs: (prefs) => ipcRenderer.invoke('launch:set', prefs),
   getVersion: () => ipcRenderer.invoke('version:get'),
+  platform: process.platform,
+  venmic: {
+    isAvailable: () => ipcRenderer.invoke('venmic:available'),
+    link: () => ipcRenderer.invoke('venmic:link'),
+    unlink: () => ipcRenderer.invoke('venmic:unlink'),
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', api);

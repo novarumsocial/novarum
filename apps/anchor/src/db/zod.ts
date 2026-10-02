@@ -2,6 +2,7 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import {
   attachments,
+  channelMembers,
   channels,
   friendRelationships,
   guildInvites,
@@ -15,7 +16,9 @@ import { publicUserSchema } from '../../utils/publicUser';
 
 const isoDateSchema = z.iso.datetime();
 
+// channels users can create within a guild; DM/GROUP_DM channels are made by the /dm module.
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
+export const dmChannelTypeSchema = z.enum(['DM', 'GROUP_DM']);
 const guildMemberRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER']);
 export const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
 export const friendStatusSchema = z.enum(['NONE', 'PENDING', 'ACCEPTED']);
@@ -39,8 +42,10 @@ export const guildInviteResponseSchema = createSelectSchema(guildInvites, {
   expiresAt: isoDateSchema.nullable(),
 });
 
+// this is guild-channel-only: guildId and type are always present for TEXT/VOICE channels.
 export const channelResponseSchema = createSelectSchema(channels, {
   type: channelTypeSchema,
+  guildId: z.string(),
   position: z.number(),
 }).pick({
   id: true,
@@ -104,4 +109,29 @@ export const guildCreateSchema = createInsertSchema(guilds, {
 export const channelCreateSchema = createInsertSchema(channels, {
   name: (schema) => schema.min(1).max(100),
   type: channelTypeSchema,
+  guildId: z.string(),
 }).pick({ name: true, type: true, guildId: true });
+
+const channelMemberResponseSchema = createSelectSchema(channelMembers, {
+  joinedAt: isoDateSchema,
+}).pick({ joinedAt: true });
+
+export const dmResponseSchema = z.object({
+  id: z.string(),
+  type: dmChannelTypeSchema,
+  participants: z.array(publicUserSchema),
+  lastMessageAt: isoDateSchema.nullable(),
+  unread: z.boolean(),
+  joinedAt: channelMemberResponseSchema.shape.joinedAt,
+});
+
+// what a homeserver's POST /federation/dms/open returns: just enough to build a shadow DM locally.
+export const dmOpenResponseSchema = dmResponseSchema.pick({ id: true, type: true }).extend({
+  participants: z.array(publicUserSchema),
+});
+
+export const dmLatestResponseSchema = z.object({
+  channels: z.array(
+    z.object({ channelId: z.string(), id: z.string(), createdAt: isoDateSchema, own: z.boolean() })
+  ),
+});

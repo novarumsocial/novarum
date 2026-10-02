@@ -12,7 +12,7 @@
   "type": "module",
   "main": ".electron/main.js",
   "scripts": {
-    "compile": "bun build src/main.ts --target=node --outfile=.electron/main.js --external electron --external electron-updater && bun build src/preload.ts --target=node --format=cjs --outfile=.electron/preload.cjs --external electron",
+    "compile": "bun build src/main.ts --target=node --outfile=.electron/main.js --external electron --external electron-updater --external @vencord/venmic && bun build src/preload.ts --target=node --format=cjs --outfile=.electron/preload.cjs --external electron",
     "check": "tsc --noEmit -p tsconfig.json",
     "dev": "bun run compile && electron .",
     "build": "bun run --cwd ../frontend build && bun run compile && electron-builder",
@@ -38,7 +38,11 @@
     "files": [
       ".electron/main.js",
       ".electron/preload.cjs",
-      "package.json"
+      "package.json",
+      "node_modules/@vencord/venmic/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/@vencord/venmic/**/*"
     ],
     "extraResources": [
       {
@@ -62,7 +66,10 @@
     },
     "mac": {
       "icon": "icons/macos/icon.icns",
-      "artifactName": "Novarum-${version}-${arch}.${ext}"
+      "artifactName": "Novarum-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Novarum needs permission to capture system audio so it can be included when you share your screen."
+      }
     },
     "win": {
       "icon": "icons/windows/icon.ico",
@@ -79,6 +86,7 @@
     ]
   },
   "dependencies": {
+    "@vencord/venmic": "^7.2.3",
     "electron-updater": "^6.8.9"
   }
 }

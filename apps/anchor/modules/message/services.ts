@@ -1,14 +1,21 @@
 import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
-import { publishRealtime } from '../../utils/publishRealtime';
+import { publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles } from '../../utils/mentions';
-import { db, messages, attachments as dbAttachment, messagePings } from '../../src/db';
+import { canAccessChannel } from '../../utils/channelAccess';
+import {
+  db,
+  messages,
+  attachments as dbAttachment,
+  messagePings,
+  channelMembers,
+} from '../../src/db';
 import { and, eq } from 'drizzle-orm';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -17,7 +24,7 @@ import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/d
 
 const remoteErrorSchema = z.object({ error: z.string() });
 const messageSchema = messageResponseBaseSchema.extend({
-  guildId: z.string(),
+  guildId: z.string().nullable(),
   pingedHandles: z.array(z.string()).optional(),
   attachments: z.array(attachmentResponseSchema),
   author: publicUserSchema,
@@ -50,13 +57,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         return status(404, { error: 'Channel not found' });
       }
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) {
+      if (!(await canAccessChannel(channel, session.userId))) {
         return status(403, { error: 'Forbidden' });
       }
 
@@ -172,13 +173,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         return status(404, { error: 'Channel not found' });
       }
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) {
+      if (!(await canAccessChannel(channel, session.userId, true))) {
         return status(403, { error: 'Forbidden' });
       }
 
@@ -219,7 +214,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           channel.guildId
         );
         if (server) {
-          publishRealtime(server, `guildEvents:${channel.guildId}`, {
+          await publishToChannel(server, channel, {
             type: 'message.created',
             data: mappedMessage,
           });
@@ -317,6 +312,14 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           });
         }
 
+        // a new message reopens the DM for everyone who had closed it.
+        if (!channel.guildId) {
+          await tx
+            .update(channelMembers)
+            .set({ closed: false })
+            .where(eq(channelMembers.channelId, channel.id));
+        }
+
         return created;
       });
       const responseAttachments = attachments.value.map(attachmentPayload);
@@ -336,7 +339,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       };
 
       if (server) {
-        publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'message.created',
           data: responseMessage,
         });
@@ -374,13 +377,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) return status(403, { error: 'Forbidden' });
+      if (!(await canAccessChannel(channel, session.userId)))
+        return status(403, { error: 'Forbidden' });
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
@@ -413,7 +411,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           channel.guildId
         );
         if (server) {
-          publishRealtime(server, `guildEvents:${channel.guildId}`, {
+          await publishToChannel(server, channel, {
             type: 'message.updated',
             data: mappedMessage,
           });
@@ -478,7 +476,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       };
 
       if (server) {
-        publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'message.updated',
           data: responseMessage,
         });
@@ -511,13 +509,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       });
       if (!channel) return status(404, { error: 'Channel not found' });
 
-      const membership = await db.query.guildMembers.findFirst({
-        where: {
-          guildId: channel.guildId,
-          userId: session.userId,
-        },
-      });
-      if (!membership) return status(403, { error: 'Forbidden' });
+      if (!(await canAccessChannel(channel, session.userId)))
+        return status(403, { error: 'Forbidden' });
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
@@ -560,7 +553,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       );
 
       if (server) {
-        publishRealtime(server, `guildEvents:${channel.guildId}`, {
+        await publishToChannel(server, channel, {
           type: 'message.deleted',
           data: { id: messageId, channelId, guildId: channel.guildId },
         });
@@ -586,7 +579,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 function mapFederatedMessage(
   message: z.infer<typeof messageSchema>,
   channelId: string,
-  guildId: string
+  guildId: string | null
 ) {
   return {
     ...message,
@@ -645,11 +638,14 @@ export async function verifyPendingAttachments(
 }
 
 export async function getPingRecipients(
-  guildId: string,
+  guildId: string | null,
   content: string | null,
   replyAuthorId: string | undefined,
   authorId: string
 ) {
+  // DMs have no @mentions to resolve; every message already goes straight to the other participant.
+  if (!guildId) return [];
+
   const mentionedHandles = mentionHandles(content);
   if (!mentionedHandles.size && !replyAuthorId) return [];
 

@@ -7,10 +7,10 @@ import {
   Track,
   TrackEvent,
 } from 'livekit-client';
-import { LocalAudioTrack, type RemoteTrack } from 'livekit-client';
+import { LocalAudioTrack, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client';
 import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { Sound } from 'svelte-sound';
 
 // sounds
@@ -40,6 +40,10 @@ const microphoneCaptureOptions = () => ({
   deviceId: settings.value.voiceInputDeviceId,
 });
 
+// the fixed device label @vencord/venmic gives the virtual mic it patches system
+// audio into on linux - baked into the native addon, not something we control.
+export const VENMIC_DEVICE_LABEL = 'vencord-screen-share';
+
 const joinSound = new Sound(JoinEffect);
 const leaveSound = new Sound(Leave);
 const muteSound = new Sound(Mute);
@@ -63,9 +67,15 @@ export class Voice {
   selfCamera = $state<boolean>(false);
   selfScreenShare = $state<boolean>(false);
   audioPlaybackBlocked = $state<boolean>(false);
+  linuxSystemAudioAvailable = $state<boolean>(false);
 
   voiceStates = new SvelteMap<string, VoiceState>();
-  private participantAudio = new SvelteMap<string, { volume: number; muted: boolean }>();
+  // remote screen shares are only subscribed to once the user chooses to watch them
+  watchedStreams = new SvelteSet<string>();
+  private participantAudio = new SvelteMap<
+    string,
+    { volume: number; muted: boolean; screenVolume: number }
+  >();
   private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
   private endedTrackListeners = new WeakSet<VoiceVideoTrack>();
 
@@ -83,6 +93,21 @@ export class Voice {
   private audioLoopbackContext: AudioContext | null = null;
   private audioLoopbackDeafenedBefore = false;
   private audioLoopbackOperation: Promise<void> = Promise.resolve();
+
+  private screenShareAudioTrack: MediaStreamTrack | null = null;
+  private screenShareAudioStream: MediaStream | null = null;
+
+  constructor() {
+    void this.detectLinuxSystemAudio();
+  }
+
+  private async detectLinuxSystemAudio() {
+    try {
+      this.linuxSystemAudioAvailable = (await window.electron?.venmic.isAvailable()) ?? false;
+    } catch {
+      this.linuxSystemAudioAvailable = false;
+    }
+  }
 
   get participantCount() {
     return this.voiceStates.size;
@@ -122,7 +147,7 @@ export class Voice {
     this.room = room;
     this.bindRoomEvents(room, channelId);
 
-    const connectPromise = room.connect(data.serverUrl, data.token);
+    const connectPromise = room.connect(data.serverUrl, data.token, { autoSubscribe: false });
     connectPromise.catch(() => null);
 
     try {
@@ -163,9 +188,33 @@ export class Voice {
     for (const participant of room.remoteParticipants.values()) {
       this.syncParticipant(participant, channelId);
       for (const publication of participant.trackPublications.values()) {
-        if (publication.track) this.attachRemoteAudio(publication.track, participant.identity);
+        this.syncSubscription(publication, participant.identity);
       }
     }
+  }
+
+  watchStream(identity: string) {
+    this.watchedStreams.add(identity);
+    this.syncStreamSubscriptions(identity);
+  }
+
+  stopWatchingStream(identity: string) {
+    this.watchedStreams.delete(identity);
+    this.syncStreamSubscriptions(identity);
+  }
+
+  private syncStreamSubscriptions(identity: string) {
+    const participant = this.room?.remoteParticipants.get(identity);
+    for (const publication of participant?.trackPublications.values() ?? []) {
+      this.syncSubscription(publication, identity);
+    }
+  }
+
+  private syncSubscription(publication: RemoteTrackPublication, identity: string) {
+    const isStream =
+      publication.source === Track.Source.ScreenShare ||
+      publication.source === Track.Source.ScreenShareAudio;
+    publication.setSubscribed(!isStream || this.watchedStreams.has(identity));
   }
 
   async leave() {
@@ -175,6 +224,7 @@ export class Voice {
     const channelId = this.channelId;
     await this.setAudioLoopbackTesting(false);
     await this.removeNoiseCancellation();
+    await this.stopScreenShareAudio();
     this.room = null;
     this.channelId = null;
     this.connectionState = ConnectionState.Disconnected;
@@ -182,6 +232,7 @@ export class Voice {
     this.selfCamera = false;
     this.selfScreenShare = false;
     this.voiceStates.clear();
+    this.watchedStreams.clear();
     this.detachRemoteAudio();
 
     if (!room) return;
@@ -321,16 +372,34 @@ export class Voice {
     return this.participantAudio.get(identity)?.muted ?? false;
   }
 
+  participantScreenVolume(identity: string) {
+    return this.participantAudio.get(identity)?.screenVolume ?? 1;
+  }
+
   setParticipantVolume(identity: string, volume: number) {
     this.participantAudio.set(identity, {
       volume: Math.max(0, Math.min(3, volume)),
       muted: this.participantMuted(identity),
+      screenVolume: this.participantScreenVolume(identity),
     });
     this.updateParticipantAudio(identity);
   }
 
   setParticipantMuted(identity: string, muted: boolean) {
-    this.participantAudio.set(identity, { volume: this.participantVolume(identity), muted });
+    this.participantAudio.set(identity, {
+      volume: this.participantVolume(identity),
+      muted,
+      screenVolume: this.participantScreenVolume(identity),
+    });
+    this.updateParticipantAudio(identity);
+  }
+
+  setParticipantScreenVolume(identity: string, volume: number) {
+    this.participantAudio.set(identity, {
+      volume: this.participantVolume(identity),
+      muted: this.participantMuted(identity),
+      screenVolume: Math.max(0, Math.min(3, volume)),
+    });
     this.updateParticipantAudio(identity);
   }
 
@@ -357,7 +426,16 @@ export class Voice {
     if (!this.room) return;
 
     try {
-      await this.room.localParticipant.setScreenShareEnabled(enabled, { audio: true });
+      if (enabled) {
+        await this.room.localParticipant.setScreenShareEnabled(true, {
+          audio: settings.value.screenShareSystemAudio,
+        });
+        await this.startScreenShareAudio();
+      } else {
+        await this.stopScreenShareAudio();
+        await this.room.localParticipant.setScreenShareEnabled(false);
+      }
+
       this.selfScreenShare = enabled;
       if (enabled) {
         screenSound.play();
@@ -365,11 +443,83 @@ export class Voice {
         screenOffSound.play();
       }
     } catch {
+      await this.stopScreenShareAudio();
       screenOffSound.play();
       this.selfScreenShare = false;
     }
 
     this.syncParticipant(this.room.localParticipant, this.channelId!);
+  }
+
+  setScreenShareSystemAudio(enabled: boolean) {
+    settings.value.screenShareSystemAudio = enabled;
+  }
+
+  /**
+   * On windows/macOS, chromium captures system audio itself (granted as loopback
+   * by the main process), so `setScreenShareEnabled(true, { audio: true })` above
+   * is enough. Linux has no such loopback support, so instead we ask the main
+   * process to patch system audio into a venmic virtual mic, then publish that as
+   * a second, separate track.
+   */
+  private async startScreenShareAudio() {
+    if (!this.room) return;
+    if (!settings.value.screenShareSystemAudio) return;
+    if (window.electron?.platform !== 'linux' || !this.linuxSystemAudioAvailable) return;
+
+    try {
+      if (!(await window.electron.venmic.link())) return;
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const device = devices.find(
+        (d) => d.kind === 'audioinput' && d.label === VENMIC_DEVICE_LABEL
+      );
+      if (!device) {
+        await window.electron.venmic.unlink();
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: device.deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      const track = stream.getAudioTracks()[0];
+      if (!track) {
+        stream.getTracks().forEach((t) => t.stop());
+        await window.electron.venmic.unlink();
+        return;
+      }
+
+      this.screenShareAudioStream = stream;
+      this.screenShareAudioTrack = track;
+      await this.room.localParticipant.publishTrack(track, {
+        name: 'screen-share-audio',
+        source: Track.Source.ScreenShareAudio,
+      });
+    } catch (error) {
+      console.error('could not capture linux system audio for screen share', error);
+      await window.electron?.venmic.unlink().catch(() => undefined);
+    }
+  }
+
+  private async stopScreenShareAudio() {
+    const track = this.screenShareAudioTrack;
+    const stream = this.screenShareAudioStream;
+    this.screenShareAudioTrack = null;
+    this.screenShareAudioStream = null;
+
+    if (track && this.room) {
+      await this.room.localParticipant.unpublishTrack(track).catch(() => undefined);
+    }
+    stream?.getTracks().forEach((t) => t.stop());
+
+    if (window.electron?.platform === 'linux') {
+      await window.electron.venmic.unlink().catch(() => undefined);
+    }
   }
 
   private async syncLocalMicrophone(room: Room) {
@@ -391,8 +541,7 @@ export class Voice {
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
     const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-      | LocalAudioTrack
-      | undefined;
+      LocalAudioTrack | undefined;
     if (!(track instanceof LocalAudioTrack)) return;
     if (this.noiseProcessorTrack === track) return;
 
@@ -486,8 +635,7 @@ export class Voice {
       .catch(() => undefined)
       .then(async () => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-          | LocalAudioTrack
-          | undefined;
+          LocalAudioTrack | undefined;
         if (this.room !== room || !(track instanceof LocalAudioTrack)) return;
 
         await this.removeNoiseCancellation();
@@ -524,6 +672,7 @@ export class Voice {
 
         void this.setAudioLoopbackTesting(false);
         void this.removeNoiseCancellation();
+        void this.stopScreenShareAudio();
         this.room = null;
         this.channelId = null;
         this.connectionState = ConnectionState.Disconnected;
@@ -531,6 +680,7 @@ export class Voice {
         this.selfCamera = false;
         this.selfScreenShare = false;
         this.voiceStates.clear();
+        this.watchedStreams.clear();
         this.detachRemoteAudio();
         realtime.leaveVoice();
       })
@@ -543,6 +693,7 @@ export class Voice {
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.voiceStates.delete(participant.identity);
+        this.watchedStreams.delete(participant.identity);
         leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
@@ -551,7 +702,14 @@ export class Voice {
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         this.syncParticipant(participant, channelId);
       })
+      .on(RoomEvent.TrackPublished, (publication, participant) => {
+        this.syncSubscription(publication, participant.identity);
+        this.syncParticipant(participant, channelId);
+      })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+        if (publication.source === Track.Source.ScreenShare) {
+          this.watchedStreams.delete(participant.identity);
+        }
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
@@ -568,8 +726,9 @@ export class Voice {
       .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const speakingSet = new Set(speakers.map((s) => s.identity));
         for (const [identity, state] of this.voiceStates) {
-          state.speaking = speakingSet.has(identity);
-          this.voiceStates.set(identity, { ...state });
+          const speaking = speakingSet.has(identity);
+          if (state.speaking === speaking) continue;
+          this.voiceStates.set(identity, { ...state, speaking });
         }
       });
   }
@@ -622,7 +781,7 @@ export class Voice {
       serverMuted: false,
       camera: !!cameraTrack,
       cameraTrack,
-      screenShare: !!screenTrack,
+      screenShare: !!screenTrack || (!isLocal && !!screenPub && !screenPub.isMuted),
       screenTrack,
       speaking: participant.isSpeaking,
     });
@@ -648,6 +807,9 @@ export class Voice {
     track.on(TrackEvent.Ended, () => {
       if (this.channelId !== channelId) return;
 
+      // the user can also stop sharing from the OS/browser's own share bar,
+      // which ends this track without going through setScreenShare(false)
+      if (participant.isLocal) void this.stopScreenShareAudio();
       this.syncParticipant(participant, channelId);
     });
   }
@@ -666,9 +828,15 @@ export class Voice {
   }
 
   private updateParticipantAudio(identity: string) {
-    this.room?.remoteParticipants
-      .get(identity)
-      ?.setVolume(this.participantMuted(identity) ? 0 : this.participantVolume(identity));
+    const participant = this.room?.remoteParticipants.get(identity);
+    if (!participant) return;
+
+    const muted = this.participantMuted(identity);
+    participant.setVolume(muted ? 0 : this.participantVolume(identity), Track.Source.Microphone);
+    participant.setVolume(
+      muted ? 0 : this.participantScreenVolume(identity),
+      Track.Source.ScreenShareAudio
+    );
   }
 
   private detachRemoteAudio(track?: RemoteTrack) {

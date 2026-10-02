@@ -18,6 +18,7 @@ export const relations = defineRelations(schema, (r) => ({
     }),
     attachments: r.many.attachments({ from: r.users.id, to: r.attachments.uploaderId }),
     guildInvites: r.many.guildInvites({ from: r.users.id, to: r.guildInvites.creatorId }),
+    channelMemberships: r.many.channelMembers({ from: r.users.id, to: r.channelMembers.userId }),
   },
   localCredentials: {
     user: r.one.users({
@@ -48,13 +49,26 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
   channels: {
-    guild: r.one.guilds({ from: r.channels.guildId, to: r.guilds.id, optional: false }),
+    guild: r.one.guilds({ from: r.channels.guildId, to: r.guilds.id }),
     messages: r.many.messages({ from: r.channels.id, to: r.messages.channelId }),
     readStates: r.many.channelReadStates({
       from: r.channels.id,
       to: r.channelReadStates.channelId,
     }),
     attachments: r.many.attachments({ from: r.channels.id, to: r.attachments.channelId }),
+    members: r.many.channelMembers({ from: r.channels.id, to: r.channelMembers.channelId }),
+  },
+  channelMembers: {
+    channel: r.one.channels({
+      from: r.channelMembers.channelId,
+      to: r.channels.id,
+      optional: false,
+    }),
+    user: r.one.users({
+      from: r.channelMembers.userId,
+      to: r.users.id,
+      optional: false,
+    }),
   },
   messages: {
     channel: r.one.channels({

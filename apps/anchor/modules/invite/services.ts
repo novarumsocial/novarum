@@ -250,7 +250,7 @@ async function guildChannels(guildId: string) {
 
   return channels.map((channel) => ({
     id: channel.id,
-    guildId: channel.guildId,
+    guildId: channel.guildId!,
     name: channel.name,
     position: channel.position,
     type: channel.type as 'TEXT' | 'VOICE',

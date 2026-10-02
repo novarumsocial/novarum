@@ -5,6 +5,8 @@
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { dms, dmPath } from '$lib/dms.svelte';
+  import { device } from '$lib/device.svelte';
   import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
@@ -16,6 +18,7 @@
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
   import DmSidebar from './dm-sidebar.svelte';
+  import CallRinging from './call-ringing.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -43,14 +46,42 @@
       ])
     )
   );
+  const hasUnreadDms = $derived(dms.list.some((dm) => dm.unread));
+
+  const callMembers = $derived(
+    chat.route.kind === 'dms' && currentUser
+      ? [
+          { ...currentUser, userId: currentUser.id, server: currentUser.homeserver },
+          ...(dms
+            .get(chat.activeChannel ?? '')
+            ?.participants.map(({ homeserver, ...user }) => ({ ...user, server: homeserver })) ??
+            []),
+        ]
+      : chat.members
+  );
 
   const voice = new Voice();
+  let callExpanded = $state(false);
+
+  function startCall(id: string) {
+    // phones have no room for the call and the chat side by side, so start it expanded.
+    if (!device.isComputer) callExpanded = true;
+    const ring = !chat.voiceStates[id]?.length;
+    void voice
+      .join(id)
+      .then(() => {
+        if (ring && voice.channelId === id) realtime.ringCall(id);
+      })
+      .catch(() => null);
+  }
 
   const voiceChannelName = $derived(
     Object.values(chat.channelsByServer)
       .flatMap((categories) => categories)
       .flatMap((category) => category.channels)
-      .find((channel) => channel.id === voice.channelId)?.name ?? null
+      .find((channel) => channel.id === voice.channelId)?.name ??
+      (voice.channelId ? dms.get(voice.channelId)?.participants[0]?.username : null) ??
+      null
   );
 
   $effect(() => {
@@ -186,6 +217,7 @@
           servers={chat.servers}
           activeId={chat.activeServer}
           mentions={guildMentions}
+          {hasUnreadDms}
           onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}
           onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
@@ -197,7 +229,11 @@
             activeChannel={chat.activeChannel}
             onSelectChannel={selectChannel}
             onCreateChannel={async (channel: Channel) =>
-              await chat.createChannel(currentServer.id, channel, channel.type)}
+              await chat.createChannel(
+                currentServer.id,
+                channel,
+                channel.type === 'VOICE' ? 'VOICE' : 'TEXT'
+              )}
             onReorderChannels={(channelIds) => chat.reorderChannels(currentServer.id, channelIds)}
             onSaveChannelOrder={async (channelIds) =>
               await chat.saveChannelOrder(currentServer.id, channelIds)}
@@ -207,7 +243,7 @@
             voiceStates={chat.voiceStates}
           />
         {/if}
-        {#if chat.route.kind === 'home'}
+        {#if chat.route.kind === 'home' || chat.route.kind === 'dms'}
           <DmSidebar />
         {/if}
       </div>
@@ -216,7 +252,7 @@
 
     {#if chat.route.kind === 'home'}
       <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-    {:else if currentChannel && currentChannel.type === 'TEXT'}
+    {:else if currentChannel && (currentChannel.type === 'TEXT' || currentChannel.type === 'DM')}
       <ChatArea
         channel={currentChannel}
         messages={currentMessages}
@@ -227,7 +263,28 @@
         onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
         onOpenMembers={() => (mobileMembersOpen = true)}
+        onCall={() => startCall(currentChannel.id)}
+        onRing={() => realtime.ringCall(currentChannel.id)}
+        call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
+          ? dmCall
+          : undefined}
+        {callExpanded}
       />
+      {#snippet dmCall()}
+        <VoiceArea
+          channel={currentChannel!}
+          {voice}
+          members={callMembers}
+          onJoin={() => startCall(currentChannel!.id)}
+          onLeave={() => {
+            callExpanded = false;
+            leaveVoice();
+          }}
+          embedded
+          expanded={callExpanded}
+          onToggleExpand={() => (callExpanded = !callExpanded)}
+        />
+      {/snippet}
     {:else if currentChannel && currentChannel.type === 'VOICE'}
       <VoiceArea
         channel={currentChannel}
@@ -247,8 +304,13 @@
           Browse channels
         </button>
         <div class="max-w-sm text-center">
-          <p class="text-sm font-medium text-foreground">No channel selected</p>
-          <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
+          {#if chat.route.kind === 'dms'}
+            <p class="text-sm font-medium text-foreground">No conversation selected</p>
+            <p class="mt-1 text-sm text-muted-foreground">Pick a direct message to begin.</p>
+          {:else}
+            <p class="text-sm font-medium text-foreground">No channel selected</p>
+            <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
+          {/if}
         </div>
       </main>
     {/if}
@@ -270,4 +332,11 @@
       </div>
     {/if}
   </div>
+  <CallRinging
+    {voice}
+    onAccept={(id) => {
+      void goto(dmPath(id));
+      startCall(id);
+    }}
+  />
 {/if}

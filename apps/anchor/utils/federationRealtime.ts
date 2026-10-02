@@ -2,13 +2,16 @@ import type { Server } from 'elysia/universal';
 import { z } from 'zod';
 import { discoverRemoteAnchor, signFederationRequest } from './discovery';
 import { getConfig } from './config';
+import { db, channelMembers } from '../src/db';
+import { eq } from 'drizzle-orm';
 import {
   makeFederatedChannelId,
   makeFederatedGuildId,
+  parseFederatedChannelId,
   parseFederatedGuildId,
 } from './federationIds';
-import type { RealtimeEvent } from './types';
-import { publishRealtime } from './publishRealtime';
+import type { RealtimeEvent, VoicePresence } from './types';
+import { publishRealtime, publishToChannel } from './publishRealtime';
 import { publicUserSchema } from './publicUser';
 import {
   attachmentResponseSchema,
@@ -18,9 +21,29 @@ import {
 } from '../src/db/zod';
 
 const activeBridges = new Map<string, WebSocket | null>();
+const bridgedVoicePresence = new Map<string, Map<string, VoicePresence>>();
+
+// presence for remote guilds/DMs lives on their homeserver, so we keep what the bridges relay
+// to include it in the snapshot local clients get when they connect.
+export function bridgedVoicePresenceFor(ids: string[]) {
+  return ids.flatMap((id) => [...(bridgedVoicePresence.get(id)?.values() ?? [])]);
+}
+
+function trackBridgedVoicePresence(id: string, event: RealtimeEvent) {
+  if (event.type === 'voice.states.snapshot') {
+    bridgedVoicePresence.set(id, new Map(event.data.states.map((state) => [state.userId, state])));
+  }
+  if (event.type === 'voice.state.changed') {
+    const { connected, ...state } = event.data;
+    const states = bridgedVoicePresence.get(id) ?? new Map<string, VoicePresence>();
+    if (connected) states.set(state.userId, state);
+    else states.delete(state.userId);
+    bridgedVoicePresence.set(id, states);
+  }
+}
 
 const messageEventDataSchema = messageResponseBaseSchema.extend({
-  guildId: z.string(),
+  guildId: z.string().nullable(),
   replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentResponseSchema),
@@ -57,7 +80,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     data: z.object({
       id: z.string(),
       channelId: z.string(),
-      guildId: z.string(),
+      guildId: z.string().nullable(),
     }),
   }),
   z.object({
@@ -82,7 +105,7 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildIds: z.array(z.string()),
       states: z.array(
         z.object({
-          guildId: z.string(),
+          guildId: z.string().nullable(),
           channelId: z.string(),
           userId: z.string(),
           name: z.string().nullable(),
@@ -93,12 +116,16 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('voice.state.changed'),
     data: z.object({
-      guildId: z.string(),
+      guildId: z.string().nullable(),
       channelId: z.string(),
       userId: z.string(),
       name: z.string().nullable(),
       connected: z.boolean(),
     }),
+  }),
+  z.object({
+    type: z.literal('call.ringing'),
+    data: z.object({ channelId: z.string(), user: publicUserSchema, ringing: z.boolean() }),
   }),
   z.object({
     type: z.literal('channel.typing'),
@@ -122,14 +149,66 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
 
 export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId: string) {
   const federatedGuild = parseFederatedGuildId(guildId);
-  if (!federatedGuild || activeBridges.has(guildId)) return;
+  if (!federatedGuild) return;
 
-  activeBridges.set(guildId, null);
+  await ensureBridge(
+    guildId,
+    federatedGuild.homeserver,
+    `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`,
+    (event) => publishRealtime(server, `guildEvents:${guildId}`, event)
+  );
+}
+
+// same idea as the guild bridge, but a DM has no shared topic of its own to
+// publish to: publishToChannel fans the event out to each local participant.
+export async function ensureFederatedDmRealtimeBridge(server: Server, channelId: string) {
+  const federatedChannel = parseFederatedChannelId(channelId);
+  if (!federatedChannel) return;
+
+  await ensureBridge(
+    channelId,
+    federatedChannel.homeserver,
+    `/federation/realtime/dms/${encodeURIComponent(federatedChannel.id)}`,
+    async (event) => {
+      if (event.type === 'message.created') {
+        await db
+          .update(channelMembers)
+          .set({ closed: false })
+          .where(eq(channelMembers.channelId, channelId));
+      }
+      await publishToChannel(server, { id: channelId, guildId: null }, event);
+    }
+  );
+}
+
+const maxReconnectDelayMs = 5 * 60 * 1000;
+
+async function ensureBridge(
+  id: string,
+  homeserver: string,
+  path: string,
+  handler: (event: RealtimeEvent) => void | Promise<void>,
+  attempt = 0
+) {
+  if (activeBridges.has(id)) return;
+  activeBridges.set(id, null);
+
+  const onEvent = (event: RealtimeEvent) =>
+    Promise.resolve()
+      .then(() => handler(event))
+      .catch((error) => console.warn(`Failed to handle bridged event for ${id}:`, error));
+
+  // clients never ask for a bridge again once connected, so keep retrying with backoff
+  // (reset once the remote actually accepts the connection).
+  const reconnect = () =>
+    setTimeout(
+      () => void ensureBridge(id, homeserver, path, handler, attempt + 1).catch(() => null),
+      Math.min(1000 * 2 ** attempt, maxReconnectDelayMs)
+    );
 
   let socket: WebSocket;
   try {
-    const remote = await discoverRemoteAnchor(federatedGuild.homeserver);
-    const path = `/federation/realtime/guilds/${encodeURIComponent(federatedGuild.id)}`;
+    const remote = await discoverRemoteAnchor(homeserver);
     const url = new URL(path, remote.baseUrl);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
@@ -145,25 +224,38 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
     }
 
     socket = new WebSocket(url);
-    activeBridges.set(guildId, socket);
+    activeBridges.set(id, socket);
   } catch (error) {
-    if (activeBridges.get(guildId) === null) activeBridges.delete(guildId);
+    if (activeBridges.get(id) === null) activeBridges.delete(id);
+    reconnect();
     throw error;
   }
+
+  socket.addEventListener('open', () => {
+    attempt = 0;
+  });
 
   socket.addEventListener('message', (message) => {
     const event = parseRealtimeEvent(message.data);
     if (!event) return;
 
-    publishRealtime(
-      server,
-      `guildEvents:${guildId}`,
-      mapFederatedRealtimeEvent(event, federatedGuild.homeserver)
-    );
+    const mapped = mapFederatedRealtimeEvent(event, homeserver);
+    trackBridgedVoicePresence(id, mapped);
+    onEvent(mapped);
   });
 
-  socket.addEventListener('close', () => {
-    if (activeBridges.get(guildId) === socket) activeBridges.delete(guildId);
+  socket.addEventListener('close', (event) => {
+    if (activeBridges.get(id) !== socket) return;
+    activeBridges.delete(id);
+
+    // updates stop with the bridge, so don't leave clients showing people in a call forever.
+    for (const state of bridgedVoicePresenceFor([id])) {
+      onEvent({ type: 'voice.state.changed', data: { ...state, connected: false } });
+    }
+    bridgedVoicePresence.delete(id);
+    // 1008 means the remote refused us (left the guild, DM gone): retrying won't help, and
+    // the next GET /dm or /guilds starts a fresh bridge if access comes back.
+    if (event.code !== 1008) reconnect();
   });
 
   socket.addEventListener('error', () => {
@@ -210,24 +302,13 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
     };
   }
 
-  if (event.type === 'message.created') {
+  if (event.type === 'message.created' || event.type === 'message.updated') {
     return {
       ...event,
       data: {
         ...event.data,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
-      },
-    };
-  }
-
-  if (event.type === 'message.updated') {
-    return {
-      ...event,
-      data: {
-        ...event.data,
-        channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
       },
     };
   }
@@ -238,7 +319,7 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       data: {
         ...event.data,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
       },
     };
   }
@@ -260,7 +341,7 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
         guildIds: event.data.guildIds.map((guildId) => makeFederatedGuildId(homeserver, guildId)),
         states: event.data.states.map((state) => ({
           ...state,
-          guildId: makeFederatedGuildId(homeserver, state.guildId),
+          guildId: state.guildId ? makeFederatedGuildId(homeserver, state.guildId) : null,
           channelId: makeFederatedChannelId(homeserver, state.channelId),
         })),
       },
@@ -272,9 +353,16 @@ function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: string): Re
       ...event,
       data: {
         ...event.data,
-        guildId: makeFederatedGuildId(homeserver, event.data.guildId),
+        guildId: event.data.guildId ? makeFederatedGuildId(homeserver, event.data.guildId) : null,
         channelId: makeFederatedChannelId(homeserver, event.data.channelId),
       },
+    };
+  }
+
+  if (event.type === 'call.ringing') {
+    return {
+      ...event,
+      data: { ...event.data, channelId: makeFederatedChannelId(homeserver, event.data.channelId) },
     };
   }
 

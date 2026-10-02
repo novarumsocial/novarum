@@ -4,11 +4,16 @@ import { isNonceUsed, storeNonce, verifyMessage } from '../../utils/keys';
 import { getConfig } from '../../utils/config';
 import crypto from 'node:crypto';
 import { randomString } from '../../utils/randomString';
-import { publishRealtime } from '../../utils/publishRealtime';
+import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
+import { canAccessChannel } from '../../utils/channelAccess';
+import { makeFederatedChannelId } from '../../utils/federationIds';
+import { dmResponse, latestMessages, openLocalDm, upsertDmShadow } from '../dm/services';
+import { ensureFederatedDmRealtimeBridge } from '../../utils/federationRealtime';
 import { AccessToken } from 'livekit-server-sdk';
 import {
   removeVoicePresence,
   setVoicePresence,
+  voicePresenceForChannels,
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
 import {
@@ -26,6 +31,8 @@ import { isMessageAfter } from '../../utils/messageCursor';
 import {
   db,
   guildMembers,
+  channels as dbChannels,
+  channelMembers,
   messages,
   attachments as dbAttachments,
   messagePings,
@@ -40,6 +47,7 @@ import {
 } from '../../utils/federationPayload';
 import {
   applyFriendSnapshot,
+  findFriendship,
   friendAuthority,
   friendCommandSchema,
   friendSnapshotSchema,
@@ -52,9 +60,12 @@ import {
   attachmentResponseSchema,
   channelResponseSchema,
   channelUsersResponseSchema,
+  dmLatestResponseSchema,
+  dmOpenResponseSchema,
   federatedGuildResponseSchema,
   guildInviteResponseSchema,
   messageResponseBaseSchema,
+  userStatusSchema,
 } from '../../src/db/zod';
 
 const federatedMessagePageSize = 50;
@@ -62,7 +73,7 @@ const maxFederatedMessagePageSize = 100;
 const okResponseSchema = z.object({ ok: z.boolean() });
 const successResponseSchema = z.object({ success: z.boolean() });
 const federatedMessageSchema = messageResponseBaseSchema.extend({
-  guildId: z.string(),
+  guildId: z.string().nullable(),
   pingedHandles: z.array(z.string()),
   attachments: z.array(attachmentResponseSchema),
   author: publicUserSchema,
@@ -381,7 +392,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const user = await db.query.users.findFirst({
         where: {
           username: userPayload.username,
-          homeserver: userPayload.homeserver,
+          homeserver: userPayload.homeserver.toLowerCase(),
         },
       });
       if (!user) return status(403, { error: 'Forbidden' });
@@ -404,7 +415,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       const guildIds = new Set(memberships.map((membership) => membership.guildId));
       if (
         channels.length !== channelIds.length ||
-        channels.some((channel) => !guildIds.has(channel.guildId))
+        channels.some((channel) => !channel.guildId || !guildIds.has(channel.guildId))
       ) {
         return status(403, { error: 'Forbidden' });
       }
@@ -522,7 +533,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         },
         channels: channels.map((channel) => ({
           id: channel.id,
-          guildId: channel.guildId,
+          guildId: channel.guildId!,
           name: channel.name,
           position: channel.position,
           type: channel.type as 'TEXT' | 'VOICE',
@@ -570,7 +581,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(400, { error: 'Message content or an attachment is required' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       const replyTarget = replyTo
@@ -647,6 +658,14 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
           });
         }
 
+        // a new message reopens the DM for everyone who had closed it.
+        if (!access.channel.guildId) {
+          await tx
+            .update(channelMembers)
+            .set({ closed: false })
+            .where(eq(channelMembers.channelId, params.id));
+        }
+
         return {
           ...created,
           attachments: attachments.value,
@@ -656,7 +675,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
 
       const responseMessage = federatedMessageResponse(message, access.channel, access.user);
       if (server) {
-        publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'message.created',
           data: responseMessage,
         });
@@ -742,7 +761,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         access.user
       );
       if (server) {
-        publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'message.updated',
           data: responseMessage,
         });
@@ -796,7 +815,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       );
 
       if (server) {
-        publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'message.deleted',
           data: {
             id: messageId,
@@ -836,7 +855,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(415, { error: 'Unsupported file type' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       return createPendingAttachment({
@@ -920,6 +939,8 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
 
       const access = await getFederatedChannelAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
+      // this route only lists guild rosters; DMs have no roster to speak of.
+      if (!access.channel.guildId) return { users: [] };
 
       const members = await db.query.guildMembers.findMany({
         where: { guildId: access.channel.guildId },
@@ -959,11 +980,11 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
 
       if (server) {
-        publishRealtime(server, `guildEvents:${access.channel.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'channel.typing',
           data: {
             channelId: access.channel.id,
@@ -1000,9 +1021,11 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const access = await getFederatedChannelAccess(params.id, userPayload);
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
       if (!access.ok) return status(access.status, { error: access.error });
-      if (access.channel.type !== 'VOICE') return status(404, { error: 'Channel not right' });
+      if (access.channel.type !== 'VOICE' && access.channel.type !== 'DM') {
+        return status(404, { error: 'Channel not right' });
+      }
 
       const voiceConfig = getConfig().voice;
       const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
@@ -1056,7 +1079,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
 
       const access = await getFederatedChannelAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
-      if (access.channel.type !== 'VOICE') return status(404, { error: 'Channel not right' });
+      if (access.channel.type !== 'VOICE' && access.channel.type !== 'DM') {
+        return status(404, { error: 'Channel not right' });
+      }
 
       const state = {
         guildId: access.channel.guildId,
@@ -1069,7 +1094,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       else removeVoicePresence(state.userId);
 
       if (server) {
-        publishRealtime(server, `guildEvents:${state.guildId}`, {
+        await publishToChannel(server, access.channel, {
           type: 'voice.state.changed',
           data: { ...state, connected },
         });
@@ -1081,7 +1106,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       response: {
         200: z.object({
           state: z.object({
-            guildId: z.string(),
+            guildId: z.string().nullable(),
             channelId: z.string(),
             userId: z.string(),
             name: z.string(),
@@ -1090,6 +1115,61 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/friends/status',
+    async ({ request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const statusResult = userStatusSchema.safeParse(getObjectProperty(parsed.body, 'status'));
+      if (!statusResult.success) return status(400, { error: 'Invalid federation user status' });
+      const nextStatus = statusResult.data;
+
+      const [remote] = await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            eq(users.username, userPayload.username),
+            sql`lower(${users.homeserver}) = ${parsed.origin.homeserver}`
+          )
+        )
+        .limit(1);
+      if (!remote) return status(404, { error: 'Unknown user' });
+
+      await db.update(users).set({ status: nextStatus }).where(eq(users.id, remote.id));
+
+      const friendships = await db.query.friendRelationships.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [{ userOneId: remote.id }, { userTwoId: remote.id }],
+        },
+      });
+      for (const { userOneId, userTwoId } of friendships) {
+        if (server)
+          publishRealtime(server, `userEvents:${userOneId === remote.id ? userTwoId : userOneId}`, {
+            type: 'user.status.changed',
+            data: { userId: remote.id, status: nextStatus },
+          });
+      }
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: okResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
@@ -1106,10 +1186,9 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         return status(401, { error: 'Federation user homeserver mismatch' });
       }
 
-      const nextStatus = getObjectProperty(parsed.body, 'status');
-      if (nextStatus !== 'ONLINE' && nextStatus !== 'OFFLINE') {
-        return status(400, { error: 'Invalid federation user status' });
-      }
+      const statusResult = userStatusSchema.safeParse(getObjectProperty(parsed.body, 'status'));
+      if (!statusResult.success) return status(400, { error: 'Invalid federation user status' });
+      const nextStatus = statusResult.data;
 
       const access = await getFederatedGuildAccess(params.id, userPayload);
       if (!access.ok) return status(access.status, { error: access.error });
@@ -1145,6 +1224,271 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
       },
     }
   )
+  .post(
+    '/dms/open',
+    async ({ request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+      if (userPayload.isBot) return status(403, { error: 'Bots cannot open DMs' });
+
+      const peerResult = z.string().safeParse(getObjectProperty(parsed.body, 'peerUsername'));
+      if (!peerResult.success) return status(400, { error: 'Invalid peer username' });
+      const peerUsername = peerResult.data;
+
+      const localHomeserver = getConfig().server.homeserver;
+      if (
+        friendAuthority(localHomeserver, userPayload.homeserver) !== localHomeserver.toLowerCase()
+      ) {
+        return status(400, { error: 'This homeserver is not authoritative for this DM' });
+      }
+
+      const target = await db.query.users.findFirst({
+        where: { username: peerUsername, homeserver: localHomeserver },
+      });
+      if (!target || target.isBot) return status(404, { error: 'User not found' });
+
+      const actor = await upsertFederatedUser(userPayload);
+      const friendship = await findFriendship(actor.id, target.id);
+      if (friendship?.status !== 'ACCEPTED') return status(403, { error: 'Users are not friends' });
+
+      const dm = await openLocalDm(actor.id, target.id);
+      if (dm.created && server) {
+        publishRealtime(server, `userEvents:${target.id}`, {
+          type: 'dm.created',
+          data: dmResponse(dm.channel, dm.joinedAt, [actor]),
+        });
+      }
+
+      return {
+        id: dm.channel.id,
+        type: dm.channel.type as 'DM' | 'GROUP_DM',
+        participants: [publicUser(target), publicUser(actor)],
+      };
+    },
+    {
+      response: {
+        200: dmOpenResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/dms/notify',
+    async ({ request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const channelResult = z.string().safeParse(getObjectProperty(parsed.body, 'channelId'));
+      if (!channelResult.success) return status(400, { error: 'Invalid channel ID' });
+      const channelId = channelResult.data;
+
+      const participants = z
+        .array(federationUserSchema)
+        .safeParse(getObjectProperty(parsed.body, 'participants'));
+      if (!participants.success) return status(400, { error: 'Invalid participants' });
+
+      const localHomeserver = getConfig().server.homeserver.toLowerCase();
+      const local = participants.data.find((p) => p.homeserver.toLowerCase() === localHomeserver);
+      if (!local) return status(400, { error: 'No local participant in this DM' });
+      const remotes = participants.data.filter((p) => p !== local);
+      if (
+        participants.data.length !== 2 ||
+        remotes.some((p) => p.homeserver.toLowerCase() !== parsed.origin.homeserver)
+      ) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      if (
+        friendAuthority(parsed.origin.homeserver, getConfig().server.homeserver) !==
+        parsed.origin.homeserver.toLowerCase()
+      ) {
+        return status(403, { error: 'This homeserver is not authoritative for this DM' });
+      }
+
+      const localUser = await db.query.users.findFirst({
+        where: { username: local.username, homeserver: getConfig().server.homeserver },
+      });
+      if (!localUser) return status(404, { error: 'User not found' });
+
+      const others = await Promise.all(remotes.map(upsertFederatedUser));
+      const actor = others[0]!;
+
+      const friendship = await findFriendship(localUser.id, actor.id);
+      if (friendship?.status !== 'ACCEPTED') {
+        return status(403, { error: 'Users are not friends' });
+      }
+
+      const shadowId = makeFederatedChannelId(parsed.origin.homeserver, channelId);
+      const membership = await upsertDmShadow(shadowId, localUser.id, [
+        localUser.id,
+        ...others.map((user) => user.id),
+      ]);
+
+      if (server) {
+        publishRealtime(server, `userEvents:${localUser.id}`, {
+          type: 'dm.created',
+          data: dmResponse({ id: shadowId, type: 'DM' }, membership.joinedAt, others),
+        });
+        void ensureFederatedDmRealtimeBridge(server, shadowId).catch(() => null);
+      }
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: okResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/dms/latest',
+    async ({ request, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const channelIds = z
+        .array(z.string())
+        .max(500)
+        .safeParse(getObjectProperty(parsed.body, 'channelIds'));
+      if (!channelIds.success) return status(400, { error: 'Invalid channel IDs' });
+
+      const user = await db.query.users.findFirst({
+        where: { username: userPayload.username, homeserver: userPayload.homeserver.toLowerCase() },
+      });
+      if (!user || !channelIds.data.length) return { channels: [] };
+
+      const memberships = await db.query.channelMembers.findMany({
+        where: { userId: user.id, channelId: { in: channelIds.data } },
+      });
+      const latest = await latestMessages(memberships.map((m) => m.channelId));
+
+      return {
+        channels: latest.map((message) => ({
+          channelId: message.channelId,
+          id: message.id,
+          createdAt: message.createdAt.toISOString(),
+          own: message.authorId === user.id,
+        })),
+      };
+    },
+    {
+      response: {
+        200: dmLatestResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/channels/:id/ring',
+    async ({ params, request, server, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const userPayload = parseFederationUserPayload(getObjectProperty(parsed.body, 'user'));
+      if (!userPayload) return status(400, { error: 'Invalid federation user' });
+      if (userPayload.homeserver.toLowerCase() !== parsed.origin.homeserver) {
+        return status(401, { error: 'Federation user homeserver mismatch' });
+      }
+
+      const ringResult = z.boolean().safeParse(getObjectProperty(parsed.body, 'ringing'));
+      if (!ringResult.success) return status(400, { error: 'Invalid ring state' });
+      const ringing = ringResult.data;
+
+      const access = await getFederatedChannelAccess(params.id, userPayload, true);
+      if (!access.ok) return status(access.status, { error: access.error });
+      if (access.channel.type !== 'DM') return status(404, { error: 'Channel not right' });
+
+      if (server) {
+        await publishToChannel(server, access.channel, {
+          type: 'call.ringing',
+          data: { channelId: access.channel.id, user: publicUser(access.user), ringing },
+        });
+      }
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: z.object({ ok: z.boolean() }),
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .ws('/realtime/dms/:id', {
+    async open(ws) {
+      const headers = new Headers();
+      const query = ws.data.query as Record<string, string | undefined>;
+      for (const key of [
+        'X-Novarum-Homeserver',
+        'X-Novarum-Key-Id',
+        'X-Novarum-Date',
+        'X-Novarum-Nonce',
+        'X-Novarum-Body-SHA256',
+        'X-Novarum-Signature',
+      ]) {
+        const value = query[key];
+        if (value) headers.set(key, value);
+      }
+
+      const request = new Request(ws.data.request.url, {
+        method: 'GET',
+        headers,
+      });
+      const signedPath = `/federation/realtime/dms/${encodeURIComponent(ws.data.params.id)}`;
+      const verification = await verifyFederationRequest(request, '', signedPath);
+      if (!verification.ok) {
+        ws.close(1008, verification.error);
+        return;
+      }
+
+      const members = await db.query.channelMembers.findMany({
+        where: { channelId: ws.data.params.id },
+        with: { user: true },
+      });
+      const hasAccess = members.some(
+        (member) => member.user.homeserver === verification.origin.homeserver
+      );
+      if (!hasAccess) {
+        ws.close(1008, 'Forbidden');
+        return;
+      }
+
+      ws.subscribe(`dmEvents:${ws.data.params.id}`);
+      ws.send(
+        JSON.stringify({
+          type: 'voice.states.snapshot',
+          data: { guildIds: [], states: voicePresenceForChannels([ws.data.params.id]) },
+        })
+      );
+    },
+    message() {
+      // server-to-server realtime is publish-only for now.
+    },
+  })
   .ws('/realtime/guilds/:id', {
     async open(ws) {
       const headers = new Headers();
@@ -1305,7 +1649,11 @@ async function fetchFederatedMessagePage(
     limit: limit + 1,
   });
 }
-async function getFederatedChannelAccess(channelId: string, userPayload: FederationUserPayload) {
+async function getFederatedChannelAccess(
+  channelId: string,
+  userPayload: FederationUserPayload,
+  write = false
+) {
   const channel = await db.query.channels.findFirst({
     where: { id: channelId },
   });
@@ -1314,7 +1662,7 @@ async function getFederatedChannelAccess(channelId: string, userPayload: Federat
   const user = await db.query.users.findFirst({
     where: {
       username: userPayload.username,
-      homeserver: userPayload.homeserver,
+      homeserver: userPayload.homeserver.toLowerCase(),
     },
   });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
@@ -1327,13 +1675,9 @@ async function getFederatedChannelAccess(channelId: string, userPayload: Federat
     })
     .where(eq(users.id, user.id));
 
-  const membership = await db.query.guildMembers.findFirst({
-    where: {
-      guildId: channel.guildId,
-      userId: user.id,
-    },
-  });
-  if (!membership) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+  if (!(await canAccessChannel(channel, user.id, write))) {
+    return { ok: false as const, status: 403 as const, error: 'Forbidden' };
+  }
 
   return {
     ok: true as const,
@@ -1354,7 +1698,7 @@ async function getFederatedGuildAccess(guildId: string, userPayload: FederationU
   const user = await db.query.users.findFirst({
     where: {
       username: userPayload.username,
-      homeserver: userPayload.homeserver,
+      homeserver: userPayload.homeserver.toLowerCase(),
     },
   });
   if (!user) return { ok: false as const, status: 403 as const, error: 'Forbidden' };
@@ -1374,7 +1718,7 @@ async function getFederatedGuildAccess(guildId: string, userPayload: FederationU
   };
 }
 
-function federatedMessageResponse(message: any, channel: { guildId: string }, author: any) {
+function federatedMessageResponse(message: any, channel: { guildId: string | null }, author: any) {
   return {
     id: message.id,
     channelId: message.channelId,

@@ -41,8 +41,12 @@ export type RealtimeEvent =
       data: {
         id: string;
         channelId: string;
-        guildId: string;
+        guildId: string | null;
       };
+    }
+  | {
+      type: 'dm.created';
+      data: DmChannel;
     }
   | {
       type: 'user.status.changed';
@@ -64,6 +68,8 @@ export type RealtimeEvent =
       type: 'voice.states.snapshot';
       data: {
         guildIds: string[];
+        // DM channels this snapshot is authoritative for (only sent on connect)
+        dmIds?: string[];
         states: VoicePresence[];
       };
     }
@@ -71,6 +77,14 @@ export type RealtimeEvent =
       type: 'voice.state.changed';
       data: VoicePresence & {
         connected: boolean;
+      };
+    }
+  | {
+      type: 'call.ringing';
+      data: {
+        channelId: string;
+        user: PublicUser;
+        ringing: boolean;
       };
     }
   | {
@@ -113,7 +127,7 @@ export type AttachmentPayload = {
 export type MessageEventData = {
   id: string;
   channelId: string;
-  guildId: string;
+  guildId: string | null;
   content: string | null;
   nonce: string;
   replyTo: string | null;
@@ -123,8 +137,17 @@ export type MessageEventData = {
   author: PublicUser;
 };
 
+export type DmChannel = {
+  id: string;
+  type: 'DM' | 'GROUP_DM';
+  participants: PublicUser[];
+  lastMessageAt: string | null;
+  unread: boolean;
+  joinedAt: string;
+};
+
 export type VoicePresence = {
-  guildId: string;
+  guildId: string | null;
   channelId: string;
   userId: string;
   name: string | null;
