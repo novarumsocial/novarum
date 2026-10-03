@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { LoaderCircle, Phone, Plus, Users, X } from '@lucide/svelte';
+  import { LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
   import { goto } from '$app/navigation';
-  import { dms } from '$lib/dms.svelte';
+  import { dms, dmPath } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -20,6 +20,8 @@
         new Date(a.lastMessageAt ?? a.joinedAt).getTime()
     )
   );
+
+  let { onCall }: { onCall?: (channelId: string) => void } = $props();
 
   let newDmOpen = $state(false);
 
@@ -112,6 +114,61 @@
         </ContextMenu.Trigger>
         <ContextMenu.Content class="w-56">
           <NotificationMenu targetId={entry.id} noun="Conversation" />
+
+          <ContextMenu.Separator />
+
+          <ContextMenu.Item class="gap-2" onclick={() => dms.markRead(entry.id)}>
+            Mark as read
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator />
+
+          <ContextMenu.Item onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}>
+            Profile
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            onclick={() => {
+              void goto(dmPath(entry.id));
+              onCall?.(entry.id);
+            }}
+          >
+            Start a Call
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            onclick={() => {
+              void dms.close(entry.id);
+              if (active) void goto('/guilds/dms');
+            }}
+          >
+            Close DM
+          </ContextMenu.Item>
+
+          {#if other && friends.isFriend?.(other.userId)}
+            <ContextMenu.Item onclick={() => void friends.remove?.(other.userId)}>
+              Remove Friend
+            </ContextMenu.Item>
+          {/if}
+          <ContextMenu.Item
+            class="text-destructive data-[highlighted]:bg-destructive data-[highlighted]:text-white"
+            onclick={() => other && void friends.block?.(other.userId)}
+          >
+            Block
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator />
+
+          <ContextMenu.Item
+            class="gap-2"
+            disabled={!other}
+            onclick={() => other && navigator.clipboard.writeText(other.userId)}
+          >
+            <IdCardLanyard />
+            Copy User ID
+          </ContextMenu.Item>
+          <ContextMenu.Item class="gap-2" onclick={() => navigator.clipboard.writeText(entry.id)}>
+            <IdCardLanyard />
+            Copy Channel ID
+          </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Root>
     {/each}
