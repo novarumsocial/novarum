@@ -60,6 +60,12 @@
   let editMsgTextarea = $state<HTMLTextAreaElement | null>(null);
   let savingEdit = $state(false);
 
+  $effect(() => {
+    if (!chat.editingMessage || chat.editingMessageId !== message.id) return;
+    editContent = message.content;
+    setTimeout(() => editMsgTextarea?.focus(), 0);
+  });
+
   const dropdownItems: DropdownItems[] = $derived([
     {
       label: () => 'Reply',
@@ -76,13 +82,9 @@
             variant: 'default' as const,
             hideFromShift: true,
             onclick: () => {
-              editContent = message.content;
               chat.editingMessage = true;
               chat.editingMessageId = message.id;
               dropdownOpen = false;
-              setTimeout(() => {
-                editMsgTextarea?.focus();
-              }, 0);
             },
           },
         ]
@@ -389,14 +391,9 @@
                     size="icon-xs"
                     aria-label="Edit"
                     onclick={() => {
-                      editContent = message.content;
                       chat.editingMessage = true;
                       chat.editingMessageId = message.id;
                       dropdownOpen = false;
-                      // should wait a small bit to open up the textarea before focusing it
-                      setTimeout(() => {
-                        editMsgTextarea?.focus();
-                      }, 0);
                     }}><Pencil class="size-3" /></Button
                   >
                 {/if}
