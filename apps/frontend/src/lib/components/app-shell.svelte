@@ -280,7 +280,7 @@
           />
         {/if}
         {#if chat.route.kind === 'home' || chat.route.kind === 'dms'}
-          <DmSidebar />
+          <DmSidebar onCall={startCall} />
         {/if}
       </div>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
