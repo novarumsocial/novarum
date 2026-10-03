@@ -123,7 +123,7 @@
 
           <ContextMenu.Separator />
 
-          <ContextMenu.Item onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}>
+          <ContextMenu.Item onclick={() => console.log('not done')}>
             Profile
           </ContextMenu.Item>
           <ContextMenu.Item
