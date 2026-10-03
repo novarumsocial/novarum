@@ -184,7 +184,7 @@
       <p
         class="pointer-events-none mt-4 flex items-center justify-center px-2 text-center text-xs text-muted-foreground select-none"
       >
-        No direct messages yet. Start one from a friend's profile.
+        No direct messages yet :(
       </p>
     {/if}
   </div>
