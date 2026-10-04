@@ -1,4 +1,4 @@
-import { getNotificationPermission } from './notifications';
+import { getNotificationPermission, notificationsSupported } from './notifications';
 
 export type TimeFormat = 'auto' | '12hr' | '24hr';
 
@@ -52,7 +52,9 @@ async function load(): Promise<Settings> {
     return {
       ...value,
       pushNotifications:
-        value.pushNotifications && (await getNotificationPermission()) === 'granted',
+        value.pushNotifications &&
+        // phones have no Notification api; their permission is asked natively when registering
+        (!notificationsSupported() || (await getNotificationPermission()) === 'granted'),
     };
   } catch {
     return { ...defaults };

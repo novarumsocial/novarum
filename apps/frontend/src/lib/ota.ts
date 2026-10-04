@@ -4,6 +4,7 @@ const MANIFEST_URL = 'https://mobile.novarum.me/updates.json';
 
 export async function checkForUpdates() {
   await CapacitorUpdater.notifyAppReady();
+  if (__LOCAL_BUILD__) return;
   try {
     const response = await fetch(MANIFEST_URL);
     if (!response.ok) return;

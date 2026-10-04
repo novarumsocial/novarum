@@ -40,5 +40,7 @@ export default defineConfig({
   define: {
     __FRONTEND_VERSION__: JSON.stringify(packageJson.version),
     __GIT_COMMIT_HASH__: JSON.stringify(gitCommitHash),
+    // only CI builds take over-the-air updates; a local build keeps the code it was built with
+    __LOCAL_BUILD__: !process.env.GITHUB_ACTIONS,
   },
 });
