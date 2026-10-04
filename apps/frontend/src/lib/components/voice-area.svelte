@@ -195,7 +195,17 @@
   }
 
   const canScreenShare = !!navigator.mediaDevices?.getDisplayMedia;
-  const canFullscreen = document.fullscreenEnabled;
+
+  // iPadOS Safari only ships the webkit-prefixed Fullscreen API.
+  type WebkitDocument = Document & {
+    webkitFullscreenEnabled?: boolean;
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => Promise<void>;
+  };
+  type WebkitElement = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+  const doc = document as WebkitDocument;
+  const canFullscreen = doc.fullscreenEnabled || !!doc.webkitFullscreenEnabled;
+  const currentFullscreen = () => doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
 
   function hideControls() {
     clearTimeout(idleTimer);
@@ -204,16 +214,25 @@
 
   $effect(() => () => clearTimeout(idleTimer));
 
+  $effect(() => {
+    const sync = () => (fullscreen = !!currentFullscreen());
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => document.removeEventListener('webkitfullscreenchange', sync);
+  });
+
   async function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen().catch(() => undefined);
+    if (currentFullscreen()) {
+      await (doc.exitFullscreen ?? doc.webkitExitFullscreen)?.call(doc)?.catch(() => undefined);
       return;
     }
-    await stageElement?.requestFullscreen().catch(() => undefined);
+    const stage = stageElement as WebkitElement | null;
+    await (stage?.requestFullscreen ?? stage?.webkitRequestFullscreen)
+      ?.call(stage)
+      ?.catch(() => undefined);
   }
 </script>
 
-<svelte:document onfullscreenchange={() => (fullscreen = !!document.fullscreenElement)} />
+<svelte:document onfullscreenchange={() => (fullscreen = !!currentFullscreen())} />
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
   {#if !embedded}
