@@ -23,6 +23,9 @@ import type { VoicePresence } from '../../utils/types';
 import { publicUser } from '../../utils/publicUser';
 
 const activeRealtimeConnections = new Map<string, number>();
+// whether each open socket's window is focused. a socket that is connected but backgrounded
+// (a phone app) must not stop push, so push only skips users with an *active* connection.
+const connectionActive = new Map<string, { userId: string; active: boolean }>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
 const voiceSocketByUser = new Map<string, string>();
 const pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
@@ -34,6 +37,10 @@ const voiceStateResponseSchema = z.object({
     name: z.string().nullable(),
   }),
 });
+
+export function isUserActive(userId: string) {
+  return [...connectionActive.values()].some((state) => state.userId === userId && state.active);
+}
 
 export function startPresenceCleanup() {
   return setInterval(async () => {
@@ -70,6 +77,10 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     t.Object({
       type: t.Literal('subscribe.guild'),
       guildId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('client.state'),
+      active: t.Boolean(),
     }),
     t.Object({
       type: t.Literal('voice.join'),
@@ -113,6 +124,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       where: { userId: session.userId },
     });
 
+    connectionActive.set(ws.id, { userId: session.userId, active: true });
     ws.subscribe(`userEvents:${session.userId}`);
     for (const membership of memberships) {
       ws.subscribe(`guildEvents:${membership.guildId}`);
@@ -153,6 +165,12 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     // @ts-ignore stored during open
     const session = (await ws.data.sessionReady) as SessionWithUser | null;
     if (!session) return;
+
+    if (message.type === 'client.state') {
+      const state = connectionActive.get(ws.id);
+      if (state) state.active = message.active;
+      return;
+    }
 
     if (message.type === 'voice.leave') {
       voiceSocketByUser.delete(session.userId);
@@ -286,6 +304,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
   async close(ws) {
     clearInterval(pingIntervals.get(ws.id));
     pingIntervals.delete(ws.id);
+    connectionActive.delete(ws.id);
     // @ts-ignore using it here
     const session = ws.data.session as SessionWithUser;
     if (!session) return;

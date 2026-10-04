@@ -6,6 +6,7 @@ import type { ElectronAPI } from '$lib/electron-api';
 declare global {
   const __FRONTEND_VERSION__: string;
   const __GIT_COMMIT_HASH__: string;
+  const __LOCAL_BUILD__: boolean;
   namespace App {
     // interface Error {}
     // interface Locals {}

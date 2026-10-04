@@ -8,6 +8,8 @@ export interface ElectronAPI {
   getLaunchPrefs(): Promise<LaunchPrefs>;
   setLaunchPrefs(prefs: Partial<LaunchPrefs>): Promise<LaunchPrefs>;
   getVersion(): Promise<string>;
+  /** Sets the dock / launcher unread badge; 0 clears it. */
+  setBadgeCount(count: number): Promise<void>;
   /** `process.platform` from the main process, e.g. 'linux' | 'darwin' | 'win32'. */
   platform: string;
   venmic: {

@@ -13,6 +13,7 @@ import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
 import { dm } from '../modules/dm/services';
 import { friends } from '../modules/friends/services.ts';
+import { notifications } from '../modules/notifications/services';
 import openapi from '@elysia/openapi';
 import { ip } from 'elysia-ip';
 
@@ -37,6 +38,7 @@ export const createApp = () =>
           { name: 'User', description: 'the user/ routes' },
           { name: 'Friends', description: 'the friends/ routes' },
           { name: 'DM', description: 'the dm/ routes' },
+          { name: 'Notifications', description: 'the notifications/ routes' },
         ],
       },
     })
@@ -53,4 +55,5 @@ export const createApp = () =>
   .use(user)
   .use(friends)
   .use(dm)
+  .use(notifications)
   .get('/', () => 'this is anchor');

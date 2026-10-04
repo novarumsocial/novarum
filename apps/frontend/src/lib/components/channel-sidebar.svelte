@@ -11,7 +11,6 @@
     UserRoundPlus,
     Volume2,
     Bell,
-    BellOff,
     IdCardLanyard,
     HeadphoneOff,
     Eye,
@@ -36,6 +35,8 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
   import ProfileCard from './profile-card.svelte';
+  import NotificationMenu from './notification-menu.svelte';
+  import { notificationSettings } from '$lib/notification-settings.svelte';
 
   let {
     server,
@@ -377,6 +378,9 @@
         >
           {#each channels as ch (ch.id)}
             {@const connectedVoiceUsers = ch.type === 'VOICE' ? voiceUsersFor(ch.id) : []}
+            {@const target = { channelId: ch.id, guildId: server.id }}
+            {@const showMention = ch.mention > 0 && notificationSettings.showsMentions(target)}
+            {@const showUnread = ch.unread && notificationSettings.showsUnread(target)}
 
             <div animate:flip={{ duration: flipDurationMs }} class="touch-none">
               <ContextMenu.Root>
@@ -395,15 +399,15 @@
                       <Volume2 class="size-4 shrink-0" />
                     {:else}
                       <Hash
-                        class={cn('size-4 shrink-0', (ch.unread || ch.mention > 0) && 'text-white')}
+                        class={cn('size-4 shrink-0', (showUnread || showMention) && 'text-white')}
                       />
                     {/if}
 
-                    <span class="flex-1 truncate" class:text-white={ch.unread || ch.mention > 0}>
+                    <span class="flex-1 truncate" class:text-white={showUnread || showMention}>
                       {ch.label || ch.name}
                     </span>
 
-                    {#if ch.mention > 0}
+                    {#if showMention}
                       <span class="flex size-5 shrink-0 items-center justify-center">
                         <span
                           class="flex size-5 items-center justify-center bg-destructive text-[11px] font-bold text-destructive-foreground"
@@ -414,7 +418,7 @@
                       </span>
                     {/if}
 
-                    {#if ch.unread && ch.mention === 0}
+                    {#if showUnread && !showMention}
                       <span class="flex size-5 shrink-0 items-center justify-center">
                         <span
                           class="size-2 bg-foreground/80"
@@ -447,31 +451,7 @@
 
                   <ContextMenu.Separator />
 
-                  <ContextMenu.Sub>
-                    <ContextMenu.SubTrigger>
-                      <BellOff class="size-4" />
-                      Mute Channel
-                    </ContextMenu.SubTrigger>
-                    <ContextMenu.SubContent>
-                      <ContextMenu.Item>For 15 Minutes</ContextMenu.Item>
-                      <ContextMenu.Item>For 1 Hour</ContextMenu.Item>
-                      <ContextMenu.Item>For 8 Hours</ContextMenu.Item>
-                      <ContextMenu.Item>For 24 Hours</ContextMenu.Item>
-                      <ContextMenu.Item>Until I turn it back on</ContextMenu.Item>
-                    </ContextMenu.SubContent>
-                  </ContextMenu.Sub>
-
-                  <ContextMenu.Sub>
-                    <ContextMenu.SubTrigger>
-                      <Bell class="size-4" />
-                      Notifications
-                    </ContextMenu.SubTrigger>
-                    <ContextMenu.SubContent>
-                      <ContextMenu.Item>All Messages</ContextMenu.Item>
-                      <ContextMenu.Item>Only Mentions</ContextMenu.Item>
-                      <ContextMenu.Item>Nothing</ContextMenu.Item>
-                    </ContextMenu.SubContent>
-                  </ContextMenu.Sub>
+                  <NotificationMenu targetId={ch.id} guildId={server.id} noun="Channel" />
 
                   <ContextMenu.Separator />
 

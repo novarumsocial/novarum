@@ -19,6 +19,40 @@ export const relations = defineRelations(schema, (r) => ({
     attachments: r.many.attachments({ from: r.users.id, to: r.attachments.uploaderId }),
     guildInvites: r.many.guildInvites({ from: r.users.id, to: r.guildInvites.creatorId }),
     channelMemberships: r.many.channelMembers({ from: r.users.id, to: r.channelMembers.userId }),
+    notificationSettings: r.many.notificationSettings({
+      from: r.users.id,
+      to: r.notificationSettings.userId,
+    }),
+    pushSubscriptions: r.many.pushSubscriptions({
+      from: r.users.id,
+      to: r.pushSubscriptions.userId,
+    }),
+    notificationPreference: r.one.notificationPreferences({
+      from: r.users.id,
+      to: r.notificationPreferences.userId,
+    }),
+  },
+  notificationSettings: {
+    user: r.one.users({
+      from: r.notificationSettings.userId,
+      to: r.users.id,
+      optional: false,
+    }),
+  },
+  notificationPreferences: {
+    user: r.one.users({
+      from: r.notificationPreferences.userId,
+      to: r.users.id,
+      optional: false,
+    }),
+  },
+  pushSubscriptions: {
+    user: r.one.users({ from: r.pushSubscriptions.userId, to: r.users.id, optional: false }),
+    session: r.one.sessions({
+      from: r.pushSubscriptions.sessionId,
+      to: r.sessions.id,
+      optional: false,
+    }),
   },
   localCredentials: {
     user: r.one.users({

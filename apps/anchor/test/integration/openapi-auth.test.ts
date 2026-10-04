@@ -22,6 +22,7 @@ const publicRoutes: Record<string, string> = {
   'GET /user/avatar/{userId}': 'avatars are public images (redirect to a presigned URL)',
   'GET /user/banner/{userId}': 'banners are public images (redirect to a presigned URL)',
   'GET /user/about/{userId}': 'profile text is public (also fetched by remote homeservers/clients)',
+  'GET /notifications/vapid-key': 'the public VAPID key is what browsers need to subscribe to push',
   'GET /invite/{code}': 'invite preview before joining; the code is the credential',
 };
 

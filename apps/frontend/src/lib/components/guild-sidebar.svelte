@@ -9,6 +9,8 @@
 
   import Avatar from './avatar.svelte';
   import CreateServerDialog from './create-server-dialog.svelte';
+  import NotificationMenu from './notification-menu.svelte';
+  import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
   let {
     servers,
@@ -118,6 +120,8 @@
   >
     {#each orderedServers as server (server.id)}
       <div animate:flip={{ duration: flipDurationMs }} class="size-10 touch-none">
+        <ContextMenu.Root>
+          <ContextMenu.Trigger class="block size-full">
         <button
           onclick={() => onSelect(server.id)}
           class="cursor-pointer relative flex size-full items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
@@ -153,6 +157,11 @@
             </span>
           {/if}
         </button>
+          </ContextMenu.Trigger>
+          <ContextMenu.Content class="w-56">
+            <NotificationMenu targetId={server.id} noun="Server" />
+          </ContextMenu.Content>
+        </ContextMenu.Root>
       </div>
     {/each}
   </div>

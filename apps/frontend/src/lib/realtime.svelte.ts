@@ -6,7 +6,14 @@ import { goto } from '$app/navigation';
 import { z } from 'zod';
 import { publicUserSchema } from 'anchor/public-user';
 import type { RealtimeEvent } from 'anchor';
-import { getNotificationPermission, sendNotification } from './notifications';
+import {
+  getNotificationPermission,
+  messageNotificationTitle,
+  notificationSound,
+  sendNotification,
+  shouldNotify,
+} from './notifications';
+import { notificationSettings } from './notification-settings.svelte';
 import { friends } from './friends.svelte';
 import { dms, dmPath } from './dms.svelte';
 
@@ -263,7 +270,13 @@ class RealtimeState {
       this.openSocket();
     };
 
+    // the server skips push for users with an active window, so it has to hear when this one stops being it
+    const reportClientState = () => this.sendClientState();
+
     window.addEventListener('online', reconnectWhenOnline);
+    window.addEventListener('focus', reportClientState);
+    window.addEventListener('blur', reportClientState);
+    document.addEventListener('visibilitychange', reportClientState);
     this.openSocket();
 
     return () => {
@@ -271,11 +284,21 @@ class RealtimeState {
       this.connected = false;
       this.clearReconnectTimer();
       window.removeEventListener('online', reconnectWhenOnline);
+      window.removeEventListener('focus', reportClientState);
+      window.removeEventListener('blur', reportClientState);
+      document.removeEventListener('visibilitychange', reportClientState);
 
       const socket = this.socket;
       this.socket = null;
       socket?.close();
     };
+  }
+
+  private sendClientState() {
+    this.socket?.send({
+      type: 'client.state',
+      active: document.hasFocus() && !document.hidden,
+    });
   }
 
   private openSocket() {
@@ -289,6 +312,7 @@ class RealtimeState {
 
       this.connected = true;
       this.reconnectAttempt = 0;
+      this.sendClientState();
 
       for (const guild of chat.servers) this.subscribeGuild(guild.id);
       if (this.voiceChannelId) socket.send({ type: 'voice.join', channelId: this.voiceChannelId });
@@ -352,37 +376,47 @@ class RealtimeState {
         const user = useSession().user;
         const isDm = event.data.guildId === null;
         const isActive = chat.activeChannel === event.data.channelId;
-        const notifyWorthy = isDm
-          ? !isActive
-          : event.data.pingedHandles.some(
-              (handle) => handle.toLowerCase() === user?.handle.toLowerCase()
-            );
 
         if (
           user &&
-          event.data.author.userId !== user.id &&
-          notifyWorthy &&
-          settings.value.pushNotifications &&
-          (await getNotificationPermission()) === 'granted'
+          shouldNotify(event.data, {
+            user,
+            activeChannelId: chat.activeChannel,
+            hasFocus: document.hasFocus(),
+            entries: notificationSettings.entries,
+          })
         ) {
-          sendNotification({
-            title: event.data.author.displayName || event.data.author.username,
-            body: settings.value.messagePreview
-              ? (event.data.content ?? 'Sent an attachment')
-              : isDm
-                ? 'Sent you a message'
-                : 'Mentioned you',
-            tag: event.data.channelId,
-            onClick: () => {
-              void goto(
-                isDm
-                  ? dmPath(event.data.channelId)
-                  : `/guilds/${[event.data.guildId!, event.data.channelId, event.data.id]
-                      .map(encodeURIComponent)
-                      .join('/')}`
-              );
-            },
-          });
+          // the sound follows its own switch, so it plays even with system notifications off
+          if (settings.value.mentionSound) notificationSound();
+          if (settings.value.pushNotifications && (await getNotificationPermission()) === 'granted') {
+            const guild = chat.servers.find((server) => server.id === event.data.guildId);
+            const channel = chat.channelsByServer[event.data.guildId ?? '']
+              ?.flatMap((category) => category.channels)
+              .find((item) => item.id === event.data.channelId);
+            void sendNotification({
+              title: messageNotificationTitle(
+                event.data.author,
+                isDm ? null : { channel: channel?.name, guild: guild?.name }
+              ),
+              body: settings.value.messagePreview
+                ? (event.data.content ?? 'Sent an attachment')
+                : isDm
+                  ? 'Sent you a message'
+                  : 'Mentioned you',
+              icon: event.data.author.avatarUrl ?? undefined,
+              tag: event.data.channelId,
+              onClick: () => {
+                // fed: ids stay as they are, so the link opens the shadow guild or DM
+                void goto(
+                  isDm
+                    ? dmPath(event.data.channelId)
+                    : `/guilds/${[event.data.guildId!, event.data.channelId, event.data.id]
+                        .map(encodeURIComponent)
+                        .join('/')}`
+                );
+              },
+            });
+          }
         }
 
         chat.addMessage(event.data);
@@ -428,6 +462,7 @@ class RealtimeState {
         } else if (!self) {
           dms.incomingCall = { channelId, user: caller };
           if (document.hidden && settings.value.pushNotifications) {
+            notificationSound();
             void sendNotification({
               title: caller.displayName || caller.username,
               body: 'Is calling you',

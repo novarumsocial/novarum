@@ -332,6 +332,9 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('version:get', () => app.getVersion());
+  ipcMain.handle('badge:set', (_event, count: number) => {
+    app.setBadgeCount(Math.max(0, Math.floor(Number(count)) || 0));
+  });
 
   ipcMain.on('voice:get-audio-devices', async (ev) => {
     // just noticed you can do this on the native browser apis lmfao

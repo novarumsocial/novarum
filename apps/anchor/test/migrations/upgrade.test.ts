@@ -217,6 +217,21 @@ const specs: Record<string, Spec> = {
       );
     },
   },
+  '20261004105808_silky_tattoo': {
+    check: async (url) => {
+      // the new tables start empty and everything cascades from user and session
+      await query(
+        url,
+        `INSERT INTO notification_setting ("userId", "targetId", level) VALUES ('u1', 'g1', 'MENTIONS'), ('u1', 'fed:guild:remote.example:g9', 'NONE');
+         INSERT INTO notification_preference ("userId") VALUES ('u1');
+         INSERT INTO push_subscription (id, "userId", "sessionId", kind, endpoint, p256dh, auth) VALUES ('p1', 'u1', 's1', 'WEBPUSH', 'https://push.example/1', 'k', 'a')`
+      );
+      expect(await fails(url, `INSERT INTO notification_setting ("userId", "targetId", level) VALUES ('u1', 'g1', 'ALL')`)).toBe(true);
+      expect(await fails(url, `INSERT INTO push_subscription (id, "userId", "sessionId", kind, endpoint, p256dh, auth) VALUES ('p2', 'u1', 's1', 'FCM', 'x', 'k', 'a')`)).toBe(true);
+      await query(url, `DELETE FROM session WHERE id = 's1'`);
+      expect(await rows(url, `SELECT 1 FROM push_subscription`)).toHaveLength(0);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

@@ -121,13 +121,17 @@ export function createBlankSessionCookie(): SessionCookie {
 }
 
 function sessionCookieAttributes(maxAge: number): SessionCookie['attributes'] {
-  const secure = new URL(getConfig().server.base_url).protocol === 'https:';
+  const { protocol, hostname } = new URL(getConfig().server.base_url);
+  const https = protocol === 'https:';
+  // browsers treat http://localhost as secure, so Secure + SameSite=None works there too
+  // (needed for cross-origin clients like the Android app's tauri.localhost webview)
+  const secure = https || hostname === 'localhost';
 
   return {
     httpOnly: true,
     secure,
     sameSite: secure ? 'none' : 'lax',
-    partitioned: secure,
+    partitioned: https,
     path: '/',
     maxAge,
   };

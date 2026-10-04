@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { randomString } from '../../utils/randomString';
 import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { canAccessChannel } from '../../utils/channelAccess';
-import { makeFederatedChannelId } from '../../utils/federationIds';
+import { makeFederatedChannelId, makeFederatedGuildId } from '../../utils/federationIds';
 import { dmResponse, latestMessages, openLocalDm, upsertDmShadow } from '../dm/services';
 import { ensureFederatedDmRealtimeBridge } from '../../utils/federationRealtime';
 import { AccessToken } from 'livekit-server-sdk';
@@ -23,6 +23,7 @@ import {
   maxAttachmentCount,
   presignedUploadSchema,
 } from '../../utils/attachments';
+import { dmRecipients, maxSnippetLength, notifyInBackground, notifyLocal } from '../../utils/notify';
 import { createPendingAttachment } from '../upload/services';
 import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../message/services';
 import { storage } from '../../utils/services/storage';
@@ -95,6 +96,40 @@ const unreadMentionChannelsSchema = z
     })
   )
   .max(1000);
+
+// text only: the receiving end shows it as plain text, never as html
+const federationPushSchema = z.object({
+  guildId: z.string().min(1).nullable(),
+  channelId: z.string().min(1),
+  messageId: z.string().min(1),
+  author: z.object({
+    username: z.string().min(1).max(64),
+    displayName: z.string().max(64).nullable(),
+    homeserver: z.string().min(1).max(255),
+    avatarUrl: z.url().nullable(),
+  }),
+  snippet: z
+    .string()
+    .nullable()
+    .transform((snippet) => snippet?.slice(0, maxSnippetLength) ?? null),
+  handles: z.array(z.string().max(300)).min(1).max(1000),
+});
+const maxPushesPerMinute = 600;
+const pushWindows = new Map<string, { start: number; count: number }>();
+
+// a fixed window per sending homeserver, so one noisy server can't flood push services
+function allowFederatedPush(homeserver: string) {
+  const now = Date.now();
+  if (pushWindows.size > 1000) {
+    for (const [name, old] of pushWindows) if (now - old.start > 60_000) pushWindows.delete(name);
+  }
+  const window = pushWindows.get(homeserver);
+  if (!window || now - window.start > 60_000) {
+    pushWindows.set(homeserver, { start: now, count: 1 });
+    return true;
+  }
+  return ++window.count <= maxPushesPerMinute;
+}
 
 type PingMessage = { id: string; channelId: string; createdAt: Date | string };
 
@@ -449,6 +484,60 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
     }
   )
   .post(
+    '/push',
+    async ({ request, status }) => {
+      const parsed = await verifiedFederationJsonBody(request);
+      if (!parsed.ok) return status(parsed.status, { error: parsed.error });
+
+      const origin = parsed.origin.homeserver;
+      if (!allowFederatedPush(origin)) return status(429, { error: 'Too many pushes' });
+
+      const input = federationPushSchema.safeParse(parsed.body);
+      if (!input.success) return status(400, { error: 'Invalid push' });
+
+      // the ids are rebuilt from the sender's homeserver, so a server can only ever push
+      // for its own guilds and DMs
+      const guildId = input.data.guildId && makeFederatedGuildId(origin, input.data.guildId);
+      const channelId = makeFederatedChannelId(origin, input.data.channelId);
+
+      const localHomeserver = getConfig().server.homeserver.toLowerCase();
+      const wanted = input.data.handles.flatMap((handle) => {
+        const [, username, homeserver] = handle.match(/^@([^:]+):(.+)$/) ?? [];
+        return username && homeserver?.toLowerCase() === localHomeserver ? [username] : [];
+      });
+      const [members, users] = await Promise.all([
+        guildId
+          ? db.query.guildMembers.findMany({ where: { guildId } })
+          : db.query.channelMembers.findMany({ where: { channelId } }),
+        wanted.length
+          ? db.query.users.findMany({ where: { username: { in: wanted }, homeserver: getConfig().server.homeserver } })
+          : [],
+      ]);
+      // anything that is not a local member of that guild or DM is silently dropped
+      const memberIds = new Set(members.map((member) => member.userId));
+      const userIds = users.filter((user) => memberIds.has(user.id)).map((user) => user.id);
+
+      await notifyLocal(userIds, {
+        guildId,
+        channelId,
+        messageId: input.data.messageId,
+        author: input.data.author,
+        snippet: input.data.snippet,
+      });
+
+      return { ok: true };
+    },
+    {
+      response: {
+        200: okResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
     '/invites/:code/accept',
     async ({ params, request, server, status }) => {
       const parsed = await verifiedFederationJsonBody(request);
@@ -680,6 +769,11 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
           data: responseMessage,
         });
       }
+      notifyInBackground(
+        { ...message, author: access.user },
+        access.channel,
+        access.channel.guildId ? pingRecipients : dmRecipients(access.channel.id)
+      );
 
       return { message: responseMessage };
     },
@@ -738,6 +832,12 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
         access.user.id
       );
 
+      // anyone already pinged by the original message was already notified
+      const alreadyPinged = new Set(
+        (await db.query.messagePings.findMany({ where: { messageId: existing.id } })).map(
+          (ping) => ping.userId
+        )
+      );
       const message = await db.transaction(async (tx) => {
         await tx.delete(messagePings).where(eq(messagePings.messageId, existing.id));
         for (const recipient of pingRecipients) {
@@ -766,6 +866,11 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
           data: responseMessage,
         });
       }
+      notifyInBackground(
+        { ...message!, author: access.user },
+        access.channel,
+        pingRecipients.filter((recipient) => !alreadyPinged.has(recipient.userId))
+      );
 
       return { message: responseMessage };
     },
