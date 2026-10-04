@@ -9,6 +9,9 @@
   import NewDmDialog from './new-dm-dialog.svelte';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { device } from '$lib/device.svelte';
+  import { notificationSettings } from '$lib/notification-settings.svelte';
+  import NotificationMenu from './notification-menu.svelte';
+  import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
   const entries = $derived(
     [...dms.list].sort(
@@ -58,6 +61,9 @@
       {@const other = entry.participants[0]}
       {@const name = other ? other.displayName || other.username : 'Direct Message'}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
+      {@const unread = entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
+      <ContextMenu.Root>
+        <ContextMenu.Trigger class="block">
       <div
         role="button"
         tabindex="0"
@@ -84,11 +90,11 @@
             ></span>
           {/if}
         </div>
-        <span class="flex-1 truncate" class:font-semibold={entry.unread}>{name}</span>
+        <span class="flex-1 truncate" class:font-semibold={unread}>{name}</span>
         {#if chat.voiceStates[entry.id]?.length}
           <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
         {/if}
-        {#if entry.unread}
+        {#if unread}
           <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
         {/if}
         <button
@@ -103,6 +109,11 @@
           <X class="size-3.5" />
         </button>
       </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Content class="w-56">
+          <NotificationMenu targetId={entry.id} noun="Conversation" />
+        </ContextMenu.Content>
+      </ContextMenu.Root>
     {/each}
 
     {#each dms.pending as homeserver (homeserver)}

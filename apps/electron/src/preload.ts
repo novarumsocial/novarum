@@ -42,6 +42,7 @@ const api: ElectronAPI = {
   getLaunchPrefs: () => ipcRenderer.invoke('launch:get'),
   setLaunchPrefs: (prefs) => ipcRenderer.invoke('launch:set', prefs),
   getVersion: () => ipcRenderer.invoke('version:get'),
+  setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
   platform: process.platform,
   venmic: {
     isAvailable: () => ipcRenderer.invoke('venmic:available'),

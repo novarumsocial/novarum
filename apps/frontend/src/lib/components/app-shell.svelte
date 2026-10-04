@@ -7,6 +7,9 @@
   import { friends } from '$lib/friends.svelte';
   import { dms, dmPath } from '$lib/dms.svelte';
   import { device } from '$lib/device.svelte';
+  import { settings } from '$lib/settings.svelte';
+  import { syncPush, watchNotificationTaps } from '$lib/push';
+  import { notificationSettings } from '$lib/notification-settings.svelte';
   import { Voice } from '$lib/voice.svelte';
   import ServerSidebar from './guild-sidebar.svelte';
   import ChannelSidebar from './channel-sidebar.svelte';
@@ -42,11 +45,44 @@
         guildId,
         categories
           .flatMap((category) => category.channels)
-          .reduce((sum, channel) => sum + channel.mention, 0),
+          .reduce(
+            (sum, channel) =>
+              notificationSettings.showsMentions({ channelId: channel.id, guildId })
+                ? sum + channel.mention
+                : sum,
+            0
+          ),
       ])
     )
   );
-  const hasUnreadDms = $derived(dms.list.some((dm) => dm.unread));
+  const hasUnreadDms = $derived(
+    dms.list.some(
+      (dm) => dm.unread && notificationSettings.showsUnread({ channelId: dm.id, guildId: null })
+    )
+  );
+
+  // shown in the tab title and, on desktop, as the app badge
+  const unreadTotal = $derived(
+    Object.values(guildMentions).reduce((sum, count) => sum + count, 0) +
+      dms.list.filter(
+        (dm) => dm.unread && notificationSettings.showsUnread({ channelId: dm.id, guildId: null })
+      ).length
+  );
+
+  // push subscriptions go stale (endpoints change, sessions get replaced), so renew them once per start
+  let pushSynced = false;
+  $effect(() => {
+    if (booting || pushSynced || !settings.value.pushNotifications) return;
+    pushSynced = true;
+    void syncPush();
+  });
+
+  $effect(() => watchNotificationTaps((url) => void goto(url)));
+
+  $effect(() => {
+    document.title = unreadTotal ? `(${unreadTotal}) Novarum` : 'Novarum';
+    void window.electron?.setBadgeCount(unreadTotal);
+  });
 
   const callMembers = $derived(
     chat.route.kind === 'dms' && currentUser
@@ -96,7 +132,7 @@
       return;
     }
 
-    await Promise.all([chat.loadInitialData(), friends.load()]);
+    await Promise.all([chat.loadInitialData(), friends.load(), notificationSettings.load()]);
     bootFinished = true;
     await new Promise((resolve) => setTimeout(resolve, 100));
     booting = false;

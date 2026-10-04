@@ -26,6 +26,8 @@ const date = (name: string) =>
   });
 
 export const mfaMethod = pgEnum('mfa_method', ['TOTP', 'EMAIL']);
+export const notificationLevel = pgEnum('notification_level', ['ALL', 'MENTIONS', 'NONE']);
+export const pushKind = pgEnum('push_kind', ['WEBPUSH', 'UNIFIEDPUSH']);
 
 export const users = pgTable(
   'user',
@@ -509,3 +511,63 @@ export const emailOtps = pgTable('email_otps', {
   createdAt: date('createdAt').notNull().defaultNow(),
   expiresAt: date('expiresAt').notNull(),
 });
+
+// per-user defaults for notifications; a missing row means the defaults (push on, preview on).
+export const notificationPreferences = pgTable('notification_preference', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+
+  push: boolean('push').notNull().default(true),
+  messagePreview: boolean('messagePreview').notNull().default(true),
+});
+
+// targetId is a guild, channel or DM id, including fed: ids for things hosted elsewhere,
+// so there is deliberately no foreign key on it.
+export const notificationSettings = pgTable(
+  'notification_setting',
+  {
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    targetId: text('targetId').notNull(),
+    level: notificationLevel('level').notNull().default('ALL'),
+    mutedUntil: date('mutedUntil'),
+  },
+  (table) => [
+    primaryKey({
+      name: 'notification_setting_pkey',
+      columns: [table.userId, table.targetId],
+    }),
+  ]
+);
+
+// one per device; deleting the session (logout) removes the subscription with it.
+export const pushSubscriptions = pgTable(
+  'push_subscription',
+  {
+    id: text('id').primaryKey(),
+
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    sessionId: text('sessionId')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+
+    // WEBPUSH: browsers. UNIFIEDPUSH: Android distributors, which speak the same Web Push protocol.
+    kind: pushKind('kind').notNull(),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+
+    createdAt: date('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    unique('push_subscription_endpoint_unique').on(table.endpoint),
+    index('push_subscription_userId_idx').on(table.userId),
+    index('push_subscription_sessionId_idx').on(table.sessionId),
+  ]
+);

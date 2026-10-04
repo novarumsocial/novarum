@@ -66,6 +66,16 @@ const schema = z.object({
     save_attachment_thumbnails: z.boolean().optional().default(true),
     skip_emoji_download: z.boolean().optional().default(false),
   }),
+  notifications: z
+    .object({
+      // contact for push services, a mailto: or https: url. defaults to the email from_email.
+      vapid_subject: z
+        .string()
+        .regex(/^(mailto:|https?:\/\/)/, { error: 'vapid_subject must be a mailto: or http(s) url' })
+        .optional(),
+    })
+    .optional()
+    .default({}),
   network: z
     .object({
       proxy_url: z.url().optional(),

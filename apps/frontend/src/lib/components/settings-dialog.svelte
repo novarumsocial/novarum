@@ -39,6 +39,8 @@
     notificationsSupported,
     requestNotificationPermission,
   } from '$lib/notifications';
+  import { disablePush, enablePush, pushAvailable } from '$lib/push';
+  import { notificationSettings } from '$lib/notification-settings.svelte';
   import { onMount } from 'svelte';
   import { getAnchorInfo } from '$lib/api';
   import * as ColorPicker from '$lib/components/ui/color-picker/index.js';
@@ -72,7 +74,6 @@
   let aboutLoading = $state(false);
   let aboutError = $state<string | null>(null);
   let aboutSaved = $state(false);
-  let mentionSound = $state(true);
   let showOnlineStatus = $state(true);
   let logoutLoading = $state(false);
   let audioDevices = $state<{ input: MediaDeviceInfo[]; output: MediaDeviceInfo[] }>({
@@ -480,18 +481,49 @@
     localStorage.setItem('quickcss', css);
   });
 
+  let pushError = $state<string | null>(null);
+
   async function setPushNotifications(enabled: boolean) {
-    if (!enabled || !notificationsSupported()) {
+    pushError = null;
+    if (!enabled) {
+      settings.value.pushNotifications = false;
+      void disablePush();
+      void notificationSettings.savePreferences({ push: false });
+      return;
+    }
+
+    // phones have no Notification api; their notifications come from the push service alone
+    const canShow = notificationsSupported();
+    if (!canShow && !pushAvailable()) {
       settings.value.pushNotifications = false;
       return;
     }
 
     const permission = await getNotificationPermission();
     const granted =
-      permission === 'granted' || (await requestNotificationPermission()) === 'granted';
+      !canShow || permission === 'granted' || (await requestNotificationPermission()) === 'granted';
+    if (!granted) {
+      settings.value.pushNotifications = false;
+      return;
+    }
 
-    settings.value.pushNotifications = granted;
-    if (granted) new Notification('Novarum notifications enabled');
+    try {
+      await enablePush();
+    } catch (error) {
+      pushError = error instanceof Error ? error.message : 'Could not set up push notifications';
+      settings.value.pushNotifications = false;
+      return;
+    }
+
+    settings.value.pushNotifications = true;
+    void notificationSettings.savePreferences({ push: true });
+    if (canShow) new Notification('Novarum notifications enabled');
+  }
+
+  // the server decides what a push contains, so it needs to know about this one too
+  function setMessagePreview(enabled: boolean) {
+    settings.value.messagePreview = enabled;
+    void notificationSettings.savePreferences({ messagePreview: enabled });
   }
 
   async function refreshAudioDevices() {
@@ -1190,6 +1222,9 @@
                 onCheckedChange={setPushNotifications}
               />
             </div>
+            {#if pushError}
+              <p class="text-[11px] text-destructive">{pushError}</p>
+            {/if}
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-medium">Message Preview</p>
@@ -1197,7 +1232,7 @@
                   Show message content in notifications
                 </p>
               </div>
-              <Switch bind:checked={settings.value.messagePreview} />
+              <Switch checked={settings.value.messagePreview} onCheckedChange={setMessagePreview} />
             </div>
             <div class="flex items-center justify-between">
               <div>
@@ -1206,7 +1241,7 @@
                   Play a sound when someone mentions you
                 </p>
               </div>
-              <Switch bind:checked={mentionSound} />
+              <Switch bind:checked={settings.value.mentionSound} />
             </div>
             <div class="flex items-center justify-between">
               <div>

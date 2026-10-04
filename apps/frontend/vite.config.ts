@@ -30,6 +30,8 @@ export default defineConfig({
           async: true,
         },
       },
+      // registered by hand, only where web push can work (not in Electron or the mobile app)
+      serviceWorker: { register: false },
       adapter: adapter({
         fallback: 'index.html',
       }),

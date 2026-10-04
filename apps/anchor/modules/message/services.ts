@@ -9,6 +9,7 @@ import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles } from '../../utils/mentions';
 import { canAccessChannel } from '../../utils/channelAccess';
+import { dmRecipients, notifyInBackground } from '../../utils/notify';
 import {
   db,
   messages,
@@ -344,6 +345,11 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           data: responseMessage,
         });
       }
+      notifyInBackground(
+        { ...message, author: session.user },
+        channel,
+        channel.guildId ? pingRecipients : dmRecipients(channel.id)
+      );
 
       return { message: responseMessage };
     },
@@ -440,6 +446,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         session.userId
       );
 
+      // anyone already pinged by the original message was already notified
+      const alreadyPinged = new Set(
+        (await db.query.messagePings.findMany({ where: { messageId: existing.id } })).map(
+          (ping) => ping.userId
+        )
+      );
       const updated = await db.transaction(async (tx) => {
         await tx.delete(messagePings).where(eq(messagePings.messageId, existing.id));
         for (const recipient of pingRecipients) {
@@ -481,6 +493,11 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           data: responseMessage,
         });
       }
+      notifyInBackground(
+        { ...updated, author: session.user },
+        channel,
+        pingRecipients.filter((recipient) => !alreadyPinged.has(recipient.userId))
+      );
 
       return { message: responseMessage };
     },
@@ -657,7 +674,7 @@ export async function getPingRecipients(
     const handle = `@${member.user.username}:${member.user.homeserver}`;
     return member.userId !== authorId &&
       (member.userId === replyAuthorId || mentionedHandles.has(handle.toLowerCase()))
-      ? [{ userId: member.userId, handle }]
+      ? [{ userId: member.userId, homeserver: member.user.homeserver, handle }]
       : [];
   });
 }

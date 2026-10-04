@@ -219,7 +219,7 @@ export async function postSignedFederationJson(homeserver: string, path: string,
   return { data, remote, response };
 }
 
-async function assertSafeFederationUrl(url: URL) {
+export async function assertSafeFederationUrl(url: URL) {
   const allowLocal = allowLocalFederationTargets();
   if (url.protocol !== 'https:' && !(allowLocal && url.protocol === 'http:')) {
     throw new Error('Federation URL must use HTTPS');
