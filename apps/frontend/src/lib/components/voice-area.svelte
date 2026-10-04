@@ -204,7 +204,9 @@
   };
   type WebkitElement = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
   const doc = document as WebkitDocument;
-  const canFullscreen = doc.fullscreenEnabled || !!doc.webkitFullscreenEnabled;
+  // Non-Safari iOS browsers (Brave, Chrome...) run on WKWebView, where element fullscreen
+  // is disabled, so we fall back to filling the viewport with CSS.
+  const nativeFullscreen = doc.fullscreenEnabled || !!doc.webkitFullscreenEnabled;
   const currentFullscreen = () => doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
 
   function hideControls() {
@@ -221,6 +223,10 @@
   });
 
   async function toggleFullscreen() {
+    if (!nativeFullscreen) {
+      fullscreen = !fullscreen;
+      return;
+    }
     if (currentFullscreen()) {
       await (doc.exitFullscreen ?? doc.webkitExitFullscreen)?.call(doc)?.catch(() => undefined);
       return;
@@ -255,7 +261,7 @@
       {/if}
 
       <div class="ml-auto flex items-center gap-1">
-        {#if active && canFullscreen}
+        {#if active}
           <Tooltip.Root>
             <Tooltip.Trigger>
               {#snippet child({ props })}
@@ -293,7 +299,10 @@
 
   <div
     bind:this={stageElement}
-    class="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+    class={[
+      'relative flex min-h-0 min-w-0 flex-1 flex-col bg-background',
+      fullscreen && !nativeFullscreen && 'fixed! inset-0 z-50',
+    ]}
     role="region"
     aria-label="Call"
     onpointermove={wakeControls}
