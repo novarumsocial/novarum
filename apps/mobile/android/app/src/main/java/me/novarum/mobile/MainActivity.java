@@ -10,6 +10,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(UnifiedPushPlugin.class);
         super.onCreate(savedInstanceState);
         // a notification tapped while the app was closed: JS asks for it once it has loaded
-        UnifiedPushPlugin.launchUrl = getIntent().getStringExtra(UnifiedPushService.EXTRA_URL);
+        String url = getIntent().getStringExtra(UnifiedPushService.EXTRA_URL);
+        UnifiedPushPlugin.launchUrl =
+            url != null && url.matches(UnifiedPushService.URL_PATTERN) ? url : null;
     }
 }

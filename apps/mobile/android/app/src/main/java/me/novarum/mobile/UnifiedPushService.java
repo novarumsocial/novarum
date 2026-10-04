@@ -23,6 +23,7 @@ public class UnifiedPushService extends PushService {
 
     static final String EXTRA_URL = "novarum_url";
     private static final String CHANNEL_ID = "messages";
+    static final String URL_PATTERN = "^/guilds(/[^/?#\\\\]+)*$";
 
     @Override
     public void onNewEndpoint(@NonNull PushEndpoint endpoint, @NonNull String instance) {
@@ -69,6 +70,8 @@ public class UnifiedPushService extends PushService {
                 new NotificationChannel(CHANNEL_ID, "Messages", NotificationManager.IMPORTANCE_HIGH)
             );
         }
+
+        if (!url.matches(URL_PATTERN)) url = "/guilds";
 
         Intent open = new Intent(this, MainActivity.class)
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)

@@ -48,6 +48,11 @@ export const relations = defineRelations(schema, (r) => ({
   },
   pushSubscriptions: {
     user: r.one.users({ from: r.pushSubscriptions.userId, to: r.users.id, optional: false }),
+    session: r.one.sessions({
+      from: r.pushSubscriptions.sessionId,
+      to: r.sessions.id,
+      optional: false,
+    }),
   },
   localCredentials: {
     user: r.one.users({

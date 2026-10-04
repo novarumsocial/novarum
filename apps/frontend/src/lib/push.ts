@@ -50,13 +50,19 @@ async function vapidKey() {
   return result.data.publicKey;
 }
 
+// false when another account on this device still owns the endpoint
 async function saveSubscription(
   kind: 'WEBPUSH' | 'UNIFIEDPUSH',
   subscription: z.infer<typeof webSubscriptionSchema>
 ) {
   const result = await anchor.client.notifications.subscriptions.post({ kind, ...subscription });
-  if (result.error || !result.data) throw new Error('Your homeserver rejected this device');
+  if (result.status === 409) return false;
+  if (result.error || !result.data) {
+    const reason = z.object({ error: z.string() }).safeParse(result.error?.value);
+    throw new Error(reason.success ? reason.data.error : 'Your homeserver rejected this device');
+  }
   localStorage.setItem(subscriptionIdKey, result.data.id);
+  return true;
 }
 
 const toBytes = (base64Url: string) =>
@@ -64,7 +70,7 @@ const toBytes = (base64Url: string) =>
     char.charCodeAt(0)
   );
 
-async function subscribeWebPush() {
+async function subscribeWebPush(retry = true) {
   const registration = await navigator.serviceWorker.register('/service-worker.js', {
     type: dev ? 'module' : 'classic',
   });
@@ -84,7 +90,13 @@ async function subscribeWebPush() {
     applicationServerKey: bytes,
   });
 
-  await saveSubscription('WEBPUSH', webSubscriptionSchema.parse(subscription.toJSON()));
+  if (await saveSubscription('WEBPUSH', webSubscriptionSchema.parse(subscription.toJSON()))) return;
+
+  // switching accounts without logging out leaves the old one holding this browser's endpoint,
+  // so drop the subscription and ask the push service for a fresh one
+  if (!retry) throw new Error('This browser is already registered to another account');
+  await subscription.unsubscribe();
+  await subscribeWebPush(false);
 }
 
 // resolves once the distributor has handed us an endpoint, which comes back as an event
@@ -125,7 +137,9 @@ async function saveEndpoint(data: Endpoint) {
     endpoint: data.endpoint,
     keys: { p256dh: data.p256dh, auth: data.auth },
   });
-  if (subscription.success) await saveSubscription('UNIFIEDPUSH', subscription.data);
+  if (subscription.success && !(await saveSubscription('UNIFIEDPUSH', subscription.data))) {
+    throw new Error('This device is already registered to another account');
+  }
 }
 
 // throws a message fit to show the user when this device can't be set up
@@ -156,8 +170,14 @@ export async function syncPush() {
   }
 }
 
+const chatPathSchema = z.string().regex(/^\/guilds(\/[^/?#\\]+)*$/);
+
 // a tapped notification opens the chat it came from, whether the app was open, backgrounded or closed
-export function watchNotificationTaps(open: (url: string) => void) {
+export function watchNotificationTaps(openUrl: (url: string) => void) {
+  const open = (url: string) => {
+    const path = chatPathSchema.safeParse(url);
+    if (path.success) openUrl(path.data);
+  };
   const onMessage = (event: MessageEvent) => {
     const message = z.object({ type: z.literal('navigate'), url: z.string() }).safeParse(event.data);
     if (message.success) open(message.data.url);
@@ -166,17 +186,20 @@ export function watchNotificationTaps(open: (url: string) => void) {
     navigator.serviceWorker.addEventListener('message', onMessage);
   }
 
+  // an older apk without the native plugin gets this bundle over the air; it just has no push
   const handle = isAndroid()
-    ? UnifiedPush.addListener('notificationTapped', ({ url }) => open(url))
+    ? UnifiedPush.addListener('notificationTapped', ({ url }) => open(url)).catch(() => null)
     : null;
   if (isAndroid()) {
-    void UnifiedPush.getLaunchUrl().then(({ url }) => url && open(url));
+    void UnifiedPush.getLaunchUrl()
+      .then(({ url }) => url && open(url))
+      .catch(() => null);
   }
 
   return () => {
     if (browser && 'serviceWorker' in navigator) {
       navigator.serviceWorker.removeEventListener('message', onMessage);
     }
-    void handle?.then((listener) => listener.remove());
+    void handle?.then((listener) => listener?.remove());
   };
 }

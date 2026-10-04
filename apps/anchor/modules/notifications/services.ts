@@ -1,6 +1,6 @@
 import Elysia from 'elysia';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import {
   db,
@@ -13,6 +13,8 @@ import { assertSafeFederationUrl } from '../../utils/discovery';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { randomString } from '../../utils/randomString';
 import { getVapidKeys } from '../../utils/vapid';
+
+const maxSubscriptionsPerUser = 10;
 
 const levelSchema = z.enum(['ALL', 'MENTIONS', 'NONE']);
 const settingSchema = z.object({
@@ -136,6 +138,34 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
       );
       if (!safe) return status(400, { error: 'Invalid push endpoint' });
 
+      const existing = await db.query.pushSubscriptions.findFirst({
+        where: { endpoint: body.endpoint },
+        with: { session: true },
+      });
+      // an endpoint is a capability of one device. Moving it to another account is only fine once
+      // the old account's session is gone (the same phone, logged in as someone else).
+      if (
+        existing &&
+        existing.userId !== session.userId &&
+        existing.session.expiresAt.getTime() > Date.now()
+      ) {
+        return status(409, { error: 'Endpoint already registered' });
+      }
+      if (!existing || existing.userId !== session.userId) {
+        const owned = await db.query.pushSubscriptions.findMany({
+          where: { userId: session.userId },
+          columns: { id: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        // devices that vanished without logging out would otherwise fill the quota for good
+        const stale = owned.slice(0, Math.max(0, owned.length - maxSubscriptionsPerUser + 1));
+        if (stale.length) {
+          await db.delete(pushSubscriptions).where(
+            inArray(pushSubscriptions.id, stale.map((item) => item.id))
+          );
+        }
+      }
+
       const values = {
         userId: session.userId,
         sessionId: session.id,
@@ -144,7 +174,6 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
         p256dh: body.keys.p256dh,
         auth: body.keys.auth,
       };
-      // an endpoint belongs to one device, so a re-subscribe moves it to the current session
       const [row] = await db
         .insert(pushSubscriptions)
         .values({ id: randomString(), ...values })
@@ -158,6 +187,7 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
         200: z.object({ id: z.string() }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        409: genericResponseErrorSchema,
       },
     }
   )

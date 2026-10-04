@@ -12,7 +12,7 @@ const pushSchema = z.object({
   body: z.string().optional(),
   icon: z.string().optional(),
   tag: z.string().optional(),
-  url: z.string(),
+  url: z.string().regex(/^\/guilds(\/[^/?#\\]+)*$/),
 });
 
 sw.addEventListener('install', () => void sw.skipWaiting());
@@ -45,7 +45,7 @@ sw.addEventListener('push', (event) => {
 
 sw.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = z.string().catch('/').parse(event.notification.data?.url);
+  const url = z.string().catch('/guilds').parse(event.notification.data?.url);
 
   event.waitUntil(
     (async () => {

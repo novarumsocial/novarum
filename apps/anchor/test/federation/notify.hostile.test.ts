@@ -51,6 +51,18 @@ describe('control', () => {
   });
 });
 
+describe('what a hostile host can make us show', () => {
+  test('a remote author\'s avatar url is never used as the notification icon', async () => {
+    const before = received();
+    const author = { username: 'mallory', displayName: null, homeserver: evil, avatarUrl: 'https://tracker.example/pixel.png' };
+    expect((await sendSigned(await signed(1, 'b', path, push({ author, messageId: 'icon' })))).status).toBe(200);
+    await eventually(() => received() === before + 1, { message: 'push delivered' });
+    const last = sink.for(device.label).at(-1);
+    expect(last.icon).toBeUndefined();
+    expect(JSON.stringify(last)).not.toContain('tracker.example');
+  });
+});
+
 describe('forged and mismatched senders', () => {
   test('claiming to be another homeserver while signing with the evil key is 401, and nothing is pushed', async () => {
     const before = received();
@@ -71,7 +83,6 @@ describe('forged and mismatched senders', () => {
   });
 
   test('the evil homeserver cannot push for a guild hosted by another one, even by naming its raw id', async () => {
-    // a real guild on A that the member joined: the evil server names A's guild id, which it rebuilds as its own
     const owner = await signup('a');
     const { guild } = await createGuild(owner, 'real');
     const { body } = await call(owner, 'POST', `/guilds/${guild.id}/invites`, {});
@@ -120,15 +131,16 @@ describe('flooding', () => {
   test('one homeserver is limited to 600 pushes a minute, with a 429 after that', async () => {
     const statuses: number[] = [];
     for (let batch = 0; batch < 35; batch++) {
-      const results = await Promise.all(
-        Array.from({ length: 20 }, async () => (await sendSigned(await signed(1, 'b', path, push({ guildId: 'nope', handles: ['@nobody:' + anchors.b.homeserver] })))).status)
+      const requests = await Promise.all(
+        Array.from({ length: 20 }, () => signed(2, 'b', path, push({ guildId: 'nope', handles: ['@nobody:' + anchors.b.homeserver] })))
       );
+      const results = (await Promise.all(requests.map((request) => sendSigned(request)))).map((res) => res.status);
       statuses.push(...results);
     }
     expect(statuses.filter((code) => code === 429).length).toBeGreaterThan(0);
     expect(statuses.filter((code) => code === 200).length).toBeLessThanOrEqual(600);
     expect(statuses.every((code) => code === 200 || code === 429)).toBe(true);
-  });
+  }, 120_000);
 });
 
 describe('subscription endpoints', () => {

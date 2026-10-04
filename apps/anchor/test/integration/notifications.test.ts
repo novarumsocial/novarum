@@ -134,6 +134,33 @@ describe('subscriptions', () => {
     expect((await call(u, 'DELETE', `/notifications/subscriptions/${id}`)).status).toBe(404);
   });
 
+  test('another account cannot take over a device\'s endpoint while the owner\'s session is alive', async () => {
+    const [owner, thief] = await Promise.all([user(), user()]);
+    const { id, label } = await sink.subscribe(owner);
+    const endpoint = (await sql`SELECT endpoint FROM push_subscription WHERE id = ${id}`)[0]!.endpoint;
+    const body = { kind: 'WEBPUSH', endpoint, keys: { p256dh: 'k', auth: 'a' } };
+    expect((await call(thief, 'POST', '/notifications/subscriptions', body)).status).toBe(409);
+    expect((await sql`SELECT "userId" FROM push_subscription WHERE id = ${id}`)[0]!.userId).toBe(owner.user.id);
+
+    // the same phone moving to another account, after the first one's session ran out
+    await sql`UPDATE session SET "expiresAt" = now() - interval '1 minute' WHERE "userId" = ${owner.user.id}`;
+    expect((await call(thief, 'POST', '/notifications/subscriptions', body)).status).toBe(200);
+    expect((await sql`SELECT "userId" FROM push_subscription WHERE id = ${id}`)[0]!.userId).toBe(thief.user.id);
+    expect(label).toBeDefined();
+  });
+
+  test('a user keeps at most 10 devices: a new one replaces the oldest', async () => {
+    const u = await user();
+    for (let i = 0; i < 10; i++) await sink.subscribe(u, `cap-${u.user.id}-${i}`);
+    await sink.subscribe(u, `cap-${u.user.id}-new`);
+    const rows = await sql`SELECT endpoint FROM push_subscription WHERE "userId" = ${u.user.id}`;
+    expect(rows).toHaveLength(10);
+    expect(rows.some((row: any) => row.endpoint.endsWith(`cap-${u.user.id}-0`))).toBe(false);
+    expect(rows.some((row: any) => row.endpoint.endsWith(`cap-${u.user.id}-new`))).toBe(true);
+    await sink.subscribe(u, `cap-${u.user.id}-5`);
+    expect(await sql`SELECT 1 FROM push_subscription WHERE "userId" = ${u.user.id}`).toHaveLength(10);
+  });
+
   test('UnifiedPush endpoints are stored like web push ones', async () => {
     const u = await user();
     const { id } = await sink.subscribe(u, undefined, 'UNIFIEDPUSH');
@@ -281,6 +308,22 @@ describe('who is skipped', () => {
     await sink.settle();
     expect(sink.for(label)).toHaveLength(1);
     rt.close();
+  });
+
+  test('one person gets at most 60 pushes a minute, however many people mention them', async () => {
+    const { owner, b, channel, label } = await guildWithSubscriber();
+    for (let i = 0; i < 70; i++) await send(owner, channel.id, `spam ${i} ${b.user.handle}`);
+    await eventually(() => sink.for(label).length >= 60, { timeout: 15_000, message: 'pushes arrive' });
+    await sink.settle();
+    expect(sink.for(label)).toHaveLength(60);
+  });
+
+  test('a local author\'s avatar is the notification icon', async () => {
+    const { owner, b, channel, label } = await guildWithSubscriber();
+    await sql`UPDATE "user" SET "avatarUrl" = 'https://example.com/a.png' WHERE id = ${owner.user.id}`;
+    await send(owner, channel.id, `look ${b.user.handle}`);
+    const [push] = await eventually(() => (sink.for(label).length ? sink.for(label) : null), { message: 'push' });
+    expect(push.icon).toBe('https://example.com/a.png');
   });
 
   test('without message preview the content stays out of the push', async () => {

@@ -46,7 +46,7 @@ public class UnifiedPushPlugin extends Plugin {
     @Override
     protected void handleOnNewIntent(Intent intent) {
         String url = intent.getStringExtra(UnifiedPushService.EXTRA_URL);
-        if (url == null) return;
+        if (url == null || !url.matches(UnifiedPushService.URL_PATTERN)) return;
         JSObject data = new JSObject();
         data.put("url", url);
         notifyListeners("notificationTapped", data);

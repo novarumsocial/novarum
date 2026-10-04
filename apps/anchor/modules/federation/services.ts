@@ -120,6 +120,9 @@ const pushWindows = new Map<string, { start: number; count: number }>();
 // a fixed window per sending homeserver, so one noisy server can't flood push services
 function allowFederatedPush(homeserver: string) {
   const now = Date.now();
+  if (pushWindows.size > 1000) {
+    for (const [name, old] of pushWindows) if (now - old.start > 60_000) pushWindows.delete(name);
+  }
   const window = pushWindows.get(homeserver);
   if (!window || now - window.start > 60_000) {
     pushWindows.set(homeserver, { start: now, count: 1 });

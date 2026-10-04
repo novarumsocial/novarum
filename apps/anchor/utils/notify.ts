@@ -2,13 +2,30 @@ import webpush from 'web-push';
 import { eq } from 'drizzle-orm';
 import { db, pushSubscriptions } from '../src/db';
 import { getConfig } from './config';
-import { assertSafeFederationUrl, postSignedFederationJson } from './discovery';
+import { postSignedFederationJson } from './discovery';
+import { safePost } from './safePost';
 import { effectiveLevel, levelAllows } from './notificationLevel';
 import { getVapidKeys, vapidSubject } from './vapid';
 import { isUserActive } from '../modules/realtime/services';
 
 export const maxSnippetLength = 200;
 const pushTimeoutMs = 10_000;
+const maxPushesPerUserPerMinute = 60;
+const pushWindows = new Map<string, { start: number; count: number }>();
+
+function allowPushTo(userId: string) {
+  const now = Date.now();
+  if (pushWindows.size > 10_000) {
+    for (const [id, window] of pushWindows) if (now - window.start > 60_000) pushWindows.delete(id);
+  }
+
+  const window = pushWindows.get(userId);
+  if (!window || now - window.start > 60_000) {
+    pushWindows.set(userId, { start: now, count: 1 });
+    return true;
+  }
+  return ++window.count <= maxPushesPerUserPerMinute;
+}
 
 // ids are local to whoever receives this: fed: ids for things hosted elsewhere.
 export type PushPayload = {
@@ -43,6 +60,7 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
   ]);
 
   const target = { channelId: payload.channelId, guildId: payload.guildId };
+  const localHomeserver = getConfig().server.homeserver.toLowerCase();
   const name = payload.author.displayName || payload.author.username;
   const url = payload.guildId
     ? `/guilds/${[payload.guildId, payload.channelId, payload.messageId].map(encodeURIComponent).join('/')}`
@@ -60,6 +78,7 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
     );
     // everything pushed is a DM or a mention, so it always counts as one
     if (!levelAllows(effectiveLevel(entries, target), true)) continue;
+    if (!allowPushTo(userId)) continue;
 
     const preview = preference?.messagePreview ?? true;
     const message = JSON.stringify({
@@ -72,7 +91,9 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
           : payload.guildId
             ? 'Mentioned you'
             : 'Sent you a message',
-      icon: payload.author.avatarUrl ?? undefined,
+      // a remote author's avatar lives on a server we don't control, and showing it would tell that
+      // server when and where this user got the notification
+      icon: payload.author.homeserver.toLowerCase() === localHomeserver ? (payload.author.avatarUrl ?? undefined) : undefined,
       tag: payload.channelId,
       url,
       channelId: payload.channelId,
@@ -101,15 +122,12 @@ async function sendPush(
         vapidDetails: { subject: vapidSubject(), ...vapid },
       }
     );
-    await assertSafeFederationUrl(new URL(request.endpoint));
-
-    const response = await fetch(request.endpoint, {
-      method: request.method,
-      headers: request.headers,
-      body: new Uint8Array(request.body),
-      redirect: 'error',
-      signal: AbortSignal.timeout(pushTimeoutMs),
-    });
+    const response = await safePost(
+      request.endpoint,
+      request.headers as Record<string, string>,
+      new Uint8Array(request.body),
+      pushTimeoutMs
+    );
     // the push service says this device is gone for good
     if (response.status === 404 || response.status === 410) {
       await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, subscription.id));
