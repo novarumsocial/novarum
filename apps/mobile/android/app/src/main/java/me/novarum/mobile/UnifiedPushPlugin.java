@@ -64,6 +64,12 @@ public class UnifiedPushPlugin extends Plugin {
         registerWithDistributor(call);
     }
 
+    // one registration per account (the homeserver), since each has its own VAPID key and endpoint
+    private static String instanceOf(PluginCall call) {
+        String instance = call.getString("instance");
+        return instance == null ? ConstantsKt.INSTANCE_DEFAULT : instance;
+    }
+
     @PermissionCallback
     private void registerAfterPermission(PluginCall call) {
         if (getPermissionState("notifications") == PermissionState.GRANTED) {
@@ -76,6 +82,7 @@ public class UnifiedPushPlugin extends Plugin {
     // resolves once the request is sent; the endpoint itself arrives as an "endpoint" event
     private void registerWithDistributor(PluginCall call) {
         String vapid = call.getString("vapid");
+        String instance = instanceOf(call);
         Activity activity = getActivity();
         UnifiedPush.tryUseCurrentOrDefaultDistributor(
             activity,
@@ -87,8 +94,8 @@ public class UnifiedPushPlugin extends Plugin {
                 try {
                     UnifiedPush.register(
                         getContext(),
-                        ConstantsKt.INSTANCE_DEFAULT,
-                        "Novarum",
+                        instance,
+                        "Novarum (" + instance + ")",
                         vapid
                     );
                     call.resolve();
@@ -102,15 +109,17 @@ public class UnifiedPushPlugin extends Plugin {
 
     @PluginMethod
     public void unregister(PluginCall call) {
-        UnifiedPush.unregister(getContext(), ConstantsKt.INSTANCE_DEFAULT);
-        prefs(getContext()).edit().clear().apply();
+        String instance = instanceOf(call);
+        UnifiedPush.unregister(getContext(), instance);
+        clearEndpoint(getContext(), instance);
         call.resolve();
     }
 
     // the last endpoint we were given, so the app can re-send it to the homeserver on start
     @PluginMethod
     public void getEndpoint(PluginCall call) {
-        call.resolve(endpointData(prefs(getContext())));
+        String instance = instanceOf(call);
+        call.resolve(endpointData(prefs(getContext()), instance));
     }
 
     @PluginMethod
@@ -125,30 +134,49 @@ public class UnifiedPushPlugin extends Plugin {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    private static JSObject endpointData(SharedPreferences prefs) {
+    private static JSObject endpointData(SharedPreferences prefs, String instance) {
         JSObject data = new JSObject();
-        String endpoint = prefs.getString("endpoint", null);
+        String endpoint = prefs.getString(instance + "|endpoint", null);
         if (endpoint != null) {
+            data.put("instance", instance);
             data.put("endpoint", endpoint);
-            data.put("p256dh", prefs.getString("p256dh", null));
-            data.put("auth", prefs.getString("auth", null));
+            data.put("p256dh", prefs.getString(instance + "|p256dh", null));
+            data.put("auth", prefs.getString(instance + "|auth", null));
         }
         return data;
     }
 
-    static void onEndpoint(Context context, String endpoint, String p256dh, String auth) {
+    static void clearEndpoint(Context context, String instance) {
+        prefs(context)
+            .edit()
+            .remove(instance + "|endpoint")
+            .remove(instance + "|p256dh")
+            .remove(instance + "|auth")
+            .apply();
+    }
+
+    static void onEndpoint(
+        Context context,
+        String account,
+        String endpoint,
+        String p256dh,
+        String auth
+    ) {
         SharedPreferences prefs = prefs(context);
         prefs
             .edit()
-            .putString("endpoint", endpoint)
-            .putString("p256dh", p256dh)
-            .putString("auth", auth)
+            .putString(account + "|endpoint", endpoint)
+            .putString(account + "|p256dh", p256dh)
+            .putString(account + "|auth", auth)
             .apply();
-        if (instance != null) instance.notifyListeners("endpoint", endpointData(prefs), true);
+        if (instance != null) {
+            instance.notifyListeners("endpoint", endpointData(prefs, account), true);
+        }
     }
 
-    static void onFailure(String reason) {
+    static void onFailure(String account, String reason) {
         JSObject data = new JSObject();
+        data.put("instance", account);
         data.put("reason", reason);
         if (instance != null) instance.notifyListeners("registrationFailed", data, true);
     }

@@ -29,10 +29,10 @@ public class UnifiedPushService extends PushService {
     public void onNewEndpoint(@NonNull PushEndpoint endpoint, @NonNull String instance) {
         PublicKeySet keys = endpoint.getPubKeySet();
         if (keys == null) {
-            UnifiedPushPlugin.onFailure("NO_KEYS");
+            UnifiedPushPlugin.onFailure(instance, "NO_KEYS");
             return;
         }
-        UnifiedPushPlugin.onEndpoint(this, endpoint.getUrl(), keys.getPubKey(), keys.getAuth());
+        UnifiedPushPlugin.onEndpoint(this, instance, endpoint.getUrl(), keys.getPubKey(), keys.getAuth());
     }
 
     @Override
@@ -55,12 +55,12 @@ public class UnifiedPushService extends PushService {
 
     @Override
     public void onRegistrationFailed(@NonNull FailedReason reason, @NonNull String instance) {
-        UnifiedPushPlugin.onFailure(reason.name());
+        UnifiedPushPlugin.onFailure(instance, reason.name());
     }
 
     @Override
     public void onUnregistered(@NonNull String instance) {
-        UnifiedPushPlugin.prefs(this).edit().clear().apply();
+        UnifiedPushPlugin.clearEndpoint(this, instance);
     }
 
     private void show(String title, String body, String tag, String url) {

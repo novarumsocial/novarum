@@ -5,23 +5,24 @@ import { anchor } from './anchor.svelte';
 
 // push when the app is closed: Web Push in browsers, UnifiedPush on Android (through our own
 // native plugin). Electron can't receive either; it keeps its realtime connection in the tray.
-const subscriptionIdKey = 'novarum:push-subscription-id';
+// the session cookie is per homeserver, so a homeserver is an account: each gets its own subscription
+const subscriptionIdKey = () => `novarum:push-subscription-id:${anchor.homeServer}`;
 
 const webSubscriptionSchema = z.object({
   endpoint: z.string(),
   keys: z.object({ p256dh: z.string(), auth: z.string() }),
 });
-type Endpoint = { endpoint?: string; p256dh?: string; auth?: string };
+type Endpoint = { instance?: string; endpoint?: string; p256dh?: string; auth?: string };
 
 const UnifiedPush = registerPlugin<{
-  register(options: { vapid: string }): Promise<void>;
-  unregister(): Promise<void>;
-  getEndpoint(): Promise<Endpoint>;
+  register(options: { vapid: string; instance: string }): Promise<void>;
+  unregister(options: { instance: string }): Promise<void>;
+  getEndpoint(options: { instance: string }): Promise<Endpoint>;
   getLaunchUrl(): Promise<{ url: string | null }>;
   addListener(event: 'endpoint', callback: (data: Endpoint) => void): Promise<PluginListenerHandle>;
   addListener(
     event: 'registrationFailed',
-    callback: (data: { reason: string }) => void
+    callback: (data: { instance: string; reason: string }) => void
   ): Promise<PluginListenerHandle>;
   addListener(
     event: 'notificationTapped',
@@ -61,7 +62,7 @@ async function saveSubscription(
     const reason = z.object({ error: z.string() }).safeParse(result.error?.value);
     throw new Error(reason.success ? reason.data.error : 'Your homeserver rejected this device');
   }
-  localStorage.setItem(subscriptionIdKey, result.data.id);
+  localStorage.setItem(subscriptionIdKey(), result.data.id);
   return true;
 }
 
@@ -101,6 +102,7 @@ async function subscribeWebPush(retry = true) {
 
 // resolves once the distributor has handed us an endpoint, which comes back as an event
 function subscribeUnifiedPush() {
+  const instance = anchor.homeServer;
   return new Promise<void>((resolve, reject) => {
     const handles: Promise<PluginListenerHandle>[] = [];
     const finish = (error?: Error) => {
@@ -111,15 +113,17 @@ function subscribeUnifiedPush() {
     const timeout = setTimeout(() => finish(new Error('Your push service did not answer')), 20_000);
 
     handles.push(
-      UnifiedPush.addListener('endpoint', (data) =>
-        void saveEndpoint(data).then(() => finish(), (error: Error) => finish(error))
-      ),
-      UnifiedPush.addListener('registrationFailed', ({ reason }) =>
-        finish(new Error(`Your push service refused: ${reason}`))
-      )
+      UnifiedPush.addListener('endpoint', (data) => {
+        if (data.instance === instance)
+          void saveEndpoint(data).then(() => finish(), (error: Error) => finish(error));
+      }),
+      UnifiedPush.addListener('registrationFailed', (data) => {
+        if (data.instance === instance)
+          finish(new Error(`Your push service refused: ${data.reason}`));
+      })
     );
     void vapidKey()
-      .then((vapid) => UnifiedPush.register({ vapid }))
+      .then((vapid) => UnifiedPush.register({ vapid, instance }))
       .catch((error: { code?: string; message?: string }) =>
         finish(
           new Error(
@@ -149,11 +153,11 @@ export async function enablePush() {
 }
 
 export async function disablePush() {
-  const id = localStorage.getItem(subscriptionIdKey);
-  localStorage.removeItem(subscriptionIdKey);
+  const id = localStorage.getItem(subscriptionIdKey());
+  localStorage.removeItem(subscriptionIdKey());
   if (id) await anchor.client.notifications.subscriptions({ id }).delete().catch(() => null);
 
-  if (isAndroid()) await UnifiedPush.unregister().catch(() => null);
+  if (isAndroid()) await UnifiedPush.unregister({ instance: anchor.homeServer }).catch(() => null);
   else if (webPushSupported()) {
     const registration = await navigator.serviceWorker.getRegistration('/service-worker.js');
     await (await registration?.pushManager.getSubscription())?.unsubscribe().catch(() => null);
@@ -163,7 +167,12 @@ export async function disablePush() {
 // subscriptions go stale: endpoints change and sessions get replaced, so re-send them on start
 export async function syncPush() {
   try {
-    if (isAndroid()) await saveEndpoint(await UnifiedPush.getEndpoint());
+    if (isAndroid()) {
+      // an account that has no endpoint yet (just switched to, or from before per-account pushes) registers now
+      const endpoint = await UnifiedPush.getEndpoint({ instance: anchor.homeServer });
+      if (endpoint.endpoint) await saveEndpoint(endpoint);
+      else await subscribeUnifiedPush();
+    }
     else if (webPushSupported()) await subscribeWebPush();
   } catch (error) {
     console.warn('Could not refresh push subscription', error);
