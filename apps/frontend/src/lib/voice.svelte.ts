@@ -697,16 +697,20 @@ export class Voice {
         leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
+        if (!participant.isLocal) this.playRemoteSound(publication.source, false);
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
+        if (!participant.isLocal) this.playRemoteSound(publication.source, true);
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackPublished, (publication, participant) => {
+        this.playRemoteSound(publication.source, true, true);
         this.syncSubscription(publication, participant.identity);
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+        this.playRemoteSound(publication.source, false, true);
         if (publication.source === Track.Source.ScreenShare) {
           this.watchedStreams.delete(participant.identity);
         }
@@ -731,6 +735,13 @@ export class Voice {
           this.voiceStates.set(identity, { ...state, speaking });
         }
       });
+  }
+
+  // on = the track turned on (unmuted / published); video sources only react to publish changes too
+  private playRemoteSound(source: Track.Source, on: boolean, published = false) {
+    if (source === Track.Source.Microphone && !published) (on ? unmuteSound : muteSound).play();
+    if (source === Track.Source.Camera) (on ? cameraSound : cameraOffSound).play();
+    if (source === Track.Source.ScreenShare) (on ? screenSound : screenOffSound).play();
   }
 
   private syncParticipant(participant: Participant, channelId: string) {
@@ -771,13 +782,6 @@ export class Voice {
     }
     if (isLocal && !screenTrack && this.selfScreenShare) {
       screenOffSound.play();
-    }
-
-    const previous = isLocal ? undefined : this.voiceStates.get(participant.identity);
-    if (previous) {
-      if (previous.selfMuted !== micMuted) (micMuted ? muteSound : unmuteSound).play();
-      if (previous.camera !== !!cameraTrack) (cameraTrack ? cameraSound : cameraOffSound).play();
-      if (previous.screenShare !== !!screenTrack) (screenTrack ? screenSound : screenOffSound).play();
     }
 
     this.voiceStates.set(participant.identity, {
