@@ -773,6 +773,13 @@ export class Voice {
       screenOffSound.play();
     }
 
+    const previous = isLocal ? undefined : this.voiceStates.get(participant.identity);
+    if (previous) {
+      if (previous.selfMuted !== micMuted) (micMuted ? muteSound : unmuteSound).play();
+      if (previous.camera !== !!cameraTrack) (cameraTrack ? cameraSound : cameraOffSound).play();
+      if (previous.screenShare !== !!screenTrack) (screenTrack ? screenSound : screenOffSound).play();
+    }
+
     this.voiceStates.set(participant.identity, {
       userId: participant.identity,
       channelId,
