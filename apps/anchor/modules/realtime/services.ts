@@ -44,10 +44,14 @@ export function isUserActive(userId: string) {
 
 export function startPresenceCleanup() {
   return setInterval(async () => {
-    const dbOnlineUsers = (await getOnlineUsers()).map((u) => u.id);
-    await clearOnlineUsers(
-      dbOnlineUsers.filter((userId) => !activeRealtimeConnections.has(userId))
-    );
+    try {
+      const dbOnlineUsers = (await getOnlineUsers()).map((u) => u.id);
+      await clearOnlineUsers(
+        dbOnlineUsers.filter((userId) => !activeRealtimeConnections.has(userId))
+      );
+    } catch (e) {
+      console.error('Presence cleanup failed, retrying next tick:', e);
+    }
   }, 3000);
 }
 

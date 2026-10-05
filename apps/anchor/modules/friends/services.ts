@@ -288,7 +288,10 @@ function notify(server: Server, userId: string) {
 }
 
 export function startFriendSyncRetry() {
-  const timer = setInterval(() => void retryPendingFriendSyncs(), 30_000);
+  const timer = setInterval(
+    () => retryPendingFriendSyncs().catch((e) => console.error('Friend sync retry failed:', e)),
+    30_000
+  );
   timer.unref();
   return timer;
 }

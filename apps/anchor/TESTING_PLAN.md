@@ -194,7 +194,7 @@ Every anchor uses `listen_port = 80`, because homeservers can't carry a port.
 
 Every §5.4 test asserts that the canaries and the fake's "target" counters saw **zero** requests, unless the case expects a hit.
 
-The test CA (`test/federation/certs/gen.sh`, committed; the generated keys stay out of git) must use ECDSA P-256 or RSA. Bun failed to verify an ed25519 CA in our check. A boot smoke test confirms that the pinned Bun version (1.3.9 in the Dockerfile) honours `NODE_EXTRA_CA_CERTS`.
+The test CA (`test/federation/certs/gen.sh`, committed; the generated keys stay out of git) must use ECDSA P-256 or RSA. Bun failed to verify an ed25519 CA in our check. A boot smoke test confirms that the pinned Bun version (1.4.2 in the Dockerfile) honours `NODE_EXTRA_CA_CERTS`.
 
 Why IPs: homeservers can't carry a port, plain http is only allowed for private/local targets, and IP literals skip DNS (`*.localhost` resolution inside containers isn't reliable). Anchors build from `apps/anchor/Dockerfile` (after the lockfile fix, §10 step 5) and get the harness-generated config mounted at `/app/config.toml`, with `s3_disable_cors = true` except on `anchor-a`, which covers the attachment flows. The test runner runs on the host (Linux can route to bridge IPs) or as a `runner` container on the same network (needed on macOS).
 

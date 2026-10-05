@@ -305,8 +305,9 @@ test(
     await setup();
     t0 = Date.now();
     running = true;
-    for (const sim of sims) connect(sim);
-    await eventually(() => sims.every((s) => s.ws?.readyState === WebSocket.OPEN && s.gapStart === null), { timeout: 60_000, message: 'all clients connected' });
+    // stagger the first connects: 200 simultaneous handshakes on a shared CI runner is a thundering herd, not the steady state we soak
+    sims.forEach((sim, i) => setTimeout(() => connect(sim), (i * 10_000) / sims.length));
+    await eventually(() => sims.every((s) => s.ws?.readyState === WebSocket.OPEN && s.gapStart === null), { timeout: 120_000, message: 'all clients connected' });
     for (const s of sims) s.gaps.length = 0;
     t0 = Date.now();
 
