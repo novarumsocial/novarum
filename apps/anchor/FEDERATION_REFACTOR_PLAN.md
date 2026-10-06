@@ -1,5 +1,25 @@
 # Federation refactor plan
 
+## Status
+
+Implemented: everything in Parts 1 and 2, and 3.0, 3.1 and 3.2 of Part 3.
+
+Left out on purpose (the plan said "measure first"): 3.3, i.e. combining typing updates (it changes timing)
+and moving the old-nonce cleanup out of the request path.
+
+Where the code differs from the plan:
+
+- The shared message writes (1.7) live in `modules/message/store.ts` (`createMessage`, `editMessage`,
+  `deleteMessage`, `pingedUserIds`). The response bodies of local and federated messages are still built by
+  their own routes.
+- The three "user went online or offline" routes sit together in `modules/federation/routes/status.ts`.
+- The `federated` / `federatedUser` macro does not need `parse: 'none'`: Elysia only parses a body that a
+  handler asks for.
+- Two small behaviour differences, both only in failure cases:
+  - Sending a local message now fails (500) if one of its attachments was claimed by another message in the
+    meantime. The old code had that check, but it could never fire.
+  - A database error while storing a nonce is now a 500 instead of being reported as "nonce already used".
+
 ## What this is about
 
 Federation is how two Anchor servers talk to each other. When someone on `a.test` chats in a guild hosted on

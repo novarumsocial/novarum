@@ -1,13 +1,26 @@
 import Elysia from 'elysia';
 import { db } from '../../../src/db';
+import {
+  maxSubscriptionsPerSocket,
+  sharedEventFrame,
+  sharedRefusedFrame,
+  sharedSocketTopic,
+  subscribeMessageSchema,
+  type SharedKind,
+} from '../../../utils/federationSharedSocket';
 import { voicePresenceForChannels, voicePresenceForGuilds } from '../../../utils/services/livekit';
-import { requestFromSignedQuery, verifyFederationRequest } from '../verify';
+import { requestFromSignedQuery, verifyFederationRequest, type FederationOrigin } from '../verify';
 
 // The live event streams other homeservers follow for the guilds and DMs they have members in
 // (see utils/federationRealtime.ts for the other end). Events only ever flow from here to the
 // remote, never the other way around.
+//
+// There are two ways to follow, and a homeserver can use either:
+//   /realtime/guilds/:id and /realtime/dms/:id   one socket for one guild or DM
+//   /realtime                                    one socket for any number of them (see federationSharedSocket.ts)
 
 type Source = {
+  kind: SharedKind;
   path: 'guilds' | 'dms';
   // which of these guilds or DMs have a member from this homeserver? A homeserver can only
   // follow what it has members in.
@@ -21,6 +34,7 @@ type Source = {
 };
 
 const guildSource: Source = {
+  kind: 'guild',
   path: 'guilds',
   followable: async (ids, homeserver) => {
     const members = await db.query.guildMembers.findMany({
@@ -34,6 +48,7 @@ const guildSource: Source = {
 };
 
 const dmSource: Source = {
+  kind: 'dm',
   path: 'dms',
   followable: async (ids, homeserver) => {
     const members = await db.query.channelMembers.findMany({
@@ -95,6 +110,60 @@ function singleSocket(source: Source) {
   };
 }
 
+// who is on the other end of each shared socket, once known. A message can arrive while the
+// signature is still being checked, so it waits for the answer here.
+const sharedSocketOrigins = new Map<string, Promise<FederationOrigin | null>>();
+
+// one socket for any number of guilds and DMs: the remote says which ones it wants
+const sharedSocket = {
+  open(ws: Socket) {
+    const origin = verifySocket(ws, '/federation/realtime')
+      .then((verification) => {
+        if (!verification.ok) {
+          ws.close(policyViolation, verification.error);
+          return null;
+        }
+        return verification.origin;
+      })
+      .catch((error) => {
+        // not the remote's fault (the database is down, say), so it is free to try again
+        console.warn('Could not verify a federation socket:', error);
+        ws.close(1011, 'Could not verify the request');
+        return null;
+      });
+    sharedSocketOrigins.set(ws.id, origin);
+  },
+  async message(ws: Socket, message: unknown) {
+    const origin = await sharedSocketOrigins.get(ws.id);
+    const request = subscribeMessageSchema.safeParse(message);
+    if (!origin || !request.success) return;
+
+    for (const [source, ids] of [
+      [guildSource, request.data.guilds],
+      [dmSource, request.data.dms],
+    ] as const) {
+      const wanted = ids.filter((id) => !ws.isSubscribed(sharedSocketTopic(source.kind, id)));
+      if (!wanted.length) continue;
+
+      // one query for all of them, then each is checked on its own: the same rule as a single socket
+      const followable = await source.followable(wanted, origin.homeserver);
+      for (const id of wanted) {
+        const topic = sharedSocketTopic(source.kind, id);
+        if (!followable.has(id) || ws.subscriptions.length >= maxSubscriptionsPerSocket) {
+          ws.send(sharedRefusedFrame(source.kind, id));
+          continue;
+        }
+        ws.subscribe(topic);
+        ws.send(sharedEventFrame(source.kind, id, voiceSnapshotEvent(source, id)));
+      }
+    }
+  },
+  close(ws: Socket) {
+    sharedSocketOrigins.delete(ws.id);
+  },
+};
+
 export const realtime = new Elysia()
   .ws('/realtime/dms/:id', singleSocket(dmSource))
-  .ws('/realtime/guilds/:id', singleSocket(guildSource));
+  .ws('/realtime/guilds/:id', singleSocket(guildSource))
+  .ws('/realtime', sharedSocket);

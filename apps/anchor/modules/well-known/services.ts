@@ -3,6 +3,7 @@ import { version } from '../../utils/version';
 import { getConfig } from '../../utils/config';
 import { getKeys } from '../../utils/keys';
 import { z } from 'zod';
+import { federationFeatures } from '../../utils/federationFeatures';
 
 export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Well known'] }).get(
   '/info',
@@ -24,6 +25,7 @@ export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Wel
       homeserver,
       baseUrl,
       version,
+      features: [...federationFeatures],
     };
   },
   {
@@ -42,6 +44,7 @@ export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Wel
         homeserver: z.string(),
         baseUrl: z.url(),
         version: z.string(),
+        features: z.array(z.string()),
       }),
     },
   }

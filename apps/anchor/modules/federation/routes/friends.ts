@@ -1,12 +1,10 @@
 import Elysia from 'elysia';
-import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, users } from '../../../src/db';
+import { db } from '../../../src/db';
 import { getConfig } from '../../../utils/config';
 import { upsertFederatedUser } from '../../../utils/federationPayload';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { publishRealtime } from '../../../utils/publishRealtime';
-import { userStatusSchema } from '../../../src/db/zod';
 import {
   applyFriendSnapshot,
   friendAuthority,
@@ -17,7 +15,7 @@ import {
   transitionFriendship,
 } from '../../friends/model';
 import { federationAuth } from '../plugin';
-import { federationErrors, okResponseSchema } from '../schemas';
+import { federationErrors } from '../schemas';
 
 const friendCommandErrorSchema = z.object({
   error: z.string(),
@@ -135,52 +133,6 @@ export const friends = new Elysia()
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
-      },
-    }
-  )
-  .post(
-    '/friends/status',
-    async ({ payload, remoteUser, origin, server, status }) => {
-      const nextStatus = userStatusSchema.safeParse(payload.status);
-      if (!nextStatus.success) return status(400, { error: 'Invalid federation user status' });
-
-      // case-insensitive on purpose: the homeserver name is stored as the remote spelled it
-      const [remote] = await db
-        .select()
-        .from(users)
-        .where(
-          and(
-            eq(users.username, remoteUser.username),
-            sql`lower(${users.homeserver}) = ${origin.homeserver}`
-          )
-        )
-        .limit(1);
-      if (!remote) return status(404, { error: 'Unknown user' });
-
-      await db.update(users).set({ status: nextStatus.data }).where(eq(users.id, remote.id));
-
-      // tell the local friends of this remote user
-      const friendships = await db.query.friendRelationships.findMany({
-        where: { status: 'ACCEPTED', OR: [{ userOneId: remote.id }, { userTwoId: remote.id }] },
-      });
-      if (server) {
-        for (const { userOneId, userTwoId } of friendships) {
-          const friendId = userOneId === remote.id ? userTwoId : userOneId;
-          publishRealtime(server, `userEvents:${friendId}`, {
-            type: 'user.status.changed',
-            data: { userId: remote.id, status: nextStatus.data },
-          });
-        }
-      }
-
-      return { ok: true };
-    },
-    {
-      federatedUser: true,
-      response: {
-        200: okResponseSchema,
-        ...federationErrors,
-        404: genericResponseErrorSchema,
       },
     }
   );

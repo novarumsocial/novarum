@@ -157,25 +157,18 @@ async function maybeDeleteExpiredFederationNonces() {
   return federationNonceCleanupPromise;
 }
 
+// Remembers a nonce so the same request can't be replayed. Returns false when it was already
+// stored, including when two requests with the same nonce arrive at the same time: the unique
+// index on (homeserver, nonce) lets exactly one insert through.
 export async function storeNonce(nonce: string, homeserver: string) {
   await maybeDeleteExpiredFederationNonces();
 
-  const existingNonce = await db.query.federationNonces.findFirst({
-    where: { nonce, homeserver },
-  });
-  if (existingNonce) return false;
-
-  try {
-    await db.insert(federationNonces).values({
-      id: crypto.randomUUID(),
-      nonce,
-      homeserver,
-    });
-  } catch {
-    return false;
-  }
-
-  return true;
+  const stored = await db
+    .insert(federationNonces)
+    .values({ id: crypto.randomUUID(), nonce, homeserver })
+    .onConflictDoNothing()
+    .returning({ id: federationNonces.id });
+  return stored.length > 0;
 }
 
 export async function isNonceUsed(nonce: string, homeserver: string) {

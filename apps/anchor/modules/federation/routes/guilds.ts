@@ -1,15 +1,10 @@
 import Elysia from 'elysia';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, users } from '../../../src/db';
-import { userStatusSchema } from '../../../src/db/zod';
+import { db } from '../../../src/db';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { isMessageAfter } from '../../../utils/messageCursor';
-import { userProfile } from '../../../utils/publicUser';
-import { publishRealtime } from '../../../utils/publishRealtime';
-import { getFederatedGuildAccess } from '../access';
 import { federationAuth } from '../plugin';
-import { federationErrors, okResponseSchema } from '../schemas';
+import { federationErrors } from '../schemas';
 
 // for each channel: where the user stopped reading (null = never read anything)
 const unreadMentionsBodySchema = z.object({
@@ -25,40 +20,6 @@ const unreadMentionsBodySchema = z.object({
 
 export const guilds = new Elysia()
   .use(federationAuth)
-  // a member of one of our guilds went online or offline
-  .post(
-    '/guilds/:id/users/status',
-    async ({ params, payload, remoteUser, server, status }) => {
-      const nextStatus = userStatusSchema.safeParse(payload.status);
-      if (!nextStatus.success) return status(400, { error: 'Invalid federation user status' });
-
-      const access = await getFederatedGuildAccess(params.id, remoteUser);
-      if (!access.ok) return status(access.status, { error: access.error });
-
-      await db
-        .update(users)
-        .set({ ...userProfile(remoteUser), status: nextStatus.data, updatedAt: new Date() })
-        .where(eq(users.id, access.user.id));
-
-      if (server) {
-        publishRealtime(server, `guildEvents:${params.id}`, {
-          type: 'user.status.changed',
-          data: { userId: access.user.id, status: nextStatus.data },
-        });
-      }
-
-      return { ok: true };
-    },
-    {
-      federatedUser: true,
-      response: {
-        200: okResponseSchema,
-        ...federationErrors,
-        403: genericResponseErrorSchema,
-        404: genericResponseErrorSchema,
-      },
-    }
-  )
   // how many unread mentions the user has in channels of our guilds
   .post(
     '/unread-mentions',

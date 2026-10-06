@@ -151,9 +151,12 @@ export const fakeBridgeSigner =
   async (target, path) =>
     (await fake.sign({ identity, method: 'GET', path, host: new URL(anchors[target].baseUrl).host, homeserver, body: '' })).headers;
 
-/** opens a federation realtime bridge socket (the WS A/B open towards each other), signed by `sign` */
-export async function openBridge(target: AnchorName, kind: 'guilds' | 'dms', id: string, sign: BridgeSigner) {
-  const path = `/federation/realtime/${kind}/${encodeURIComponent(id)}`;
+/**
+ * opens a federation realtime bridge socket (the WS A/B open towards each other), signed by `sign`.
+ * `shared` is the one socket for all guilds and DMs (`id` is ignored); `send` then subscribes to them.
+ */
+export async function openBridge(target: AnchorName, kind: 'guilds' | 'dms' | 'shared', id: string, sign: BridgeSigner) {
+  const path = kind === 'shared' ? '/federation/realtime' : `/federation/realtime/${kind}/${encodeURIComponent(id)}`;
   const url = new URL(`${api(target).replace(/^http/, 'ws')}${path}`);
   for (const [k, v] of Object.entries(await sign(target, path))) url.searchParams.set(k, v);
   const events: { type: string; data?: any }[] = [];
@@ -178,6 +181,7 @@ export async function openBridge(target: AnchorName, kind: 'guilds' | 'dms', id:
     get closed() {
       return closed;
     },
+    send: (message: unknown) => ws.send(JSON.stringify(message)),
     waitClosed: (timeout = 5000) => eventually(() => closed, { timeout, message: 'bridge close' }),
     waitFor: (type: string, timeout = 5000) => eventually(() => events.find((e) => e.type === type), { timeout, message: `bridge event ${type}` }),
     close: () => ws.close(),
