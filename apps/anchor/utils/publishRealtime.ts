@@ -13,8 +13,9 @@ export function publishRealtime(target: Publisher, topic: string, event: Realtim
 
   // Other homeservers can follow guilds and DMs of ours through one shared socket, which needs
   // to know what each event belongs to, so they get a copy with that wrapped around it.
+  // Remote (`fed:`) ids are not ours to share, so nobody can follow them.
   const [, topicName, id] = topic.match(guildOrDmTopic) ?? [];
-  if (id) {
+  if (id && !id.startsWith('fed:')) {
     const kind = topicName === 'guildEvents' ? 'guild' : 'dm';
     target.publish(sharedSocketTopic(kind, id), sharedEventFrame(kind, id, message));
   }

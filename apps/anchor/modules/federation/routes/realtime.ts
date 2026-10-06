@@ -149,6 +149,8 @@ const sharedSocket = {
       const followable = await source.followable(wanted, origin.homeserver);
       for (const id of wanted) {
         const topic = sharedSocketTopic(source.kind, id);
+        // an overlapping subscribe may have got there while we were querying
+        if (ws.isSubscribed(topic)) continue;
         if (!followable.has(id) || ws.subscriptions.length >= maxSubscriptionsPerSocket) {
           ws.send(sharedRefusedFrame(source.kind, id));
           continue;
