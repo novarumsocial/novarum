@@ -54,11 +54,12 @@ function openExternalUrl(value: string) {
 }
 
 const prefsFile = path.join(app.getPath('userData'), 'launch-prefs.json');
+const defaultPrefs = { autoLaunch: false, startHidden: true, autoUpdate: true };
 const readPrefs = () => {
   try {
-    return { autoLaunch: false, startHidden: true, ...JSON.parse(readFileSync(prefsFile, 'utf8')) };
+    return { ...defaultPrefs, ...JSON.parse(readFileSync(prefsFile, 'utf8')) };
   } catch {
-    return { autoLaunch: false, startHidden: true };
+    return defaultPrefs;
   }
 };
 
@@ -193,8 +194,18 @@ function configureAutoUpdater(window: BrowserWindow) {
 
   let downloading = false;
 
+  const download = () => {
+    downloading = true;
+    void autoUpdater.downloadUpdate().catch((error) => {
+      downloading = false;
+      window.setProgressBar(-1);
+      console.error('Failed to download update', error);
+    });
+  };
+
   autoUpdater.on('update-available', async ({ version }) => {
     if (downloading) return;
+    if (readPrefs().autoUpdate) return download();
 
     const { response } = await dialog.showMessageBox(window, {
       type: 'info',
@@ -206,14 +217,7 @@ function configureAutoUpdater(window: BrowserWindow) {
       cancelId: 1,
     });
 
-    if (response !== 0) return;
-
-    downloading = true;
-    void autoUpdater.downloadUpdate().catch((error) => {
-      downloading = false;
-      window.setProgressBar(-1);
-      console.error('Failed to download update', error);
-    });
+    if (response === 0) download();
   });
 
   autoUpdater.on('download-progress', ({ percent }) => {
@@ -222,6 +226,8 @@ function configureAutoUpdater(window: BrowserWindow) {
 
   autoUpdater.on('update-downloaded', async ({ version }) => {
     window.setProgressBar(-1);
+    // with auto-update on, the update installs the next time Novarum quits
+    if (readPrefs().autoUpdate) return;
     const { response } = await dialog.showMessageBox(window, {
       type: 'info',
       title: 'Novarum update ready',
@@ -242,6 +248,7 @@ function configureAutoUpdater(window: BrowserWindow) {
   });
 
   const check = () => {
+    if (!readPrefs().autoUpdate) return;
     void autoUpdater.checkForUpdates().catch((error) => {
       console.error('Failed to check for updates', error);
     });
@@ -329,6 +336,18 @@ app.whenReady().then(() => {
     writeFileSync(prefsFile, JSON.stringify(next));
     applyAutoLaunch(next.autoLaunch);
     return next;
+  });
+
+  ipcMain.handle('update:check', async () => {
+    if (!app.isPackaged) return { status: 'unsupported' };
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return result?.isUpdateAvailable
+        ? { status: 'available', version: result.updateInfo.version }
+        : { status: 'current' };
+    } catch {
+      return { status: 'error' };
+    }
   });
 
   ipcMain.handle('version:get', () => app.getVersion());

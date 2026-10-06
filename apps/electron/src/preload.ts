@@ -41,6 +41,7 @@ const api: ElectronAPI = {
   getAudioDevices: () => ipcRenderer.invoke('voice:get-audio-devices'),
   getLaunchPrefs: () => ipcRenderer.invoke('launch:get'),
   setLaunchPrefs: (prefs) => ipcRenderer.invoke('launch:set', prefs),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
   getVersion: () => ipcRenderer.invoke('version:get'),
   setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
   platform: process.platform,

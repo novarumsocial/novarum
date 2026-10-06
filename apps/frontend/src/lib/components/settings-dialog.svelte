@@ -1,12 +1,11 @@
 <script lang="ts">
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
-  import type { LaunchPrefs } from '$lib/electron-api';
+  import type { LaunchPrefs, UpdateCheck } from '$lib/electron-api';
   import { Switch } from '$lib/components/ui/switch/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import * as Card from '$lib/components/ui/card/index.js';
   import * as RadioGroup from '$lib/components/ui/radio-group';
   import {
     User,
@@ -23,6 +22,8 @@
     LoaderCircle,
     Mail,
     Trash2,
+    Monitor,
+    RefreshCw,
   } from '@lucide/svelte';
   import { anchor } from '$lib/anchor.svelte';
   import { goto } from '$app/navigation';
@@ -49,6 +50,8 @@
   import { Slider } from '$lib/components/ui/slider/index.js';
   import QRCode from 'qrcode';
   import { cn } from '$lib/utils';
+  import SettingsGroup from './settings-group.svelte';
+  import SettingsRow from './settings-row.svelte';
 
   let { open = $bindable(false), voice }: { open: boolean; voice: Voice } = $props();
 
@@ -74,7 +77,6 @@
   let aboutLoading = $state(false);
   let aboutError = $state<string | null>(null);
   let aboutSaved = $state(false);
-  let showOnlineStatus = $state(true);
   let logoutLoading = $state(false);
   let audioDevices = $state<{ input: MediaDeviceInfo[]; output: MediaDeviceInfo[] }>({
     input: [],
@@ -105,6 +107,26 @@
   let launchPrefs = $state(await window.electron?.getLaunchPrefs());
   const setLaunchPref = async (prefs: Partial<LaunchPrefs>) =>
     (launchPrefs = await window.electron?.setLaunchPrefs(prefs));
+  let updateState = $state<'idle' | 'checking' | UpdateCheck['status']>('idle');
+  let updateVersion = $state<string>();
+  async function checkForUpdates() {
+    updateState = 'checking';
+    const result = await window.electron!.checkForUpdates();
+    updateState = result.status;
+    updateVersion = result.version;
+  }
+  const updateMessage = $derived(
+    {
+      idle: launchPrefs?.autoUpdate
+        ? 'Novarum checks for updates every 30 minutes.'
+        : 'Automatic checks are off.',
+      checking: 'Checking for updates…',
+      current: "You're on the latest version.",
+      available: `Version ${updateVersion} is available.`,
+      unsupported: 'Updates are only available in installed builds.',
+      error: 'Could not check for updates. Try again later.',
+    }[updateState]
+  );
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
 
@@ -559,6 +581,37 @@
     }
   }
 
+  const timeFormats = [
+    { value: 'auto', label: 'Automatic', example: 'Follow your system settings' },
+    { value: '12hr', label: '12-hour', example: 'Example: 3:30 PM' },
+    { value: '24hr', label: '24-hour', example: 'Example: 15:30' },
+  ];
+
+  const pages = $derived([
+    { id: 'account', group: 'You', title: 'Account', icon: User },
+    { id: 'security', group: 'You', title: 'Privacy & security', icon: ShieldCheck },
+    { id: 'appearance', group: 'App', title: 'Appearance', icon: Palette },
+    { id: 'notifications', group: 'App', title: 'Notifications', icon: Bell },
+    { id: 'voice', group: 'App', title: 'Voice & audio', icon: Volume2 },
+    { id: 'langt', group: 'App', title: 'Language & time', icon: Languages },
+    ...(launchPrefs
+      ? [{ id: 'desktop', group: 'This computer', title: 'Desktop app', icon: Monitor }]
+      : []),
+  ]);
+  // on phones the nav is a sideways strip, so keep the open page in view
+  $effect(() => {
+    document
+      .querySelector(`[data-page="${activeTab}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
+
+  const navGroups = $derived(
+    [...new Set(pages.map((p) => p.group))].map((label) => ({
+      label,
+      pages: pages.filter((p) => p.group === label),
+    }))
+  );
+
   const languageOptions = [
     { value: 'en', label: 'English' },
     { value: 'es', label: 'Español' },
@@ -568,105 +621,110 @@
   ];
 </script>
 
+{#snippet head(title: string, description: string)}
+  <header class="mb-8">
+    <h2 class="text-2xl font-semibold tracking-tight">{title}</h2>
+    <p class="mt-1 text-sm text-muted-foreground">{description}</p>
+  </header>
+{/snippet}
+
+{#snippet colorButton(label: string, color: string)}
+  <span class="sr-only">{label}</span>
+  <span class="size-4 border border-black/15" style:background-color={color}></span>
+  <span class="font-mono text-xs">{color.toUpperCase()}</span>
+{/snippet}
+
 <Dialog.Root bind:open>
-  <Dialog.Content class="sm:max-w-2xl">
-    <Dialog.Header>
-      <Dialog.Title>User Settings</Dialog.Title>
-      <Dialog.Description>Manage your account, security, and preferences.</Dialog.Description>
+  <Dialog.Content
+    class="top-0 left-0 h-dvh max-h-dvh w-full max-w-none translate-x-0 translate-y-0 grid-cols-1 gap-0 overflow-hidden bg-background p-0 sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:max-w-4xl sm:-translate-x-1/2 sm:-translate-y-1/2"
+  >
+    <Dialog.Header class="sr-only">
+      <Dialog.Title>Settings</Dialog.Title>
+      <Dialog.Description>Manage your profile, privacy, and app preferences.</Dialog.Description>
     </Dialog.Header>
 
     <Tabs.Root
       bind:value={activeTab}
+      style="--you: {savedAvatarColor}"
       orientation="vertical"
-      class="flex flex-col gap-4 sm:h-[480px] sm:flex-row sm:gap-0"
+      class="flex h-dvh min-w-0 flex-col gap-0 sm:h-[min(680px,88vh)] sm:flex-row"
     >
-      <div
-        class="flex min-w-0 shrink-0 flex-col gap-2 sm:w-44 sm:border-r sm:border-border sm:pr-2"
+      <nav
+        class="flex min-w-0 shrink-0 flex-col gap-1 border-b bg-sidebar p-2 pr-12 sm:w-60 sm:pr-3 sm:gap-3 sm:border-r sm:border-b-0 sm:p-3"
       >
-        <Tabs.List
-          class="flex h-auto w-full items-stretch justify-start gap-0.5 overflow-x-auto bg-transparent p-0 sm:flex-col sm:overflow-visible"
-        >
-          <Tabs.Trigger
-            value="account"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
+        <div class="hidden items-center gap-3 px-2 py-2 sm:flex">
+          <div
+            class="size-10 shrink-0 overflow-hidden"
+            class:rounded-full={settings.value.circleIcons}
+            style:background-color={savedAvatarColor}
           >
-            <User class="size-3.5" />
-            Account
-          </Tabs.Trigger>
-
-          <Tabs.Trigger
-            value="security"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
-          >
-            <ShieldCheck class="size-3.5" />
-            Security
-          </Tabs.Trigger>
-
-          <Tabs.Trigger
-            value="appearance"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
-          >
-            <Palette class="size-3.5" />
-            Appearance
-          </Tabs.Trigger>
-
-          <Tabs.Trigger
-            value="notifications"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
-          >
-            <Bell class="size-3.5" />
-            Notifications
-          </Tabs.Trigger>
-
-          <Tabs.Trigger
-            value="voice"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
-          >
-            <Volume2 class="size-3.5" />
-            Voice & Audio
-          </Tabs.Trigger>
-
-          <Tabs.Trigger
-            value="langt"
-            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
-          >
-            <Languages class="size-3.5" />
-            Language & Time
-          </Tabs.Trigger>
-        </Tabs.List>
-
-        <div class="flex flex-col gap-0.5 px-2 text-[11px] text-muted-foreground sm:mt-auto">
-          <p>Frontend: v{frontendVersion}</p>
-          <p>Anchor: {anchorVersion ?? 'Unknown'}</p>
-          {#if desktopVersion}
-            <p>Desktop: v{desktopVersion}</p>
-          {/if}
-          <p>
-            Commit: <a
-              href={`https://github.com/novarumsocial/novarum/commit/${gitCommit}`}
-              class="underline">{gitCommit}</a
-            >
-          </p>
+            <Avatar
+              src={session.user?.avatarUrl}
+              name={session.user?.displayName || session.user?.username || '?'}
+              class="size-full bg-transparent! text-white!"
+            />
+          </div>
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium">
+              {session.user?.displayName || session.user?.username || 'You'}
+            </p>
+            <p class="truncate text-xs text-muted-foreground">
+              {session.user?.handle || `@${session.user?.username ?? 'you'}`}
+            </p>
+          </div>
         </div>
 
+        <div
+          class="flex gap-3 overflow-x-auto sm:flex-1 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto"
+        >
+          {#each navGroups as group (group.label)}
+            <div class="flex shrink-0 flex-col gap-0.5">
+              <p class="hidden px-2 pb-1 text-xs text-muted-foreground sm:block">{group.label}</p>
+              <Tabs.List
+                class="flex h-auto w-full flex-row! gap-0.5 bg-transparent p-0 sm:flex-col!"
+              >
+                {#each group.pages as page (page.id)}
+                  <Tabs.Trigger
+                    value={page.id}
+                    data-page={page.id}
+                    class="min-h-9 shrink-0 justify-start gap-2.5 border-0 px-2.5 py-1.5 text-muted-foreground hover:text-foreground data-active:bg-sidebar-accent! data-active:text-foreground data-active:shadow-[inset_0_-2px_0_var(--you)] sm:w-full sm:data-active:shadow-[inset_2px_0_0_var(--you)]"
+                  >
+                    <page.icon class="size-4" />
+                    {page.title}
+                  </Tabs.Trigger>
+                {/each}
+              </Tabs.List>
+            </div>
+          {/each}
+        </div>
+
+        <div class="hidden flex-col gap-0.5 px-2 text-[11px] text-muted-foreground sm:flex">
+          <p>Frontend v{frontendVersion} · Anchor {anchorVersion ?? 'unknown'}</p>
+          {#if desktopVersion}<p>Desktop v{desktopVersion}</p>{/if}
+          <a
+            href={`https://github.com/novarumsocial/novarum/commit/${gitCommit}`}
+            class="w-fit font-mono underline">{gitCommit}</a
+          >
+        </div>
         <Button
           variant="destructive"
-          size="sm"
-          class="w-full rounded-none"
+          class="hidden w-full sm:inline-flex"
           disabled={logoutLoading}
           onclick={logout}
         >
-          <LogOut class="size-3.5" />
-          Logout
+          <LogOut class="size-4" />
+          Log out
         </Button>
-      </div>
+      </nav>
 
-      <div class="min-w-0 flex-1 sm:pl-4">
-        <Tabs.Content value="account" class="sm:h-full sm:overflow-y-auto sm:pr-1">
-          <div class="space-y-3 pb-1">
-            <section class="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div class="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+        <div class="mx-auto max-w-xl">
+          <Tabs.Content value="account" class="space-y-6 outline-none">
+            {@render head('Account', 'How you appear to everyone on Novarum.')}
+
+            <section class="overflow-hidden bg-card">
               <div
-                class="group relative h-32 overflow-hidden sm:h-36"
+                class="group relative h-28 overflow-hidden sm:h-32"
                 style:background={`linear-gradient(125deg, ${selectedAvatarColor}, color-mix(in srgb, ${selectedAvatarColor} 35%, var(--background)))`}
               >
                 {#if session.user?.bannerUrl}
@@ -677,16 +735,7 @@
                     focused={false}
                     fit="cover"
                   />
-                {:else}
-                  <div
-                    class="absolute inset-0 opacity-30"
-                    style:background-image={'radial-gradient(circle at 20% 30%, white 0, transparent 35%), radial-gradient(circle at 80% 70%, black 0, transparent 40%)'}
-                  ></div>
                 {/if}
-                <div
-                  class="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10"
-                ></div>
-
                 <input
                   bind:this={bannerInput}
                   type="file"
@@ -697,248 +746,180 @@
                 <button
                   type="button"
                   aria-label="Change profile banner"
-                  class="absolute inset-0 z-10 flex cursor-pointer items-center justify-center bg-black/0 text-white transition-colors hover:bg-black/45 focus-visible:bg-black/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:cursor-wait"
+                  class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 text-white transition-colors hover:bg-black/45 focus-visible:bg-black/45 focus-visible:outline-none disabled:cursor-wait"
                   disabled={mediaLoading !== null}
                   onclick={() => bannerInput.click()}
                 >
                   <span
-                    class="flex items-center gap-2 rounded-md bg-black/55 px-3 py-1.5 text-xs font-medium opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                    class="flex items-center gap-2 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                     class:opacity-100={mediaLoading === 'banner'}
                   >
                     <Camera class="size-4" />
-                    {mediaLoading === 'banner' ? 'Uploading...' : 'Change banner'}
+                    {mediaLoading === 'banner' ? 'Uploading…' : 'Change banner'}
                   </span>
                 </button>
               </div>
 
-              <div class="px-4 pb-4">
+              <div class="flex items-end gap-4 px-4 pb-4">
+                <input
+                  bind:this={avatarInput}
+                  type="file"
+                  accept="image/gif,image/jpeg,image/png,image/webp"
+                  class="hidden"
+                  onchange={(event) => selectMedia(event, 'avatar')}
+                />
                 <div
-                  class="pointer-events-none relative z-10 -mt-9 flex items-end justify-between gap-3"
+                  class="group relative -mt-10 size-20 shrink-0 overflow-hidden border-4 border-card"
+                  class:rounded-full={settings.value.circleIcons}
+                  style:background-color={selectedAvatarColor}
                 >
-                  <input
-                    bind:this={avatarInput}
-                    type="file"
-                    accept="image/gif,image/jpeg,image/png,image/webp"
-                    class="hidden"
-                    onchange={(event) => selectMedia(event, 'avatar')}
+                  <Avatar
+                    src={session.user?.avatarUrl}
+                    name={session.user?.displayName || session.user?.username || '?'}
+                    class="size-full bg-transparent! text-2xl text-white!"
                   />
-                  <div
-                    class="pointer-events-auto group relative size-20 shrink-0 overflow-hidden border-4 border-card shadow-md"
-                    class:rounded-full={settings.value.circleIcons}
-                    style:background-color={selectedAvatarColor}
+                  <button
+                    type="button"
+                    aria-label="Change profile picture"
+                    class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 text-white transition-colors hover:bg-black/55 focus-visible:bg-black/55 focus-visible:outline-none disabled:cursor-wait"
+                    disabled={mediaLoading !== null}
+                    onclick={() => avatarInput.click()}
                   >
-                    <Avatar
-                      src={session.user?.avatarUrl}
-                      name={session.user?.displayName || session.user?.username || '?'}
-                      class="size-full bg-transparent! text-2xl text-white!"
+                    <Camera
+                      class="size-5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                     />
-                    <button
-                      type="button"
-                      aria-label="Change profile picture"
-                      class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/0 text-white transition-colors hover:bg-black/55 focus-visible:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/80 disabled:cursor-wait"
-                      disabled={mediaLoading !== null}
-                      onclick={() => avatarInput.click()}
-                    >
-                      <span
-                        class="flex flex-col items-center gap-0.5 text-[10px] font-medium opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                        class:opacity-100={mediaLoading === 'avatar'}
-                      >
-                        <Camera class="size-4" />
-                        {mediaLoading === 'avatar' ? 'Uploading...' : ''}
-                      </span>
-                    </button>
-                  </div>
-
-                  <div class="pointer-events-auto mb-1 mt-12 flex flex-col items-end gap-2">
-                    <div class="flex items-center gap-2">
-                      <span class="hidden text-[11px] text-muted-foreground sm:inline"
-                        >Avatar color</span
-                      >
-                      <Popover.Root bind:open={avatarColorOpen}>
-                        <Popover.Trigger>
-                          {#snippet child({ props })}
-                            <Button
-                              {...props}
-                              variant="outline"
-                              size="xs"
-                              class="gap-1.5 px-2 font-mono"
-                              aria-label={`Change avatar color, currently ${selectedAvatarColor}`}
-                              title="Avatar color"
-                            >
-                              <span
-                                class="size-3.5 rounded-full border border-black/15 ring-1 ring-white/20"
-                                style:background-color={selectedAvatarColor}
-                              ></span>
-                              <span class="hidden sm:inline"
-                                >{selectedAvatarColor.toUpperCase()}</span
-                              >
-                            </Button>
-                          {/snippet}
-                        </Popover.Trigger>
-
-                        <Popover.Content align="end" class="w-auto overflow-hidden p-0">
-                          <ColorPicker.Root
-                            bind:value={selectedAvatarColor}
-                            formats={['hex']}
-                            class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
-                          />
-                          <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
-                            <p class="text-[11px] text-destructive">{avatarColorError ?? ''}</p>
-                            <div class="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                disabled={avatarColorLoading}
-                                onclick={() => (avatarColorOpen = false)}>Cancel</Button
-                              >
-                              <Button
-                                size="xs"
-                                disabled={avatarColorLoading}
-                                onclick={saveAvatarColor}
-                              >
-                                {avatarColorLoading ? 'Saving...' : 'Save color'}
-                              </Button>
-                            </div>
-                          </div>
-                        </Popover.Content>
-                      </Popover.Root>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                      <span class="hidden text-[11px] text-muted-foreground sm:inline"
-                        >Speaking ring</span
-                      >
-                      <Popover.Root bind:open={speakingRingOpen}>
-                        <Popover.Trigger>
-                          {#snippet child({ props })}
-                            <Button
-                              {...props}
-                              variant="outline"
-                              size="xs"
-                              class="gap-1.5 px-2 font-mono"
-                              aria-label={`Change speaking ring color, currently ${selectedSpeakingRing}`}
-                              title="Speaking ring color"
-                            >
-                              <span
-                                class="size-3.5 rounded-full border border-black/15 ring-1 ring-white/20"
-                                style:background-color={selectedSpeakingRing}
-                              ></span>
-                              <span class="hidden sm:inline"
-                                >{selectedSpeakingRing.toUpperCase()}</span
-                              >
-                            </Button>
-                          {/snippet}
-                        </Popover.Trigger>
-
-                        <Popover.Content align="end" class="w-auto overflow-hidden p-0">
-                          <ColorPicker.Root
-                            bind:value={selectedSpeakingRing}
-                            formats={['hex']}
-                            class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
-                          />
-                          <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
-                            <p class="text-[11px] text-destructive">{avatarColorError ?? ''}</p>
-                            <div class="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="xs"
-                                disabled={avatarColorLoading}
-                                onclick={() => (speakingRingOpen = false)}>Cancel</Button
-                              >
-                              <Button
-                                size="xs"
-                                disabled={avatarColorLoading}
-                                onclick={saveAvatarColor}
-                              >
-                                {avatarColorLoading ? 'Saving...' : 'Save color'}
-                              </Button>
-                            </div>
-                          </div>
-                        </Popover.Content>
-                      </Popover.Root>
-                    </div>
-                  </div>
+                  </button>
                 </div>
-
-                <div class="mt-3 flex items-end justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-base font-semibold">
-                      {session.user?.displayName || session.user?.username || 'Your profile'}
-                    </p>
-                    <p class="truncate text-xs text-muted-foreground">
-                      {session.user?.handle || `@${session.user?.username ?? 'you'}`}
-                    </p>
-                  </div>
-
-                  <!-- TODO: pronouns
-                  <div class="grid shrink-0 gap-1.5">
-                    <Label for="pronouns">Pronouns</Label>
-                    <Input
-                      id="pronouns"
-                      placeholder="e.g. they/them"
-                      class="h-9 w-36 bg-background"
-                    />
-                  </div>
-                  -->
-                </div>
-
-                {#if mediaError}
-                  <p class="mt-3 text-xs text-destructive">{mediaError}</p>
-                {/if}
-              </div>
-            </section>
-
-            <section class="rounded-xl border bg-card">
-              <div class="border-b px-4 py-2">
-                <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  My account
-                </p>
-              </div>
-              <div class="grid gap-4 px-4 py-2 sm:grid-cols-2">
-                <div class="grid gap-1.5">
-                  <Label for="display-name">Display name</Label>
-                  <Input id="display-name" bind:value={displayName} class="h-9 bg-background" />
-                  <p class="text-[10px] text-muted-foreground">Shown to people you chat with.</p>
-                </div>
-                <div class="grid gap-1.5">
-                  <Label for="email">Email address</Label>
-                  <Input id="email" type="email" bind:value={email} class="h-9 bg-background" />
-                  <p class="text-[10px] text-muted-foreground">Only visible to you.</p>
-                </div>
-              </div>
-            </section>
-
-            <section class="rounded-xl border bg-card">
-              <div class="flex items-center justify-between border-b px-4 py-2">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    About me
+                <div class="min-w-0 flex-1 pt-3">
+                  <p class="truncate text-base font-semibold">
+                    {session.user?.displayName || session.user?.username || 'Your profile'}
+                  </p>
+                  <p class="truncate text-xs text-muted-foreground">
+                    {session.user?.handle || `@${session.user?.username ?? 'you'}`}
                   </p>
                 </div>
-                <span class="font-mono text-[10px] text-muted-foreground">{about.length}/512</span>
               </div>
-              <div class="px-4 py-2">
+              {#if mediaError}
+                <p class="px-4 pb-3 text-xs text-destructive">{mediaError}</p>
+              {/if}
+            </section>
+
+            <SettingsGroup title="About me">
+              <div>
                 <textarea
                   id="about"
                   bind:value={about}
                   maxlength="512"
                   rows="4"
                   placeholder="What should people know about you?"
-                  class="w-full resize-none rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-relaxed outline-none transition-shadow placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  class="block w-full resize-none bg-transparent px-4 py-3.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60"
                   oninput={() => (aboutSaved = false)}></textarea>
-                <div class="mt-1 flex items-center justify-between gap-3">
-                  <p class="text-xs text-destructive">{aboutError ?? ''}</p>
-                  <Button size="xs" disabled={aboutLoading} onclick={saveAbout}>
-                    {aboutLoading ? 'Saving...' : aboutSaved ? 'Saved!' : 'Save about'}
+                <div class="flex items-center justify-between gap-3 px-4 pb-3">
+                  <p class="text-xs text-destructive">
+                    {aboutError ?? ''}
+                    <span class="text-muted-foreground"
+                      >{aboutError ? '' : `${about.length}/512`}</span
+                    >
+                  </p>
+                  <Button size="sm" disabled={aboutLoading} onclick={saveAbout}>
+                    {aboutLoading ? 'Saving…' : aboutSaved ? 'Saved' : 'Save about'}
                   </Button>
                 </div>
               </div>
-            </section>
-          </div>
-        </Tabs.Content>
+            </SettingsGroup>
 
-        <Tabs.Content value="security" class="sm:h-full sm:overflow-y-auto sm:pr-1">
-          <div class="space-y-3 pb-1">
+            <SettingsGroup
+              title="Colors"
+              description="Used for your avatar and when you speak in voice."
+            >
+              <SettingsRow
+                title="Avatar color"
+                description="Shown behind your picture and on your banner."
+              >
+                <Popover.Root bind:open={avatarColorOpen}>
+                  <Popover.Trigger>
+                    {#snippet child({ props })}
+                      <Button {...props} variant="outline" size="sm" class="gap-2">
+                        {@render colorButton('Change avatar color', selectedAvatarColor)}
+                      </Button>
+                    {/snippet}
+                  </Popover.Trigger>
+                  <Popover.Content align="end" class="w-auto overflow-hidden p-0">
+                    <ColorPicker.Root
+                      bind:value={selectedAvatarColor}
+                      formats={['hex']}
+                      class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
+                    />
+                    {@render colorActions(() => (avatarColorOpen = false))}
+                  </Popover.Content>
+                </Popover.Root>
+              </SettingsRow>
+              <SettingsRow
+                title="Speaking ring"
+                description="The outline around you while you talk."
+              >
+                <Popover.Root bind:open={speakingRingOpen}>
+                  <Popover.Trigger>
+                    {#snippet child({ props })}
+                      <Button {...props} variant="outline" size="sm" class="gap-2">
+                        {@render colorButton('Change speaking ring color', selectedSpeakingRing)}
+                      </Button>
+                    {/snippet}
+                  </Popover.Trigger>
+                  <Popover.Content align="end" class="w-auto overflow-hidden p-0">
+                    <ColorPicker.Root
+                      bind:value={selectedSpeakingRing}
+                      formats={['hex']}
+                      class="w-[min(350px,calc(100vw-3rem))] rounded-none border-0 shadow-none"
+                    />
+                    {@render colorActions(() => (speakingRingOpen = false))}
+                  </Popover.Content>
+                </Popover.Root>
+              </SettingsRow>
+            </SettingsGroup>
+
+            <SettingsGroup title="Sign-in details">
+              <SettingsRow title="Display name">
+                <span class="block max-w-48 truncate text-sm text-muted-foreground"
+                  >{displayName}</span
+                >
+              </SettingsRow>
+              <SettingsRow title="Email address" description="Only visible to you.">
+                <span class="block max-w-48 truncate text-sm text-muted-foreground">{email}</span>
+              </SettingsRow>
+            </SettingsGroup>
+
+            <div class="sm:hidden">
+              <SettingsGroup title="Session">
+                <SettingsRow
+                  title="Log out"
+                  description="You'll need to sign in again on this device."
+                >
+                  <Button variant="destructive" size="sm" disabled={logoutLoading} onclick={logout}>
+                    <LogOut class="size-3.5" />
+                    Log out
+                  </Button>
+                </SettingsRow>
+              </SettingsGroup>
+            </div>
+          </Tabs.Content>
+
+          <Tabs.Content value="security" class="space-y-6 outline-none">
+            {@render head(
+              'Privacy & security',
+              'Protect your account and choose what others can see.'
+            )}
+
+            <SettingsGroup title="Privacy">
+              <SettingsRow
+                title="Show online status"
+                description="Let people see when you're online."
+                id="online-status"
+              >
+                <Switch id="online-status" bind:checked={settings.value.showOnlineStatus} />
+              </SettingsRow>
+            </SettingsGroup>
+
             {#if mfaLoading && !mfaLoaded}
               <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
               <span class="text-xs text-muted-foreground">Checking MFA status...</span>
@@ -951,502 +932,525 @@
               </div>
               <Button variant="outline" size="xs" onclick={loadMfaStatus}>Try again</Button>
             {:else}
-              <div class="flex items-center justify-between gap-4 px-4 py-3">
-                <div class="flex min-w-0 items-start gap-3">
-                  <div
-                    class={cn(
-                      'flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground',
-                      mfaOptions.includes('EMAIL')
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-muted text-muted-foreground'
-                    )}
-                  >
-                    <Mail class="size-4" />
-                  </div>
-                  <div class="min-w-0">
-                    <Label for="email-mfa" class="text-sm font-medium">Email codes</Label>
-                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      A one-time code sent to your account email.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  id="email-mfa"
-                  checked={mfaOptions.includes('EMAIL')}
-                  disabled={emailMfaLoading}
-                  aria-label="Enable email MFA"
-                  onCheckedChange={toggleEmailMfa}
-                />
-              </div>
-
-              {#if totpLoading && totpState === 'idle'}
-                <div class="flex min-h-20 items-center justify-center gap-2 px-4 py-4">
-                  <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
-                  <span class="text-xs text-muted-foreground">Preparing authenticator setup...</span
-                  >
-                </div>
-              {:else if totpState === 'enabled'}
+              <SettingsGroup
+                title="Two-step verification"
+                description="Ask for a second code when you sign in."
+              >
                 <div class="flex items-center justify-between gap-4 px-4 py-3">
                   <div class="flex min-w-0 items-start gap-3">
                     <div
                       class={cn(
-                        'flex size-8 shrink-0 items-center justify-center rounded-md',
-                        mfaOptions.includes('TOTP')
+                        'flex size-8 shrink-0 items-center justify-center',
+                        mfaOptions.includes('EMAIL')
                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                           : 'bg-muted text-muted-foreground'
                       )}
                     >
-                      <ShieldCheck class="size-4" />
+                      <Mail class="size-4" />
                     </div>
                     <div class="min-w-0">
-                      <p class="text-sm font-medium">Authenticator app</p>
+                      <Label for="email-mfa" class="text-sm font-medium">Email codes</Label>
                       <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        One-time codes from your authenticator app.
+                        A one-time code sent to your account email.
                       </p>
                     </div>
                   </div>
-                  <div class="flex shrink-0 items-center gap-4">
-                    <Button
-                      variant="outline"
-                      size="icon-xs"
-                      class={confirmTotpDelete
-                        ? 'border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                        : ''}
-                      disabled={totpMfaLoading || totpDeleteLoading}
-                      onclick={requestDeleteTotp}
-                    >
-                      {#if totpDeleteLoading}
-                        <LoaderCircle class="size-3.5 animate-spin" />
-                      {:else if confirmTotpDelete}
-                        <Trash2 class="size-3.5" /> ?
-                      {:else}
-                        <Trash2 class="size-3.5" />
-                      {/if}
-                    </Button>
-                    <Switch
-                      checked={mfaOptions.includes('TOTP')}
-                      disabled={totpMfaLoading || totpDeleteLoading}
-                      aria-label="Enable authenticator MFA"
-                      onCheckedChange={toggleTotpMfa}
-                    />
-                  </div>
+                  <Switch
+                    id="email-mfa"
+                    checked={mfaOptions.includes('EMAIL')}
+                    disabled={emailMfaLoading}
+                    aria-label="Enable email MFA"
+                    onCheckedChange={toggleEmailMfa}
+                  />
                 </div>
-              {:else if totpState === 'setup'}
-                <div class="space-y-4 px-4 py-4">
-                  <div class="flex items-center gap-2">
-                    <Smartphone class="size-4" />
-                    <p class="text-sm font-medium">Set up an authenticator app</p>
+
+                {#if totpLoading && totpState === 'idle'}
+                  <div class="flex min-h-20 items-center justify-center gap-2 px-4 py-4">
+                    <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
+                    <span class="text-xs text-muted-foreground"
+                      >Preparing authenticator setup...</span
+                    >
                   </div>
-
-                  <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
-                    <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
-                      <img
-                        src={totpQr}
-                        alt="Authenticator setup QR code"
-                        class="size-40 not-hover:blur-xs transition not-hover:blur-none"
-                      />
-                    </div>
-
-                    <div class="min-w-0 space-y-2">
-                      <div>
-                        <p class="text-xs font-medium">Can't scan it?</p>
-                        <p class="text-[11px] text-muted-foreground">
-                          Enter this setup key manually. Keep it private.
+                {:else if totpState === 'enabled'}
+                  <div class="flex items-center justify-between gap-4 px-4 py-3">
+                    <div class="flex min-w-0 items-start gap-3">
+                      <div
+                        class={cn(
+                          'flex size-8 shrink-0 items-center justify-center',
+                          mfaOptions.includes('TOTP')
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        <ShieldCheck class="size-4" />
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium">Authenticator app</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                          One-time codes from your authenticator app.
                         </p>
                       </div>
-                      <div class="flex items-stretch border bg-muted/40">
-                        <code
-                          class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs transition blur-none"
-                        >
-                          {totpSecret}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          class="h-auto border-l"
-                          aria-label="Copy setup key"
-                          onclick={copyTotpSecret}
-                        >
-                          {#if secretCopied}
-                            <Check class="size-3.5" />
-                          {:else}
-                            <Copy class="size-3.5" />
-                          {/if}
-                        </Button>
-                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-4">
+                      <Button
+                        variant="outline"
+                        size="icon-xs"
+                        class={confirmTotpDelete
+                          ? 'border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground'
+                          : ''}
+                        disabled={totpMfaLoading || totpDeleteLoading}
+                        onclick={requestDeleteTotp}
+                      >
+                        {#if totpDeleteLoading}
+                          <LoaderCircle class="size-3.5 animate-spin" />
+                        {:else if confirmTotpDelete}
+                          <Trash2 class="size-3.5" /> ?
+                        {:else}
+                          <Trash2 class="size-3.5" />
+                        {/if}
+                      </Button>
+                      <Switch
+                        checked={mfaOptions.includes('TOTP')}
+                        disabled={totpMfaLoading || totpDeleteLoading}
+                        aria-label="Enable authenticator MFA"
+                        onCheckedChange={toggleTotpMfa}
+                      />
                     </div>
                   </div>
+                {:else if totpState === 'setup'}
+                  <div class="space-y-4 px-4 py-4">
+                    <div class="flex items-center gap-2">
+                      <Smartphone class="size-4" />
+                      <p class="text-sm font-medium">Set up an authenticator app</p>
+                    </div>
 
-                  <form class="space-y-2" onsubmit={enableTotp}>
-                    <div class="grid gap-1.5">
-                      <Label for="totp-code">Verification code</Label>
-                      <div class="flex gap-2">
-                        <Input
-                          id="totp-code"
-                          bind:value={totpCode}
-                          inputmode="numeric"
-                          autocomplete="one-time-code"
-                          maxlength={6}
-                          placeholder="000000"
-                          class="h-9 font-mono text-base tracking-[0.3em]"
-                          aria-invalid={Boolean(totpError)}
-                          autofocus
+                    <div class="grid items-center gap-4 sm:grid-cols-[auto_1fr]">
+                      <div class="mx-auto bg-white p-2 shadow-sm sm:mx-0">
+                        <img
+                          src={totpQr}
+                          alt="Authenticator setup QR code"
+                          class="size-40 not-hover:blur-xs transition not-hover:blur-none"
                         />
-                        <Button type="submit" class="h-9" disabled={totpLoading}>
-                          {#if totpLoading}
-                            <LoaderCircle class="size-4 animate-spin" />
-                          {/if}
-                          Enable MFA
-                        </Button>
+                      </div>
+
+                      <div class="min-w-0 space-y-2">
+                        <div>
+                          <p class="text-xs font-medium">Can't scan it?</p>
+                          <p class="text-[11px] text-muted-foreground">
+                            Enter this setup key manually. Keep it private.
+                          </p>
+                        </div>
+                        <div class="flex items-stretch border bg-muted/40">
+                          <code
+                            class="min-w-0 flex-1 break-all px-2.5 py-2 font-mono text-[11px] not-hover:blur-xs transition blur-none"
+                          >
+                            {totpSecret}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            class="h-auto border-l"
+                            aria-label="Copy setup key"
+                            onclick={copyTotpSecret}
+                          >
+                            {#if secretCopied}
+                              <Check class="size-3.5" />
+                            {:else}
+                              <Copy class="size-3.5" />
+                            {/if}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <p class="min-h-4 text-xs text-destructive" aria-live="polite">
-                      {totpError ?? ''}
-                    </p>
-                  </form>
-                </div>
-              {:else}
-                <div class="flex items-center justify-between gap-4 px-4 py-3">
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium">Authenticator app</p>
-                    <p class="mt-0.5 text-xs text-destructive">
-                      {totpError ?? 'Could not prepare authenticator setup.'}
-                    </p>
+
+                    <form class="space-y-2" onsubmit={enableTotp}>
+                      <div class="grid gap-1.5">
+                        <Label for="totp-code">Verification code</Label>
+                        <div class="flex gap-2">
+                          <Input
+                            id="totp-code"
+                            bind:value={totpCode}
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength={6}
+                            placeholder="000000"
+                            class="h-9 font-mono text-base tracking-[0.3em]"
+                            aria-invalid={Boolean(totpError)}
+                            autofocus
+                          />
+                          <Button type="submit" class="h-9" disabled={totpLoading}>
+                            {#if totpLoading}
+                              <LoaderCircle class="size-4 animate-spin" />
+                            {/if}
+                            Enable MFA
+                          </Button>
+                        </div>
+                      </div>
+                      <p class="min-h-4 text-xs text-destructive" aria-live="polite">
+                        {totpError ?? ''}
+                      </p>
+                    </form>
                   </div>
-                  <Button variant="outline" size="xs" onclick={loadTotpSetup}>Try again</Button>
-                </div>
-              {/if}
-
-              {#if mfaError}
-                <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">{mfaError}</p>
-              {/if}
-            {/if}
-          </div>
-        </Tabs.Content>
-
-        <Tabs.Content value="appearance" class="space-y-4">
-          <div class="grid gap-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Dark Mode</p>
-                {#if settings.value.darkMode}
-                  <p class="text-[11px] text-muted-foreground">It's good for your eyes!</p>
                 {:else}
-                  <p class="text-[11px] text-muted-foreground">
-                    Trust me, it's good for your eyes!!! Turn me back on :)
-                  </p>
+                  <div class="flex items-center justify-between gap-4 px-4 py-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium">Authenticator app</p>
+                      <p class="mt-0.5 text-xs text-destructive">
+                        {totpError ?? 'Could not prepare authenticator setup.'}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="xs" onclick={loadTotpSetup}>Try again</Button>
+                  </div>
                 {/if}
-              </div>
-              <Switch bind:checked={settings.value.darkMode} />
-            </div>
-            <div class="items-center justify-between">
-              <p class="text-xs font-medium">QuickCSS</p>
+
+                {#if mfaError}
+                  <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">{mfaError}</p>
+                {/if}
+              </SettingsGroup>
+            {/if}
+          </Tabs.Content>
+
+          <Tabs.Content value="appearance" class="space-y-6 outline-none">
+            {@render head('Appearance', 'Make Novarum look the way you like.')}
+
+            <SettingsGroup title="Theme">
+              <SettingsRow
+                title="Dark mode"
+                description="Use the dark color scheme."
+                id="dark-mode"
+              >
+                <Switch id="dark-mode" bind:checked={settings.value.darkMode} />
+              </SettingsRow>
+              <SettingsRow
+                title="Round icons"
+                description="Show avatars and server icons as circles instead of squares."
+                id="circle-icons"
+              >
+                <Switch id="circle-icons" bind:checked={settings.value.circleIcons} />
+              </SettingsRow>
+            </SettingsGroup>
+
+            <SettingsGroup title="Layout">
+              <SettingsRow
+                title="Show member list"
+                description="Display the member sidebar in channels."
+                id="member-list"
+              >
+                <Switch id="member-list" bind:checked={settings.value.showMemberList} />
+              </SettingsRow>
+              <SettingsRow
+                title="Compact mode"
+                description="Reduce spacing between messages. Coming soon."
+                id="compact-mode"
+              >
+                <Switch id="compact-mode" bind:checked={settings.value.compactMode} disabled />
+              </SettingsRow>
+            </SettingsGroup>
+
+            <SettingsGroup
+              title="Custom CSS"
+              description="Applied instantly and saved on this device."
+            >
               <textarea
                 bind:value={css}
-                class="font-mono text-xs w-full min-h-[250px] rounded-md border bg-input/30 p-2 mt-1 resize-none"
+                aria-label="Custom CSS"
+                spellcheck="false"
+                class="min-h-56 w-full resize-y bg-transparent p-4 font-mono text-xs outline-none"
               ></textarea>
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Compact Mode</p>
-                <p class="text-[11px] text-muted-foreground">Reduce spacing between messages</p>
-              </div>
-              <Switch bind:checked={settings.value.compactMode} disabled />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Show Member List</p>
-                <p class="text-[11px] text-muted-foreground">Display member sidebar in channels</p>
-              </div>
-              <Switch bind:checked={settings.value.showMemberList} />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Circle icons</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Replace default square icons with round ones
-                </p>
-              </div>
-              <Switch bind:checked={settings.value.circleIcons} />
-            </div>
-            {#if launchPrefs}
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-xs font-medium">Launch at startup</p>
-                  <p class="text-[11px] text-muted-foreground">Open Novarum when you log in</p>
-                </div>
+            </SettingsGroup>
+          </Tabs.Content>
+
+          <Tabs.Content value="notifications" class="space-y-6 outline-none">
+            {@render head('Notifications', 'Choose how Novarum gets your attention.')}
+
+            <SettingsGroup title="Alerts">
+              <SettingsRow
+                title="Push notifications"
+                description="Get notified about mentions and replies."
+                id="push"
+              >
                 <Switch
-                  checked={launchPrefs.autoLaunch}
-                  onCheckedChange={(autoLaunch) => setLaunchPref({ autoLaunch })}
+                  id="push"
+                  checked={settings.value.pushNotifications}
+                  onCheckedChange={setPushNotifications}
                 />
-              </div>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-xs font-medium">Start in background</p>
-                  <p class="text-[11px] text-muted-foreground">
-                    Keep the window hidden in the tray when launching at startup
-                  </p>
-                </div>
+              </SettingsRow>
+              <SettingsRow
+                title="Message preview"
+                description="Show the message text in notifications."
+                id="preview"
+              >
                 <Switch
-                  checked={launchPrefs.startHidden}
-                  disabled={!launchPrefs.autoLaunch}
-                  onCheckedChange={(startHidden) => setLaunchPref({ startHidden })}
+                  id="preview"
+                  checked={settings.value.messagePreview}
+                  onCheckedChange={setMessagePreview}
                 />
-              </div>
-            {/if}
-            <!-- tbd
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Rounded borders</p>
-                <p class="text-[11px] text-muted-foreground">
-                  You get it.
-                </p>
-              </div>
-              <Switch bind:checked={settings.value.roundedBorders} />
-            </div>
-          </div> -->
-          </div></Tabs.Content
-        >
+              </SettingsRow>
+              {#if pushError}
+                <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">{pushError}</p>
+              {/if}
+            </SettingsGroup>
 
-        <Tabs.Content value="notifications" class="space-y-4">
-          <div class="grid gap-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Push Notifications</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Receive notifications for mentions and replies
-                </p>
-              </div>
-              <Switch
-                checked={settings.value.pushNotifications}
-                onCheckedChange={setPushNotifications}
-              />
-            </div>
-            {#if pushError}
-              <p class="text-[11px] text-destructive">{pushError}</p>
-            {/if}
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Message Preview</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Show message content in notifications
-                </p>
-              </div>
-              <Switch checked={settings.value.messagePreview} onCheckedChange={setMessagePreview} />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Mention Sound</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Play a sound when someone mentions you
-                </p>
-              </div>
-              <Switch bind:checked={settings.value.mentionSound} />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Online Status</p>
-                <p class="text-[11px] text-muted-foreground">Show when you're online to others</p>
-              </div>
-              <Switch bind:checked={showOnlineStatus} />
-            </div>
-            <div class="grid gap-1.5">
-              <Label for="input-volume">Notification Volume</Label>
-              <Slider
-                type="single"
-                min={0}
-                max={1}
-                step={0.01}
-                value={settings.value.notificationVolume}
-                onValueCommit={(v) => {
-                  settings.value.notificationVolume = v;
-                  notificationSound();
-                }}
-              />
-            </div>
-          </div>
-        </Tabs.Content>
-
-        <Tabs.Content value="voice" class="space-y-4">
-          <div class="grid gap-3">
-            <div class="grid gap-1.5">
-              <Label for="input-device">Input Device</Label>
-              <Select.Root
-                type="single"
-                value={settings.value.voiceInputDeviceId}
-                onValueChange={(value) => setAudioDevice('input', value)}
+            <SettingsGroup title="Sound">
+              <SettingsRow
+                title="Mention sound"
+                description="Play a sound when someone mentions you."
+                id="mention-sound"
               >
-                <Select.Trigger
-                  >{settings.value.voiceInputDeviceId === 'default'
-                    ? 'Default microphone'
-                    : audioDevices.input.find(
-                        (d) => d.deviceId === settings.value.voiceInputDeviceId
-                      )?.label}</Select.Trigger
+                <Switch id="mention-sound" bind:checked={settings.value.mentionSound} />
+              </SettingsRow>
+              <SettingsRow title="Volume" stacked id="notification-volume">
+                <Slider
+                  type="single"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={settings.value.notificationVolume}
+                  onValueCommit={(v) => {
+                    settings.value.notificationVolume = v;
+                    notificationSound();
+                  }}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+          </Tabs.Content>
+
+          <Tabs.Content value="voice" class="space-y-6 outline-none">
+            {@render head('Voice & audio', 'Pick your devices and how your voice is processed.')}
+
+            <SettingsGroup title="Devices">
+              <SettingsRow title="Microphone" stacked id="input-device">
+                <Select.Root
+                  type="single"
+                  value={settings.value.voiceInputDeviceId}
+                  onValueChange={(value) => setAudioDevice('input', value)}
                 >
-                <Select.Content>
-                  <Select.Item value="default">Default microphone</Select.Item>
-                  {#each audioDevices.input as device, index}
-                    <Select.Item value={device.deviceId}>
-                      {device.label || `Microphone ${index + 1}`}
-                    </Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </div>
-            <div class="grid gap-1.5">
-              <Label for="output-device">Output Device</Label>
-              <Select.Root
-                type="single"
-                value={settings.value.voiceOutputDeviceId}
-                onValueChange={(value) => setAudioDevice('output', value)}
-              >
-                <Select.Trigger
-                  >{settings.value.voiceOutputDeviceId === 'default'
-                    ? 'Default output'
-                    : audioDevices.output.find(
-                        (d) => d.deviceId === settings.value.voiceOutputDeviceId
-                      )?.label}</Select.Trigger
+                  <Select.Trigger id="input-device" class="w-full">
+                    {settings.value.voiceInputDeviceId === 'default'
+                      ? 'Default microphone'
+                      : (audioDevices.input.find(
+                          (d) => d.deviceId === settings.value.voiceInputDeviceId
+                        )?.label ?? 'Unknown microphone')}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="default">Default microphone</Select.Item>
+                    {#each audioDevices.input as device, index}
+                      <Select.Item value={device.deviceId}>
+                        {device.label || `Microphone ${index + 1}`}
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </SettingsRow>
+              <SettingsRow title="Speakers" stacked id="output-device">
+                <Select.Root
+                  type="single"
+                  value={settings.value.voiceOutputDeviceId}
+                  onValueChange={(value) => setAudioDevice('output', value)}
                 >
-                <Select.Content>
-                  <Select.Item value="default">Default output</Select.Item>
-                  {#each audioDevices.output as device, index}
-                    <Select.Item value={device.deviceId}>
-                      {device.label || `Output device ${index + 1}`}
-                    </Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </div>
-            {#if audioDeviceError}
-              <p class="text-[11px] text-destructive">{audioDeviceError}</p>
-            {/if}
-            <div class="grid gap-1.5">
-              <Label for="input-volume">Input Volume</Label>
-              <Slider
-                type="single"
-                min={0}
-                max={100}
-                step={1}
-                value={80}
-                onValueChange={(value) => console.log('Input volume changed to:', value)}
-              />
-            </div>
-            <div class="grid gap-1.5">
-              <Label for="output-volume">Output Volume</Label>
-              <Slider
-                type="single"
-                min={0}
-                max={100}
-                step={1}
-                value={100}
-                onValueChange={(value) => console.log('Output volume changed to:', value)}
-              />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Echo Cancellation</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Turn off if it interferes with noise suppression.
+                  <Select.Trigger id="output-device" class="w-full">
+                    {settings.value.voiceOutputDeviceId === 'default'
+                      ? 'Default output'
+                      : (audioDevices.output.find(
+                          (d) => d.deviceId === settings.value.voiceOutputDeviceId
+                        )?.label ?? 'Unknown output')}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="default">Default output</Select.Item>
+                    {#each audioDevices.output as device, index}
+                      <Select.Item value={device.deviceId}>
+                        {device.label || `Output device ${index + 1}`}
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </SettingsRow>
+              {#if audioDeviceError}
+                <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">
+                  {audioDeviceError}
                 </p>
-              </div>
-              <Switch
-                checked={settings.value.voiceEchoCancellation}
-                onCheckedChange={(enabled) => voice.setEchoCancellation(enabled)}
-              />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Automatic Gain Control</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Automatically balances microphone volume.
-                </p>
-              </div>
-              <Switch
-                checked={settings.value.voiceAutoGainControl}
-                onCheckedChange={(enabled) => voice.setAutoGainControl(enabled)}
-              />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Noise Suppression</p>
-                <p class="text-[11px] text-muted-foreground">Reduce background noise</p>
-              </div>
-              <Switch
-                checked={settings.value.noiseCancellation}
-                onCheckedChange={(enabled) => voice.setNoiseCancellation(enabled)}
-              />
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs font-medium">Share System Audio</p>
-                <p class="text-[11px] text-muted-foreground">
-                  Include your computer's audio when you share your screen.
-                </p>
-              </div>
-              <Switch
-                checked={settings.value.screenShareSystemAudio}
-                onCheckedChange={(enabled) => voice.setScreenShareSystemAudio(enabled)}
-              />
-            </div>
-          </div>
-        </Tabs.Content>
+              {/if}
+            </SettingsGroup>
 
-        <Tabs.Content value="langt" class="space-y-4">
-          <div>
-            <!-- localization should be properly implemented at some point -->
-            <p class="text-xs font-medium">Language</p>
-            <p class="text-[11px] text-muted-foreground">
-              Choose your preferred language for Novarum to use.
-            </p>
-            <div class="mt-2">
-              <Select.Root
-                type="single"
-                value={settings.value.language}
-                onValueChange={(value) => (settings.value.language = value)}
+            <SettingsGroup title="Voice processing">
+              <SettingsRow
+                title="Echo cancellation"
+                description="Turn off if it interferes with noise suppression."
+                id="echo"
               >
-                <Select.Trigger>
-                  {languageOptions.find((l) => l.value === settings.value.language)?.label ??
-                    'Select language'}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each languageOptions as lang}
-                    <Select.Item value={lang.value}>{lang.label}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </div>
-          </div>
+                <Switch
+                  id="echo"
+                  checked={settings.value.voiceEchoCancellation}
+                  onCheckedChange={(enabled) => voice.setEchoCancellation(enabled)}
+                />
+              </SettingsRow>
+              <SettingsRow
+                title="Automatic gain control"
+                description="Keep your microphone volume steady."
+                id="agc"
+              >
+                <Switch
+                  id="agc"
+                  checked={settings.value.voiceAutoGainControl}
+                  onCheckedChange={(enabled) => voice.setAutoGainControl(enabled)}
+                />
+              </SettingsRow>
+              <SettingsRow
+                title="Noise suppression"
+                description="Reduce background noise."
+                id="noise"
+              >
+                <Switch
+                  id="noise"
+                  checked={settings.value.noiseCancellation}
+                  onCheckedChange={(enabled) => voice.setNoiseCancellation(enabled)}
+                />
+              </SettingsRow>
+            </SettingsGroup>
 
-          <div class="grid gap-3">
-            <div>
-              <p class="text-xs font-medium">Time Format</p>
-              <p class="text-[11px] text-muted-foreground">Select your time format!</p>
-            </div>
-            <RadioGroup.Root
-              value={settings.value.timeFormat}
-              onValueChange={(value) => (settings.value.timeFormat = value as TimeFormat)}
-              class="grid gap-3"
-            >
-              <div class="flex items-center gap-2">
-                <!-- doesnt do anything -->
-                <RadioGroup.Item value="auto" id="autohr" />
-                <Label for="autohr">Auto</Label>
-              </div>
-              <div class="flex items-center gap-2">
-                <RadioGroup.Item value="12hr" id="12hr" />
-                <Label for="12hr">12-hour</Label>
-              </div>
-              <div class="flex items-center gap-2">
-                <RadioGroup.Item value="24hr" id="24hr" />
-                <Label for="24hr">24-hour</Label>
-              </div>
-            </RadioGroup.Root>
-          </div>
-        </Tabs.Content>
+            <SettingsGroup title="Screen sharing">
+              <SettingsRow
+                title="Share system audio"
+                description="Include your computer's sound when you share your screen."
+                id="system-audio"
+              >
+                <Switch
+                  id="system-audio"
+                  checked={settings.value.screenShareSystemAudio}
+                  onCheckedChange={(enabled) => voice.setScreenShareSystemAudio(enabled)}
+                />
+              </SettingsRow>
+            </SettingsGroup>
+          </Tabs.Content>
+
+          <Tabs.Content value="langt" class="space-y-6 outline-none">
+            {@render head('Language & time', 'Set your language and how times are shown.')}
+
+            <SettingsGroup title="Language">
+              <!-- localization should be properly implemented at some point -->
+              <SettingsRow title="Display language" stacked id="language">
+                <Select.Root
+                  type="single"
+                  value={settings.value.language}
+                  onValueChange={(value) => (settings.value.language = value)}
+                >
+                  <Select.Trigger id="language" class="w-full">
+                    {languageOptions.find((l) => l.value === settings.value.language)?.label ??
+                      'Select language'}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each languageOptions as lang}
+                      <Select.Item value={lang.value}>{lang.label}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </SettingsRow>
+            </SettingsGroup>
+
+            <SettingsGroup title="Time format">
+              <RadioGroup.Root
+                value={settings.value.timeFormat}
+                onValueChange={(value) => (settings.value.timeFormat = value as TimeFormat)}
+                class="gap-0 divide-y"
+              >
+                {#each timeFormats as format (format.value)}
+                  <Label
+                    for={`time-${format.value}`}
+                    class="flex cursor-pointer items-center justify-between gap-4 px-4 py-3"
+                  >
+                    <span>
+                      <span class="block text-sm font-medium">{format.label}</span>
+                      <span class="mt-0.5 block text-xs font-normal text-muted-foreground"
+                        >{format.example}</span
+                      >
+                    </span>
+                    <RadioGroup.Item value={format.value} id={`time-${format.value}`} />
+                  </Label>
+                {/each}
+              </RadioGroup.Root>
+            </SettingsGroup>
+          </Tabs.Content>
+
+          {#if launchPrefs}
+            <Tabs.Content value="desktop" class="space-y-6 outline-none">
+              {@render head('Desktop app', 'How Novarum behaves on this computer.')}
+
+              <SettingsGroup title="Startup">
+                <SettingsRow
+                  title="Launch at startup"
+                  description="Open Novarum when you log in to your computer."
+                  id="auto-launch"
+                >
+                  <Switch
+                    id="auto-launch"
+                    checked={launchPrefs.autoLaunch}
+                    onCheckedChange={(autoLaunch) => setLaunchPref({ autoLaunch })}
+                  />
+                </SettingsRow>
+                <SettingsRow
+                  title="Start in the background"
+                  description="Keep the window hidden in the tray when Novarum launches at startup."
+                  id="start-hidden"
+                >
+                  <Switch
+                    id="start-hidden"
+                    checked={launchPrefs.startHidden}
+                    disabled={!launchPrefs.autoLaunch}
+                    onCheckedChange={(startHidden) => setLaunchPref({ startHidden })}
+                  />
+                </SettingsRow>
+              </SettingsGroup>
+
+              <SettingsGroup title="Updates">
+                <SettingsRow
+                  title="Update automatically"
+                  description="Download new versions in the background and install them when you quit Novarum."
+                  id="auto-update"
+                >
+                  <Switch
+                    id="auto-update"
+                    checked={launchPrefs.autoUpdate}
+                    onCheckedChange={(autoUpdate) => setLaunchPref({ autoUpdate })}
+                  />
+                </SettingsRow>
+                <SettingsRow
+                  title={`Novarum Desktop v${desktopVersion}`}
+                  description={updateMessage}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={updateState === 'checking'}
+                    onclick={checkForUpdates}
+                  >
+                    <RefreshCw
+                      class={cn('size-3.5', updateState === 'checking' && 'animate-spin')}
+                    />
+                    Check for updates
+                  </Button>
+                </SettingsRow>
+              </SettingsGroup>
+            </Tabs.Content>
+          {/if}
+        </div>
       </div>
     </Tabs.Root>
   </Dialog.Content>
 </Dialog.Root>
+
+{#snippet colorActions(cancel: () => void)}
+  <div class="flex items-center justify-between gap-3 border-t px-3 py-2.5">
+    <p class="text-xs text-destructive">{avatarColorError ?? ''}</p>
+    <div class="flex gap-2">
+      <Button variant="ghost" size="sm" disabled={avatarColorLoading} onclick={cancel}
+        >Cancel</Button
+      >
+      <Button size="sm" disabled={avatarColorLoading} onclick={saveAvatarColor}>
+        {avatarColorLoading ? 'Saving…' : 'Save colors'}
+      </Button>
+    </div>
+  </div>
+{/snippet}
 
 <AvatarCropDialog
   bind:open={cropOpen}
