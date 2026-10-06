@@ -6,6 +6,7 @@ import { getKeys, signMessage } from './keys';
 import { getConfig } from './config';
 import { db, guilds } from '../src/db';
 import { like } from 'drizzle-orm';
+import { z } from 'zod';
 
 const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 const discoveryCacheTtlMs = 5 * 60 * 1000;
@@ -25,6 +26,8 @@ type DiscoveredAnchor = {
   baseUrl: string;
   version: string;
   publicKey: AnchorInfo['publicKey'];
+  // optional protocol features the remote supports, see federationFeatures.ts
+  features: string[];
 };
 
 const discoveryCache = new Map<
@@ -140,6 +143,8 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       baseUrl: baseUrl.toString().replace(/\/+$/, ''),
       version: data.version,
       publicKey: data.publicKey,
+      // older homeservers don't send any
+      features: z.array(z.string()).catch([]).parse(data.features),
     };
   } catch (error) {
     // network errors and timeouts mean the remote is down too, not just non-2xx responses
@@ -309,4 +314,5 @@ interface AnchorInfo {
     algorithm: string;
     key: string;
   };
+  features?: unknown;
 }

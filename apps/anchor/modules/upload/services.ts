@@ -6,9 +6,8 @@ import {
   presignedUploadSchema,
   safeAttachmentFilename,
 } from '../../utils/attachments';
-import { postSignedFederationJson } from '../../utils/discovery';
 import { parseFederatedChannelId } from '../../utils/federationIds';
-import { federationUserPayload } from '../../utils/federationPayload';
+import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { randomString } from '../../utils/randomString';
 import {
   storage,
@@ -27,7 +26,6 @@ import { Demuxer, Decoder, Scaler } from 'node-av/api';
 import { getConfig } from '../../utils/config';
 import { AV_AFD_4_3 } from 'node-av';
 
-const remoteErrorSchema = z.object({ error: z.string() });
 const attachmentQuery = t.Object({ exp: t.Numeric(), sig: t.String() });
 
 async function requireUploadAccess(channelId: string, contentType: string, token: unknown) {
@@ -176,32 +174,21 @@ export const upload = new Elysia({ tags: ['Upload'] })
       const session = access.session;
       const federatedChannel = parseFederatedChannelId(body.channelId);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const remoteUpload = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/attachments/presign`,
+          federationChannelPath(federatedChannel, 'attachments/presign'),
+          session,
+          { filename: body.filename, contentType: body.contentType, size: body.size },
           {
-            user: federationUserPayload(session),
-            filename: body.filename,
-            contentType: body.contentType,
-            size: body.size,
+            response: presignedUploadSchema,
+            forward: passThrough(400, 401, 403, 404, 415),
+            errors: {
+              failed: 'Remote upload failed',
+              invalid: 'Remote homeserver returned an invalid upload',
+            },
           }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [400, 401, 403, 404, 415].includes(result.response.status)
-            ? (result.response.status as 400 | 401 | 403 | 404 | 415)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote upload failed' }
-          );
-        }
-        const remoteUpload = presignedUploadSchema.safeParse(result.data);
-        if (!remoteUpload.success) {
-          return status(502, { error: 'Remote homeserver returned an invalid upload' });
-        }
+        );
+        if (!remoteUpload.ok) return status(remoteUpload.status, remoteUpload.error);
         return remoteUpload.data;
       }
 

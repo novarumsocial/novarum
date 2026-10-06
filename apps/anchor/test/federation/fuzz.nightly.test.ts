@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { anchorRoot } from '../harness/env';
@@ -9,7 +9,10 @@ setDefaultTimeout(120_000); // hooks restart anchors and wait on canaries; a mul
 
 // TESTING_PLAN 7 "federation fuzz": valid signatures, hostile payloads, every federation route. Expect 4xx (never 5xx)
 // and no writes to anchor-a's database (row counts of every table except federation_nonce/session are unchanged).
-const source = readFileSync(path.join(anchorRoot, 'modules/federation/services.ts'), 'utf8');
+const routesDir = path.join(anchorRoot, 'modules/federation/routes');
+const source = readdirSync(routesDir)
+  .map((file) => readFileSync(path.join(routesDir, file), 'utf8'))
+  .join('\n');
 const routes = [...source.matchAll(/\.(get|post)\(\s*'([^']+)'/g)].map((m) => ({ method: m[1]!.toUpperCase(), route: m[2]! }));
 const concrete = (route: string, param = 'x') => `/federation${route.replace(/:[a-zA-Z]+/g, param)}`;
 

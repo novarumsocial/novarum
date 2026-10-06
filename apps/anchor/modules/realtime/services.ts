@@ -1,7 +1,9 @@
 import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
-import { postSignedFederationJson } from '../../utils/discovery';
+import { discoverRemoteAnchor, postSignedFederationJson } from '../../utils/discovery';
+import { remoteSupports } from '../../utils/federationFeatures';
+import { federationChannelPath } from '../../utils/federationClient';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { searchEmojis } from '../../utils/emojiSearch';
 import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
@@ -11,7 +13,7 @@ import {
   voicePresenceForChannels,
   voicePresenceForGuilds,
 } from '../../utils/services/livekit';
-import { channelTopics } from '../../utils/publishRealtime';
+import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { bridgedVoicePresenceFor } from '../../utils/federationRealtime';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
 import { canAccessChannel } from '../../utils/channelAccess';
@@ -192,7 +194,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (federatedChannel) {
         const result = await postSignedFederationJson(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+          federationChannelPath(federatedChannel, 'voice-state'),
           { user: federationUserPayload(session), connected: true }
         ).catch(() => null);
         if (!result?.response.ok || !voiceStateResponseSchema.safeParse(result.data).success)
@@ -237,7 +239,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (federatedChannel) {
         void postSignedFederationJson(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/ring`,
+          federationChannelPath(federatedChannel, 'ring'),
           { user: federationUserPayload(session), ringing: message.ringing }
         ).catch(() => null);
         return;
@@ -247,11 +249,10 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (!channel || channel.type !== 'DM') return;
       if (!(await canAccessChannel(channel, session.userId, true))) return;
 
-      const event = JSON.stringify({
+      await publishToChannel(ws, channel, {
         type: 'call.ringing',
         data: { channelId: channel.id, user: publicUser(session.user), ringing: message.ringing },
       });
-      for (const topic of await channelTopics(channel)) ws.publish(topic, event);
       return;
     }
 
@@ -338,15 +339,10 @@ async function publishVoiceState(
   state: VoicePresence,
   connected: boolean
 ) {
-  const event = JSON.stringify({
-    type: 'voice.state.changed',
-    data: { ...state, connected },
-  });
+  const event = { type: 'voice.state.changed', data: { ...state, connected } } as const;
 
-  for (const topic of await channelTopics({ id: state.channelId, guildId: state.guildId })) {
-    ws.publish(topic, event);
-  }
-  ws.send(event);
+  await publishToChannel(ws, { id: state.channelId, guildId: state.guildId }, event);
+  ws.send(JSON.stringify(event));
 }
 
 function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string) {
@@ -359,7 +355,7 @@ function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string)
 
   void postSignedFederationJson(
     federatedChannel.homeserver,
-    `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+    federationChannelPath(federatedChannel, 'voice-state'),
     { user: federationUserPayload(session), connected: false }
   ).catch(() => null);
 }
@@ -377,47 +373,65 @@ async function publishUserStatus(
     },
     with: { userOne: true, userTwo: true },
   });
-  const statusEvent = JSON.stringify({
+  const statusEvent = {
     type: 'user.status.changed',
     data: { userId: session.userId, status },
-  });
+  } as const;
+
+  // what each remote homeserver has to hear: that they have friends of ours, and which of its guilds we are in
+  const remotes = new Map<string, { hasFriends: boolean; guildIds: string[] }>();
+  const remote = (homeserver: string) => {
+    const key = homeserver.toLowerCase();
+    if (!remotes.has(key)) remotes.set(key, { hasFriends: false, guildIds: [] });
+    return remotes.get(key)!;
+  };
+
   const localHomeserver = getConfig().server.homeserver.toLowerCase();
-  const remoteHomeservers = new Set<string>();
   for (const { userOne, userTwo } of friendships) {
     const friend = userOne.id === session.userId ? userTwo : userOne;
-    const homeserver = friend.homeserver.toLowerCase();
-    if (homeserver === localHomeserver) ws.publish(`userEvents:${friend.id}`, statusEvent);
-    else remoteHomeservers.add(homeserver);
-  }
-  for (const homeserver of remoteHomeservers) {
-    void postSignedFederationJson(homeserver, '/federation/friends/status', {
-      user: federationUserPayload(session),
-      status,
-    }).catch(() => null);
+    if (friend.homeserver.toLowerCase() === localHomeserver) {
+      publishRealtime(ws, `userEvents:${friend.id}`, statusEvent);
+    } else {
+      remote(friend.homeserver).hasFriends = true;
+    }
   }
 
   for (const membership of memberships) {
-    ws.publish(
-      `guildEvents:${membership.guildId}`,
-      JSON.stringify({
-        type: 'user.status.changed',
-        data: {
-          userId: session.userId,
-          status,
-        },
-      })
-    );
+    publishRealtime(ws, `guildEvents:${membership.guildId}`, statusEvent);
 
     const federatedGuild = parseFederatedGuildId(membership.guildId);
-    if (!federatedGuild) continue;
-
-    void postSignedFederationJson(
-      federatedGuild.homeserver,
-      `/federation/guilds/${encodeURIComponent(federatedGuild.id)}/users/status`,
-      {
-        user: federationUserPayload(session),
-        status,
-      }
-    ).catch(() => null);
+    if (federatedGuild) remote(federatedGuild.homeserver).guildIds.push(federatedGuild.id);
   }
+
+  for (const [homeserver, targets] of remotes) {
+    void tellRemoteStatus(session, homeserver, status, targets);
+  }
+}
+
+// Tells a homeserver the user went online or offline. A homeserver that supports it gets one
+// request for everything; an older one gets one for the friends and one for each guild.
+async function tellRemoteStatus(
+  session: SessionWithUser,
+  homeserver: string,
+  status: 'ONLINE' | 'OFFLINE',
+  { hasFriends, guildIds }: { hasFriends: boolean; guildIds: string[] }
+) {
+  const remote = await discoverRemoteAnchor(homeserver).catch(() => null);
+  if (!remote) return;
+
+  const user = federationUserPayload(session);
+  const post = (path: string, body: object) =>
+    postSignedFederationJson(homeserver, path, { user, ...body }).catch(() => null);
+
+  if (remoteSupports(remote, 'status-batch')) {
+    await post('/federation/users/status', { status, guildIds });
+    return;
+  }
+
+  await Promise.all([
+    hasFriends ? post('/federation/friends/status', { status }) : null,
+    ...guildIds.map((id) =>
+      post(`/federation/guilds/${encodeURIComponent(id)}/users/status`, { status })
+    ),
+  ]);
 }

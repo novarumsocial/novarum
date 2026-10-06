@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { anchorRoot } from '../harness/env';
@@ -8,8 +8,11 @@ import { fakeUser, ready, restartAnchor, sendSigned, signed } from '../harness/f
 setDefaultTimeout(120_000); // hooks restart anchors and wait on canaries; a multi-file run resets bun's timeout
 
 // TESTING_PLAN 5.2 impersonation matrix: `fake` signs a valid request whose user payload names another homeserver (anchor-b).
-// The route list is read from the route table in modules/federation/services.ts, so a new POST route is covered automatically.
-const source = readFileSync(path.join(anchorRoot, 'modules/federation/services.ts'), 'utf8');
+// The route list is read from the route files in modules/federation/routes, so a new POST route is covered automatically.
+const routesDir = path.join(anchorRoot, 'modules/federation/routes');
+const source = readdirSync(routesDir)
+  .map((file) => readFileSync(path.join(routesDir, file), 'utf8'))
+  .join('\n');
 const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)].map((m) => m[1]!);
 
 type Family = 'user' | 'friends' | 'participants';
