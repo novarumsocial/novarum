@@ -2,6 +2,7 @@ import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { postSignedFederationJson } from '../../utils/discovery';
+import { federationChannelPath } from '../../utils/federationClient';
 import { federationUserPayload } from '../../utils/federationPayload';
 import { searchEmojis } from '../../utils/emojiSearch';
 import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
@@ -192,7 +193,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (federatedChannel) {
         const result = await postSignedFederationJson(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+          federationChannelPath(federatedChannel, 'voice-state'),
           { user: federationUserPayload(session), connected: true }
         ).catch(() => null);
         if (!result?.response.ok || !voiceStateResponseSchema.safeParse(result.data).success)
@@ -237,7 +238,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (federatedChannel) {
         void postSignedFederationJson(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/ring`,
+          federationChannelPath(federatedChannel, 'ring'),
           { user: federationUserPayload(session), ringing: message.ringing }
         ).catch(() => null);
         return;
@@ -359,7 +360,7 @@ function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string)
 
   void postSignedFederationJson(
     federatedChannel.homeserver,
-    `/federation/channels/${encodeURIComponent(federatedChannel.id)}/voice-state`,
+    federationChannelPath(federatedChannel, 'voice-state'),
     { user: federationUserPayload(session), connected: false }
   ).catch(() => null);
 }

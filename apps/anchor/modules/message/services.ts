@@ -1,29 +1,20 @@
 import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
-import { randomString } from '../../utils/randomString';
 import { publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
-import { postSignedFederationJson } from '../../utils/discovery';
-import { federationUserPayload } from '../../utils/federationPayload';
+import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles } from '../../utils/mentions';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { dmRecipients, notifyInBackground } from '../../utils/notify';
-import {
-  db,
-  messages,
-  attachments as dbAttachment,
-  messagePings,
-  channelMembers,
-} from '../../src/db';
-import { and, eq } from 'drizzle-orm';
+import { db } from '../../src/db';
+import { createMessage, deleteMessage, editMessage, pingedUserIds } from './store';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
-const remoteErrorSchema = z.object({ error: z.string() });
 const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
   pingedHandles: z.array(z.string()).optional(),
@@ -68,31 +59,13 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         const seenCursors = new Set<string>();
         let cursor: string | null = null;
 
+        // the remote sends the channel one page at a time
         do {
-          const result = await postSignedFederationJson(
-            federatedChannel.homeserver,
-            `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages`,
-            {
-              user: federationUserPayload(session),
-              limit: 100,
-              ...(cursor ? { cursor } : {}),
-            }
-          ).catch(() => null);
+          const page = await fetchRemoteMessagePage(federatedChannel, session, cursor);
+          if (!page.ok) return status(page.status, page.error);
 
-          if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-          if (!result.response.ok) {
-            const remoteError = remoteErrorSchema.safeParse(result.data);
-            const remoteStatus = [401, 403, 404].includes(result.response.status)
-              ? (result.response.status as 401 | 403 | 404)
-              : 502;
-            return status(
-              remoteStatus,
-              remoteError.success ? remoteError.data : { error: 'Remote messages failed' }
-            );
-          }
-
-          const page = federatedMessageListResponseSchema.safeParse(result.data);
-          if (!page.success || (page.data.nextCursor && seenCursors.has(page.data.nextCursor))) {
+          // a cursor we have seen before would make us loop forever
+          if (page.data.nextCursor && seenCursors.has(page.data.nextCursor)) {
             return status(502, { error: 'Remote messages returned an invalid response' });
           }
 
@@ -180,40 +153,23 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const sent = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages/send`,
+          federationChannelPath(federatedChannel, 'messages/send'),
+          session,
+          { content, nonce, replyTo, attachmentIds },
           {
-            user: federationUserPayload(session),
-            content,
-            nonce,
-            replyTo,
-            attachmentIds,
+            response: messageResponseSchema,
+            forward: passThrough(400, 401, 403, 404, 409),
+            errors: {
+              failed: 'Remote send failed',
+              invalid: 'Remote send returned an invalid response',
+            },
           }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [400, 401, 403, 404, 409].includes(result.response.status)
-            ? (result.response.status as 400 | 401 | 403 | 404 | 409)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote send failed' }
-          );
-        }
-
-        const remoteMessage = messageResponseSchema.safeParse(result.data);
-        if (!remoteMessage.success) {
-          return status(502, { error: 'Remote send returned an invalid response' });
-        }
-
-        const mappedMessage = mapFederatedMessage(
-          remoteMessage.data.message,
-          channel.id,
-          channel.guildId
         );
+        if (!sent.ok) return status(sent.status, sent.error);
+
+        const mappedMessage = mapFederatedMessage(sent.data.message, channel.id, channel.guildId);
         if (server) {
           await publishToChannel(server, channel, {
             type: 'message.created',
@@ -281,47 +237,14 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       const attachments = await verifyPendingAttachments(attachmentIds, session.userId, channelId);
       if (!attachments.ok) return status(400, { error: attachments.error });
 
-      const message = await db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(messages)
-          .values({
-            id: randomString(),
-            channelId,
-            authorId: session.userId,
-            content,
-            replyTo: replyTo ?? null,
-            nonce,
-          })
-          .returning();
-        if (!created) throw new Error('message creation shit the bed');
-
-        for (const attachment of attachments.value) {
-          const updated = await tx
-            .update(dbAttachment)
-            .set({
-              messageId: created.id,
-              status: 'ATTACHED',
-            })
-            .where(and(eq(dbAttachment.id, attachment.id), eq(dbAttachment.status, 'PENDING')));
-          if (!updated) throw new Error('Attachment was already claimed');
-        }
-
-        for (const recipient of pingRecipients) {
-          await tx.insert(messagePings).values({
-            messageId: created.id,
-            userId: recipient.userId,
-          });
-        }
-
-        // a new message reopens the DM for everyone who had closed it.
-        if (!channel.guildId) {
-          await tx
-            .update(channelMembers)
-            .set({ closed: false })
-            .where(eq(channelMembers.channelId, channel.id));
-        }
-
-        return created;
+      const message = await createMessage({
+        channel,
+        authorId: session.userId,
+        content,
+        replyTo: replyTo ?? null,
+        nonce,
+        pingRecipients,
+        attachments: attachments.value,
       });
       const responseAttachments = attachments.value.map(attachmentPayload);
       const responseMessage = {
@@ -388,34 +311,23 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const edited = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages/edit`,
-          { user: federationUserPayload(session), messageId, content }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [400, 401, 403, 404].includes(result.response.status)
-            ? (result.response.status as 400 | 401 | 403 | 404)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote edit failed' }
-          );
-        }
-
-        const remoteMessage = messageResponseSchema.safeParse(result.data);
-        if (!remoteMessage.success) {
-          return status(502, { error: 'Remote edit returned an invalid response' });
-        }
-
-        const mappedMessage = mapFederatedMessage(
-          remoteMessage.data.message,
-          channel.id,
-          channel.guildId
+          federationChannelPath(federatedChannel, 'messages/edit'),
+          session,
+          { messageId, content },
+          {
+            response: messageResponseSchema,
+            forward: passThrough(400, 401, 403, 404),
+            errors: {
+              failed: 'Remote edit failed',
+              invalid: 'Remote edit returned an invalid response',
+            },
+          }
         );
+        if (!edited.ok) return status(edited.status, edited.error);
+
+        const mappedMessage = mapFederatedMessage(edited.data.message, channel.id, channel.guildId);
         if (server) {
           await publishToChannel(server, channel, {
             type: 'message.updated',
@@ -446,28 +358,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         session.userId
       );
 
-      // anyone already pinged by the original message was already notified
-      const alreadyPinged = new Set(
-        (await db.query.messagePings.findMany({ where: { messageId: existing.id } })).map(
-          (ping) => ping.userId
-        )
-      );
-      const updated = await db.transaction(async (tx) => {
-        await tx.delete(messagePings).where(eq(messagePings.messageId, existing.id));
-        for (const recipient of pingRecipients) {
-          await tx.insert(messagePings).values({
-            messageId: existing.id,
-            userId: recipient.userId,
-          });
-        }
-        const [updated] = await tx
-          .update(messages)
-          .set({ content })
-          .where(eq(messages.id, existing.id))
-          .returning();
-        if (!updated) throw new Error('message edit shit the bed');
-        return updated;
-      });
+      const alreadyPinged = await pingedUserIds(existing.id);
+      const updated = await editMessage(existing.id, content, pingRecipients);
 
       const responseMessage = {
         id: updated.id,
@@ -493,6 +385,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           data: responseMessage,
         });
       }
+      // anyone already pinged by the original message was already notified
       notifyInBackground(
         { ...updated, author: session.user },
         channel,
@@ -531,23 +424,19 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const federatedChannel = parseFederatedChannelId(channelId);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const deleted = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/messages/delete`,
-          { user: federationUserPayload(session), messageId }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [401, 403, 404].includes(result.response.status)
-            ? (result.response.status as 401 | 403 | 404)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote delete failed' }
-          );
-        }
+          federationChannelPath(federatedChannel, 'messages/delete'),
+          session,
+          { messageId },
+          {
+            // nothing to read from a successful answer
+            response: z.unknown(),
+            forward: passThrough(401, 403, 404),
+            errors: { failed: 'Remote delete failed', invalid: 'Remote delete failed' },
+          }
+        );
+        if (!deleted.ok) return status(deleted.status, deleted.error);
 
         return { success: true };
       }
@@ -559,15 +448,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       if (!existing) return status(404, { error: 'Message not found' });
       if (existing.authorId !== session.userId) return status(403, { error: 'Forbidden' });
 
-      await db.delete(messages).where(eq(messages.id, messageId));
-      await Promise.all(
-        existing.attachments.map((attachment) =>
-          storage
-            .file(String(attachment.objectKey))
-            .delete()
-            .catch(() => {})
-        )
-      );
+      await deleteMessage(existing);
 
       if (server) {
         await publishToChannel(server, channel, {
@@ -592,6 +473,27 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       },
     }
   );
+
+function fetchRemoteMessagePage(
+  channel: { homeserver: string; id: string },
+  session: Parameters<typeof callRemote>[2],
+  cursor: string | null
+) {
+  return callRemote(
+    channel.homeserver,
+    federationChannelPath(channel, 'messages'),
+    session,
+    { limit: 100, ...(cursor ? { cursor } : {}) },
+    {
+      response: federatedMessageListResponseSchema,
+      forward: passThrough(401, 403, 404),
+      errors: {
+        failed: 'Remote messages failed',
+        invalid: 'Remote messages returned an invalid response',
+      },
+    }
+  );
+}
 
 function mapFederatedMessage(
   message: z.infer<typeof messageSchema>,

@@ -8,7 +8,7 @@ import { realtime } from '../modules/realtime/services';
 import { channel } from '../modules/channel/services';
 import { message } from '../modules/message/services';
 import { invite } from '../modules/invite/services';
-import { federation } from '../modules/federation/services';
+import { federation } from '../modules/federation';
 import { upload } from '../modules/upload/services';
 import { user } from '../modules/user/services';
 import { dm } from '../modules/dm/services';

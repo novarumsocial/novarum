@@ -4,8 +4,7 @@ import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { canAccessChannel } from '../../utils/channelAccess';
-import { postSignedFederationJson } from '../../utils/discovery';
-import { federationUserPayload } from '../../utils/federationPayload';
+import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { getConfig } from '../../utils/config';
 import { AccessToken } from 'livekit-server-sdk';
 import {
@@ -28,7 +27,6 @@ import {
   channelUsersResponseSchema,
 } from '../../src/db/zod';
 
-const remoteErrorSchema = z.object({ error: z.string() });
 const successResponseSchema = z.object({ success: z.boolean() });
 const okResponseSchema = z.object({ ok: z.boolean() });
 const callTokenResponseSchema = z.object({
@@ -308,30 +306,22 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
 
       const federatedChannel = parseFederatedChannelId(params.id);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const remoteUsers = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/users`,
-          { user: federationUserPayload(session) }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const error = remoteError.success ? remoteError.data : { error: 'Remote users failed' };
-
-          if (result.response.status === 404) return status(404, error);
-          if (result.response.status === 401 || result.response.status === 403) {
-            return status(401, error);
+          federationChannelPath(federatedChannel, 'users'),
+          session,
+          {},
+          {
+            response: channelUsersResponseSchema,
+            // to our client the remote refusing it means it isn't logged in, not that it is forbidden
+            forward: { ...passThrough(401, 404), 403: 401 },
+            errors: {
+              failed: 'Remote users failed',
+              invalid: 'Remote users returned an invalid response',
+            },
           }
-
-          return status(502, error);
-        }
-        const remoteUsers = channelUsersResponseSchema.safeParse(result.data);
-        if (!remoteUsers.success) {
-          return status(502, {
-            error: 'Remote users returned an invalid response',
-          });
-        }
+        );
+        if (!remoteUsers.ok) return status(remoteUsers.status, remoteUsers.error);
 
         return remoteUsers.data;
       }
@@ -371,29 +361,21 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       const voiceConfig = getConfig().voice;
       const federatedChannel = parseFederatedChannelId(params.id);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const callToken = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/call/token`,
-          { user: federationUserPayload(session) }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [401, 403, 404].includes(result.response.status)
-            ? (result.response.status as 401 | 403 | 404)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote call token failed' }
-          );
-        }
-        const callToken = callTokenResponseSchema.safeParse(result.data);
-        if (!callToken.success) {
-          return status(502, {
-            error: 'Remote call token returned an invalid response',
-          });
-        }
+          federationChannelPath(federatedChannel, 'call/token'),
+          session,
+          {},
+          {
+            response: callTokenResponseSchema,
+            forward: passThrough(401, 403, 404),
+            errors: {
+              failed: 'Remote call token failed',
+              invalid: 'Remote call token returned an invalid response',
+            },
+          }
+        );
+        if (!callToken.ok) return status(callToken.status, callToken.error);
 
         return callToken.data;
       }
@@ -464,23 +446,19 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
 
       const federatedChannel = parseFederatedChannelId(params.id);
       if (federatedChannel) {
-        const result = await postSignedFederationJson(
+        const typing = await callRemote(
           federatedChannel.homeserver,
-          `/federation/channels/${encodeURIComponent(federatedChannel.id)}/typing`,
-          { user: federationUserPayload(session) }
-        ).catch(() => null);
-
-        if (!result) return status(502, { error: 'Could not reach remote homeserver' });
-        if (!result.response.ok) {
-          const remoteError = remoteErrorSchema.safeParse(result.data);
-          const remoteStatus = [401, 403, 404].includes(result.response.status)
-            ? (result.response.status as 401 | 403 | 404)
-            : 502;
-          return status(
-            remoteStatus,
-            remoteError.success ? remoteError.data : { error: 'Remote typing failed' }
-          );
-        }
+          federationChannelPath(federatedChannel, 'typing'),
+          session,
+          {},
+          {
+            // nothing to read from a successful answer
+            response: z.unknown(),
+            forward: passThrough(401, 403, 404),
+            errors: { failed: 'Remote typing failed', invalid: 'Remote typing failed' },
+          }
+        );
+        if (!typing.ok) return status(typing.status, typing.error);
       }
 
       if (server) {
