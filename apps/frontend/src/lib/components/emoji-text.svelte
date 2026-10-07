@@ -39,7 +39,7 @@
 
   function mentionClass(text: string) {
     const self = text === `@${session.user!.username}:${session.user!.homeserver}`;
-    return `${self ? 'bg-primary/30' : 'bg-primary/15'} rounded-[3px] px-0.5 font-medium text-primary transition-colors hover:bg-primary/35`;
+    return `${self ? 'bg-link/25' : 'bg-link/12'} rounded-[3px] px-0.5 font-medium text-link transition-colors hover:bg-link/30`;
   }
 
   function mentionUser(mention: string): Author {
@@ -73,7 +73,7 @@
       href={part.text}
       target="_blank"
       rel="noreferrer"
-      class="text-primary underline underline-offset-2 transition-colors hover:text-primary/80"
+      class="text-link underline underline-offset-2 transition-colors hover:text-link/80"
       >{part.text}</a
     >
   {:else if part.mention}
