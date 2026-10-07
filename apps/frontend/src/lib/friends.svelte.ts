@@ -1,4 +1,5 @@
 import { anchor } from '$lib/anchor.svelte';
+import { dms } from '$lib/dms.svelte';
 import type { PublicUser } from 'anchor/public-user';
 import { z } from 'zod';
 
@@ -86,12 +87,15 @@ class FriendsState {
     );
   }
 
-  accept(userId: string) {
-    return this.mutate(
+  async accept(userId: string) {
+    const accepted = await this.mutate(
       userId,
       () => anchor.client.friends.requests({ userId }).accept.post(),
       'Could not accept the friend request.'
     );
+    // jump straight into a conversation with the new friend
+    if (accepted) await dms.open(userId);
+    return accepted;
   }
 
   decline(userId: string) {
