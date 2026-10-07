@@ -143,6 +143,7 @@ export class Voice {
       webAudioMix: true,
       audioCaptureDefaults: microphoneCaptureOptions(),
       audioOutput: { deviceId: settings.value.voiceOutputDeviceId },
+      videoCaptureDefaults: { deviceId: settings.value.videoInputDeviceId },
     });
     this.room = room;
     this.bindRoomEvents(room, channelId);
@@ -623,6 +624,21 @@ export class Voice {
     } catch (error) {
       settings.value.voiceOutputDeviceId = previous;
       console.error('could not change audio output', error);
+      throw error;
+    }
+  }
+
+  async setCameraDevice(deviceId: string) {
+    const previous = settings.value.videoInputDeviceId;
+    settings.value.videoInputDeviceId = deviceId;
+
+    try {
+      if (this.room) {
+        await this.room.switchActiveDevice('videoinput', deviceId, deviceId !== 'default');
+      }
+    } catch (error) {
+      settings.value.videoInputDeviceId = previous;
+      console.error('could not change camera', error);
       throw error;
     }
   }

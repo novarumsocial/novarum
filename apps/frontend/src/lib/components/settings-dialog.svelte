@@ -78,9 +78,14 @@
   let aboutError = $state<string | null>(null);
   let aboutSaved = $state(false);
   let logoutLoading = $state(false);
-  let audioDevices = $state<{ input: MediaDeviceInfo[]; output: MediaDeviceInfo[] }>({
+  let audioDevices = $state<{
+    input: MediaDeviceInfo[];
+    output: MediaDeviceInfo[];
+    camera: MediaDeviceInfo[];
+  }>({
     input: [],
     output: [],
+    camera: [],
   });
   let audioDeviceError = $state<string | null>(null);
   let activeTab = $state('account');
@@ -561,23 +566,27 @@
         output: devices.filter(
           (device) => device.kind === 'audiooutput' && device.deviceId !== 'default'
         ),
+        camera: devices.filter((device) => device.kind === 'videoinput' && device.deviceId),
       };
     } catch (error) {
       console.error('Error getting audio devices:', error);
     }
   }
 
-  async function setAudioDevice(kind: 'input' | 'output', deviceId: string) {
+  async function setAudioDevice(kind: 'input' | 'output' | 'camera', deviceId: string) {
     audioDeviceError = null;
     try {
       if (kind === 'input') await voice.setInputDevice(deviceId);
-      else await voice.setOutputDevice(deviceId);
+      else if (kind === 'output') await voice.setOutputDevice(deviceId);
+      else await voice.setCameraDevice(deviceId);
       await refreshAudioDevices();
     } catch {
-      audioDeviceError =
-        kind === 'input'
-          ? 'Could not switch to that microphone.'
-          : 'Could not switch to that output device. Your browser may not support audio routing.';
+      audioDeviceError = {
+        input: 'Could not switch to that microphone.',
+        output:
+          'Could not switch to that output device. Your browser may not support audio routing.',
+        camera: 'Could not switch to that camera.',
+      }[kind];
     }
   }
 
@@ -1260,6 +1269,29 @@
                     {#each audioDevices.output as device, index}
                       <Select.Item value={device.deviceId}>
                         {device.label || `Output device ${index + 1}`}
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </SettingsRow>
+              <SettingsRow title="Camera" stacked id="camera-device">
+                <Select.Root
+                  type="single"
+                  value={settings.value.videoInputDeviceId}
+                  onValueChange={(value) => setAudioDevice('camera', value)}
+                >
+                  <Select.Trigger id="camera-device" class="w-full">
+                    {settings.value.videoInputDeviceId === 'default'
+                      ? 'Default camera'
+                      : (audioDevices.camera.find(
+                          (d) => d.deviceId === settings.value.videoInputDeviceId
+                        )?.label ?? 'Unknown camera')}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="default">Default camera</Select.Item>
+                    {#each audioDevices.camera as device, index}
+                      <Select.Item value={device.deviceId}>
+                        {device.label || `Camera ${index + 1}`}
                       </Select.Item>
                     {/each}
                   </Select.Content>
