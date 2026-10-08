@@ -16,6 +16,7 @@
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
+  import { formatBytes } from '$lib/utils';
   import VideoPlayer from './video-player.svelte';
   import AudioPlayer from './audio-player.svelte';
   import Avatar from './avatar.svelte';
@@ -143,12 +144,6 @@
       window.removeEventListener('keyup', handleKeyUp);
     };
   });
-
-  function formatBytes(bytes: number) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
 
   const authorName = $derived(message.author.displayName || message.author.username);
   const selfMentioned = $derived.by(() => {
@@ -547,4 +542,6 @@
   bind:open={viewerOpen}
   bind:index={viewerIndex}
   attachments={viewableAttachments}
+  author={message.author}
+  timestamp={message.timestamp}
 />
