@@ -32,6 +32,8 @@
   let pan = $state<HTMLDivElement>();
   let zoomWidth = $state(0);
 
+  type Point = { x: number; y: number };
+
   $effect(() => {
     if (!api) return;
     const updateIndex = () => (index = api!.selectedScrollSnap());
@@ -43,11 +45,23 @@
     if (open && api) api.scrollTo(index, true);
   });
 
-  // leaving the current image always drops back to the fitted view
   $effect(() => {
     void [open, index];
     zoomed = false;
   });
+
+  const MAX_ZOOM = 4;
+  const DRAG_THRESHOLD = 3;
+
+  const pointers = new Map<number, Point>();
+  let pinch: { distance: number; width: number } | undefined;
+  let drag: { start: Point; scroll: Point } | undefined;
+  let gestureHappened = false;
+
+  const fittedImage = () => api?.slideNodes()[index]?.querySelector('img');
+  const zoomedImage = () => pan?.querySelector('img');
+  const currentWidth = () => (zoomed ? zoomWidth : (fittedImage()?.clientWidth ?? 0));
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
   function onkeydown(event: KeyboardEvent) {
     if (!open || zoomed) return;
@@ -55,26 +69,102 @@
     if (event.key === 'ArrowRight') api?.scrollNext();
   }
 
-  // morphs the fitted image into the full-size one (and back) with a view transition
   function setZoom(value: boolean, focus = { x: 0.5, y: 0.5 }) {
     const update = () => {
       flushSync(() => (zoomed = value));
-      // land the zoom on the spot that was clicked
-      if (pan) {
-        pan.scrollLeft = focus.x * pan.scrollWidth - pan.clientWidth / 2;
-        pan.scrollTop = focus.y * pan.scrollHeight - pan.clientHeight / 2;
-      }
+      if (!pan) return;
+      pan.scrollLeft = focus.x * pan.scrollWidth - pan.clientWidth / 2;
+      pan.scrollTop = focus.y * pan.scrollHeight - pan.clientHeight / 2;
     };
-    if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches)
-      return update();
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!document.startViewTransition || reduceMotion) return update();
     document.startViewTransition(update);
   }
 
-  // zoom to actual size, or at least double what's on screen so small images still grow
   function zoomIn(event: MouseEvent & { currentTarget: HTMLImageElement }) {
     const img = event.currentTarget;
     zoomWidth = Math.max(img.naturalWidth, img.clientWidth * 2);
     setZoom(true, { x: event.offsetX / img.clientWidth, y: event.offsetY / img.clientHeight });
+  }
+
+  function zoomTo(width: number, focus: Point = { x: innerWidth / 2, y: innerHeight / 2 }) {
+    const fitted = fittedImage();
+    const shown = zoomed ? zoomedImage() : fitted;
+    if (!fitted || !shown) return;
+
+    const fitWidth = fitted.clientWidth;
+    const newWidth = clamp(width, fitWidth, Math.max(fitted.naturalWidth, fitWidth) * MAX_ZOOM);
+    if (!zoomed && newWidth < fitWidth * 1.05) return;
+
+    const before = shown.getBoundingClientRect();
+    const anchor = {
+      x: clamp((focus.x - before.left) / before.width, 0, 1),
+      y: clamp((focus.y - before.top) / before.height, 0, 1),
+    };
+
+    if (!zoomed) {
+      zoomWidth = fitWidth;
+      flushSync(() => (zoomed = true));
+    }
+    flushSync(() => (zoomWidth = newWidth));
+
+    const after = zoomedImage()?.getBoundingClientRect();
+    if (!pan || !after) return;
+    pan.scrollLeft += after.left + anchor.x * after.width - focus.x;
+    pan.scrollTop += after.top + anchor.y * after.height - focus.y;
+  }
+
+  function onwheel(event: WheelEvent) {
+    if (!attachment?.contentType.startsWith('image/')) return;
+    event.preventDefault();
+    const sensitivity = event.ctrlKey ? 0.01 : 0.002;
+    zoomTo(currentWidth() * Math.exp(-event.deltaY * sensitivity), {
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function fingers() {
+    const [a, b] = [...pointers.values()];
+    return {
+      distance: Math.hypot(a.x - b.x, a.y - b.y),
+      center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    };
+  }
+
+  function onpointerdown(event: PointerEvent) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 1) gestureHappened = false;
+    if (pointers.size === 2) pinch = { distance: fingers().distance, width: currentWidth() };
+    if (zoomed && pan && event.pointerType === 'mouse') {
+      drag = {
+        start: { x: event.clientX, y: event.clientY },
+        scroll: { x: pan.scrollLeft, y: pan.scrollTop },
+      };
+    }
+  }
+
+  function onpointermove(event: PointerEvent) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pinch && pointers.size === 2) {
+      const { distance, center } = fingers();
+      gestureHappened = true;
+      zoomTo((pinch.width * distance) / pinch.distance, center);
+    } else if (drag && pan) {
+      const dx = event.clientX - drag.start.x;
+      const dy = event.clientY - drag.start.y;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) gestureHappened = true;
+      pan.scrollLeft = drag.scroll.x - dx;
+      pan.scrollTop = drag.scroll.y - dy;
+    }
+  }
+
+  function onpointerend(event: PointerEvent) {
+    pointers.delete(event.pointerId);
+    drag = undefined;
+    if (pointers.size < 2) pinch = undefined;
   }
 </script>
 
@@ -146,10 +236,14 @@
         setApi={(carouselApi) => (api = carouselApi)}
         opts={{ loop: attachments.length > 1 }}
         class="relative min-h-0 flex-1 [&_[data-slot=carousel-content]]:h-full"
+        {onwheel}
+        {onpointerdown}
+        {onpointermove}
+        onpointerup={onpointerend}
+        onpointercancel={onpointerend}
       >
         <Carousel.Content class="ms-0 h-full">
           {#each attachments as item (item.id)}
-            <!-- clicking the empty space around the media closes the viewer -->
             <Carousel.Item
               class="flex h-full items-center justify-center px-3 pb-3 sm:px-20 sm:pb-6"
               onclick={(event) => event.target === event.currentTarget && (open = false)}
@@ -160,7 +254,7 @@
                   src={item.url}
                   alt={item.filename}
                   draggable="false"
-                  class="max-h-full max-w-full cursor-zoom-in object-contain shadow-2xl shadow-black/50 select-none"
+                  class="max-h-full max-w-full cursor-zoom-in touch-pan-y object-contain shadow-2xl shadow-black/50 select-none"
                   style:view-transition-name={item.id === attachment.id && !zoomed
                     ? 'viewer-image'
                     : undefined}
@@ -203,17 +297,17 @@
         {/if}
 
         {#if zoomed}
-          <!-- actual size, scroll to pan, click anywhere to fit again -->
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div
             bind:this={pan}
-            class="absolute inset-0 z-20 flex cursor-zoom-out overflow-auto bg-background/80 backdrop-blur-xl"
-            onclick={() => setZoom(false)}
+            class="absolute inset-0 z-20 flex cursor-grab touch-pan-x touch-pan-y overflow-auto bg-background/80 backdrop-blur-xl"
+            onclick={() => !gestureHappened && setZoom(false)}
           >
             <img
               src={attachment.url}
               alt={attachment.filename}
-              class="m-auto max-w-none shrink-0"
+              draggable="false"
+              class="m-auto max-w-none shrink-0 select-none"
               style:width="{zoomWidth}px"
               style:view-transition-name="viewer-image"
             />
