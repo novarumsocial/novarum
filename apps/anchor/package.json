@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@elysia/openapi": "^1.4.15",
+    "@elysia/server-timing": "^1.4.1",
     "@elysiajs/cors": "^1.4.2",
     "@leeoniya/ufuzzy": "^1.0.19",
     "@react-email/components": "^1.0.12",

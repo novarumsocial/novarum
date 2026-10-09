@@ -18,6 +18,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@elysia/openapi": "^1.4.15",
+        "@elysia/server-timing": "^1.4.1",
         "@elysiajs/cors": "^1.4.2",
         "@leeoniya/ufuzzy": "^1.0.19",
         "@react-email/components": "^1.0.12",
@@ -269,6 +270,8 @@
     "@elysia/eden": ["@elysia/eden@1.4.10", "", { "peerDependencies": { "elysia": ">=1.4.19" } }, "sha512-vcZXQcW6wZj6rhTxaiTkuCbVuS/yAJQ9jqCM6b83a5hu99F5Aj3HOyWXL17iod2Rz+pJpYsQGX0XaeoCsMpw2g=="],
 
     "@elysia/openapi": ["@elysia/openapi@1.4.15", "", { "peerDependencies": { "elysia": ">= 1.4.0" } }, "sha512-MrVGCPo5hnRF4/yWGOyH5ddjt4DlSIbeC5rrkupQtHY8TEQe+XdJa2YM9aUOrtgtRcy4UNGyiVlLl/jllPkPQA=="],
+
+    "@elysia/server-timing": ["@elysia/server-timing@1.4.1", "", { "peerDependencies": { "elysia": ">= 1.4.0" } }, "sha512-+NDGhslxN0HZuyT8o4dt+hgib9bzsMuvxTE5bPrDhFFRl1duCNosseW3wE76pmwle8+m9+1aOeZ28mZAv51ggQ=="],
 
     "@elysiajs/cors": ["@elysiajs/cors@1.4.2", "", { "peerDependencies": { "elysia": ">= 1.4.0" } }, "sha512-FTCcbH35brTLigF1W7BYySRZomgI/dBEMK9BgK9RP9Nez7zmpGh4koL/Yr1BFv8nYz7CfhRvcM8d/c+XnwMaVQ=="],
 

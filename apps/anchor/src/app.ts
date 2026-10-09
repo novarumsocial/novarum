@@ -16,44 +16,45 @@ import { friends } from '../modules/friends/services.ts';
 import { notifications } from '../modules/notifications/services';
 import openapi from '@elysia/openapi';
 import { ip } from 'elysia-ip';
+import { serverTiming } from '@elysia/server-timing';
 
-// no side effects: migrations, timers and listen() live in index.ts so tests can import this
 export const createApp = () =>
   new Elysia()
-  .use(cors({ credentials: true, origin: getConfig().files.s3_cors_origins }))
-  .use(ip({ headersFirst: true }))
-  .use(
-    openapi({
-      documentation: {
-        tags: [
-          { name: 'Well known', description: 'the .well-known/ routes' },
-          { name: 'Auth', description: 'the auth/ routes' },
-          { name: 'Guilds', description: 'the guilds/ routes' },
-          { name: 'Realtime', description: 'the realtime/ routes' },
-          { name: 'Channel', description: 'the channel/ routes' },
-          { name: 'Message', description: 'the message/ routes' },
-          { name: 'Invite', description: 'the invite/ routes' },
-          { name: 'Federation', description: 'the federation/ routes' },
-          { name: 'Upload', description: 'the upload/ routes' },
-          { name: 'User', description: 'the user/ routes' },
-          { name: 'Friends', description: 'the friends/ routes' },
-          { name: 'DM', description: 'the dm/ routes' },
-          { name: 'Notifications', description: 'the notifications/ routes' },
-        ],
-      },
-    })
-  )
-  .use(wellKnown)
-  .use(auth)
-  .use(guilds)
-  .use(realtime)
-  .use(channel)
-  .use(message)
-  .use(invite)
-  .use(federation)
-  .use(upload)
-  .use(user)
-  .use(friends)
-  .use(dm)
-  .use(notifications)
-  .get('/', () => 'this is anchor');
+    .use(cors({ credentials: true, origin: getConfig().files.s3_cors_origins }))
+    .use(ip({ headersFirst: true }))
+    .use(serverTiming({ enabled: getConfig().server.server_timing }))
+    .use(
+      openapi({
+        documentation: {
+          tags: [
+            { name: 'Well known', description: 'the .well-known/ routes' },
+            { name: 'Auth', description: 'the auth/ routes' },
+            { name: 'Guilds', description: 'the guilds/ routes' },
+            { name: 'Realtime', description: 'the realtime/ routes' },
+            { name: 'Channel', description: 'the channel/ routes' },
+            { name: 'Message', description: 'the message/ routes' },
+            { name: 'Invite', description: 'the invite/ routes' },
+            { name: 'Federation', description: 'the federation/ routes' },
+            { name: 'Upload', description: 'the upload/ routes' },
+            { name: 'User', description: 'the user/ routes' },
+            { name: 'Friends', description: 'the friends/ routes' },
+            { name: 'DM', description: 'the dm/ routes' },
+            { name: 'Notifications', description: 'the notifications/ routes' },
+          ],
+        },
+      })
+    )
+    .use(wellKnown)
+    .use(auth)
+    .use(guilds)
+    .use(realtime)
+    .use(channel)
+    .use(message)
+    .use(invite)
+    .use(federation)
+    .use(upload)
+    .use(user)
+    .use(friends)
+    .use(dm)
+    .use(notifications)
+    .get('/', () => 'this is anchor');

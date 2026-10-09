@@ -34,8 +34,6 @@ startFriendSyncRetry();
 
 const app = createApp().listen(getConfig().server.listen_port);
 
-// federated DM bridges otherwise only start from /dm, so after a restart new messages
-// in a closed DM would never reach us to reopen it.
 const federatedDms = await db
   .select({ id: channels.id })
   .from(channels)

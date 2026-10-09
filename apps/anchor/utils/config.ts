@@ -8,6 +8,7 @@ const schema = z.object({
     homeserver: z.string(),
     base_url: z.string().regex(/^https?:\/\/(?:localhost:\d+|[^\/\s]+)$/),
     listen_port: z.number().int().positive().optional().default(5049),
+    server_timing: z.boolean().optional().default(process.env.NODE_ENV !== 'production'),
   }),
   federation: z.object({
     key_dir: z.string().optional().default('./keys'),
@@ -68,7 +69,6 @@ const schema = z.object({
   }),
   notifications: z
     .object({
-      // contact for push services, a mailto: or https: url. defaults to the email from_email.
       vapid_subject: z
         .string()
         .regex(/^(mailto:|https?:\/\/)/, { error: 'vapid_subject must be a mailto: or http(s) url' })
