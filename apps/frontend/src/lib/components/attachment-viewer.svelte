@@ -102,7 +102,7 @@
       event.preventDefault();
       setZoom(false);
     }}
-    class="top-0 left-0 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden bg-background p-0 ring-0 sm:max-w-none in-[.desktop]:top-9 in-[.desktop]:h-[calc(100dvh-36px)]"
+    class="top-0 left-0 flex h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden bg-background/40 p-0 ring-0 sm:max-w-none in-[.desktop]:top-9 in-[.desktop]:h-[calc(100dvh-36px)]"
   >
     <Dialog.Title class="sr-only">{attachment?.filename ?? 'Attachment'}</Dialog.Title>
     <Dialog.Description class="sr-only">
@@ -110,18 +110,6 @@
     </Dialog.Description>
 
     {#if attachment}
-      <!-- the image's own colours bleed into the room around it -->
-      {#key attachment.id}
-        {#if attachment.contentType.startsWith('image/')}
-          <img
-            src={attachment.previewUrl}
-            alt=""
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-0 size-full scale-125 object-cover opacity-40 blur-3xl brightness-50 saturate-200 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-500"
-          />
-        {/if}
-      {/key}
-
       <header class="relative z-10 flex shrink-0 items-center gap-3 p-3 sm:px-4">
         <Avatar
           src={author.avatarUrl}

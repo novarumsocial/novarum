@@ -238,6 +238,7 @@ export class Voice {
 
     if (!room) return;
 
+    room.removeAllListeners();
     await room.disconnect().catch(() => null);
     if (channelId) realtime.leaveVoice();
     leaveSound.play();
