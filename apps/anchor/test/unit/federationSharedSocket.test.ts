@@ -93,9 +93,14 @@ describe('publishRealtime', () => {
   });
 
   test('ids that look like topics or contain separators survive', () => {
-    const id = 'fed:guild:b.test:g:1';
+    const id = 'g:1:dmEvents:d1';
     const [, shared] = publishTo(`guildEvents:${id}`);
     expect(JSON.parse(shared![1])).toMatchObject({ kind: 'guild', id });
+  });
+
+  test('remote (fed:) guilds and DMs are not shared, nobody can follow them', () => {
+    expect(publishTo('guildEvents:fed:guild:b.test:g1')).toHaveLength(1);
+    expect(publishTo('dmEvents:fed:channel:b.test:d1')).toHaveLength(1);
   });
 
   test('personal topics are not shared with other homeservers', () => {
