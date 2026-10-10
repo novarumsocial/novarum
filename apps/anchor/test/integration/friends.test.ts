@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { connect } from '../harness/db';
-import { openRealtime } from '../harness/ws';
+import { connect as connectRealtime } from '../harness/realtime';
 import { signup } from '../harness/users';
 import { eventually } from '../harness/wait';
 
@@ -223,7 +223,7 @@ describe('validation', () => {
 describe('realtime', () => {
   test('friends.changed is delivered to both users on every change', async () => {
     const [a, b] = await pair();
-    const [wa, wb] = await Promise.all([openRealtime(anchor.url, a.cookie), openRealtime(anchor.url, b.cookie)]);
+    const [wa, wb] = await Promise.all([connectRealtime(a), connectRealtime(b)]);
     const count = (ws: typeof wa) => ws.events.filter((e) => e.type === 'friends.changed').length;
     const expectCounts = async (n: number) => {
       await eventually(() => count(wa) === n && count(wb) === n, { message: `friends.changed x${n}` });

@@ -16,7 +16,7 @@ const signupBody = (over: Record<string, unknown> = {}) => {
 };
 
 describe('signup', () => {
-  test('sets a session cookie (HttpOnly, SameSite=Lax, not Secure on http) and returns the user', async () => {
+  test('sets a session cookie (HttpOnly, Secure, SameSite=None, not Partitioned on http://localhost) and returns the user', async () => {
     const body = signupBody({ displayName: 'Shown' });
     const res = await post(anchor.url, '/auth/signup', body);
     expect(res.status).toBe(200);
@@ -30,10 +30,10 @@ describe('signup', () => {
     });
     const raw = res.headers.getSetCookie().find((c) => c.startsWith('session_token='))!;
     expect(raw).toContain('HttpOnly');
-    expect(raw).toContain('SameSite=Lax');
+    expect(raw).toContain('SameSite=None');
     expect(raw).toContain('Path=/');
     expect(raw).toContain('Max-Age=31536000');
-    expect(raw).not.toContain('Secure');
+    expect(raw).toContain('Secure');
     expect(raw).not.toContain('Partitioned');
     expect(await meStatus(anchor.url, parseSetCookie(res)!)).toBe(200);
   });
