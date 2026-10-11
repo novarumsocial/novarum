@@ -92,8 +92,9 @@
   <div class="min-w-0 flex-1 leading-tight select-none">
     <p class="truncate text-sm font-semibold">
       {name}
-      <span class="ml-1 hidden text-xs font-normal text-muted-foreground group-hover:inline"
-        >{handleFor(entry)}</span
+      <span
+        class="ml-1 hidden text-[10px] font-normal text-muted-foreground group-hover:inline"
+        >({entry.user.homeserver})</span
       >
     </p>
     <p class="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
