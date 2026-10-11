@@ -281,29 +281,15 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
   if (!snapshot) return null;
 
   const guildId = makeFederatedGuildId(homeserver, snapshot.guild.id);
-  const existingGuild = await db.query.guilds.findFirst({
-    where: { id: guildId },
-  });
-
-  if (existingGuild) {
-    await db
-      .update(guilds)
-      .set({
-        name: snapshot.guild.name,
-        description: snapshot.guild.description,
-        avatarUrl: snapshot.guild.avatarUrl,
-      })
-      .where(eq(guilds.id, guildId));
-  } else {
-    await db.insert(guilds).values({
-      id: guildId,
-      name: snapshot.guild.name,
-      description: snapshot.guild.description,
-      avatarUrl: snapshot.guild.avatarUrl,
-      ownerId: session.userId,
-      extAnchorDown: false,
-    });
-  }
+  const guildFields = {
+    name: snapshot.guild.name,
+    description: snapshot.guild.description,
+    avatarUrl: snapshot.guild.avatarUrl,
+  };
+  await db
+    .insert(guilds)
+    .values({ id: guildId, ...guildFields, ownerId: session.userId, extAnchorDown: false })
+    .onConflictDoUpdate({ target: guilds.id, set: guildFields });
 
   const membership = await db.query.guildMembers.findFirst({
     where: { guildId, userId: session.userId },
@@ -328,29 +314,16 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
   const channels = [];
   for (const channel of snapshot.channels) {
     const channelId = makeFederatedChannelId(homeserver, channel.id);
-    const existingChannel = await db.query.channels.findFirst({
-      where: { id: channelId },
-    });
-
-    if (existingChannel) {
-      await db
-        .update(dbChannels)
-        .set({
-          guildId,
-          name: channel.name,
-          position: channel.position,
-          type: channel.type,
-        })
-        .where(eq(dbChannels.id, channelId));
-    } else {
-      await db.insert(dbChannels).values({
-        id: channelId,
-        guildId,
-        name: channel.name,
-        position: channel.position,
-        type: channel.type,
-      });
-    }
+    const channelFields = {
+      guildId,
+      name: channel.name,
+      position: channel.position,
+      type: channel.type,
+    };
+    await db
+      .insert(dbChannels)
+      .values({ id: channelId, ...channelFields })
+      .onConflictDoUpdate({ target: dbChannels.id, set: channelFields });
 
     channels.push({
       ...channel,

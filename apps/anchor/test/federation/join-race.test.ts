@@ -11,8 +11,7 @@ beforeAll(async () => {
   await resetHarness();
 });
 
-// gap: the shadow guild row is inserted per accept without ON CONFLICT, so concurrent first joins from one anchor race on its primary key (500)
-test.failing('concurrent first joins of a remote guild by several users of one anchor all succeed', async () => {
+test('concurrent first joins of a remote guild by several users of one anchor all succeed', async () => {
   const owner = await signup('a');
   const { guild } = await createGuild(owner);
   const { body } = await call(owner, 'POST', `/guilds/${guild.id}/invites`, {});
