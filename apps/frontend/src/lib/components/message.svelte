@@ -39,6 +39,7 @@
     onDelete,
     onReply,
     onEdit,
+    onProfileCall,
   }: {
     message: Message;
     repliedMessage: Message | null;
@@ -46,6 +47,7 @@
     onDelete: (messageId: string) => void | Promise<void>;
     onReply: () => void;
     onEdit: (messageId: string, content: string | null) => void | Promise<void>;
+    onProfileCall?: (channelId: string) => void;
   } = $props();
 
   let shiftPressed = $state(false);
@@ -289,7 +291,7 @@
           <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
         {/if}
         {#if !grouped}
-          <ProfileCard user={message.author} class="self-start">
+          <ProfileCard user={message.author} onCall={onProfileCall} class="self-start">
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
@@ -304,7 +306,7 @@
         <div class="min-w-0 flex-1">
           {#if !grouped}
             <div class="flex items-baseline gap-2">
-              <ProfileCard user={message.author} class="text-sm font-semibold text-foreground">
+              <ProfileCard user={message.author} onCall={onProfileCall} class="text-sm font-semibold text-foreground">
                 {authorName}
               </ProfileCard>
               <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>

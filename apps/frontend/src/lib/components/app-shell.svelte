@@ -299,6 +299,7 @@
         onOpenMembers={() => (mobileMembersOpen = true)}
         onCall={() => startCall(currentChannel.id)}
         onRing={() => realtime.ringCall(currentChannel.id)}
+        onProfileCall={startCall}
         call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
           ? dmCall
           : undefined}
@@ -362,7 +363,7 @@
           <X class="size-5" />
         </button>
         -->
-        <MemberSidebar server={currentServer!} members={chat.members} />
+        <MemberSidebar server={currentServer!} members={chat.members} onCall={startCall} />
       </div>
     {/if}
   </div>

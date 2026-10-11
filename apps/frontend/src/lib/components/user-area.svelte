@@ -24,7 +24,7 @@
   import Switch from './ui/switch/switch.svelte';
   import Label from './ui/label/label.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { settings } from '$lib/settings.svelte';
+  import { settings, settingsDialog } from '$lib/settings.svelte';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { session, type SessionUser } from '$lib/session.svelte';
   import { anchor } from '$lib/anchor.svelte';
@@ -42,7 +42,6 @@
     voiceChannelName: string | null;
     onLeaveVoice: () => void;
   } = $props();
-  let settingsOpen = $state(false);
   let acctSwitcherOpen = $state(false);
   const otherAccounts = $derived(
     session.accounts.filter((account) => account.homeServer !== anchor.homeServer)
@@ -323,7 +322,7 @@
       <button
         class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="User settings"
-        onclick={() => (settingsOpen = true)}
+        onclick={() => (settingsDialog.open = true)}
       >
         <Settings class="size-4" />
       </button>
@@ -331,4 +330,4 @@
   </div>
 </div>
 
-<SettingsDialog bind:open={settingsOpen} {voice} />
+<SettingsDialog bind:open={settingsDialog.open} {voice} />

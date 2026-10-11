@@ -23,6 +23,7 @@
     onOpenMembers,
     onCall,
     onRing,
+    onProfileCall,
     call,
     callExpanded = false,
   }: {
@@ -40,6 +41,7 @@
     onOpenMembers?: () => void;
     onCall?: () => void;
     onRing?: () => void;
+    onProfileCall?: (channelId: string) => void;
     call?: Snippet;
     callExpanded?: boolean;
   } = $props();
@@ -377,6 +379,7 @@
                 {onDelete}
                 {onEdit}
                 onReply={() => (replyingTo = msg)}
+                {onProfileCall}
               />
             {/each}
           </div>

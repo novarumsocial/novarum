@@ -9,9 +9,11 @@
   let {
     server,
     members,
+    onCall,
   }: {
     server: Server;
     members: Author[];
+    onCall?: (channelId: string) => void;
   } = $props();
 
   const online = $derived(members.filter((member) => member.status !== 'OFFLINE'));
@@ -42,7 +44,7 @@
       <div class="space-y-0.5">
         {#each online as member}
           {@const name = nameFor(member)}
-          <ProfileCard user={member} class="group flex w-full items-center gap-2 px-1 py-1">
+          <ProfileCard user={member} {onCall} class="group flex w-full items-center gap-2 px-1 py-1">
             <div class="relative">
               <Avatar
                 src={member.avatarUrl}
@@ -84,7 +86,7 @@
         <div class="space-y-0.5 opacity-50">
           {#each offline as member}
             {@const name = nameFor(member)}
-            <ProfileCard user={member} class="group flex w-full items-center gap-2 px-1 py-1">
+            <ProfileCard user={member} {onCall} class="group flex w-full items-center gap-2 px-1 py-1">
               <div class="relative">
                 <Avatar
                   src={member.avatarUrl}

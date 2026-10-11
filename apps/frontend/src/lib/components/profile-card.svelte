@@ -2,31 +2,28 @@
   import type { Snippet } from 'svelte';
   import type { Author } from '$lib/types/chat';
   import * as Popover from '$lib/components/ui/popover/index.js';
-  import { settings } from '$lib/settings.svelte';
+  import * as Drawer from '$lib/components/ui/drawer/index.js';
+  import { device } from '$lib/device.svelte';
+  import { settings, settingsDialog } from '$lib/settings.svelte';
   import { friends } from '$lib/friends.svelte';
   import { dms } from '$lib/dms.svelte';
-  import { chat } from '$lib/chat-state.svelte';
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
-  import {
-    UserRoundArrowLeft,
-    UserRoundCheck,
-    UserRoundCog,
-    UserRoundMinus,
-    UserRoundPlus,
-  } from '@lucide/svelte';
+  import { Separator } from '$lib/components/ui/separator/index.js';
+  import { MessageCircle, Phone, UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundMinus, UserRoundPlus } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
-  import { Input } from '$lib/components/ui/input/index.js';
 
   let {
     user,
     children,
     class: className = '',
+    onCall,
   }: {
     user: Author;
     children: Snippet;
     class?: string;
+    onCall?: (channelId: string) => void;
   } = $props();
 
   const session = useSession();
@@ -69,24 +66,28 @@
         };
     }
   });
-  let dmDraft = $state('');
 
-  async function sendDm() {
-    const content = dmDraft.trim();
-    if (!content || !friendshipUserId) return;
+  async function openDm() {
+    if (!friendshipUserId) return;
+    await dms.open(friendshipUserId);
+  }
+
+  async function call() {
+    if (!friendshipUserId) return;
     const channelId = await dms.open(friendshipUserId);
-    if (channelId) await chat.sendMessage(channelId, content);
-    dmDraft = '';
+    if (channelId && onCall) onCall(channelId);
+  }
+
+  let open = $state(false);
+
+  function editProfile() {
+    open = false;
+    settingsDialog.open = true;
   }
 </script>
 
-<Popover.Root>
-  <Popover.Trigger class="cursor-pointer text-left {className}">
-    {@render children()}
-  </Popover.Trigger>
-
-  <Popover.Content align="start" side="right" class="w-72 overflow-hidden mx-2 p-0">
-    <div class="relative aspect-[3/1] overflow-hidden" style:background-color={user.avatarColor}>
+{#snippet card()}
+  <div class="relative aspect-[3/1] overflow-hidden" style:background-color={user.avatarColor}>
       {#if user.bannerUrl}
         <AnimatedImage
           src={user.bannerUrl}
@@ -176,27 +177,53 @@
         {/if}
         -->
       </Popover.Description>
-      {#if user.about}
-        <p class="mt-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
-          {user.about}
-        </p>
+      {#if isSelf}
+        <Button variant="secondary" class="mt-3 w-full" onclick={editProfile}>
+          <UserRoundCog class="size-4" />
+          Edit profile
+        </Button>
+      {:else if user.username && friendStatus === 'FRIEND'}
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <Button variant="secondary" class="w-full" onclick={() => void openDm()}>
+            <MessageCircle class="size-4" />
+            Message
+          </Button>
+          <Button variant="secondary" class="w-full" onclick={() => void call()}>
+            <Phone class="size-4" />
+            Call
+          </Button>
+        </div>
       {/if}
-      {#if user.username && !isSelf && friendStatus === 'FRIEND'}
-        <Input
-          id="direct-message-person"
-          placeholder="Message @{user.username}:{user.server}"
-          class="mt-2.5"
-          autocomplete="off"
-          spellcheck="false"
-          bind:value={dmDraft}
-          onkeydown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void sendDm();
-            }
-          }}
-        />
+      {#if user.about}
+        <div class="mt-3 space-y-1.5">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Bio
+            </span>
+            <Separator class="flex-1" />
+          </div>
+          <p class="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
+            {user.about}
+          </p>
+        </div>
       {/if}
     </div>
-  </Popover.Content>
-</Popover.Root>
+{/snippet}
+
+{#if !device.isComputer}
+  <Drawer.Root bind:open>
+    <Drawer.Trigger class="cursor-pointer text-left {className}">
+      {@render children()}
+    </Drawer.Trigger>
+    <Drawer.Content class="pb-6">{@render card()}</Drawer.Content>
+  </Drawer.Root>
+{:else}
+  <Popover.Root bind:open>
+    <Popover.Trigger class="cursor-pointer text-left {className}">
+      {@render children()}
+    </Popover.Trigger>
+    <Popover.Content align="start" side="right" class="w-72 overflow-hidden mx-2 p-0">
+      {@render card()}
+    </Popover.Content>
+  </Popover.Root>
+{/if}
