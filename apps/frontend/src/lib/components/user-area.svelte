@@ -223,6 +223,14 @@
             bgColor={user.avatarColor}
             class="size-8 text-xs"
           />
+          <span
+            class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+          ></span>
+          {#if settings.value.circleIcons}
+            <span
+              class="rounded-full absolute -right-px -bottom-px size-2.75 border-2 border-sidebar bg-emerald-500"
+            ></span>
+          {/if}
         </div>
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
