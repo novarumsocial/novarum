@@ -109,7 +109,7 @@
         <Button
           variant="outline"
           size="icon"
-          class="group absolute top-1 right-3"
+          class={`group absolute right-3 ${!device.isComputer ? 'top-3' : 'top-1'}`}
           disabled={busy}
           aria-label={friendAction.label}
           onclick={friendAction.run}
