@@ -148,12 +148,6 @@
               Remove Friend
             </ContextMenu.Item>
           {/if}
-          <ContextMenu.Item
-            class="text-destructive data-[highlighted]:bg-destructive data-[highlighted]:text-white"
-            onclick={() => other && void friends.block?.(other.userId)}
-          >
-            Block
-          </ContextMenu.Item>
 
           <ContextMenu.Separator />
 

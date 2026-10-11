@@ -69,6 +69,10 @@ class FriendsState {
     }
   }
 
+  isFriend(userId: string) {
+    return this.accepted.some((entry) => entry.user.userId === userId);
+  }
+
   isOnline(userId: string) {
     return this.accepted.some((entry) => entry.user.userId === userId && entry.status === 'ONLINE');
   }
