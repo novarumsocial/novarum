@@ -4,6 +4,7 @@ import { db, users } from '../src/db';
 import { discoverRemoteAnchor, federationRequestTimeoutMs } from './discovery';
 import { publicUser, publicUserSchema, userProfile } from './publicUser';
 import { randomString } from './randomString';
+import { readJson } from './parseJson';
 
 export const federationUserSchema = publicUserSchema.omit({ userId: true });
 export type FederationUserPayload = z.infer<typeof federationUserSchema>;
@@ -24,7 +25,7 @@ export async function fetchFederatedUser(homeserver: string, username: string) {
   });
   if (!response.ok) return null;
 
-  const result = z.object({ user: federationUserSchema }).safeParse(await response.json());
+  const result = z.object({ user: federationUserSchema }).safeParse(await readJson(response));
   if (
     !result.success ||
     result.data.user.username !== username ||

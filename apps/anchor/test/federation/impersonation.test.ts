@@ -13,7 +13,8 @@ const routesDir = path.join(anchorRoot, 'modules/federation/routes');
 const source = readdirSync(routesDir)
   .map((file) => readFileSync(path.join(routesDir, file), 'utf8'))
   .join('\n');
-const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)].map((m) => m[1]!);
+// /push names no user: its ids are rebuilt from the signer (forged senders are in notify.hostile.test.ts)
+const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)].map((m) => m[1]!).filter((route) => route !== '/push');
 
 type Family = 'user' | 'friends' | 'participants';
 // friends/command and /sync -> 403; everything else with a `user` payload (guild, channel, message, invite, DM, voice, status) -> 401

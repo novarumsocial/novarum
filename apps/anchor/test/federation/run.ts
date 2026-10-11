@@ -66,7 +66,8 @@ try {
     console.log(`[fed] no test files for suite ${env.FED_SUITE}`);
     code = 0;
   } else {
-    code = await sh(['bun', 'test', ...files, ...extra]);
+    // anchors restart and federation calls wait up to 10s, far past bun's 5s default, in hooks as much as in tests
+    code = await sh(['bun', 'test', '--timeout', '120000', ...files, ...extra]);
     if (code !== 0) await saveArtifacts();
   }
 } catch (error) {

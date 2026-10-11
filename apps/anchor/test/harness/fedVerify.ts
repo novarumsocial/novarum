@@ -87,6 +87,9 @@ export async function ensurePingUser(target: AnchorName, identity: FakeIdentity)
   const peer = (await signup(target)).user.username;
   const homeserver = fake.identityInfo(identity).homeserver;
   const body = { commandId: crypto.randomUUID(), actor: fakeUser(homeserver, 'fkping'), peerUsername: peer, action: 'REQUEST', expectedVersion: 0 };
+  // the target is the friendship's authority and syncs it back before answering; accepting that sync keeps the target's 30s
+  // retry loop from posting to the fake for the rest of the run (which breaks later "nothing reached the fake" assertions)
+  await fake.respond(identity, 'POST /federation/friends/sync', { json: { version: 1 } });
   const res = await sendFrom(identity, target, '/federation/friends/command', body);
   if (res.status !== 200) throw new Error(`could not create the ping user: ${res.status} ${res.text}`);
   const ping = await sendFrom(identity, target, pingPath, pingBody(homeserver));

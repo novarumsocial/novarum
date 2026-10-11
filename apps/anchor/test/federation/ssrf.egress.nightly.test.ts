@@ -87,9 +87,9 @@ describe('F. WebSockets bypass the proxy', () => {
   });
 });
 
-describe('F. network.proxy_url only works when HTTP(S)_PROXY is set at process start', () => {
-  // utils/config.ts copies proxy_url into process.env on the first getConfig(); Bun 1.3.9 reads the proxy variables only at startup,
-  // so an anchor configured through config.toml alone still connects directly. A bun child without the variables stands in for it.
+describe('F. network.proxy_url works without HTTP(S)_PROXY at process start', () => {
+  // utils/config.ts copies proxy_url into process.env on the first getConfig(); Bun 1.3.9 read the proxy variables only at startup,
+  // Bun 1.4 reads them per request. A bun child without the variables stands in for an anchor configured through config.toml alone.
   const probe = `
     import { getConfig } from './utils/config';
     const { proxy_url } = getConfig().network;
@@ -104,7 +104,7 @@ describe('F. network.proxy_url only works when HTTP(S)_PROXY is set at process s
     expect((await fake.requests(1))[0]!.sourceIp).toBe(ips.proxy.pub);
   });
 
-  test.failing('known gap: with only config.toml and no HTTP(S)_PROXY at startup, fetch goes through the proxy_url', async () => {
+  test('with only config.toml and no HTTP(S)_PROXY at startup, fetch goes through the proxy_url', async () => {
     await publicDiscovery();
     expect(await bunIn('q', probe, false)).toMatchObject({ ok: true, status: 200 });
     expect((await fake.requests(1))[0]!.sourceIp).toBe(ips.proxy.pub);

@@ -61,21 +61,16 @@ describe('E2. baseUrl rebinds to a private address inside the 5 minute cache, th
   const rebindAfterDiscovery = async (name: 'p' | 'q') => {
     await dns.set('rb2.test', pub);
     await warmWithBaseUrl(name, 'https://rb2.test');
-    // postSignedFederationJson checks again, but Bun caches the lookup of the discovery check for ~30s, so only fetch's own
-    // resolution sees the new (private) answer
+    // postSignedFederationJson checks again right before the POST; Bun 1.3 cached the discovery check's lookup for ~30s, so
+    // only fetch's own resolution saw the private answer. Bun 1.4 does not, so the check refuses it before anything is sent.
     await dns.set('rb2.test', '172.30.0.99');
-    await runTriggers(ctxs[name], 'evil.test', ['T4']);
+    return (await runTriggers(ctxs[name], 'evil.test', ['T4'])).T4![0]!.status;
   };
 
-  test.failing('anchor-p: known gap, the signed POST reaches the canary', async () => {
-    await rebindAfterDiscovery('p');
+  // anchor-q is refused by the same check, so the request never reaches smokescreen
+  test.each(['p', 'q'] as const)('anchor-%s: the check before the signed POST refuses it', async (name) => {
+    expect(await rebindAfterDiscovery(name)).toBe(502);
     await noCanaryHits();
-  });
-
-  test('anchor-q: smokescreen denies it', async () => {
-    await rebindAfterDiscovery('q');
-    await noCanaryHits();
-    expect(await eventually(() => deniedFor('rb2.test'), { message: 'proxy deny log for rb2.test' })).not.toEqual([]);
   });
 });
 

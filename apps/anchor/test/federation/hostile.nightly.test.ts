@@ -96,9 +96,8 @@ describe('H. bodies that never end or never fit', () => {
 
   for (const [label, behaviour] of bodies) {
     for (const where of wheres) {
-      // no size limit on remote bodies: the 1 GB body and the endless stream are buffered whole (+3 GB / +300-750 MB RSS in 10s)
-      const run = /1 GB|endless/.test(label) ? test.failing : test;
-      run(`${label} as ${where}: aborted within about 10s, RSS growth under 100 MB`, async () => {
+      // remote bodies are capped (readJson in utils/parseJson.ts), so the big ones are dropped as soon as they pass the cap
+      test(`${label} as ${where}: aborted within about 10s, RSS growth under 100 MB`, async () => {
         await serve(where, behaviour);
         const { result, elapsed, growthMb } = await watched(() => trigger(where));
         console.log(

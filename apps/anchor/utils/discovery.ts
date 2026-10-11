@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { randomString } from './randomString';
+import { readJson } from './parseJson';
 import { getKeys, signMessage } from './keys';
 import { getConfig } from './config';
 import { db, guilds } from '../src/db';
@@ -12,6 +13,8 @@ const homeserverPattern = /^[a-zA-Z0-9.-]+$/;
 const discoveryCacheTtlMs = 5 * 60 * 1000;
 const discoveryFailureCacheTtlMs = 30 * 1000;
 export const federationRequestTimeoutMs = 10 * 1000;
+// a resolver that never answers makes getaddrinfo hang for ~16s, past Bun.serve's 10s idle timeout for the waiting client
+const dnsLookupTimeoutMs = 5 * 1000;
 
 class DiscoveryError extends Error {
   constructor(message: string) {
@@ -112,7 +115,7 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       );
     }
 
-    const data = (await response.json().catch(() => null)) as Partial<AnchorInfo> | null;
+    const data = (await readJson(response)) as Partial<AnchorInfo> | null;
     if (!data || typeof data !== 'object') {
       throw new DiscoveryError(`Invalid discovery response for ${clean}`);
     }
@@ -220,7 +223,7 @@ export async function postSignedFederationJson(homeserver: string, path: string,
     throw error;
   });
 
-  const data = await response.json().catch(() => null);
+  const data = await readJson(response);
   return { data, remote, response };
 }
 
@@ -239,7 +242,10 @@ export async function assertSafeFederationUrl(url: URL) {
 
   if (net.isIP(hostname)) return;
 
-  const addresses = await dns.lookup(hostname, { all: true });
+  const addresses = await Promise.race([
+    dns.lookup(hostname, { all: true }),
+    Bun.sleep(dnsLookupTimeoutMs).then(() => Promise.reject(new Error('getaddrinfo ETIMEOUT'))),
+  ]);
   if (!allowLocal && addresses.some(({ address }) => isPrivateIp(address))) {
     throw new Error('Federation URL resolves to a local or private address');
   }
