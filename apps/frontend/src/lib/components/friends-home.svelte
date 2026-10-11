@@ -84,7 +84,7 @@
     <span
       class={cn(
         'absolute -right-1 -bottom-1 size-3.5 border-[3px] border-background group-hover:border-card',
-        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-muted-foreground/60'
+        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-neutral-500'
       )}
       class:rounded-full={settings.value.circleIcons}
     ></span>
