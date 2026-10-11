@@ -17,12 +17,14 @@
     index = $bindable(0),
     author,
     timestamp,
+    plain = false,
   }: {
     open: boolean;
     attachments: Attachment[];
     index: number;
     author: Author;
     timestamp: Date;
+    plain?: boolean;
   } = $props();
 
   const attachment = $derived(attachments[index]);
@@ -201,6 +203,7 @@
 
     {#if attachment}
       <header class="relative z-10 flex shrink-0 items-center gap-3 p-3 sm:px-4">
+        {#if !plain}
         <Avatar
           src={author.avatarUrl}
           name={authorName}
@@ -218,7 +221,8 @@
             {attachment.filename}, {formatBytes(attachment.size)}
           </p>
         </div>
-        <div class="flex shrink-0 items-center">
+        {/if}
+        <div class="ml-auto flex shrink-0 items-center">
           {@render action('Open in new tab', ExternalLink, {
             href: attachment.url,
             target: '_blank',

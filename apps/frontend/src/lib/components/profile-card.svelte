@@ -13,6 +13,7 @@
   import { MessageCircle, Phone, UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundMinus, UserRoundPlus } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
+  import AttachmentViewer from './attachment-viewer.svelte';
 
   let {
     user,
@@ -79,6 +80,11 @@
   }
 
   let open = $state(false);
+  let avatarOpen = $state(false);
+
+  function viewAvatar() {
+    if (user.avatarUrl) avatarOpen = true;
+  }
 
   function editProfile() {
     open = false;
@@ -132,12 +138,28 @@
       {/if}
 
       <div class="relative -mt-8 w-fit">
-        <Avatar
-          src={user.avatarUrl}
-          {name}
-          class="size-16 border-4 border-popover text-xl"
-          bgColor={user.avatarColor}
-        />
+        {#if user.avatarUrl}
+          <button
+            type="button"
+            class="cursor-pointer"
+            aria-label={`View ${name}'s avatar`}
+            onclick={viewAvatar}
+          >
+            <Avatar
+              src={user.avatarUrl}
+              {name}
+              class="size-16 border-4 border-popover text-xl"
+              bgColor={user.avatarColor}
+            />
+          </button>
+        {:else}
+          <Avatar
+            src={user.avatarUrl}
+            {name}
+            class="size-16 border-4 border-popover text-xl"
+            bgColor={user.avatarColor}
+          />
+        {/if}
         {#if user.status}
           <span
             class="absolute bottom-0 right-0 size-3.5 border-[3px] border-popover {user.status ===
@@ -208,6 +230,25 @@
         </div>
       {/if}
     </div>
+  {#if user.avatarUrl}
+    <AttachmentViewer
+      bind:open={avatarOpen}
+      index={0}
+      attachments={[
+        {
+          id: `${user.userId}-avatar`,
+          filename: `${name} avatar.png`,
+          contentType: 'image/png',
+          size: 0,
+          url: user.avatarUrl,
+          previewUrl: user.avatarUrl,
+        },
+      ]}
+      author={user}
+      timestamp={new Date()}
+      plain
+    />
+  {/if}
 {/snippet}
 
 {#if !device.isComputer}
