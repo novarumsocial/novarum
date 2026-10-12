@@ -20,6 +20,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { InAppBanner } from '@/components/in-app-banner';
 import '@/lib/notifications'; // sets up the notification handler and tap routing
+import { checkForUpdates } from '@/lib/ota';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
 
@@ -37,6 +38,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => colorScheme.set(darkMode ? 'dark' : 'light'), [darkMode]);
+  useEffect(() => void checkForUpdates(), []);
   useEffect(() => {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);

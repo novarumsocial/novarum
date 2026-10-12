@@ -68,6 +68,8 @@ const config: ExpoConfig = {
       { android: { minSdkVersion: 24 }, ios: { deploymentTarget: '16.4' } },
     ],
   ],
+  // OTA updates turn on when EAS_UPDATE_URL is set (the `eas update` URL from `eas init`)
+  updates: { enabled: Boolean(process.env.EAS_UPDATE_URL), url: process.env.EAS_UPDATE_URL },
   runtimeVersion: { policy: 'appVersion' }, // set `updates.url` after `eas init` to turn on OTA updates
   experiments: { typedRoutes: true },
 };
