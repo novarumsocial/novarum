@@ -343,12 +343,31 @@ type ChatState = {
   reorderGuilds: (guilds: string[]) => Promise<void>;
   reorderChannels: (guildId: string, channelIds: string[]) => void;
   saveChannelOrder: (guildId: string, channelIds: string[]) => Promise<void>;
+  // native-only: the web reloads the page when the account changes
+  reset: () => void;
 };
 
 // not reactive on the web either
 const lastTypingByChannel = new Map<string, number>();
 const nextCursorByChannel = new Map<string, number>();
 const hasMoreByChannel = new Map<string, boolean>();
+let resetCount = 0;
+
+const initialData = () => ({
+  servers: [],
+  channelsByServer: {},
+  messagesByChannel: {},
+  messagesLoadingByChannel: {},
+  members: [],
+  voiceStates: {},
+  typingByChannel: {},
+  loadingOlderByChannel: {},
+  loadedChannel: null,
+  route: { kind: 'home' } as ChatRoute,
+  editingMessage: false,
+  editingMessageId: null,
+  uploadProgress: {},
+});
 
 function messageNonce() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
@@ -442,9 +461,10 @@ export const useChat = create<ChatState>((set, get) => {
       : null;
 
   const loadGuilds = async () => {
+    const count = resetCount;
     const result = await anchor().client.guilds.list.get();
 
-    if (result.error || !result.data) return;
+    if (result.error || !result.data || count !== resetCount) return;
 
     for (const guild of result.data.guilds) {
       get().addGuild(guild);
@@ -537,19 +557,7 @@ export const useChat = create<ChatState>((set, get) => {
   };
 
   return {
-    servers: [],
-    channelsByServer: {},
-    messagesByChannel: {},
-    messagesLoadingByChannel: {},
-    members: [],
-    voiceStates: {},
-    typingByChannel: {},
-    loadingOlderByChannel: {},
-    loadedChannel: null,
-    route: { kind: 'home' },
-    editingMessage: false,
-    editingMessageId: null,
-    uploadProgress: {},
+    ...initialData(),
 
     setRoute(route) {
       if (JSON.stringify(route) !== JSON.stringify(get().route)) set({ route });
@@ -1075,6 +1083,14 @@ export const useChat = create<ChatState>((set, get) => {
 
     async saveChannelOrder(guildId, channelIds) {
       await anchor().client.channel.order.patch({ guildId, channelIds });
+    },
+
+    reset() {
+      resetCount++; // drops any guild load still in flight
+      lastTypingByChannel.clear();
+      nextCursorByChannel.clear();
+      hasMoreByChannel.clear();
+      set(initialData());
     },
   };
 });

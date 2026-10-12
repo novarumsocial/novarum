@@ -36,6 +36,8 @@ type FriendsState = {
   accept: (userId: string) => Promise<boolean>;
   decline: (userId: string) => Promise<boolean>;
   remove: (userId: string) => Promise<boolean>;
+  // native-only: the web reloads the page when the account changes
+  reset: () => void;
 };
 
 let loadGeneration = 0;
@@ -157,6 +159,18 @@ export const useFriends = create<FriendsState>((set, get) => {
         () => anchor().client.friends({ userId }).delete(),
         'Could not remove this friend.'
       ),
+
+    reset() {
+      loadGeneration++; // drops any load still in flight
+      set({
+        accepted: [],
+        incoming: [],
+        outgoing: [],
+        loading: false,
+        busyUserIds: [],
+        error: null,
+      });
+    },
   };
 });
 

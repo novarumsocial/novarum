@@ -28,14 +28,19 @@ type NotificationSettingsState = {
   unmute: (targetId: string, defaultLevel: NotificationLevel) => Promise<void>;
   reset: (targetId: string) => Promise<void>;
   savePreferences: (preferences: { push?: boolean; messagePreview?: boolean }) => Promise<void>;
+  // native-only: the web reloads the page when the account changes (`reset` is taken: it clears one target)
+  clear: () => void;
 };
+
+let loadGeneration = 0;
 
 export const useNotificationSettings = create<NotificationSettingsState>((set, get) => ({
   entries: {},
 
   async load() {
+    const generation = loadGeneration;
     const result = await anchor().client.notifications.settings.get();
-    if (result.error || !result.data) return;
+    if (result.error || !result.data || generation !== loadGeneration) return;
 
     set({
       entries: Object.fromEntries(result.data.settings.map((item) => [item.targetId, item])),
@@ -103,6 +108,11 @@ export const useNotificationSettings = create<NotificationSettingsState>((set, g
     await anchor()
       .client.notifications.preferences.put(preferences)
       .catch(() => null);
+  },
+
+  clear() {
+    loadGeneration++;
+    set({ entries: {} });
   },
 }));
 

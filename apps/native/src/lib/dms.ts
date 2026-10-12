@@ -48,6 +48,8 @@ type DmsState = {
     options: { active: boolean; fromSelf: boolean }
   ) => void;
   markRead: (channelId: string) => void;
+  // native-only: the web reloads the page when the account changes
+  reset: () => void;
 };
 
 let generation = 0;
@@ -164,6 +166,18 @@ export const useDms = create<DmsState>((set, get) => {
 
     markRead: (channelId) =>
       set({ list: get().list.map((dm) => (dm.id === channelId ? { ...dm, unread: false } : dm)) }),
+
+    reset() {
+      generation++; // drops any load still in flight
+      set({
+        list: [],
+        loading: false,
+        error: null,
+        pending: [],
+        incomingCall: null,
+        outgoingCall: null,
+      });
+    },
   };
 });
 
