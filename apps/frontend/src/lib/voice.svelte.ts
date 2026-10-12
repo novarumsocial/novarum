@@ -430,7 +430,7 @@ export class Voice {
     try {
       if (enabled) {
         await this.room.localParticipant.setScreenShareEnabled(true, {
-          audio: settings.value.screenShareSystemAudio,
+          audio: settings.value.screenShareSystemAudio && { restrictOwnAudio: true },
         });
         await this.startScreenShareAudio();
       } else {
