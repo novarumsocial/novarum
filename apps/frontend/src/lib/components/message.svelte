@@ -16,7 +16,7 @@
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
-  import { formatBytes } from '$lib/utils';
+  import { cn, formatBytes } from '$lib/utils';
   import VideoPlayer from './video-player.svelte';
   import AudioPlayer from './audio-player.svelte';
   import Avatar from './avatar.svelte';
@@ -185,6 +185,9 @@
       (attachment) =>
         !attachment.contentType.startsWith('video/') && !attachment.contentType.startsWith('audio/')
     )
+  );
+  const singleImage = $derived(
+    gridAttachments.length === 1 && gridAttachments[0].contentType.startsWith('image/')
   );
   let viewerOpen = $state(false);
   let viewerIndex = $state(0);
@@ -458,12 +461,20 @@
               </div>
             {/each}
             {#if gridAttachments.length > 0}
-              <div class="mt-2 grid max-w-md grid-cols-2 gap-1.5 sm:grid-cols-3">
+              <div
+                class={cn(
+                  'mt-2 grid gap-1.5',
+                  singleImage ? 'w-fit max-w-full' : 'max-w-md grid-cols-2 sm:grid-cols-3'
+                )}
+              >
                 {#each gridAttachments as attachment (attachment.id)}
                   {#if attachment.contentType.startsWith('image/')}
                     <Button
                       variant="outline"
-                      class="group relative aspect-[4/3] h-auto min-w-0 overflow-hidden p-0 text-left"
+                      class={cn(
+                        'group relative h-auto min-w-0 overflow-hidden p-0 text-left',
+                        singleImage ? 'max-w-full' : 'aspect-[4/3]'
+                      )}
                       aria-label={`View ${attachment.filename}`}
                       onclick={() => viewAttachment(attachment.id)}
                     >
@@ -471,7 +482,12 @@
                         src={attachment.previewUrl}
                         alt={attachment.filename}
                         loading="lazy"
-                        class="size-full object-cover transition-transform group-hover:scale-[1.02]"
+                        class={cn(
+                          'transition-transform group-hover:scale-[1.02]',
+                          singleImage
+                            ? 'max-h-96 w-auto max-w-md object-contain'
+                            : 'size-full object-cover'
+                        )}
                       />
                     </Button>
                   {:else if attachment.contentType === 'application/pdf'}

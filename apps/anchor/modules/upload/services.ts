@@ -107,19 +107,10 @@ export const upload = new Elysia({ tags: ['Upload'] })
       let thumbnail: Buffer | undefined;
       if (type === 'image') {
         const img = sharp(file);
-        const { width, height } = await img.metadata();
-
-        let ratio = 4;
-        if (width < 320 && height < 240) {
-          ratio = 1;
-        }
         thumbnail = await img
-          .resize({
-            width: Math.round(width / ratio),
-            height: Math.round(height / ratio),
-            fit: 'inside',
-          })
-          .webp({ quality: 75 })
+          .rotate()
+          .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 85 })
           .toBuffer();
       } else if (type === 'video') {
         await using input = await Demuxer.open(Buffer.from(file));
