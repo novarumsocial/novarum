@@ -463,17 +463,17 @@
             {#if gridAttachments.length > 0}
               <div
                 class={cn(
-                  'mt-2 grid gap-1.5',
-                  singleImage ? 'w-fit max-w-full' : 'max-w-md grid-cols-2 sm:grid-cols-3'
+                  'mt-2 grid',
+                  singleImage ? 'w-fit max-w-full' : 'max-w-80 grid-cols-2 gap-1 sm:grid-cols-3'
                 )}
               >
                 {#each gridAttachments as attachment (attachment.id)}
                   {#if attachment.contentType.startsWith('image/')}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       class={cn(
-                        'group relative h-auto min-w-0 overflow-hidden p-0 text-left',
-                        singleImage ? 'max-w-full' : 'aspect-[4/3]'
+                        'group relative h-auto min-w-0 overflow-hidden rounded-none border border-border bg-muted/30 p-0 hover:border-primary/50 hover:bg-muted/30',
+                        singleImage ? 'w-fit max-w-full' : 'aspect-square'
                       )}
                       aria-label={`View ${attachment.filename}`}
                       onclick={() => viewAttachment(attachment.id)}
@@ -482,10 +482,11 @@
                         src={attachment.previewUrl}
                         alt={attachment.filename}
                         loading="lazy"
+                        decoding="async"
                         class={cn(
-                          'transition-transform group-hover:scale-[1.02]',
+                          'block transition-[filter] group-hover:brightness-110',
                           singleImage
-                            ? 'max-h-96 w-auto max-w-md object-contain'
+                            ? 'h-auto max-h-64 w-auto min-w-32 max-w-full object-contain sm:max-w-80'
                             : 'size-full object-cover'
                         )}
                       />

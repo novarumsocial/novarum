@@ -109,7 +109,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
         const img = sharp(file);
         thumbnail = await img
           .rotate()
-          .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+          .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 85 })
           .toBuffer();
       } else if (type === 'video') {
