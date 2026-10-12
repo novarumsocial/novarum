@@ -182,7 +182,9 @@ export const useVoice = create<VoiceStore>((set, get) => {
       muted: get().participantMuted(identity),
       screenVolume: get().participantScreenVolume(identity),
     };
-    set((s) => ({ participantAudio: { ...s.participantAudio, [identity]: { ...current, ...patch } } }));
+    set((s) => ({
+      participantAudio: { ...s.participantAudio, [identity]: { ...current, ...patch } },
+    }));
     updateParticipantAudio(identity);
   };
 

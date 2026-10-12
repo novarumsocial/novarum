@@ -1,15 +1,7 @@
 // Port of apps/frontend/src/routes/login/+page.svelte
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import {
-  ArrowLeft,
-  AtSign,
-  Lock,
-  LogIn,
-  Mail,
-  Server,
-  Smartphone,
-} from 'lucide-react-native';
+import { ArrowLeft, AtSign, Lock, LogIn, Mail, Server, Smartphone } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Pressable, TextInput, View } from 'react-native';
@@ -204,7 +196,9 @@ export default function Login() {
       : 'Enter the current code from your authenticator app.'
     : 'Sign in to your home server to continue.';
 
-  const redirectQuery = redirectParam ? `?redirect=${encodeURIComponent(safeRedirect(redirectParam))}` : '';
+  const redirectQuery = redirectParam
+    ? `?redirect=${encodeURIComponent(safeRedirect(redirectParam))}`
+    : '';
 
   const error = submitError ? (
     <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">

@@ -201,8 +201,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
 
 // eden revives JSON frames into the payload itself; a raw socket frame can still arrive as a string or as `{ data }`
 function parseWith<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> | null {
-  const parse = (value: unknown) =>
-    schema.safeParse(z.string().safeParse(value).success ? safeJson(value as string) : value);
+  const parse = (value: unknown) => {
+    const text = z.string().safeParse(value);
+    return schema.safeParse(text.success ? safeJson(text.data) : value);
+  };
 
   const direct = parse(data);
   if (direct.success) return direct.data;

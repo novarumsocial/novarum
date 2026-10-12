@@ -134,7 +134,11 @@ export default function ResetPassword() {
     </Pressable>
   );
 
-  const title = { request: 'Reset your password', reset: 'Check your inbox', complete: 'Password updated!' }[step];
+  const title = {
+    request: 'Reset your password',
+    reset: 'Check your inbox',
+    complete: 'Password updated!',
+  }[step];
   const description =
     step === 'request' ? (
       'Enter your account email and a 6-digit code will be sent to you.'
@@ -189,7 +193,11 @@ export default function ResetPassword() {
           />
 
           <Button size="lg" className="w-full" disabled={requestLoading} onPress={submitRequest}>
-            <ButtonLabel loading={requestLoading} loadingText="Sending code..." text="Send reset code" />
+            <ButtonLabel
+              loading={requestLoading}
+              loadingText="Sending code..."
+              text="Send reset code"
+            />
           </Button>
 
           {requestError ? (
@@ -256,8 +264,17 @@ export default function ResetPassword() {
             >
               <Icon as={ArrowLeft} size={16} />
             </Button>
-            <Button size="lg" className="min-w-0 flex-1" disabled={resetLoading} onPress={submitReset}>
-              <ButtonLabel loading={resetLoading} loadingText="Updating password..." text="Update password" />
+            <Button
+              size="lg"
+              className="min-w-0 flex-1"
+              disabled={resetLoading}
+              onPress={submitReset}
+            >
+              <ButtonLabel
+                loading={resetLoading}
+                loadingText="Updating password..."
+                text="Update password"
+              />
             </Button>
           </View>
 

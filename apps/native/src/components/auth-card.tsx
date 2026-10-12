@@ -6,7 +6,12 @@ import { TextInput, View, type TextInputProps } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { useController, type Control, type FieldValues, type Path as FieldPath } from 'react-hook-form';
+import {
+  useController,
+  type Control,
+  type FieldValues,
+  type Path as FieldPath,
+} from 'react-hook-form';
 import { useThemeColors } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { ConstellationBackground } from './constellation-background';

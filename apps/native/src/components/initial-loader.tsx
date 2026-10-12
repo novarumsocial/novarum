@@ -61,7 +61,10 @@ export function InitialLoader({ finished = false }: { finished?: boolean }) {
           style={{ position: 'absolute' }}
           pointerEvents="none"
         >
-          <Path fill={colors.primary} d="M2 15a1 1 0 0 0 0 2h20a1 1 0 0 0 0-2Zm4 4a1 1 0 0 0 0 2h12a1 1 0 0 0 0-2Z" />
+          <Path
+            fill={colors.primary}
+            d="M2 15a1 1 0 0 0 0 2h20a1 1 0 0 0 0-2Zm4 4a1 1 0 0 0 0 2h12a1 1 0 0 0 0-2Z"
+          />
         </Svg>
       </View>
 

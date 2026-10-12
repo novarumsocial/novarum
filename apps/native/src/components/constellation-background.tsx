@@ -35,7 +35,11 @@ export function ConstellationBackground({ className }: { className?: string }) {
   const hubs = nodes.filter((n) => n.hub);
 
   useEffect(() => {
-    pulse.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true);
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true
+    );
   }, [pulse]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: pulse.value, position: 'absolute' }));
 
@@ -47,7 +51,9 @@ export function ConstellationBackground({ className }: { className?: string }) {
       nodes.flatMap((a, i) =>
         nodes.slice(i + 1).flatMap((b, j) => {
           const d = Math.hypot(a.x - b.x, a.y - b.y);
-          return d < MAX_DIST ? [{ a, b, key: `${i}-${j}`, opacity: (1 - d / MAX_DIST) * 0.2 }] : [];
+          return d < MAX_DIST
+            ? [{ a, b, key: `${i}-${j}`, opacity: (1 - d / MAX_DIST) * 0.2 }]
+            : [];
         })
       ),
     [nodes]
@@ -57,10 +63,26 @@ export function ConstellationBackground({ className }: { className?: string }) {
     <View className={className} onLayout={onLayout} pointerEvents="none" aria-hidden>
       <Svg width={size.width} height={size.height}>
         {lines.map(({ a, b, key, opacity }) => (
-          <Line key={key} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={ACCENT} strokeOpacity={opacity} strokeWidth={0.6} />
+          <Line
+            key={key}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+            stroke={ACCENT}
+            strokeOpacity={opacity}
+            strokeWidth={0.6}
+          />
         ))}
         {nodes.map((n, i) => (
-          <Circle key={i} cx={n.x} cy={n.y} r={n.r} fill={n.hub ? HOT : ACCENT} fillOpacity={n.hub ? 0.85 : 0.5} />
+          <Circle
+            key={i}
+            cx={n.x}
+            cy={n.y}
+            r={n.r}
+            fill={n.hub ? HOT : ACCENT}
+            fillOpacity={n.hub ? 0.85 : 0.5}
+          />
         ))}
       </Svg>
       <Animated.View style={glowStyle}>
