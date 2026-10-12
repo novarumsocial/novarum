@@ -51,7 +51,14 @@ const config: ExpoConfig = {
     ],
     'expo-font',
     'expo-image-picker',
-    'expo-video',
+    ['expo-video', { supportsBackgroundPlayback: true, supportsPictureInPicture: true }],
+    [
+      'expo-media-library',
+      {
+        photosPermission: 'Save images and videos to your photos',
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
     'expo-audio',
     'expo-notifications',
     'expo-unified-push',

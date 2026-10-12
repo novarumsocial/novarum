@@ -44,31 +44,31 @@ The goal is:
 
 ## Stack
 
-| Concern | Web (today) | Native (planned) | Why |
-| --- | --- | --- | --- |
-| Framework | SvelteKit (SPA) | Expo (latest SDK), React Native, New Architecture | Required |
-| Routing | SvelteKit routes | Expo Router (file-based, typed routes) | Same mental model as SvelteKit: files are screens |
-| Styling | Tailwind v4 | NativeWind (v5 if it is stable when we start, otherwise v4) | Same class names; v5 also reads a Tailwind v4 CSS theme, like the web |
-| UI kit | shadcn-svelte (bits-ui) | `react-native-reusables` (shadcn for React Native, built on NativeWind) | Same components and naming as shadcn-svelte |
-| Icons | `@lucide/svelte` | `lucide-react-native` | Same icon set and names |
-| Font | IBM Plex Sans Variable | `@expo-google-fonts/ibm-plex-sans` (400/500/600/700) | Same font |
-| API | `@elysia/eden` treaty | `@elysia/eden` treaty | Required, and same code |
-| Validation | Zod | Zod | Same schemas |
-| State | Svelte rune classes (`$state`) | Zustand, one store per web state file | Small, hook-based, easy to read |
-| Storage | `localStorage` | `react-native-mmkv` (sync, same key names) | Same synchronous API as `localStorage` |
-| Lists | DOM scroll | `@shopify/flash-list` (v2) | Fast long lists, keeps scroll position when older messages are prepended |
-| Gestures & animation | CSS / touch events | `react-native-gesture-handler` + `react-native-reanimated` | Native-thread swipes and drawers |
-| Sheets & menus | dialogs, dropdowns, context menus | `@gorhom/bottom-sheet` | The phone way to show menus |
-| Keyboard | browser | `react-native-keyboard-controller` | Composer that moves with the keyboard |
-| Images | `<img>`, canvas GIF freeze | `expo-image` | Caching, GIF/WebP animation, placeholders |
-| Video / audio | `@videojs/html` | `expo-video`, `expo-audio` | Native players, PiP, background audio |
-| Sounds | Howler / `svelte-sound` | `expo-audio` | Same `.opus` files, copied from `apps/frontend/src/lib/sounds` |
-| Voice / video | `livekit-client` | `@livekit/react-native` + `@livekit/react-native-webrtc` + Expo config plugin | Official LiveKit SDK |
-| Push | Web Push / UnifiedPush (Capacitor plugin) | UnifiedPush (Android, ported plugin), plus an iOS choice (see [Backend changes](#backend-changes)) | Works with today's backend on Android |
-| Files | `<input type=file>`, drag & drop, paste | `expo-image-picker`, `expo-document-picker`, `expo-image-manipulator` | Native pickers and camera |
-| Haptics | none | `expo-haptics` | Small touch feedback |
-| Updates | `@capgo/capacitor-updater` | `expo-updates` (EAS Update or self-hosted) | Same idea: ship JS fixes without a store release |
-| Builds | Capacitor CLI | EAS Build (or `expo run:*` locally) | Standard Expo setup |
+| Concern              | Web (today)                               | Native (planned)                                                                                   | Why                                                                      |
+| -------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Framework            | SvelteKit (SPA)                           | Expo (latest SDK), React Native, New Architecture                                                  | Required                                                                 |
+| Routing              | SvelteKit routes                          | Expo Router (file-based, typed routes)                                                             | Same mental model as SvelteKit: files are screens                        |
+| Styling              | Tailwind v4                               | NativeWind (v5 if it is stable when we start, otherwise v4)                                        | Same class names; v5 also reads a Tailwind v4 CSS theme, like the web    |
+| UI kit               | shadcn-svelte (bits-ui)                   | `react-native-reusables` (shadcn for React Native, built on NativeWind)                            | Same components and naming as shadcn-svelte                              |
+| Icons                | `@lucide/svelte`                          | `lucide-react-native`                                                                              | Same icon set and names                                                  |
+| Font                 | IBM Plex Sans Variable                    | `@expo-google-fonts/ibm-plex-sans` (400/500/600/700)                                               | Same font                                                                |
+| API                  | `@elysia/eden` treaty                     | `@elysia/eden` treaty                                                                              | Required, and same code                                                  |
+| Validation           | Zod                                       | Zod                                                                                                | Same schemas                                                             |
+| State                | Svelte rune classes (`$state`)            | Zustand, one store per web state file                                                              | Small, hook-based, easy to read                                          |
+| Storage              | `localStorage`                            | `react-native-mmkv` (sync, same key names)                                                         | Same synchronous API as `localStorage`                                   |
+| Lists                | DOM scroll                                | `@shopify/flash-list` (v2)                                                                         | Fast long lists, keeps scroll position when older messages are prepended |
+| Gestures & animation | CSS / touch events                        | `react-native-gesture-handler` + `react-native-reanimated`                                         | Native-thread swipes and drawers                                         |
+| Sheets & menus       | dialogs, dropdowns, context menus         | `@gorhom/bottom-sheet`                                                                             | The phone way to show menus                                              |
+| Keyboard             | browser                                   | `react-native-keyboard-controller`                                                                 | Composer that moves with the keyboard                                    |
+| Images               | `<img>`, canvas GIF freeze                | `expo-image`                                                                                       | Caching, GIF/WebP animation, placeholders                                |
+| Video / audio        | `@videojs/html`                           | `expo-video`, `expo-audio`                                                                         | Native players, PiP, background audio                                    |
+| Sounds               | Howler / `svelte-sound`                   | `expo-audio`                                                                                       | Same `.opus` files, copied from `apps/frontend/src/lib/sounds`           |
+| Voice / video        | `livekit-client`                          | `@livekit/react-native` + `@livekit/react-native-webrtc` + Expo config plugin                      | Official LiveKit SDK                                                     |
+| Push                 | Web Push / UnifiedPush (Capacitor plugin) | UnifiedPush (Android, ported plugin), plus an iOS choice (see [Backend changes](#backend-changes)) | Works with today's backend on Android                                    |
+| Files                | `<input type=file>`, drag & drop, paste   | `expo-image-picker`, `expo-document-picker`, `expo-image-manipulator`                              | Native pickers and camera                                                |
+| Haptics              | none                                      | `expo-haptics`                                                                                     | Small touch feedback                                                     |
+| Updates              | `@capgo/capacitor-updater`                | `expo-updates` (EAS Update or self-hosted)                                                         | Same idea: ship JS fixes without a store release                         |
+| Builds               | Capacitor CLI                             | EAS Build (or `expo run:*` locally)                                                                | Standard Expo setup                                                      |
 
 > Check exact versions when scaffolding. Use `bun create expo` with the latest SDK, then
 > `bun x expo install <pkg>` for each library so the versions match that SDK.
@@ -140,42 +140,42 @@ apps/native/
 
 This is the table to keep open while reading the code. Names match on purpose.
 
-| Web file (`apps/frontend/src/...`) | Native file (`apps/native/src/...`) | Notes |
-| --- | --- | --- |
-| `lib/api.ts` | `lib/api.ts` | Same code. Only the `fetch` options change (see [Auth](#auth-cookies-and-the-session)). |
-| `lib/anchor.svelte.ts` | `lib/anchor.ts` | `localStorage` → MMKV, same keys. |
-| `lib/session.svelte.ts` | `lib/session.ts` | Same methods. `switchAccount` re-boots the app instead of `window.location.href = '/'`. |
-| `lib/chat-state.svelte.ts` | `lib/chat-state.ts` | Same methods. URL-derived route → Expo Router params. Canvas re-encode → `expo-image-manipulator`. |
-| `lib/realtime.svelte.ts` | `lib/realtime.ts` | Same Zod schemas and handlers. `focus`/`blur`/`visibilitychange` → `AppState`. `online` → `@react-native-community/netinfo`. |
-| `lib/dms.svelte.ts`, `lib/friends.svelte.ts` | `lib/dms.ts`, `lib/friends.ts` | Nearly copies. |
-| `lib/settings.svelte.ts` | `lib/settings.ts` | Same keys and defaults. Desktop-only keys dropped. |
-| `lib/notification-settings.svelte.ts` | `lib/notification-settings.ts` | Same, uses `anchor/notification-level`. |
-| `lib/notifications.ts` | `lib/notifications.ts` | `new Notification` → `expo-notifications` local notification; Howler → `expo-audio`. |
-| `lib/push.ts` | `lib/push.ts` | Capacitor plugin → local Expo module (Android). iOS: see below. |
-| `lib/voice.svelte.ts` | `lib/voice.ts` | `livekit-client` → `@livekit/react-native`. Same state shape (`VoiceState`). |
-| `lib/voice-layout.ts`, `lib/formatDate.ts`, `lib/types/chat.ts` | same names | Plain TypeScript, copied. |
-| `components/app-shell.svelte` | `app/(app)/_layout.tsx` + `components/panels.tsx` | Boot, swipe panels, call ringing. |
-| `components/guild-sidebar.svelte` | `components/guild-sidebar.tsx` | |
-| `components/channel-sidebar.svelte` | `components/channel-sidebar.tsx` | |
-| `components/dm-sidebar.svelte` | `components/dm-sidebar.tsx` | |
-| `components/member-sidebar.svelte` | `components/member-sidebar.tsx` | |
-| `components/chat-area.svelte` | `components/chat-area.tsx` | |
-| `components/message.svelte` | `components/message.tsx` | |
-| `components/message-input.svelte` | `components/message-input.tsx` | |
-| `components/emoji-text.svelte` | `components/emoji-text.tsx` | |
-| `components/attachment-viewer.svelte` | `app/viewer.tsx` | A modal screen instead of a dialog. |
-| `components/profile-card.svelte` | `components/profile-card.tsx` | Bottom sheet instead of popover. |
-| `components/user-area.svelte` | `components/user-area.tsx` | |
-| `components/voice-area.svelte`, `voice-stage.svelte`, `voice-tile.svelte` | same names `.tsx` | |
-| `components/call-ringing.svelte` | `components/call-ringing.tsx` | Plus native call UI (later phase). |
-| `components/*-dialog.svelte` | same names `.tsx` | Bottom sheets (short forms) or modal screens (long forms). |
-| `components/settings-dialog.svelte` | `app/(app)/settings/*.tsx` | One screen per tab. |
-| `components/settings-group.svelte`, `settings-row.svelte` | same names `.tsx` | |
-| `components/notification-menu.svelte` | `components/notification-menu.tsx` | Rendered inside sheets. |
-| `components/avatar.svelte`, `animated-image.svelte` | `components/avatar.tsx` | `expo-image` handles GIFs; freeze-when-unfocused via `autoplay`. |
-| `components/initial-loader.svelte` | `components/initial-loader.tsx` | Same sunrise, built with `react-native-svg` + Reanimated. |
-| `components/constellation-background.svelte` | `components/constellation-background.tsx` | `@shopify/react-native-skia` canvas, or a static image at first. |
-| `routes/login`, `register`, `reset-password`, `i/[code]` | `app/(auth)/*`, `app/i/[code].tsx` | |
+| Web file (`apps/frontend/src/...`)                                        | Native file (`apps/native/src/...`)               | Notes                                                                                                                        |
+| ------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `lib/api.ts`                                                              | `lib/api.ts`                                      | Same code. Only the `fetch` options change (see [Auth](#auth-cookies-and-the-session)).                                      |
+| `lib/anchor.svelte.ts`                                                    | `lib/anchor.ts`                                   | `localStorage` → MMKV, same keys.                                                                                            |
+| `lib/session.svelte.ts`                                                   | `lib/session.ts`                                  | Same methods. `switchAccount` re-boots the app instead of `window.location.href = '/'`.                                      |
+| `lib/chat-state.svelte.ts`                                                | `lib/chat-state.ts`                               | Same methods. URL-derived route → Expo Router params. Canvas re-encode → `expo-image-manipulator`.                           |
+| `lib/realtime.svelte.ts`                                                  | `lib/realtime.ts`                                 | Same Zod schemas and handlers. `focus`/`blur`/`visibilitychange` → `AppState`. `online` → `@react-native-community/netinfo`. |
+| `lib/dms.svelte.ts`, `lib/friends.svelte.ts`                              | `lib/dms.ts`, `lib/friends.ts`                    | Nearly copies.                                                                                                               |
+| `lib/settings.svelte.ts`                                                  | `lib/settings.ts`                                 | Same keys and defaults. Desktop-only keys dropped.                                                                           |
+| `lib/notification-settings.svelte.ts`                                     | `lib/notification-settings.ts`                    | Same, uses `anchor/notification-level`.                                                                                      |
+| `lib/notifications.ts`                                                    | `lib/notifications.ts`                            | `new Notification` → `expo-notifications` local notification; Howler → `expo-audio`.                                         |
+| `lib/push.ts`                                                             | `lib/push.ts`                                     | Capacitor plugin → local Expo module (Android). iOS: see below.                                                              |
+| `lib/voice.svelte.ts`                                                     | `lib/voice.ts`                                    | `livekit-client` → `@livekit/react-native`. Same state shape (`VoiceState`).                                                 |
+| `lib/voice-layout.ts`, `lib/formatDate.ts`, `lib/types/chat.ts`           | same names                                        | Plain TypeScript, copied.                                                                                                    |
+| `components/app-shell.svelte`                                             | `app/(app)/_layout.tsx` + `components/panels.tsx` | Boot, swipe panels, call ringing.                                                                                            |
+| `components/guild-sidebar.svelte`                                         | `components/guild-sidebar.tsx`                    |                                                                                                                              |
+| `components/channel-sidebar.svelte`                                       | `components/channel-sidebar.tsx`                  |                                                                                                                              |
+| `components/dm-sidebar.svelte`                                            | `components/dm-sidebar.tsx`                       |                                                                                                                              |
+| `components/member-sidebar.svelte`                                        | `components/member-sidebar.tsx`                   |                                                                                                                              |
+| `components/chat-area.svelte`                                             | `components/chat-area.tsx`                        |                                                                                                                              |
+| `components/message.svelte`                                               | `components/message.tsx`                          |                                                                                                                              |
+| `components/message-input.svelte`                                         | `components/message-input.tsx`                    |                                                                                                                              |
+| `components/emoji-text.svelte`                                            | `components/emoji-text.tsx`                       |                                                                                                                              |
+| `components/attachment-viewer.svelte`                                     | `app/viewer.tsx`                                  | A modal screen instead of a dialog.                                                                                          |
+| `components/profile-card.svelte`                                          | `components/profile-card.tsx`                     | Bottom sheet instead of popover.                                                                                             |
+| `components/user-area.svelte`                                             | `components/user-area.tsx`                        |                                                                                                                              |
+| `components/voice-area.svelte`, `voice-stage.svelte`, `voice-tile.svelte` | same names `.tsx`                                 |                                                                                                                              |
+| `components/call-ringing.svelte`                                          | `components/call-ringing.tsx`                     | Plus native call UI (later phase).                                                                                           |
+| `components/*-dialog.svelte`                                              | same names `.tsx`                                 | Bottom sheets (short forms) or modal screens (long forms).                                                                   |
+| `components/settings-dialog.svelte`                                       | `app/(app)/settings/*.tsx`                        | One screen per tab.                                                                                                          |
+| `components/settings-group.svelte`, `settings-row.svelte`                 | same names `.tsx`                                 |                                                                                                                              |
+| `components/notification-menu.svelte`                                     | `components/notification-menu.tsx`                | Rendered inside sheets.                                                                                                      |
+| `components/avatar.svelte`, `animated-image.svelte`                       | `components/avatar.tsx`                           | `expo-image` handles GIFs; freeze-when-unfocused via `autoplay`.                                                             |
+| `components/initial-loader.svelte`                                        | `components/initial-loader.tsx`                   | Same sunrise, built with `react-native-svg` + Reanimated.                                                                    |
+| `components/constellation-background.svelte`                              | `components/constellation-background.tsx`         | `@shopify/react-native-skia` canvas, or a static image at first.                                                             |
+| `routes/login`, `register`, `reset-password`, `i/[code]`                  | `app/(auth)/*`, `app/i/[code].tsx`                |                                                                                                                              |
 
 Things that are **not** ported because they are web/desktop only: `electron-api.ts`, `ota.ts` (replaced by
 `expo-updates`), `service-worker.ts`, `device.svelte.ts` (always a phone; tablets get the wide layout),
@@ -312,6 +312,7 @@ These are the things that should feel better than the Capacitor app. Each one ha
 below.
 
 **Chat**
+
 - Composer is attached to the keyboard (`react-native-keyboard-controller`). No jumping or hidden input.
 - **Swipe a message right to reply** (with a haptic tick).
 - **Long-press a message** for a bottom sheet with Reply, Edit, Copy Text, Copy Link, Copy ID and Delete.
@@ -324,12 +325,14 @@ below.
 - A "jump to latest" button when you scroll up. Tapping the status bar scrolls up (iOS default).
 
 **Media**
+
 - Full-screen viewer: pinch to zoom, double-tap to zoom, swipe between attachments, **swipe down to close**.
 - Save to photos and the native share sheet, instead of "open in new tab".
 - Native video player with fullscreen and picture-in-picture.
 - GIFs and avatars cached on disk (`expo-image`).
 
 **Navigation and system**
+
 - Deep links: `novarum://` and `https://app.novarum.me/i/<code>` and `/guilds/...` open the right screen
   (the same paths the push payload `url` already uses).
 - Invite links use the **native share sheet**.
@@ -342,6 +345,7 @@ below.
 - Safe areas, edge-to-edge on Android, and Dynamic Type / font scaling respected.
 
 **Calls**
+
 - Voice keeps running with the screen off or the app in the background (audio background mode).
 - Earpiece / speaker / Bluetooth switching.
 - Later phase: **incoming DM calls as real phone calls** (CallKit on iOS, ConnectionService on Android), and a
@@ -355,95 +359,102 @@ Everything the website does today, and where it lands. ✅ = same feature, 📱 
 version of the UI.
 
 ### Auth and accounts
-| Feature | Native |
-| --- | --- |
-| Login with homeserver, username, password | ✅ |
+
+| Feature                                                                          | Native                                                   |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Login with homeserver, username, password                                        | ✅                                                       |
 | MFA step: TOTP or email code, "try another way", resend, 6-digit OTP auto-submit | ✅ (iOS/Android one-time-code autofill on the OTP field) |
-| Register with live `@user:server` preview, password rules, confirm | ✅ |
-| Reset password (request → code + new password → done) | ✅ |
-| Multiple accounts (one per homeserver), switch, add, forget | ✅ (account switcher sheet from the user area) |
-| Log out | ✅ |
-| `?redirect=` after login | ✅ via Expo Router params |
+| Register with live `@user:server` preview, password rules, confirm               | ✅                                                       |
+| Reset password (request → code + new password → done)                            | ✅                                                       |
+| Multiple accounts (one per homeserver), switch, add, forget                      | ✅ (account switcher sheet from the user area)           |
+| Log out                                                                          | ✅                                                       |
+| `?redirect=` after login                                                         | ✅ via Expo Router params                                |
 
 ### Guilds and channels
-| Feature | Native |
-| --- | --- |
-| Guild rail with Home button, unread-DM dot, mention badges, `down` guilds disabled | ✅ |
-| Create guild (name, initials preview) | 📱 bottom sheet |
-| Reorder guilds | 📱 long-press and drag |
-| Channel list with collapsible category, unread dot, mention badge, active row | ✅ |
-| Create channel (text/voice, slug name) | 📱 bottom sheet |
-| Reorder channels (if `canManageChannels`) | 📱 long-press and drag |
-| Voice channels show connected users, speaking ring, mute/deafen icons | ✅ |
-| Channel menu: copy link, copy ID, notification settings, edit (UI only, like web) | 📱 long-press sheet |
-| Guild settings: avatar upload with crop (GIF uploaded as is) | 📱 full screen |
-| Invite dialog: get or create invite, copy, regenerate | 📱 sheet + native share |
-| Join via invite (`/i/<code>@<homeserver>`), including federated invites | ✅ + deep link |
-| Member list with online/offline groups and profile cards | ✅ right panel |
+
+| Feature                                                                            | Native                  |
+| ---------------------------------------------------------------------------------- | ----------------------- |
+| Guild rail with Home button, unread-DM dot, mention badges, `down` guilds disabled | ✅                      |
+| Create guild (name, initials preview)                                              | 📱 bottom sheet         |
+| Reorder guilds                                                                     | 📱 long-press and drag  |
+| Channel list with collapsible category, unread dot, mention badge, active row      | ✅                      |
+| Create channel (text/voice, slug name)                                             | 📱 bottom sheet         |
+| Reorder channels (if `canManageChannels`)                                          | 📱 long-press and drag  |
+| Voice channels show connected users, speaking ring, mute/deafen icons              | ✅                      |
+| Channel menu: copy link, copy ID, notification settings, edit (UI only, like web)  | 📱 long-press sheet     |
+| Guild settings: avatar upload with crop (GIF uploaded as is)                       | 📱 full screen          |
+| Invite dialog: get or create invite, copy, regenerate                              | 📱 sheet + native share |
+| Join via invite (`/i/<code>@<homeserver>`), including federated invites            | ✅ + deep link          |
+| Member list with online/offline groups and profile cards                           | ✅ right panel          |
 
 ### Messages
-| Feature | Native |
-| --- | --- |
-| Send text, Enter-to-send replaced by a send button, newlines allowed | 📱 |
-| Replies with preview and "Original message unavailable" | ✅ + swipe to reply |
-| Edit (inline), delete (with confirm), "(edited)" label | 📱 long-press sheet |
-| Copy text, copy link, copy ID | 📱 long-press sheet |
-| Mentions `@user:server` with autocomplete and highlighted pills | ✅ |
-| Emoji autocomplete `:name` (realtime `emoji.search`) and emoji images (`emoji.query`) | ✅ |
-| Links in messages | ✅ open in in-app browser |
-| Attachments: up to 5, `maxFileSize`, presigned upload with progress, metadata stripped from images | ✅ + camera |
-| Image grid, video player, audio player, PDF tile, file tile | ✅ |
-| Attachment viewer with zoom and carousel | 📱 full screen gestures |
-| Load older messages, day dividers, grouping within 5 minutes | ✅ |
-| "New" divider at the last read message | ✅ |
-| Jump to a message (from links and notifications) with flash | ✅ |
-| Typing indicator (send every 5s, show for 6s) | ✅ |
-| Read markers (`channel/:id/read`) | ✅ |
-| Self-mention highlight | ✅ |
+
+| Feature                                                                                            | Native                    |
+| -------------------------------------------------------------------------------------------------- | ------------------------- |
+| Send text, Enter-to-send replaced by a send button, newlines allowed                               | 📱                        |
+| Replies with preview and "Original message unavailable"                                            | ✅ + swipe to reply       |
+| Edit (inline), delete (with confirm), "(edited)" label                                             | 📱 long-press sheet       |
+| Copy text, copy link, copy ID                                                                      | 📱 long-press sheet       |
+| Mentions `@user:server` with autocomplete and highlighted pills                                    | ✅                        |
+| Emoji autocomplete `:name` (realtime `emoji.search`) and emoji images (`emoji.query`)              | ✅                        |
+| Links in messages                                                                                  | ✅ open in in-app browser |
+| Attachments: up to 5, `maxFileSize`, presigned upload with progress, metadata stripped from images | ✅ + camera               |
+| Image grid, video player, audio player, PDF tile, file tile                                        | ✅                        |
+| Attachment viewer with zoom and carousel                                                           | 📱 full screen gestures   |
+| Load older messages, day dividers, grouping within 5 minutes                                       | ✅                        |
+| "New" divider at the last read message                                                             | ✅                        |
+| Jump to a message (from links and notifications) with flash                                        | ✅                        |
+| Typing indicator (send every 5s, show for 6s)                                                      | ✅                        |
+| Read markers (`channel/:id/read`)                                                                  | ✅                        |
+| Self-mention highlight                                                                             | ✅                        |
 
 ### Friends and DMs
-| Feature | Native |
-| --- | --- |
-| Friends home: Online / All / Pending / Add friend tabs, search | ✅ |
-| Accept, ignore, cancel, remove; accepting opens the DM | ✅ |
-| Profile card: banner, avatar, status, about, BOT badge, friend button | 📱 bottom sheet |
+
+| Feature                                                                    | Native              |
+| -------------------------------------------------------------------------- | ------------------- |
+| Friends home: Online / All / Pending / Add friend tabs, search             | ✅                  |
+| Accept, ignore, cancel, remove; accepting opens the DM                     | ✅                  |
+| Profile card: banner, avatar, status, about, BOT badge, friend button      | 📱 bottom sheet     |
 | DM list sorted by last message, unread, online dot, in-call icon, close DM | ✅ + swipe to close |
-| Federated DMs loading per homeserver ("Waiting for ...") | ✅ |
-| New DM from friends list | 📱 sheet |
+| Federated DMs loading per homeserver ("Waiting for ...")                   | ✅                  |
+| New DM from friends list                                                   | 📱 sheet            |
 
 ### Notifications
-| Feature | Native |
-| --- | --- |
-| Per guild / channel / DM level (All, Mentions, Nothing, Use default) | 📱 in long-press sheets |
-| Mute 1h / 8h / 24h / forever, unmute | 📱 |
-| Push on/off, message preview, mention sound, volume | ✅ |
+
+| Feature                                                                     | Native                                  |
+| --------------------------------------------------------------------------- | --------------------------------------- |
+| Per guild / channel / DM level (All, Mentions, Nothing, Use default)        | 📱 in long-press sheets                 |
+| Mute 1h / 8h / 24h / forever, unmute                                        | 📱                                      |
+| Push on/off, message preview, mention sound, volume                         | ✅                                      |
 | In-app notification + sound for messages in other channels (`shouldNotify`) | ✅ (in-app banner when the app is open) |
-| Tapping a notification opens the message | ✅ |
-| Unread count | ✅ app icon badge |
+| Tapping a notification opens the message                                    | ✅                                      |
+| Unread count                                                                | ✅ app icon badge                       |
 
 ### Settings
-| Web tab | Native screen | Contents |
-| --- | --- | --- |
-| Account | `settings/account` | Banner (crop 3:1) and avatar (crop 1:1) upload, about me (512 chars), avatar color, speaking ring color, read-only display name and email, log out |
-| Privacy & security | `settings/security` | Show online status, email MFA toggle, TOTP setup (QR + secret + code), TOTP toggle and delete. On a phone the QR is useless, so show the secret first with "Copy" and "Open in authenticator app" (`otpauth://` link) |
-| Appearance | `settings/appearance` | Dark mode, round icons, show member list. Custom CSS is web-only. |
-| Notifications | `settings/notifications` | Same as web |
-| Voice & audio | `settings/voice` | Echo cancellation, auto gain, noise suppression, mic test with level meter. Device pickers become "audio output: speaker / earpiece / Bluetooth" and front/back camera. |
-| Language & time | `settings/language` | Language (stored only, like web), time format |
-| — | footer | Frontend/app version, Anchor version, commit hash |
+
+| Web tab            | Native screen            | Contents                                                                                                                                                                                                              |
+| ------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Account            | `settings/account`       | Banner (crop 3:1) and avatar (crop 1:1) upload, about me (512 chars), avatar color, speaking ring color, read-only display name and email, log out                                                                    |
+| Privacy & security | `settings/security`      | Show online status, email MFA toggle, TOTP setup (QR + secret + code), TOTP toggle and delete. On a phone the QR is useless, so show the secret first with "Copy" and "Open in authenticator app" (`otpauth://` link) |
+| Appearance         | `settings/appearance`    | Dark mode, round icons, show member list. Custom CSS is web-only.                                                                                                                                                     |
+| Notifications      | `settings/notifications` | Same as web                                                                                                                                                                                                           |
+| Voice & audio      | `settings/voice`         | Echo cancellation, auto gain, noise suppression, mic test with level meter. Device pickers become "audio output: speaker / earpiece / Bluetooth" and front/back camera.                                               |
+| Language & time    | `settings/language`      | Language (stored only, like web), time format                                                                                                                                                                         |
+| —                  | footer                   | Frontend/app version, Anchor version, commit hash                                                                                                                                                                     |
 
 ### Voice and calls
-| Feature | Native |
-| --- | --- |
-| Join voice channel, LiveKit token from `channel/:id/call/token` | ✅ |
-| Mute, deafen, camera, with the same sounds | ✅ |
-| Speaking indicators, per-user volume (0–300%), local mute | ✅ (long-press a tile) |
-| Grid and spotlight layouts (`fitTiles`), filmstrip | ✅ |
-| Watch screen shares (opt-in), stream volume | ✅ |
-| Share your screen | Android in the voice phase; iOS later (needs a broadcast extension) |
-| DM calls: start, ring, incoming call toast, accept, decline, embedded call above the chat | ✅ |
-| Reconnecting banner, latency indicator in the user area | ✅ |
-| Mic test (loopback) | ✅ |
+
+| Feature                                                                                   | Native                                                              |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Join voice channel, LiveKit token from `channel/:id/call/token`                           | ✅                                                                  |
+| Mute, deafen, camera, with the same sounds                                                | ✅                                                                  |
+| Speaking indicators, per-user volume (0–300%), local mute                                 | ✅ (long-press a tile)                                              |
+| Grid and spotlight layouts (`fitTiles`), filmstrip                                        | ✅                                                                  |
+| Watch screen shares (opt-in), stream volume                                               | ✅                                                                  |
+| Share your screen                                                                         | Android in the voice phase; iOS later (needs a broadcast extension) |
+| DM calls: start, ring, incoming call toast, accept, decline, embedded call above the chat | ✅                                                                  |
+| Reconnecting banner, latency indicator in the user area                                   | ✅                                                                  |
+| Mic test (loopback)                                                                       | ✅                                                                  |
 
 ---
 
@@ -479,13 +490,14 @@ Scripts in `apps/native/package.json`:
 ```
 
 Done when:
+
 - [ ] Eden treaty calls are fully typed in the editor (hover `anchor.client.message.list.get`).
 - [ ] Login works and **survives an app restart** on iOS and Android (native cookie store).
 - [ ] The realtime socket connects with the cookie and receives `message.created`.
 - [ ] A dev build joins a LiveKit room and you can hear audio.
 - [ ] `bun run --filter native check` passes.
 - [ ] `bun run dev` from the root still works for everyone. If running Expo there is noisy, the `native`
-  `dev` script can be renamed so `--filter '*' dev` skips it.
+      `dev` script can be renamed so `--filter '*' dev` skips it.
 
 If the cookie check fails, do B1 below before Phase 1.
 
@@ -501,6 +513,7 @@ If the cookie check fails, do B1 below before Phase 1.
 - Settings: appearance and language & time (they are local only, a good first test of `settings.ts`).
 
 Done when:
+
 - [ ] You can sign up, sign in (with TOTP and email MFA), reset your password, and switch accounts.
 - [ ] Panels open and close smoothly with swipes and the back button.
 - [ ] Dark mode and round icons change the whole app.
@@ -517,9 +530,10 @@ Done when:
 - Reconnect with backoff, `recoverRealtimeState` after reconnect, offline banner.
 
 Done when:
+
 - [ ] A conversation between the app and the website looks the same on both, live, in both directions.
 - [ ] Scrolling 1,000+ messages back stays smooth, and the visible message doesn't jump when older ones
-  load.
+      load.
 - [ ] The keyboard never covers the composer on either platform.
 
 ### Phase 3: Attachments and media
@@ -531,6 +545,7 @@ Done when:
 - Full-screen viewer with zoom, swipe between items, swipe down to close, save and share.
 
 Done when:
+
 - [ ] Every content type the backend allows can be sent from the phone and viewed on the phone.
 - [ ] A photo sent from the phone has no GPS data on the server copy.
 
@@ -546,6 +561,7 @@ Done when:
   matching `avatar-crop-dialog.svelte` (1:1 for avatars, 3:1 at 960×320 for banners).
 
 Done when:
+
 - [ ] Every row in the [Feature inventory](#feature-inventory) above, except push and voice, works.
 
 ### Phase 5: Notifications and push
@@ -562,8 +578,9 @@ Done when:
 - `syncPush()` on start, like the web.
 
 Done when:
+
 - [ ] With the app closed, a DM or mention shows a notification within a few seconds, and tapping it opens
-  that message.
+      that message.
 - [ ] Turning push off in settings stops them.
 
 ### Phase 6: Voice, video and calls
@@ -580,6 +597,7 @@ Done when:
 - Screen share on Android.
 
 Done when:
+
 - [ ] A 30-minute call with the screen locked keeps working.
 - [ ] Voice and video work between the app and the website.
 
@@ -610,11 +628,11 @@ Native's `WebSocket` allows headers).
 **B2. iOS push (needed for push on iPhone).**
 iOS apps can't receive Web Push or UnifiedPush, only Apple's APNs. The options are:
 
-| Option | Backend work | Notes |
-| --- | --- | --- |
+| Option                                                            | Backend work                                                                                | Notes                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | a. Add an `EXPO` push kind that sends through Expo's push service | New enum value + migration, a subscription body without `keys`, a sender that POSTs to Expo | Easiest. Works for Android (FCM) and iOS. But the notification text goes through Expo and Apple/Google in plain text, which matters for a self-hosted, privacy-focused app. Respect the "message preview" setting (send "New message" only). |
-| b. Add an `APNS` push kind that talks to Apple directly | Same, plus APNs keys in `config.toml` | No third party except Apple. Every self-hosted Anchor would need Novarum's APNs key, so this really means a small Novarum push relay. |
-| c. No push on iOS at first | None | Ship iOS with in-app notifications only, decide later. |
+| b. Add an `APNS` push kind that talks to Apple directly           | Same, plus APNs keys in `config.toml`                                                       | No third party except Apple. Every self-hosted Anchor would need Novarum's APNs key, so this really means a small Novarum push relay.                                                                                                        |
+| c. No push on iOS at first                                        | None                                                                                        | Ship iOS with in-app notifications only, decide later.                                                                                                                                                                                       |
 
 **Recommendation:** (c) for the first iOS release, then (a), with previews off by default for that kind.
 Android keeps UnifiedPush either way, with no backend change. This is your call before Phase 5.
@@ -640,16 +658,32 @@ So the code stays easy to follow:
 - **Styling** with NativeWind `className` only. No `StyleSheet.create` unless a library needs a style
   object (for example Reanimated animated styles).
 - **Formatting** with the repo's Prettier config (2 spaces, single quotes, semicolons).
-- **Comments** explain *why*, like the rest of the repo. Short and few.
+- **Comments** explain _why_, like the rest of the repo. Short and few.
 
 ## Risks
 
-| Risk | What we do |
-| --- | --- |
-| Native cookie store doesn't send the cookie on the WebSocket upgrade | Checked in Phase 0; fallback is B1 |
-| Eden needs a web API Hermes doesn't have | Checked in Phase 0; polyfill in `src/polyfills.ts` |
-| Metro and Bun workspaces don't resolve `anchor` | Checked in Phase 0; Expo's monorepo config + `"anchor": "workspace:*"` |
-| NativeWind v5 not stable yet | Use v4 with a `tailwind.config.ts` generated by the same `sync-theme.ts` |
-| Chat list performance with mixed-height messages and media | FlashList v2 with known image sizes from attachments; fallback is an inverted `FlatList` |
-| iOS screen sharing is complex | Moved to Phase 7 |
-| The two apps drift apart over time | Same names + the map table above. Later, the plain TS files (`api.ts`, schemas, `formatDate`, `voice-layout`, `shouldNotify`) can move into a shared workspace both apps import. |
+| Risk                                                                 | What we do                                                                                                                                                                       |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native cookie store doesn't send the cookie on the WebSocket upgrade | Checked in Phase 0; fallback is B1                                                                                                                                               |
+| Eden needs a web API Hermes doesn't have                             | Checked in Phase 0; polyfill in `src/polyfills.ts`                                                                                                                               |
+| Metro and Bun workspaces don't resolve `anchor`                      | Checked in Phase 0; Expo's monorepo config + `"anchor": "workspace:*"`                                                                                                           |
+| NativeWind v5 not stable yet                                         | Use v4 with a `tailwind.config.ts` generated by the same `sync-theme.ts`                                                                                                         |
+| Chat list performance with mixed-height messages and media           | FlashList v2 with known image sizes from attachments; fallback is an inverted `FlatList`                                                                                         |
+| iOS screen sharing is complex                                        | Moved to Phase 7                                                                                                                                                                 |
+| The two apps drift apart over time                                   | Same names + the map table above. Later, the plain TS files (`api.ts`, schemas, `formatDate`, `voice-layout`, `shouldNotify`) can move into a shared workspace both apps import. |
+
+---
+
+## Implementation status
+
+Phases 0 to 6 are written on `feat/native-app` (see `apps/native/README.md` for the code tour). Nothing has been run on a device yet: the checks so far are `bun run --filter native check` (types, including Eden) and `bun run --filter native bundle` (a full Hermes bundle), plus `expo prebuild` for Android.
+
+Where the code differs from the plan above:
+
+- **One catch-all route.** The shell is `app/(app)/guilds/[...path].tsx`, the same URL scheme as the web (`/guilds`, `/guilds/dms/<id>`, `/guilds/<server>/<channel>/<message>`), so push urls and deep links need no mapping.
+- **NativeWind v4** (Tailwind 3). v5 is not stable yet. `sync-theme` writes `global.css` and `theme.generated.json`; `tailwind.config.ts` reads the latter.
+- **Scripts:** `start` instead of `dev` (so root `bun run dev` does not launch Expo), `bundle` instead of `lint`. Formatting is `oxfmt`, as in the rest of the repo.
+- **Gestures:** swipe right opens servers and channels, swipe left from the right edge opens members, swipe left on a message replies. Reorder uses a long-press sheet (Move up / Move down), not drag.
+- **Push (Android)** uses the `expo-unified-push` package. A tap on its notification opens the payload `url` as an `ACTION_VIEW` intent, and Android cannot open a scheme-less `/guilds/...`. **Backend follow-up (small):** for UnifiedPush subscriptions send `https://app.novarum.me/guilds/...` as `url`. `app.config.ts` already has the intent filter. Later we migrate to native notifications.
+- **Not done yet (Phase 7 and later):** screen share, native incoming calls (CallKit / ConnectionService), mini call view, `expo-updates` channel setup, store builds with EAS, iOS push (decision B2 still open), retry button for failed sends.
+- **Untested on device, check first:** cookie persistence and the cookie on the WebSocket upgrade (Phase 0), the XHR `{ uri }` upload, the Unicode emoji regex on Hermes, the swipe-to-reply vs panel gestures, and the LiveKit audio session.
