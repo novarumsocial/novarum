@@ -171,6 +171,18 @@
     return `${member.username}:${member.server}`;
   }
 
+  $effect(() => {
+    const member = chat.mentionRequest;
+    if (!member) return;
+    chat.mentionRequest = null;
+    const mention = `@${memberHandle(member)} `;
+    content = content ? `${content.trimEnd()} ${mention}` : mention;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(content.length, content.length);
+    });
+  })
+
   function insertMention(member: Author) {
     if (mentionStart === null) return;
 
