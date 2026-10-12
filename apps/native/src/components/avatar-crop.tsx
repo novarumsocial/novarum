@@ -98,8 +98,14 @@ export function AvatarCrop({
       const s = cover * zoom.value;
       const width = Math.min(image.width, Math.round(frameW / s));
       const height = Math.min(image.height, Math.round(frameH / s));
-      const originX = Math.max(0, Math.min(image.width - width, Math.round(image.width / 2 - x.value / s - width / 2)));
-      const originY = Math.max(0, Math.min(image.height - height, Math.round(image.height / 2 - y.value / s - height / 2)));
+      const originX = Math.max(
+        0,
+        Math.min(image.width - width, Math.round(image.width / 2 - x.value / s - width / 2))
+      );
+      const originY = Math.max(
+        0,
+        Math.min(image.height - height, Math.round(image.height / 2 - y.value / s - height / 2))
+      );
 
       const rendered = await ImageManipulator.ImageManipulator.manipulate(image.uri)
         .crop({ originX, originY, width, height })

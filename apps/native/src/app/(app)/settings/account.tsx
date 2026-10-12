@@ -30,13 +30,35 @@ const hexSchema = z.string().regex(/^#[0-9A-F]{6}$/);
 
 // no color picker on a phone: a few good colors, or type a hex
 const presets = [
-  '#E11D48', '#EA580C', '#D97706', '#65A30D', '#059669', '#0D9488',
-  '#0891B2', '#2563EB', '#4F46E5', '#7C3AED', '#C026D3', '#DB2777',
+  '#E11D48',
+  '#EA580C',
+  '#D97706',
+  '#65A30D',
+  '#059669',
+  '#0D9488',
+  '#0891B2',
+  '#2563EB',
+  '#4F46E5',
+  '#7C3AED',
+  '#C026D3',
+  '#DB2777',
 ];
 
 const crops = {
-  avatar: { width: 512, height: 512, title: 'Crop Avatar', description: 'Adjust the image to fit your profile.', action: 'Use Avatar' },
-  banner: { width: 960, height: 320, title: 'Crop Profile Banner', description: 'Adjust the image to fit your profile banner.', action: 'Use Banner' },
+  avatar: {
+    width: 512,
+    height: 512,
+    title: 'Crop Avatar',
+    description: 'Adjust the image to fit your profile.',
+    action: 'Use Avatar',
+  },
+  banner: {
+    width: 960,
+    height: 320,
+    title: 'Crop Profile Banner',
+    description: 'Adjust the image to fit your profile banner.',
+    action: 'Use Banner',
+  },
 };
 
 // the profile changed: reload it and tell the open chat, like the web does after each save
@@ -68,7 +90,12 @@ export default function Account() {
   const [editingColor, setEditingColor] = useState<'avatar' | 'ring' | null>(null);
   const [colorLoading, setColorLoading] = useState(false);
   const [colorError, setColorError] = useState<string | null>(null);
-  const [crop, setCrop] = useState<{ target: Target; uri: string; width: number; height: number } | null>(null);
+  const [crop, setCrop] = useState<{
+    target: Target;
+    uri: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const [mediaLoading, setMediaLoading] = useState<Target | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
 
@@ -80,7 +107,10 @@ export default function Account() {
   useEffect(() => setAbout(user?.about ?? ''), [user?.about]);
 
   async function selectMedia(target: Target) {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
     const asset = result.assets?.[0];
     if (result.canceled || !asset) return;
 
@@ -103,7 +133,11 @@ export default function Account() {
       // React Native sends a file as a `{ uri, name, type }` form part. Eden only builds multipart bodies
       // from web `File`s, so this one request goes through fetch (cookies come from the phone's cookie store).
       const form = new FormData();
-      form.append(target, { uri, name: `${target}.${type === 'image/gif' ? 'gif' : 'png'}`, type } as unknown as Blob);
+      form.append(target, {
+        uri,
+        name: `${target}.${type === 'image/gif' ? 'gif' : 'png'}`,
+        type,
+      } as unknown as Blob);
       const response = await fetch(`${anchor().baseUrl}/user/${target}`, {
         method: 'POST',
         body: form,
@@ -189,7 +223,10 @@ export default function Account() {
       accessibilityLabel={label}
       onPress={() => setEditingColor(which)}
     >
-      <View className="size-4 border border-black/15" style={{ backgroundColor: validColor(color, '#000000') }} />
+      <View
+        className="size-4 border border-black/15"
+        style={{ backgroundColor: validColor(color, '#000000') }}
+      />
       <Text className="font-mono text-xs">{color.toUpperCase()}</Text>
     </Button>
   );
@@ -215,7 +252,11 @@ export default function Account() {
             />
           ) : null}
           <View className="flex-row items-center gap-2 bg-black/45 px-3 py-1.5">
-            {mediaLoading === 'banner' ? <Spinner /> : <Icon as={Camera} size={16} className="text-white" />}
+            {mediaLoading === 'banner' ? (
+              <Spinner />
+            ) : (
+              <Icon as={Camera} size={16} className="text-white" />
+            )}
             <Text className="text-xs font-medium text-white">
               {mediaLoading === 'banner' ? 'Uploading…' : 'Change banner'}
             </Text>
@@ -227,12 +268,19 @@ export default function Account() {
             accessibilityLabel="Change profile picture"
             disabled={mediaDisabled}
             onPress={() => selectMedia('avatar')}
-            className={cn('-mt-10 size-20 shrink-0 overflow-hidden border-4 border-card', circleIcons && 'rounded-full')}
+            className={cn(
+              '-mt-10 size-20 shrink-0 overflow-hidden border-4 border-card',
+              circleIcons && 'rounded-full'
+            )}
             style={{ backgroundColor: avatarColor }}
           >
             <Avatar src={user?.avatarUrl} name={displayName} className="size-full bg-transparent" />
             <View className="absolute inset-0 items-center justify-center bg-black/30">
-              {mediaLoading === 'avatar' ? <Spinner /> : <Icon as={Camera} size={20} className="text-white" />}
+              {mediaLoading === 'avatar' ? (
+                <Spinner />
+              ) : (
+                <Icon as={Camera} size={20} className="text-white" />
+              )}
             </View>
           </Pressable>
           <View className="min-w-0 flex-1 pt-3">
@@ -244,7 +292,9 @@ export default function Account() {
             </Text>
           </View>
         </View>
-        {mediaError ? <Text className="px-4 pb-3 text-xs text-destructive">{mediaError}</Text> : null}
+        {mediaError ? (
+          <Text className="px-4 pb-3 text-xs text-destructive">{mediaError}</Text>
+        ) : null}
       </View>
 
       <SettingsGroup title="About me">
@@ -273,7 +323,10 @@ export default function Account() {
       </SettingsGroup>
 
       <SettingsGroup title="Colors" description="Used for your avatar and when you speak in voice.">
-        <SettingsRow title="Avatar color" description="Shown behind your picture and on your banner.">
+        <SettingsRow
+          title="Avatar color"
+          description="Shown behind your picture and on your banner."
+        >
           {colorButton('Change avatar color', avatarColor, 'avatar')}
         </SettingsRow>
         <SettingsRow title="Speaking ring" description="The outline around you while you talk.">
@@ -305,14 +358,19 @@ export default function Account() {
                 key={preset}
                 accessibilityLabel={preset}
                 onPress={() => setColor(preset)}
-                className={cn('size-10 border-2', editedColor.toUpperCase() === preset ? 'border-foreground' : 'border-transparent')}
+                className={cn(
+                  'size-10 border-2',
+                  editedColor.toUpperCase() === preset ? 'border-foreground' : 'border-transparent'
+                )}
                 style={{ backgroundColor: preset }}
               />
             ))}
           </View>
           <BottomSheetTextInput
             value={editedColor}
-            onChangeText={(text) => setColor(`#${text.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)}`.toUpperCase())}
+            onChangeText={(text) =>
+              setColor(`#${text.replace(/[^0-9a-fA-F]/g, '').slice(0, 6)}`.toUpperCase())
+            }
             autoCapitalize="characters"
             autoCorrect={false}
             placeholder="#6366F1"

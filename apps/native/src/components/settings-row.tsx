@@ -18,11 +18,15 @@ export function SettingsRow({
   children: ReactNode;
 }) {
   return (
-    <View className={cn('gap-3 px-4 py-3.5', !stacked && 'flex-row items-center justify-between gap-4')}>
+    <View
+      className={cn('gap-3 px-4 py-3.5', !stacked && 'flex-row items-center justify-between gap-4')}
+    >
       <View className={cn('min-w-0', !stacked && 'flex-1')}>
         <Label>{title}</Label>
         {description ? (
-          <Text className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</Text>
+          <Text className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {description}
+          </Text>
         ) : null}
       </View>
       <View className={stacked ? 'w-full' : 'shrink-0'}>{children}</View>

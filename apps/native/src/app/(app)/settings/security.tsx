@@ -1,7 +1,15 @@
 // Port of the "security" tab of apps/frontend/src/lib/components/settings-dialog.svelte
 // Native difference: no QR code (you can't scan your own screen); the setup key is shown with Copy and an `otpauth://` link.
 import * as Clipboard from 'expo-clipboard';
-import { Check, Copy, ExternalLink, Mail, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Mail,
+  ShieldCheck,
+  Smartphone,
+  Trash2,
+} from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Linking, View } from 'react-native';
 import { z } from 'zod';
@@ -22,19 +30,44 @@ import type { LucideIcon } from 'lucide-react-native';
 
 type MfaOption = 'EMAIL' | 'TOTP';
 
-const totpCodeSchema = z.string().regex(/^\d{6}$/, 'Enter the 6-digit code from your authenticator app.');
+const totpCodeSchema = z
+  .string()
+  .regex(/^\d{6}$/, 'Enter the 6-digit code from your authenticator app.');
 
 // an icon tile + title + switch, shared by the email and authenticator rows
-function MfaRow({ icon, active, title, description, children }: { icon: LucideIcon; active: boolean; title: string; description: string; children: ReactNode }) {
+function MfaRow({
+  icon,
+  active,
+  title,
+  description,
+  children,
+}: {
+  icon: LucideIcon;
+  active: boolean;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
   return (
     <View className="flex-row items-center justify-between gap-4 px-4 py-3">
       <View className="min-w-0 flex-1 flex-row items-start gap-3">
-        <View className={cn('size-8 items-center justify-center', active ? 'bg-emerald-500/15' : 'bg-muted')}>
-          <Icon as={icon} size={16} className={active ? 'text-emerald-400' : 'text-muted-foreground'} />
+        <View
+          className={cn(
+            'size-8 items-center justify-center',
+            active ? 'bg-emerald-500/15' : 'bg-muted'
+          )}
+        >
+          <Icon
+            as={icon}
+            size={16}
+            className={active ? 'text-emerald-400' : 'text-muted-foreground'}
+          />
         </View>
         <View className="min-w-0 flex-1">
           <Label>{title}</Label>
-          <Text className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</Text>
+          <Text className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {description}
+          </Text>
         </View>
       </View>
       <View className="shrink-0 flex-row items-center gap-3">{children}</View>
@@ -246,7 +279,10 @@ export default function Security() {
     <SettingsPage description="Protect your account and choose what others can see.">
       <SettingsGroup title="Privacy">
         <SettingsRow title="Show online status" description="Let people see when you're online.">
-          <Switch value={showOnlineStatus} onValueChange={(value) => update({ showOnlineStatus: value })} />
+          <Switch
+            value={showOnlineStatus}
+            onValueChange={(value) => update({ showOnlineStatus: value })}
+          />
         </SettingsRow>
       </SettingsGroup>
 
@@ -258,13 +294,18 @@ export default function Security() {
       ) : !mfaLoaded ? (
         <View className="gap-2">
           <Text className="text-sm font-medium">MFA settings are unavailable</Text>
-          <Text className="text-xs text-destructive">{mfaError ?? 'Could not load MFA settings.'}</Text>
+          <Text className="text-xs text-destructive">
+            {mfaError ?? 'Could not load MFA settings.'}
+          </Text>
           <Button variant="outline" size="sm" className="self-start" onPress={loadMfaStatus}>
             <Text>Try again</Text>
           </Button>
         </View>
       ) : (
-        <SettingsGroup title="Two-step verification" description="Ask for a second code when you sign in.">
+        <SettingsGroup
+          title="Two-step verification"
+          description="Ask for a second code when you sign in."
+        >
           <MfaRow
             icon={Mail}
             active={mfaOptions.includes('EMAIL')}
@@ -282,7 +323,9 @@ export default function Security() {
           {totpLoading && totpState === 'idle' ? (
             <View className="min-h-20 flex-row items-center justify-center gap-2 px-4 py-4">
               <Spinner />
-              <Text className="text-xs text-muted-foreground">Preparing authenticator setup...</Text>
+              <Text className="text-xs text-muted-foreground">
+                Preparing authenticator setup...
+              </Text>
             </View>
           ) : totpState === 'enabled' ? (
             <MfaRow
@@ -324,7 +367,13 @@ export default function Security() {
                   <Text selectable className="min-w-0 flex-1 px-2.5 py-2 font-mono text-xs">
                     {totpSecret}
                   </Text>
-                  <Button variant="ghost" size="icon" className="border-l border-border" accessibilityLabel="Copy setup key" onPress={copyTotpSecret}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="border-l border-border"
+                    accessibilityLabel="Copy setup key"
+                    onPress={copyTotpSecret}
+                  >
                     <Icon as={secretCopied ? Check : Copy} size={14} />
                   </Button>
                 </View>
@@ -347,7 +396,10 @@ export default function Security() {
                     placeholder="000000"
                     returnKeyType="done"
                     onSubmitEditing={enableTotp}
-                    className={cn('flex-1 font-mono tracking-widest', totpError && 'border-destructive')}
+                    className={cn(
+                      'flex-1 font-mono tracking-widest',
+                      totpError && 'border-destructive'
+                    )}
                   />
                   <Button disabled={totpLoading} onPress={enableTotp}>
                     {totpLoading && <Spinner />}

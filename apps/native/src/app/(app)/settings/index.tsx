@@ -94,7 +94,11 @@ export default function Settings() {
       {groups.map((group) => (
         <SettingsGroup key={group.label} title={group.label}>
           {group.pages.map((page) => (
-            <Pressable key={page.href} className={row} onPress={() => router.push(page.href as never)}>
+            <Pressable
+              key={page.href}
+              className={row}
+              onPress={() => router.push(page.href as never)}
+            >
               <Icon as={page.icon} size={18} className="text-muted-foreground" />
               <Text className="flex-1 text-sm">{page.title}</Text>
               <Icon as={ChevronRight} size={16} className="text-muted-foreground" />
