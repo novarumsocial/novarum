@@ -229,7 +229,7 @@ export function FriendsHome({ onOpenNavigation }: { onOpenNavigation: () => void
     <View className="min-w-0 flex-1 bg-background">
       <View
         className="flex-row items-center gap-2 border-b border-border px-1"
-        style={{ height: 48 + insets.top, paddingTop: insets.top }}
+        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
       >
         {width < 768 && (
           <Button
@@ -259,7 +259,7 @@ export function FriendsHome({ onOpenNavigation }: { onOpenNavigation: () => void
               accessibilityState={{ selected: tab === item.value }}
               onPress={() => setTab(item.value)}
               className={cn(
-                'h-11 flex-row items-center gap-1.5 px-2.5',
+                'min-h-11 flex-row items-center gap-1.5 px-2.5',
                 tab === item.value && 'bg-muted'
               )}
             >
@@ -285,7 +285,7 @@ export function FriendsHome({ onOpenNavigation }: { onOpenNavigation: () => void
             accessibilityState={{ selected: tab === 'add' }}
             onPress={() => setTab('add')}
             className={cn(
-              'h-11 justify-center px-2.5',
+              'min-h-11 justify-center px-2.5',
               tab === 'add' ? 'bg-transparent' : 'bg-primary'
             )}
           >

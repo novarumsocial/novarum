@@ -17,7 +17,7 @@ export const Input = React.forwardRef<
   const Field = sheet ? (BottomSheetTextInput as unknown as typeof TextInput) : TextInput;
   const colors = useThemeColors();
   const classes = cn(
-    'h-11 rounded-none border border-input bg-background px-3 text-base text-foreground',
+    'min-h-11 rounded-none border border-input bg-background px-3 text-base text-foreground',
     props.editable === false && 'opacity-50',
     className
   );

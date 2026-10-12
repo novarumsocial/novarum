@@ -38,7 +38,8 @@ export function VoiceTileView({
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const isScreen = tile.kind === 'screen';
-  const track = isScreen ? tile.state.screenTrack : tile.state.cameraTrack;
+  // your own screen is not rendered: capturing the app showing itself would loop
+  const track = isScreen ? (isSelf ? null : tile.state.screenTrack) : tile.state.cameraTrack;
   const ringColor = tile.member?.speakingRingColor ?? '#00d492';
 
   const settings = track?.mediaStreamTrack?.getSettings?.();
@@ -71,12 +72,12 @@ export function VoiceTileView({
             objectFit="contain"
             mirror={isSelf && !isScreen && mirror}
           />
-        ) : isScreen && !isSelf ? (
+        ) : isScreen ? (
           <View className="size-full items-center justify-center gap-2">
             <Icon as={MonitorUp} size={compact ? 20 : 32} className="text-white" />
             {!compact && (
               <Text className="bg-white/10 px-3 py-1.5 text-sm font-medium text-white">
-                Watch Stream
+                {isSelf ? 'Sharing your screen' : 'Watch Stream'}
               </Text>
             )}
           </View>

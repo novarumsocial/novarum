@@ -79,6 +79,7 @@ export function MessageInput({
   focusOn = null,
 }: {
   placeholder?: string;
+  // the chat shows the message as "sending" right away; this only throws when it could not even take it
   onSend?: (content: string | null, files: PickedFile[]) => void | Promise<void>;
   onTyping?: () => void;
   // focus the input whenever this changes to something (chat-area passes the id of the message being replied to)
@@ -135,7 +136,8 @@ export function MessageInput({
     const draft = content;
     setSending(true);
     setSendError('');
-    // optimistic: the text clears right away and comes back if sending fails (file tiles stay to show progress)
+    // optimistic: the chat shows the message as "sending" (with a retry if it fails), so the composer clears now
+    // and only gets the text back if the chat could not even take it
     setContent('');
     try {
       await onSend(trimmed, files);
@@ -232,6 +234,7 @@ export function MessageInput({
         >
           {mentionResults.map((member) => (
             <Pressable
+              accessibilityRole="button"
               key={member.userId}
               onPress={() => insertMention(member)}
               className="h-11 flex-row items-center gap-2 px-3 active:bg-accent"
@@ -250,6 +253,7 @@ export function MessageInput({
           ))}
           {emojiMatches.map((emoji) => (
             <Pressable
+              accessibilityRole="button"
               key={emoji.unicode}
               onPress={() => insertEmoji(emoji)}
               className="h-11 flex-row items-center gap-2 px-3 active:bg-accent"
@@ -358,6 +362,7 @@ export function MessageInput({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
+          accessibilityLabel={placeholder}
           className="max-h-40 min-h-11 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px]"
         />
         <Button

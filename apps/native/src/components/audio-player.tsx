@@ -47,7 +47,22 @@ function Controls({
           {/* tap anywhere on the bar to seek (dragging would fight the row's swipe-to-reply) */}
           <Pressable
             accessibilityRole="adjustable"
-            className="h-6 justify-center"
+            accessibilityLabel="Seek"
+            accessibilityValue={{ text: `${clock(current)} of ${clock(duration)}` }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={(event) =>
+              onSeek?.(
+                Math.max(
+                  0,
+                  Math.min(
+                    1,
+                    (duration ? current / duration : 0) +
+                      (event.nativeEvent.actionName === 'increment' ? 0.1 : -0.1)
+                  )
+                )
+              )
+            }
+            className="min-h-11 justify-center"
             onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
             onPress={(event) => onSeek?.(event.nativeEvent.locationX / width)}
           >

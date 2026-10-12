@@ -3,7 +3,17 @@
 // pages are prepended and follows new messages while you are near the bottom.
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import { BellRing, ChevronDown, Hash, Menu, Phone, Users, Volume2, X } from 'lucide-react-native';
+import {
+  BellRing,
+  ChevronDown,
+  Hash,
+  Menu,
+  Phone,
+  RotateCw,
+  Users,
+  Volume2,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
@@ -56,7 +66,18 @@ type Row =
       message: ChatMessage;
       replied: ChatMessage | null;
       grouped: boolean;
-    };
+    }
+  | { kind: 'pending'; key: string; pending: Pending };
+
+// an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
+type Pending = {
+  id: string;
+  channelId: string;
+  content: string | null;
+  files: PickedFile[];
+  replyTo: string | null;
+  failed: boolean;
+};
 
 const noCallers: { name: string | null }[] = [];
 const GROUP_WINDOW = 5 * 60 * 1000;
@@ -94,6 +115,69 @@ function Dot({ delay }: { delay: number }) {
   }, [delay, lift]);
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }));
   return <Animated.View style={style} className="size-1 rounded-full bg-muted-foreground" />;
+}
+
+function PendingMessage({
+  pending,
+  onRetry,
+  onDiscard,
+}: {
+  pending: Pending;
+  onRetry: (pending: Pending) => void;
+  onDiscard: (pending: Pending) => void;
+}) {
+  const self = useSession((s) => s.user);
+  const name = self?.displayName || self?.username || 'You';
+  const attachments = `${pending.files.length} attachment${pending.files.length === 1 ? '' : 's'}`;
+
+  return (
+    <View className="mt-4 flex-row gap-3 px-3 py-0.5">
+      <Avatar
+        src={self?.avatarUrl}
+        name={name}
+        bgColor={self?.avatarColor}
+        className="mt-0.5 size-9"
+      />
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-semibold" numberOfLines={1}>
+          {name}
+        </Text>
+        <View className={pending.failed ? undefined : 'opacity-60'}>
+          {pending.content ? (
+            <Text className="text-[15px] leading-[22px] text-foreground/90">{pending.content}</Text>
+          ) : null}
+          {pending.files.length > 0 && (
+            <Text className="text-xs text-muted-foreground">{attachments}</Text>
+          )}
+        </View>
+        {pending.failed ? (
+          <View className="flex-row items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Message failed to send. Tap to retry"
+              onPress={() => onRetry(pending)}
+              className="min-h-11 flex-1 flex-row items-center gap-1.5 active:opacity-70"
+            >
+              <Icon as={RotateCw} size={14} className="text-destructive" />
+              <Text className="shrink text-xs text-destructive">Failed to send. Tap to retry</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Discard message"
+              onPress={() => onDiscard(pending)}
+              className="size-11 items-center justify-center active:bg-accent"
+            >
+              <Icon as={X} size={16} className="text-muted-foreground" />
+            </Pressable>
+          </View>
+        ) : (
+          <Text accessibilityLiveRegion="polite" className="text-[11px] text-muted-foreground">
+            Sending…
+          </Text>
+        )}
+      </View>
+    </View>
+  );
 }
 
 function Divider({ label, className }: { label: string; className: string }) {
@@ -161,6 +245,7 @@ export function ChatArea({
     lastReadMessageId: string | null;
   } | null>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [pending, setPending] = useState<Pending[]>([]);
 
   // the call panel's height, dragged with its bottom handle
   const callHeight = useSharedValue(320);
@@ -225,8 +310,13 @@ export function ChatArea({
         grouped,
       });
     });
+    for (const item of pending) {
+      if (item.channelId === channel.id) {
+        result.push({ kind: 'pending', key: `pending-${item.id}`, pending: item });
+      }
+    }
     return result;
-  }, [messages, unreadBoundary, channel.id]);
+  }, [messages, pending, unreadBoundary, channel.id]);
 
   const typingText =
     typing.length === 0
@@ -262,8 +352,8 @@ export function ChatArea({
   }, []);
 
   // the shell may pass new functions on every render; rows get stable ones
-  const handlers = useRef({ onDelete, onEdit });
-  handlers.current = { onDelete, onEdit };
+  const handlers = useRef({ onDelete, onEdit, onSend });
+  handlers.current = { onDelete, onEdit, onSend };
   const deleteMessage = useCallback((id: string) => handlers.current.onDelete(id), []);
   const editMessage = useCallback(
     (id: string, content: string | null) => handlers.current.onEdit(id, content),
@@ -275,11 +365,41 @@ export function ChatArea({
     []
   );
 
-  async function sendMessage(content: string | null, files: PickedFile[]) {
-    await onSend?.(content, files, replyingTo?.id ?? null);
+  // sends in the background: the composer clears right away and the message waits in the list as "sending"
+  const send = useCallback(async (item: Pending) => {
+    setPending((list) => list.map((p) => (p.id === item.id ? { ...p, failed: false } : p)));
+    try {
+      await handlers.current.onSend?.(item.content, item.files, item.replyTo);
+      setPending((list) => list.filter((p) => p.id !== item.id));
+    } catch {
+      setPending((list) => list.map((p) => (p.id === item.id ? { ...p, failed: true } : p)));
+    }
+  }, []);
+  const discard = useCallback(
+    (item: Pending) => setPending((list) => list.filter((p) => p.id !== item.id)),
+    []
+  );
+
+  function sendMessage(content: string | null, files: PickedFile[]) {
+    const item: Pending = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      channelId: channel.id,
+      content,
+      files,
+      replyTo: replyingTo?.id ?? null,
+      failed: false,
+    };
+    setPending((list) => [...list, item]);
     setUnreadBoundary(null);
     setReplyingTo(null);
+    void send(item);
   }
+
+  // a new pending message scrolls into view, like your own sent messages do
+  const pendingCount = pending.filter((item) => item.channelId === channel.id).length;
+  useEffect(() => {
+    if (pendingCount > 0) list.current?.scrollToEnd({ animated: true });
+  }, [pendingCount]);
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -294,6 +414,9 @@ export function ChatArea({
         return <Divider label={formatDate(item.date)} className="bg-muted-foreground/20" />;
       }
       if (item.kind === 'new') return <Divider label="New" className="bg-destructive" />;
+      if (item.kind === 'pending') {
+        return <PendingMessage pending={item.pending} onRetry={send} onDiscard={discard} />;
+      }
 
       return (
         <Message
@@ -308,7 +431,7 @@ export function ChatArea({
         />
       );
     },
-    [activeMessage, deleteMessage, editMessage, flashEnd]
+    [activeMessage, deleteMessage, editMessage, flashEnd, send, discard]
   );
 
   const showMenu = width < 768;
@@ -319,7 +442,7 @@ export function ChatArea({
     <View className="min-h-0 min-w-0 flex-1 bg-background">
       <View
         className="flex-row items-center gap-2 border-b border-border px-1"
-        style={{ height: 48 + insets.top, paddingTop: insets.top }}
+        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
       >
         {showMenu && (
           <Button
@@ -434,14 +557,14 @@ export function ChatArea({
 
       <KeyboardAvoidingView
         behavior="padding"
-        className={call && callExpanded ? 'hidden' : 'min-h-0 flex-1'}
+        style={call && callExpanded ? { display: 'none' } : { flex: 1, minHeight: 0 }}
       >
         <View className="min-h-0 flex-1">
           {loading ? (
             <View className="flex-1 justify-end pb-4">
               <Skeletons count={5} />
             </View>
-          ) : messages.length === 0 ? (
+          ) : messages.length === 0 && rows.length === 0 ? (
             <View className="flex-1 items-start justify-end gap-3 p-4">
               {channel.type === 'DM' && (
                 <Avatar
@@ -530,7 +653,7 @@ export function ChatArea({
         </View>
 
         {replyingTo && (
-          <View className="h-11 flex-row items-center gap-2 border-t border-border pl-3">
+          <View className="min-h-11 flex-row items-center gap-2 border-t border-border pl-3">
             <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
               Replying to{' '}
               <Text className="text-xs font-medium">

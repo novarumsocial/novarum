@@ -130,7 +130,10 @@ export function Panels({
               className="absolute inset-0 bg-black"
             >
               <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Close panel"
+                accessibilityElementsHidden={!open}
+                importantForAccessibility={open ? 'yes' : 'no-hide-descendants'}
                 className="flex-1"
                 onPress={() => usePanels.getState().close()}
               />

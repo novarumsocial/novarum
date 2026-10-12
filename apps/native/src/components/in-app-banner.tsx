@@ -19,6 +19,9 @@ export function InAppBanner() {
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${banner.title}${banner.body ? `: ${banner.body}` : ''}`}
+      accessibilityLiveRegion="polite"
       onPress={() => {
         dismiss();
         banner.onClick?.();

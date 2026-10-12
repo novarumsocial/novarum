@@ -1,7 +1,8 @@
 // Port of apps/frontend/src/lib/voice.svelte.ts
 // Not ported (web/desktop only): RNNoise worklet (WebRTC `noiseSuppression` instead), input/output device
 // pickers (audio route + camera facing instead), "audio playback blocked" (no autoplay policy on phones),
-// screen share (TODO phase 7), and the loopback playback of the mic test (RN has no audio element).
+// system audio in screen shares and iOS screen share (needs a broadcast extension), and the loopback playback
+// of the mic test (RN has no audio element).
 import { registerGlobals, AudioSession } from '@livekit/react-native';
 import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
@@ -87,6 +88,7 @@ type VoiceStore = {
   mutedBeforeDeafen: boolean;
   selfDeafened: boolean;
   selfCamera: boolean;
+  selfScreenShare: boolean;
   cameraFacing: CameraFacing;
   audioOutput: AudioOutput;
   audioOutputs: AudioOutput[];
@@ -113,11 +115,12 @@ type VoiceStore = {
   setParticipantScreenVolume: (identity: string, volume: number) => void;
   setCamera: (enabled: boolean) => Promise<void>;
   setCameraFacing: (facing: CameraFacing) => Promise<void>;
+  // Android only: iOS needs a broadcast upload extension
+  setScreenShare: (enabled: boolean) => Promise<void>;
   setAudioOutput: (output: AudioOutput) => Promise<void>;
   setNoiseCancellation: (enabled: boolean) => Promise<void>;
   setEchoCancellation: (enabled: boolean) => Promise<void>;
   setAutoGainControl: (enabled: boolean) => Promise<void>;
-  // TODO phase 7: setScreenShare, setScreenShareSystemAudio
 };
 
 // iOS only knows "default" and "force_speaker"; Android has the real routes
@@ -130,6 +133,14 @@ const clampVolume = (volume: number) => Math.max(0, Math.min(3, volume));
 export const useVoice = create<VoiceStore>((set, get) => {
   let connectionAttempt = 0;
   let captureSettingsOperation: Promise<void> = Promise.resolve();
+  // start / stop calls run one after another so a quick leave + join can't end with the session stopped
+  let audioSessionOperation: Promise<void> = Promise.resolve();
+  const runAudioSession = (operation: () => Promise<void>) =>
+    (audioSessionOperation = audioSessionOperation.catch(() => undefined).then(operation));
+  const stopAudioSession = () =>
+    runAudioSession(async () => {
+      if (!get().room) await AudioSession.stopAudioSession();
+    }).catch(() => undefined);
 
   const micTrack = (room: Room) =>
     room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
@@ -143,10 +154,10 @@ export const useVoice = create<VoiceStore>((set, get) => {
       channelId: null,
       connectionState: ConnectionState.Disconnected,
       selfCamera: false,
+      selfScreenShare: false,
       voiceStates: new Map(),
       watchedStreams: new Set(),
     });
-    void AudioSession.stopAudioSession();
   };
 
   const syncSubscription = (publication: RemoteTrackPublication, identity: string) => {
@@ -203,7 +214,14 @@ export const useVoice = create<VoiceStore>((set, get) => {
     return track.mediaStreamTrack?.readyState === 'ended' ? null : (track as VideoTrack);
   };
 
-  const syncParticipant = (participant: Participant, channelId: string) => {
+  const syncParticipant = (participant: Participant) => {
+    // ignore late events and awaits that finish after leaving, or for someone who already left
+    const { room, channelId } = get();
+    const current = participant.isLocal
+      ? room?.localParticipant
+      : room?.remoteParticipants.get(participant.identity);
+    if (!channelId || current !== participant) return;
+
     const micPub = participant.getTrackPublication(Track.Source.Microphone);
     const screenPub = participant.getTrackPublication(Track.Source.ScreenShare);
     const cameraPub = participant.getTrackPublication(Track.Source.Camera);
@@ -212,7 +230,11 @@ export const useVoice = create<VoiceStore>((set, get) => {
     const cameraTrack = activeVideoTrack(cameraPub?.isMuted, cameraPub?.track);
     const screenTrack = activeVideoTrack(screenPub?.isMuted, screenPub?.track);
 
-    if (isLocal) set({ selfCamera: !!cameraTrack });
+    if (isLocal) {
+      // the system can end a share on its own (notification, status bar chip), which unpublishes the track
+      if (get().selfScreenShare !== !!screenTrack) play(screenTrack ? 'screen' : 'screenOff');
+      set({ selfCamera: !!cameraTrack, selfScreenShare: !!screenTrack });
+    }
 
     updateVoiceState(participant.identity, {
       userId: participant.identity,
@@ -235,17 +257,23 @@ export const useVoice = create<VoiceStore>((set, get) => {
     if (source === Track.Source.ScreenShare) play(on ? 'screen' : 'screenOff');
   };
 
-  const bindRoomEvents = (room: Room, channelId: string) => {
+  const bindRoomEvents = (room: Room) => {
     room
       .on(RoomEvent.ConnectionStateChanged, (state) => set({ connectionState: state }))
       .on(RoomEvent.Disconnected, () => {
         if (get().room !== room) return;
 
         resetRoom();
+        void stopAudioSession();
         realtime().leaveVoice();
       })
+      .on(RoomEvent.Reconnected, () => {
+        for (const participant of [room.localParticipant, ...room.remoteParticipants.values()]) {
+          syncParticipant(participant);
+        }
+      })
       .on(RoomEvent.ParticipantConnected, (participant) => {
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
         play('join');
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
@@ -260,44 +288,51 @@ export const useVoice = create<VoiceStore>((set, get) => {
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) playRemoteSound(publication.source, false);
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
         if (!participant.isLocal) playRemoteSound(publication.source, true);
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.TrackPublished, (publication, participant) => {
         playRemoteSound(publication.source, true, true);
         syncSubscription(publication, participant.identity);
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
         playRemoteSound(publication.source, false, true);
         if (publication.source === Track.Source.ScreenShare) {
           get().stopWatchingStream(participant.identity);
         }
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
+      })
+      .on(RoomEvent.LocalTrackPublished, (_publication, participant) => {
+        syncParticipant(participant);
       })
       .on(RoomEvent.LocalTrackUnpublished, (_publication, participant) => {
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.TrackSubscribed, (_track, _publication, participant) => {
         updateParticipantAudio(participant.identity);
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => {
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
       })
       .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const speaking = new Set(speakers.map((speaker) => speaker.identity));
-        set((s) => ({
-          voiceStates: new Map(
-            [...s.voiceStates].map(([identity, state]) => [
-              identity,
-              { ...state, speaking: speaking.has(identity) },
-            ])
-          ),
-        }));
+        set((s) => {
+          if ([...s.voiceStates].every(([id, state]) => state.speaking === speaking.has(id)))
+            return s;
+          return {
+            voiceStates: new Map(
+              [...s.voiceStates].map(([id, state]) => [
+                id,
+                { ...state, speaking: speaking.has(id) },
+              ])
+            ),
+          };
+        });
       });
   };
 
@@ -325,7 +360,11 @@ export const useVoice = create<VoiceStore>((set, get) => {
     const outputs = (await AudioSession.getAudioOutputs()).flatMap((id) =>
       Platform.OS === 'ios' ? (iosOutputs[id] ?? []) : [id as AudioOutput]
     );
-    set({ audioOutputs: outputs.filter((o) => ['speaker', 'earpiece', 'bluetooth'].includes(o)) });
+    set({
+      audioOutputs: outputs.filter((o) =>
+        ['speaker', 'earpiece', 'bluetooth'].includes(o)
+      ),
+    });
   };
 
   return {
@@ -336,6 +375,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
     mutedBeforeDeafen: false,
     selfDeafened: false,
     selfCamera: false,
+    selfScreenShare: false,
     cameraFacing: 'user',
     audioOutput: 'speaker',
     audioOutputs: ['speaker', 'earpiece'],
@@ -365,7 +405,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
       if (connectionAttempt !== attempt) return;
 
       if (error) {
-        set({ connectionState: ConnectionState.Disconnected });
+        set({ channelId: null, connectionState: ConnectionState.Disconnected });
         throw error;
       }
 
@@ -376,20 +416,26 @@ export const useVoice = create<VoiceStore>((set, get) => {
         videoCaptureDefaults: { facingMode: get().cameraFacing },
       });
       set({ room });
-      bindRoomEvents(room, channelId);
+      bindRoomEvents(room);
 
-      await AudioSession.startAudioSession();
-      if (get().audioOutput !== 'speaker') void get().setAudioOutput(get().audioOutput);
-      void loadAudioOutputs();
-
-      const connectPromise = room.connect(data.serverUrl, data.token, { autoSubscribe: false });
-      connectPromise.catch(() => null);
-
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
+        await runAudioSession(() => AudioSession.startAudioSession());
+        if (connectionAttempt !== attempt || get().room !== room) return;
+
+        if (get().audioOutput !== 'speaker') {
+          get()
+            .setAudioOutput(get().audioOutput)
+            .catch(() => null);
+        }
+        void loadAudioOutputs().catch(() => null);
+
+        const connectPromise = room.connect(data.serverUrl, data.token, { autoSubscribe: false });
+        connectPromise.catch(() => null);
         await Promise.race([
           connectPromise,
           new Promise<never>((_, reject) => {
-            setTimeout(
+            timeout = setTimeout(
               () => reject(new Error('Voice connection timed out')),
               livekitConnectionTimeoutMs
             );
@@ -399,7 +445,13 @@ export const useVoice = create<VoiceStore>((set, get) => {
         if (connectionAttempt !== attempt || get().room !== room) return;
 
         resetRoom();
+        // a connect that timed out may still finish later, so cancel it
+        room.removeAllListeners();
+        await room.disconnect().catch(() => null);
+        void stopAudioSession();
         throw error;
+      } finally {
+        clearTimeout(timeout);
       }
 
       if (connectionAttempt !== attempt || get().room !== room) {
@@ -415,10 +467,10 @@ export const useVoice = create<VoiceStore>((set, get) => {
         return;
       }
 
-      syncParticipant(room.localParticipant, channelId);
+      syncParticipant(room.localParticipant);
       realtime().joinVoice(channelId);
       for (const participant of room.remoteParticipants.values()) {
-        syncParticipant(participant, channelId);
+        syncParticipant(participant);
         for (const publication of participant.trackPublications.values()) {
           syncSubscription(publication, participant.identity);
         }
@@ -449,6 +501,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
       room.removeAllListeners();
       await room.disconnect().catch(() => null);
+      await stopAudioSession();
       if (channelId) realtime().leaveVoice();
       play('leave');
     },
@@ -458,13 +511,13 @@ export const useVoice = create<VoiceStore>((set, get) => {
       play(muted ? 'mute' : 'unmute');
       void Haptics.selectionAsync();
 
-      const { room, channelId } = get();
+      const { room } = get();
       if (!room) return;
 
       await syncLocalMicrophone(room);
 
       // keep the local participant in sync
-      syncParticipant(room.localParticipant, channelId!);
+      syncParticipant(room.localParticipant);
     },
 
     async setDeafened(deafened) {
@@ -477,13 +530,13 @@ export const useVoice = create<VoiceStore>((set, get) => {
       play(deafened ? 'deafen' : 'undeafen');
       void Haptics.selectionAsync();
 
-      const { room, channelId } = get();
+      const { room } = get();
       if (!room) return;
 
       for (const identity of room.remoteParticipants.keys()) updateParticipantAudio(identity);
       await syncLocalMicrophone(room);
 
-      syncParticipant(room.localParticipant, channelId!);
+      syncParticipant(room.localParticipant);
     },
 
     async setAudioLoopbackTesting(testing) {
@@ -499,6 +552,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
       try {
         const track = await createLocalAudioTrack(microphoneCaptureOptions());
+        get().audioLoopbackTrack?.stop();
         if (get().audioLoopbackTesting) set({ audioLoopbackTrack: track });
         else track.stop();
       } catch (error) {
@@ -519,19 +573,34 @@ export const useVoice = create<VoiceStore>((set, get) => {
       setParticipantAudio(identity, { screenVolume: clampVolume(volume) }),
 
     async setCamera(enabled) {
-      const { room, channelId } = get();
+      const room = get().room;
       if (!room) return;
 
       try {
         await room.localParticipant.setCameraEnabled(enabled, { facingMode: get().cameraFacing });
-        set({ selfCamera: enabled });
         play(enabled ? 'camera' : 'cameraOff');
       } catch {
         play('cameraOff');
-        set({ selfCamera: false });
       }
 
-      syncParticipant(room.localParticipant, channelId!);
+      // sets `selfCamera` from the actual track
+      syncParticipant(room.localParticipant);
+    },
+
+    async setScreenShare(enabled) {
+      const room = get().room;
+      if (!room || Platform.OS === 'ios') return;
+
+      try {
+        // starts the MediaProjection foreground service and shows the system capture prompt
+        await room.localParticipant.setScreenShareEnabled(enabled);
+      } catch (error) {
+        // the prompt was dismissed or the user denied the capture
+        console.error('could not change screen share', error);
+      }
+
+      // sets `selfScreenShare` and plays the sound from the actual track
+      syncParticipant(room.localParticipant);
     },
 
     async setCameraFacing(facing) {
@@ -544,7 +613,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
       try {
         await track.restartTrack({ facingMode: facing });
-        syncParticipant(room.localParticipant, get().channelId!);
+        syncParticipant(room.localParticipant);
       } catch (error) {
         set({ cameraFacing: previous });
         console.error('could not change camera', error);

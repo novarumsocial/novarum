@@ -13,6 +13,7 @@ import { DmSidebar } from '@/components/dm-sidebar';
 import { FriendsHome } from '@/components/friends-home';
 import { GuildSidebar } from '@/components/guild-sidebar';
 import { MemberSidebar } from '@/components/member-sidebar';
+import { MiniCall } from '@/components/mini-call';
 import { Panels } from '@/components/panels';
 import { Text } from '@/components/ui/text';
 import { UserArea } from '@/components/user-area';
@@ -101,6 +102,16 @@ export default function Guilds() {
       .find((channel) => channel.id === voiceChannelId)?.name ??
     (voiceChannelId ? dms().get(voiceChannelId)?.participants[0]?.username : null) ??
     null;
+
+  // where the mini call bar leads back to: the DM, or the guild the voice channel belongs to
+  const voiceChannelPath = (() => {
+    if (!voiceChannelId) return null;
+    if (dms().get(voiceChannelId)) return dmPath(voiceChannelId);
+    const guildId = Object.entries(channelsByServer).find(([, categories]) =>
+      categories.some((category) => category.channels.some((c) => c.id === voiceChannelId))
+    )?.[0];
+    return guildId ? guildPath(guildId, voiceChannelId) : null;
+  })();
 
   function startCall(id: string) {
     // phones have no room for the call and the chat side by side, so start it expanded.
@@ -258,7 +269,21 @@ export default function Guilds() {
           ) : undefined
         }
       >
-        {center}
+        <View className="min-h-0 min-w-0 flex-1">
+          {center}
+          {voiceChannelPath && (
+            <MiniCall
+              name={voiceChannelName ?? 'Voice channel'}
+              hidden={currentChannel?.id === voiceChannelId}
+              top={insets.top + 48 + 8}
+              onOpen={() => {
+                // a guild voice channel only shows its call when it is the selected channel
+                goto(voiceChannelPath);
+                panels().close();
+              }}
+            />
+          )}
+        </View>
       </Panels>
       <CallRinging
         onAccept={(id) => {

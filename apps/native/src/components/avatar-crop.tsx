@@ -119,7 +119,13 @@ export function AvatarCrop({
   }
 
   return (
-    <Modal visible={image !== null} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={image !== null}
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       {/* a Modal is outside the app's root view, so gestures need their own root */}
       <GestureHandlerRootView className="flex-1 bg-background">
         <View

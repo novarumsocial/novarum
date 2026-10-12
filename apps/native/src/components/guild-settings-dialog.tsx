@@ -85,6 +85,7 @@ export function GuildSettingsDialog({
 
           <View className="flex-row items-center gap-4">
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Change guild picture"
               disabled={uploading}
               onPress={selectPicture}

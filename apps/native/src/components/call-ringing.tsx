@@ -1,8 +1,9 @@
 // Port of apps/frontend/src/lib/components/call-ringing.svelte
 // Mount once in the app shell (above the panels): <CallRinging onAccept={(channelId) => router.push(dmPath(channelId))} />
+import * as Haptics from 'expo-haptics';
 import { Phone, PhoneOff } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { View } from 'react-native';
+import { Vibration, View } from 'react-native';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
@@ -17,19 +18,24 @@ import { useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { useVoice } from '@/lib/voice';
 
-// play the ring sound every 2s and give up after RING_TIMEOUT
-function useRinging(ringing: boolean, onTimeout: () => void) {
+// Ring sound every 2s (plus a vibration pattern when it is incoming) and give up after RING_TIMEOUT.
+// `key` identifies the call, so a different call restarts the ring and its timeout.
+function useRinging(key: string | null, onTimeout: () => void, vibrate = false) {
+  const timeoutRef = useRef(onTimeout);
+  timeoutRef.current = onTimeout;
+
   useEffect(() => {
-    if (!ringing) return;
+    if (!key) return;
     notificationSound();
+    if (vibrate) Vibration.vibrate([0, 500, 300, 500, 1200], true);
     const ring = setInterval(notificationSound, 2000);
-    const timeout = setTimeout(onTimeout, RING_TIMEOUT);
+    const timeout = setTimeout(() => timeoutRef.current(), RING_TIMEOUT);
     return () => {
       clearInterval(ring);
       clearTimeout(timeout);
+      if (vibrate) Vibration.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ringing]);
+  }, [key, vibrate]);
 }
 
 export function CallRinging({ onAccept }: { onAccept: (channelId: string) => void }) {
@@ -61,8 +67,8 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
     if (outgoing && (voiceChannelId !== outgoing || outgoingCount > 1)) setOutgoingCall(null);
   }, [outgoing, voiceChannelId, outgoingCount, setOutgoingCall]);
 
-  useRinging(!!call, () => setIncomingCall(null));
-  useRinging(!!outgoing, () => setOutgoingCall(null));
+  useRinging(call?.channelId ?? null, () => setIncomingCall(null), true);
+  useRinging(outgoing, () => setOutgoingCall(null));
 
   if (!call) return null;
 
@@ -95,6 +101,7 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
         className={cn('size-12', circleIcons && 'rounded-full')}
         accessibilityLabel="Decline"
         onPress={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           realtime().ringCall(call.channelId, false);
           setIncomingCall(null);
         }}
@@ -108,6 +115,7 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
         )}
         accessibilityLabel="Accept"
         onPress={() => {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           setIncomingCall(null);
           onAccept(call.channelId);
         }}

@@ -51,16 +51,21 @@ export function CreateChannelDialog({
       return;
     }
     setLoading(true);
-    await onCreate?.({
-      id: `chn-${Date.now()}`,
-      name: slug,
-      unread: false,
-      lastReadMessageId: null,
-      mention: 0,
-      type,
-    });
-    setLoading(false);
-    onClose();
+    try {
+      await onCreate?.({
+        id: `chn-${Date.now()}`,
+        name: slug,
+        unread: false,
+        lastReadMessageId: null,
+        mention: 0,
+        type,
+      });
+      onClose();
+    } catch {
+      setError('Could not create the channel.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -95,10 +100,12 @@ export function CreateChannelDialog({
               ] as const
             ).map(([value, label, icon]) => (
               <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: type === value }}
                 key={value}
                 onPress={() => setType(value)}
                 className={cn(
-                  'h-11 flex-1 flex-row items-center gap-2 border border-border bg-background px-3 active:bg-accent',
+                  'min-h-11 flex-1 flex-row items-center gap-2 border border-border bg-background px-3 active:bg-accent',
                   type === value && 'border-primary bg-primary/10'
                 )}
               >

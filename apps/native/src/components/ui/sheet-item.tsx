@@ -23,7 +23,7 @@ export function SheetItem({
       onPress={onPress}
       disabled={disabled}
       className={cn(
-        'h-12 flex-row items-center gap-3 px-4 active:bg-accent',
+        'min-h-12 flex-row items-center gap-3 px-4 active:bg-accent',
         disabled && 'opacity-50'
       )}
     >

@@ -40,15 +40,20 @@ export function CreateServerDialog({ open, onClose }: { open: boolean; onClose: 
       return;
     }
     setLoading(true);
-    await chat().createServer({
-      id: `srv-${Date.now()}`,
-      name: trimmed,
-      initials: initials(trimmed),
-      down: false,
-      canManageChannels: true,
-    });
-    setLoading(false);
-    onClose();
+    try {
+      await chat().createServer({
+        id: `srv-${Date.now()}`,
+        name: trimmed,
+        initials: initials(trimmed),
+        down: false,
+        canManageChannels: true,
+      });
+      onClose();
+    } catch {
+      setError('Could not create the server.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

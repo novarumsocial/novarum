@@ -28,9 +28,10 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
         return (
           <View key={account.homeServer} className="flex-row items-center">
             <Pressable
+              accessibilityRole="button"
               disabled={active}
               onPress={() => switchTo(account.homeServer)}
-              className={`h-14 flex-1 flex-row items-center gap-3 px-4 ${active ? 'bg-accent/50' : 'active:bg-accent'}`}
+              className={`min-h-14 flex-1 flex-row items-center gap-3 px-4 ${active ? 'bg-accent/50' : 'active:bg-accent'}`}
             >
               <Avatar
                 src={account.avatarUrl}
@@ -50,6 +51,7 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
             </Pressable>
             {!active && (
               <Pressable
+                accessibilityRole="button"
                 accessibilityLabel={`Forget ${account.homeServer}`}
                 onPress={() => session().forget(account.homeServer)}
                 className="h-14 w-12 items-center justify-center active:bg-accent"
@@ -61,11 +63,12 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
         );
       })}
       <Pressable
+        accessibilityRole="button"
         onPress={() => {
           onClose();
           router.push('/login?add');
         }}
-        className="h-14 flex-row items-center gap-3 px-4 active:bg-accent"
+        className="min-h-14 flex-row items-center gap-3 px-4 active:bg-accent"
       >
         <View className="size-9 items-center justify-center">
           <Icon as={Plus} size={18} className="text-muted-foreground" />

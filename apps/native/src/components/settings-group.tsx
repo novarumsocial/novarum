@@ -3,6 +3,7 @@ import { Children, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColors } from '@/lib/theme';
 import { Separator } from './ui/separator';
 import { Text } from './ui/text';
 
@@ -47,9 +48,11 @@ export function SettingsPage({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  // third-party scroll views take no `className` here
   return (
     <KeyboardAwareScrollView
-      className="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
       keyboardShouldPersistTaps="handled"
       bottomOffset={24}
       contentContainerStyle={{ gap: 24, padding: 16, paddingBottom: insets.bottom + 32 }}

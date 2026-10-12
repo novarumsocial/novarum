@@ -103,6 +103,7 @@ function FileTile({ attachment, onPress }: { attachment: Attachment; onPress: ()
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${pdf ? 'View' : 'Download'} ${attachment.filename}`}
       onPress={onPress}
       className="min-h-11 w-full flex-row items-center gap-2 border border-input bg-background p-2 active:bg-accent"
     >
@@ -328,8 +329,8 @@ export const Message = memo(function Message({
           crossed.value = past;
           if (past) runOnJS(tick)();
         })
-        .onEnd(() => {
-          if (crossed.value) runOnJS(reply)();
+        .onEnd((_event, success) => {
+          if (success && crossed.value) runOnJS(reply)();
         })
         .onFinalize(() => {
           crossed.value = false;
@@ -368,6 +369,15 @@ export const Message = memo(function Message({
 
         <Animated.View style={rowStyle} className="bg-background">
           <Pressable
+            accessibilityHint="Long press for message actions"
+            accessibilityActions={[
+              { name: 'reply', label: 'Reply' },
+              { name: 'longpress', label: 'Message actions' },
+            ]}
+            onAccessibilityAction={(event) => {
+              if (event.nativeEvent.actionName === 'reply') reply();
+              else openMenu();
+            }}
             onLongPress={openMenu}
             delayLongPress={300}
             className={cn('flex-row gap-3 px-3 py-0.5', selfMentioned && 'bg-amber-400/10')}
@@ -410,6 +420,8 @@ export const Message = memo(function Message({
 
               {message.replyTo && (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Go to the replied message"
                   onPress={() => goto(chat().messagePath(message.replyTo!))}
                   className="mt-0.5 min-h-5 flex-row items-start gap-1 self-start border-l-2 border-primary/40 pl-1.5 active:bg-muted/40"
                 >
@@ -472,7 +484,7 @@ export const Message = memo(function Message({
               {grid.length > 0 && (
                 <View
                   className={cn(
-                    'mt-2 -m-0.5 flex-row flex-wrap',
+                    'mt-1.5 -mx-0.5 -mb-0.5 flex-row flex-wrap',
                     singleImage ? 'max-w-full' : 'max-w-80'
                   )}
                 >

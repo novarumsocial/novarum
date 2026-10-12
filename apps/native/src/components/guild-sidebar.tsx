@@ -60,6 +60,8 @@ export function GuildSidebar({
       style={{ paddingTop: insets.top + 12 }}
     >
       <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: activeId === null }}
         onPress={() => onSelect(undefined)}
         accessibilityLabel={hasUnreadDms ? 'Home, unread direct messages' : 'Home'}
         className={cn(
@@ -88,6 +90,8 @@ export function GuildSidebar({
           const mention = mentions[server.id] ?? 0;
           return (
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active, disabled: server.down }}
               key={server.id}
               disabled={server.down}
               onPress={() => onSelect(server.id)}
@@ -141,6 +145,7 @@ export function GuildSidebar({
       </ScrollView>
 
       <Pressable
+        accessibilityRole="button"
         accessibilityLabel="Add server"
         onPress={() => setCreateOpen(true)}
         className={cn(

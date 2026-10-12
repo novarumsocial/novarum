@@ -1,7 +1,7 @@
 // Port of apps/frontend/src/lib/components/voice-area.svelte
 // Differences: reads the single `voice` store instead of taking it as a prop; no fullscreen button (the app
 // is already full screen); the web's hover-driven controls fade after a few seconds without touches.
-// TODO phase 7: screen share button.
+// Screen share is Android only (iOS needs a broadcast extension), so the button is hidden on iOS.
 import { ConnectionState } from 'livekit-client';
 import {
   Bluetooth,
@@ -13,6 +13,7 @@ import {
   MicOff,
   Minimize2,
   MonitorOff,
+  MonitorUp,
   PhoneOff,
   Smartphone,
   SwitchCamera,
@@ -23,7 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { VolumeSlider } from '@/components/participant-sheet';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -86,6 +87,7 @@ export function VoiceArea({
   const selfMuted = useVoice((s) => s.selfMuted);
   const selfDeafened = useVoice((s) => s.selfDeafened);
   const selfCamera = useVoice((s) => s.selfCamera);
+  const selfScreenShare = useVoice((s) => s.selfScreenShare);
   const cameraFacing = useVoice((s) => s.cameraFacing);
   const audioOutput = useVoice((s) => s.audioOutput);
   const audioOutputs = useVoice((s) => s.audioOutputs);
@@ -128,7 +130,9 @@ export function VoiceArea({
 
   // only streams that are actually playing take over the stage; unwatched ones wait for a tap
   const autoSpotlightKey =
-    tiles.find((tile) => tile.kind === 'screen' && tile.state.screenTrack)?.key ?? null;
+    tiles.find(
+      (tile) => tile.kind === 'screen' && tile.state.screenTrack && tile.identity !== localIdentity
+    )?.key ?? null;
 
   const spotlightKey =
     focusedKey && tiles.some((tile) => tile.key === focusedKey)
@@ -369,6 +373,25 @@ export function VoiceArea({
                     className={selfCamera ? 'text-primary-foreground' : 'text-secondary-foreground'}
                   />
                 </Button>
+
+                {Platform.OS !== 'ios' && (
+                  <Button
+                    variant={selfScreenShare ? 'default' : 'secondary'}
+                    size="icon"
+                    className={controlClass}
+                    accessibilityLabel={selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
+                    accessibilityState={{ selected: selfScreenShare }}
+                    onPress={() => voice().setScreenShare(!selfScreenShare)}
+                  >
+                    <Icon
+                      as={selfScreenShare ? MonitorOff : MonitorUp}
+                      size={14}
+                      className={
+                        selfScreenShare ? 'text-primary-foreground' : 'text-secondary-foreground'
+                      }
+                    />
+                  </Button>
+                )}
 
                 {selfCamera && (
                   <Button

@@ -30,6 +30,7 @@ const config: ExpoConfig = {
       'MODIFY_AUDIO_SETTINGS',
       'FOREGROUND_SERVICE',
       'FOREGROUND_SERVICE_MICROPHONE',
+      'FOREGROUND_SERVICE_MEDIA_PROJECTION',
     ],
     intentFilters: [
       {
@@ -62,7 +63,8 @@ const config: ExpoConfig = {
     'expo-audio',
     'expo-notifications',
     'expo-unified-push',
-    '@livekit/react-native-expo-plugin',
+    // the foreground service Android needs for screen share (MediaProjection)
+    ['@livekit/react-native-expo-plugin', { android: { enableScreenShareService: true } }],
     [
       'expo-build-properties',
       { android: { minSdkVersion: 24 }, ios: { deploymentTarget: '16.4' } },

@@ -120,13 +120,19 @@ export function UserArea({
             >
               {status}
             </Text>
-            <Pressable onPress={openVoiceChannel} className="min-h-6 justify-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${voiceChannelName ?? 'voice channel'}`}
+              onPress={openVoiceChannel}
+              className="min-h-11 justify-center"
+            >
               <Text numberOfLines={1} className="text-[11px] text-muted-foreground">
                 {voiceChannelName ?? 'Voice channel'}
               </Text>
             </Pressable>
           </View>
           <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Leave call"
             onPress={onLeaveVoice}
             className={cn(
@@ -139,8 +145,9 @@ export function UserArea({
         </View>
       )}
 
-      <View className="h-14 flex-row items-center gap-1 px-3">
+      <View className="min-h-14 flex-row items-center gap-1 px-3">
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Switch account"
           onPress={() => setSwitcherOpen(true)}
           className="min-h-11 min-w-0 flex-1 flex-row items-center gap-2.5 active:bg-sidebar-accent"
@@ -173,6 +180,7 @@ export function UserArea({
           </View>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel={selfDeafened ? 'Undeafen' : selfMuted ? 'Unmute' : 'Mute'}
           onPress={toggle(() =>
             selfDeafened ? voice().setDeafened(false) : voice().setMuted(!selfMuted)
@@ -186,6 +194,7 @@ export function UserArea({
           />
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel={selfDeafened ? 'Undeafen' : 'Deafen'}
           onPress={toggle(() => voice().setDeafened(!selfDeafened))}
           className="size-11 items-center justify-center"
@@ -197,6 +206,7 @@ export function UserArea({
           />
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="User settings"
           onPress={() => router.push('/settings')}
           className="size-11 items-center justify-center"

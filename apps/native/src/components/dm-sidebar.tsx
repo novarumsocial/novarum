@@ -72,6 +72,10 @@ export function DmSidebar() {
         onSwipeableOpen={() => closeDm(entry)}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${name}${unread ? ', unread' : ''}`}
+          accessibilityHint="Swipe left to close the conversation"
+          accessibilityState={{ selected: active }}
           onPress={() => {
             goto(dmPath(entry.id));
             panels().close();
@@ -136,6 +140,8 @@ export function DmSidebar() {
             {width >= 768 && (
               <>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: route.kind === 'home' }}
                   onPress={() => goto('/guilds')}
                   className={cn(
                     'mx-2 min-h-11 flex-row items-center gap-1.5 px-2',
@@ -155,6 +161,7 @@ export function DmSidebar() {
                 Direct Messages
               </Text>
               <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Start a direct message"
                 onPress={() => setNewDmOpen(true)}
                 className="size-11 items-center justify-center"

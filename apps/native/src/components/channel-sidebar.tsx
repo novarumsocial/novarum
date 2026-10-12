@@ -147,6 +147,9 @@ export function ChannelSidebar({
     return (
       <View>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${ch.type === 'VOICE' ? 'Voice channel' : 'Channel'} ${ch.label || ch.name}${showMention ? `, ${ch.mention} mentions` : showUnread ? ', unread' : ''}`}
+          accessibilityState={{ selected: activeChannel === ch.id }}
           onPress={() => onSelectChannel(ch.id)}
           onLongPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -243,10 +246,11 @@ export function ChannelSidebar({
   return (
     <View className="flex-1 bg-sidebar">
       <Pressable
+        accessibilityRole="button"
         accessibilityLabel="Server settings"
         onPress={() => open('guild')}
         className="shrink-0 flex-row items-center justify-between border-b border-border px-4 active:bg-accent"
-        style={{ height: 48 + insets.top, paddingTop: insets.top }}
+        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
       >
         <Text
           numberOfLines={1}
@@ -278,13 +282,16 @@ export function ChannelSidebar({
           ) : (
             <View className="min-h-11 flex-row items-center px-3">
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={item.category.label}
+                accessibilityState={{ expanded: !collapsed[item.category.id] }}
                 onPress={() =>
                   setCollapsed((current) => ({
                     ...current,
                     [item.category.id]: !current[item.category.id],
                   }))
                 }
-                className="h-11 flex-1 flex-row items-center gap-1"
+                className="min-h-11 flex-1 flex-row items-center gap-1"
               >
                 <Icon
                   as={collapsed[item.category.id] ? ChevronRight : ChevronDown}
@@ -297,6 +304,7 @@ export function ChannelSidebar({
               </Pressable>
               {server.canManageChannels && (
                 <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel="Add channel"
                   onPress={() => open('create', { category: item.category })}
                   className="size-11 items-center justify-center"

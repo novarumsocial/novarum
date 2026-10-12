@@ -14,7 +14,12 @@ const buttonVariants = cva('flex-row items-center justify-center gap-2 rounded-n
       ghost: 'active:bg-accent',
       link: '',
     },
-    size: { default: 'h-11 px-4', sm: 'h-9 px-3', lg: 'h-12 px-6', icon: 'h-11 w-11' },
+    size: {
+      default: 'min-h-11 px-4',
+      sm: 'min-h-9 px-3',
+      lg: 'min-h-12 px-6',
+      icon: 'min-h-11 min-w-11',
+    },
   },
   defaultVariants: { variant: 'default', size: 'default' },
 });

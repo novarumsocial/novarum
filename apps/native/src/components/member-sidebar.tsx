@@ -34,7 +34,7 @@ export function MemberSidebar({ members }: { server: Server; members: Author[] }
 
   return (
     <View className="flex-1 bg-sidebar">
-      <View className="shrink-0 border-b border-border" style={{ height: 48 + insets.top }} />
+      <View className="shrink-0 border-b border-border" style={{ minHeight: 48 + insets.top }} />
       <FlashList
         data={rows}
         getItemType={(row) => row.kind}
