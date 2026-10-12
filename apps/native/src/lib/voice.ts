@@ -1,0 +1,593 @@
+// Port of apps/frontend/src/lib/voice.svelte.ts
+// Not ported (web/desktop only): RNNoise worklet (WebRTC `noiseSuppression` instead), input/output device
+// pickers (audio route + camera facing instead), "audio playback blocked" (no autoplay policy on phones),
+// screen share (TODO phase 7), and the loopback playback of the mic test (RN has no audio element).
+import { registerGlobals, AudioSession } from '@livekit/react-native';
+import { createAudioPlayer } from 'expo-audio';
+import * as Haptics from 'expo-haptics';
+import {
+  ConnectionState,
+  createLocalAudioTrack,
+  LocalAudioTrack,
+  LocalVideoTrack,
+  Room,
+  RoomEvent,
+  Track,
+  type Participant,
+  type RemoteTrackPublication,
+  type VideoTrack,
+} from 'livekit-client';
+import { Platform } from 'react-native';
+import { create } from 'zustand';
+import { anchor } from './anchor';
+import { realtime } from './realtime';
+import { settings } from './settings';
+
+// must run once before `Room` is used
+registerGlobals();
+
+const livekitConnectionTimeoutMs = 15_000;
+const microphoneCaptureOptions = () => ({
+  echoCancellation: settings().voiceEchoCancellation,
+  autoGainControl: settings().voiceAutoGainControl,
+  noiseSuppression: settings().noiseCancellation,
+  channelCount: 1,
+  sampleRate: 48000,
+});
+
+// sounds (same files and volume as the web)
+const sources = {
+  join: require('../../assets/sounds/join.opus'),
+  leave: require('../../assets/sounds/leave.opus'),
+  mute: require('../../assets/sounds/mute.opus'),
+  unmute: require('../../assets/sounds/mute-reverse.opus'),
+  deafen: require('../../assets/sounds/deafen.opus'),
+  undeafen: require('../../assets/sounds/deafen-reverse.opus'),
+  camera: require('../../assets/sounds/camera.opus'),
+  cameraOff: require('../../assets/sounds/camera-off.opus'),
+  screen: require('../../assets/sounds/screen.opus'),
+  screenOff: require('../../assets/sounds/screen-off.opus'),
+};
+const players = new Map<keyof typeof sources, ReturnType<typeof createAudioPlayer>>();
+
+function play(name: keyof typeof sources) {
+  const player = players.get(name) ?? createAudioPlayer(sources[name]);
+  players.set(name, player);
+  void player.seekTo(0);
+  player.play();
+}
+
+export interface VoiceState {
+  userId: string;
+  channelId: string;
+
+  selfMuted: boolean;
+  selfDeafened: boolean;
+  serverMuted: boolean;
+
+  camera: boolean;
+  cameraTrack: VoiceVideoTrack | null;
+  screenShare: boolean;
+  screenTrack: VoiceVideoTrack | null;
+  speaking: boolean;
+}
+
+// what `VideoView` from @livekit/react-native renders
+export type VoiceVideoTrack = VideoTrack;
+
+export type AudioOutput = 'speaker' | 'earpiece' | 'bluetooth';
+export type CameraFacing = 'user' | 'environment';
+type ParticipantAudio = { volume: number; muted: boolean; screenVolume: number };
+
+type VoiceStore = {
+  room: Room | null;
+  channelId: string | null;
+  connectionState: ConnectionState;
+  selfMuted: boolean;
+  mutedBeforeDeafen: boolean;
+  selfDeafened: boolean;
+  selfCamera: boolean;
+  cameraFacing: CameraFacing;
+  audioOutput: AudioOutput;
+  audioOutputs: AudioOutput[];
+  voiceStates: Map<string, VoiceState>;
+  // remote screen shares are only subscribed to once the user chooses to watch them
+  watchedStreams: Set<string>;
+  participantAudio: Record<string, ParticipantAudio>;
+  // mic test: a local track whose level `MicLevelMeter` shows (no loopback playback on phones)
+  audioLoopbackTesting: boolean;
+  audioLoopbackTrack: LocalAudioTrack | null;
+
+  join: (channelId: string) => Promise<void>;
+  leave: () => Promise<void>;
+  watchStream: (identity: string) => void;
+  stopWatchingStream: (identity: string) => void;
+  setMuted: (muted: boolean) => Promise<void>;
+  setDeafened: (deafened: boolean) => Promise<void>;
+  setAudioLoopbackTesting: (testing: boolean) => Promise<void>;
+  participantVolume: (identity: string) => number;
+  participantMuted: (identity: string) => boolean;
+  participantScreenVolume: (identity: string) => number;
+  setParticipantVolume: (identity: string, volume: number) => void;
+  setParticipantMuted: (identity: string, muted: boolean) => void;
+  setParticipantScreenVolume: (identity: string, volume: number) => void;
+  setCamera: (enabled: boolean) => Promise<void>;
+  setCameraFacing: (facing: CameraFacing) => Promise<void>;
+  setAudioOutput: (output: AudioOutput) => Promise<void>;
+  setNoiseCancellation: (enabled: boolean) => Promise<void>;
+  setEchoCancellation: (enabled: boolean) => Promise<void>;
+  setAutoGainControl: (enabled: boolean) => Promise<void>;
+  // TODO phase 7: setScreenShare, setScreenShareSystemAudio
+};
+
+// iOS only knows "default" and "force_speaker"; Android has the real routes
+const iosOutputs: Record<string, AudioOutput> = { default: 'earpiece', force_speaker: 'speaker' };
+const toRoute = (output: AudioOutput) =>
+  Platform.OS === 'ios' ? (output === 'speaker' ? 'force_speaker' : 'default') : output;
+
+const clampVolume = (volume: number) => Math.max(0, Math.min(3, volume));
+
+export const useVoice = create<VoiceStore>((set, get) => {
+  let connectionAttempt = 0;
+  let captureSettingsOperation: Promise<void> = Promise.resolve();
+
+  const micTrack = (room: Room) =>
+    room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+
+  const updateVoiceState = (identity: string, state: VoiceState) =>
+    set((s) => ({ voiceStates: new Map(s.voiceStates).set(identity, state) }));
+
+  const resetRoom = () => {
+    set({
+      room: null,
+      channelId: null,
+      connectionState: ConnectionState.Disconnected,
+      selfCamera: false,
+      voiceStates: new Map(),
+      watchedStreams: new Set(),
+    });
+    void AudioSession.stopAudioSession();
+  };
+
+  const syncSubscription = (publication: RemoteTrackPublication, identity: string) => {
+    const isStream =
+      publication.source === Track.Source.ScreenShare ||
+      publication.source === Track.Source.ScreenShareAudio;
+    publication.setSubscribed(!isStream || get().watchedStreams.has(identity));
+  };
+
+  const syncStreamSubscriptions = (identity: string) => {
+    const participant = get().room?.remoteParticipants.get(identity);
+    for (const publication of participant?.trackPublications.values() ?? []) {
+      syncSubscription(publication, identity);
+    }
+  };
+
+  // remote audio is played natively by WebRTC; deafening sets every remote volume to 0
+  const updateParticipantAudio = (identity: string) => {
+    const participant = get().room?.remoteParticipants.get(identity);
+    if (!participant) return;
+
+    const silent = get().selfDeafened || get().participantMuted(identity);
+    participant.setVolume(silent ? 0 : get().participantVolume(identity), Track.Source.Microphone);
+    participant.setVolume(
+      silent ? 0 : get().participantScreenVolume(identity),
+      Track.Source.ScreenShareAudio
+    );
+  };
+
+  const setParticipantAudio = (identity: string, patch: Partial<ParticipantAudio>) => {
+    const current = {
+      volume: get().participantVolume(identity),
+      muted: get().participantMuted(identity),
+      screenVolume: get().participantScreenVolume(identity),
+    };
+    set((s) => ({ participantAudio: { ...s.participantAudio, [identity]: { ...current, ...patch } } }));
+    updateParticipantAudio(identity);
+  };
+
+  const syncLocalMicrophone = async (room: Room) => {
+    const enabled = !get().selfMuted && !get().selfDeafened;
+
+    try {
+      await room.localParticipant.setMicrophoneEnabled(enabled, microphoneCaptureOptions());
+    } catch {
+      if (get().room === room && enabled) set({ selfMuted: true });
+    }
+  };
+
+  const activeVideoTrack = (isMuted: boolean | undefined, track: Track | undefined) => {
+    if (isMuted || track?.kind !== Track.Kind.Video) return null;
+    return track.mediaStreamTrack?.readyState === 'ended' ? null : (track as VideoTrack);
+  };
+
+  const syncParticipant = (participant: Participant, channelId: string) => {
+    const micPub = participant.getTrackPublication(Track.Source.Microphone);
+    const screenPub = participant.getTrackPublication(Track.Source.ScreenShare);
+    const cameraPub = participant.getTrackPublication(Track.Source.Camera);
+
+    const isLocal = participant.isLocal;
+    const cameraTrack = activeVideoTrack(cameraPub?.isMuted, cameraPub?.track);
+    const screenTrack = activeVideoTrack(screenPub?.isMuted, screenPub?.track);
+
+    if (isLocal) set({ selfCamera: !!cameraTrack });
+
+    updateVoiceState(participant.identity, {
+      userId: participant.identity,
+      channelId,
+      selfMuted: isLocal ? get().selfMuted : !micPub || micPub.isMuted,
+      selfDeafened: isLocal ? get().selfDeafened : false,
+      serverMuted: false,
+      camera: !!cameraTrack,
+      cameraTrack,
+      screenShare: !!screenTrack || (!isLocal && !!screenPub && !screenPub.isMuted),
+      screenTrack,
+      speaking: participant.isSpeaking,
+    });
+  };
+
+  // on = the track turned on (unmuted / published); video sources only react to publish changes too
+  const playRemoteSound = (source: Track.Source, on: boolean, published = false) => {
+    if (source === Track.Source.Microphone && !published) play(on ? 'unmute' : 'mute');
+    if (source === Track.Source.Camera) play(on ? 'camera' : 'cameraOff');
+    if (source === Track.Source.ScreenShare) play(on ? 'screen' : 'screenOff');
+  };
+
+  const bindRoomEvents = (room: Room, channelId: string) => {
+    room
+      .on(RoomEvent.ConnectionStateChanged, (state) => set({ connectionState: state }))
+      .on(RoomEvent.Disconnected, () => {
+        if (get().room !== room) return;
+
+        resetRoom();
+        realtime().leaveVoice();
+      })
+      .on(RoomEvent.ParticipantConnected, (participant) => {
+        syncParticipant(participant, channelId);
+        play('join');
+      })
+      .on(RoomEvent.ParticipantDisconnected, (participant) => {
+        set((s) => {
+          const voiceStates = new Map(s.voiceStates);
+          const watchedStreams = new Set(s.watchedStreams);
+          voiceStates.delete(participant.identity);
+          watchedStreams.delete(participant.identity);
+          return { voiceStates, watchedStreams };
+        });
+        play('leave');
+      })
+      .on(RoomEvent.TrackMuted, (publication, participant) => {
+        if (!participant.isLocal) playRemoteSound(publication.source, false);
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackUnmuted, (publication, participant) => {
+        if (!participant.isLocal) playRemoteSound(publication.source, true);
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackPublished, (publication, participant) => {
+        playRemoteSound(publication.source, true, true);
+        syncSubscription(publication, participant.identity);
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+        playRemoteSound(publication.source, false, true);
+        if (publication.source === Track.Source.ScreenShare) {
+          get().stopWatchingStream(participant.identity);
+        }
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.LocalTrackUnpublished, (_publication, participant) => {
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackSubscribed, (_track, _publication, participant) => {
+        updateParticipantAudio(participant.identity);
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => {
+        syncParticipant(participant, channelId);
+      })
+      .on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        const speaking = new Set(speakers.map((speaker) => speaker.identity));
+        set((s) => ({
+          voiceStates: new Map(
+            [...s.voiceStates].map(([identity, state]) => [
+              identity,
+              { ...state, speaking: speaking.has(identity) },
+            ])
+          ),
+        }));
+      });
+  };
+
+  // restart the mic capture so changed echo / gain / noise constraints apply
+  const applyCaptureSettings = async () => {
+    const room = get().room;
+    if (!room || get().selfMuted || get().selfDeafened) return;
+
+    captureSettingsOperation = captureSettingsOperation
+      .catch(() => undefined)
+      .then(async () => {
+        const track = micTrack(room);
+        if (get().room !== room || !(track instanceof LocalAudioTrack)) return;
+        await track.restartTrack(microphoneCaptureOptions());
+      });
+
+    try {
+      await captureSettingsOperation;
+    } catch (error) {
+      console.error('could not apply microphone settings', error);
+    }
+  };
+
+  const loadAudioOutputs = async () => {
+    const outputs = (await AudioSession.getAudioOutputs()).flatMap((id) =>
+      Platform.OS === 'ios' ? (iosOutputs[id] ?? []) : [id as AudioOutput]
+    );
+    set({ audioOutputs: outputs.filter((o) => ['speaker', 'earpiece', 'bluetooth'].includes(o)) });
+  };
+
+  return {
+    room: null,
+    channelId: null,
+    connectionState: ConnectionState.Disconnected,
+    selfMuted: false,
+    mutedBeforeDeafen: false,
+    selfDeafened: false,
+    selfCamera: false,
+    cameraFacing: 'user',
+    audioOutput: 'speaker',
+    audioOutputs: ['speaker', 'earpiece'],
+    voiceStates: new Map(),
+    watchedStreams: new Set(),
+    participantAudio: {},
+    audioLoopbackTesting: false,
+    audioLoopbackTrack: null,
+
+    async join(channelId) {
+      const { connectionState } = get();
+      const busy =
+        connectionState === ConnectionState.Connected ||
+        connectionState === ConnectionState.Connecting;
+      if (get().channelId === channelId && busy) return;
+
+      if (get().room) {
+        if (get().channelId === channelId) return;
+        await get().leave();
+      }
+
+      play('join');
+      const attempt = ++connectionAttempt;
+      set({ channelId, connectionState: ConnectionState.Connecting });
+
+      const { data, error } = await anchor().client.channel({ id: channelId }).call.token.get();
+      if (connectionAttempt !== attempt) return;
+
+      if (error) {
+        set({ connectionState: ConnectionState.Disconnected });
+        throw error;
+      }
+
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        audioCaptureDefaults: microphoneCaptureOptions(),
+        videoCaptureDefaults: { facingMode: get().cameraFacing },
+      });
+      set({ room });
+      bindRoomEvents(room, channelId);
+
+      await AudioSession.startAudioSession();
+      if (get().audioOutput !== 'speaker') void get().setAudioOutput(get().audioOutput);
+      void loadAudioOutputs();
+
+      const connectPromise = room.connect(data.serverUrl, data.token, { autoSubscribe: false });
+      connectPromise.catch(() => null);
+
+      try {
+        await Promise.race([
+          connectPromise,
+          new Promise<never>((_, reject) => {
+            setTimeout(
+              () => reject(new Error('Voice connection timed out')),
+              livekitConnectionTimeoutMs
+            );
+          }),
+        ]);
+      } catch (error) {
+        if (connectionAttempt !== attempt || get().room !== room) return;
+
+        resetRoom();
+        throw error;
+      }
+
+      if (connectionAttempt !== attempt || get().room !== room) {
+        await room.disconnect().catch(() => null);
+        return;
+      }
+
+      set({ connectionState: ConnectionState.Connected });
+
+      await syncLocalMicrophone(room);
+      if (connectionAttempt !== attempt || get().room !== room) {
+        await room.disconnect().catch(() => null);
+        return;
+      }
+
+      syncParticipant(room.localParticipant, channelId);
+      realtime().joinVoice(channelId);
+      for (const participant of room.remoteParticipants.values()) {
+        syncParticipant(participant, channelId);
+        for (const publication of participant.trackPublications.values()) {
+          syncSubscription(publication, participant.identity);
+        }
+      }
+    },
+
+    watchStream(identity) {
+      set((s) => ({ watchedStreams: new Set(s.watchedStreams).add(identity) }));
+      syncStreamSubscriptions(identity);
+    },
+
+    stopWatchingStream(identity) {
+      set((s) => {
+        const watchedStreams = new Set(s.watchedStreams);
+        watchedStreams.delete(identity);
+        return { watchedStreams };
+      });
+      syncStreamSubscriptions(identity);
+    },
+
+    async leave() {
+      connectionAttempt++;
+
+      const { room, channelId } = get();
+      resetRoom();
+
+      if (!room) return;
+
+      room.removeAllListeners();
+      await room.disconnect().catch(() => null);
+      if (channelId) realtime().leaveVoice();
+      play('leave');
+    },
+
+    async setMuted(muted) {
+      set({ selfMuted: muted });
+      play(muted ? 'mute' : 'unmute');
+      void Haptics.selectionAsync();
+
+      const { room, channelId } = get();
+      if (!room) return;
+
+      await syncLocalMicrophone(room);
+
+      // keep the local participant in sync
+      syncParticipant(room.localParticipant, channelId!);
+    },
+
+    async setDeafened(deafened) {
+      // deafening also mutes
+      set((s) => ({
+        selfDeafened: deafened,
+        mutedBeforeDeafen: deafened ? s.selfMuted : s.mutedBeforeDeafen,
+        selfMuted: deafened ? true : s.mutedBeforeDeafen,
+      }));
+      play(deafened ? 'deafen' : 'undeafen');
+      void Haptics.selectionAsync();
+
+      const { room, channelId } = get();
+      if (!room) return;
+
+      for (const identity of room.remoteParticipants.keys()) updateParticipantAudio(identity);
+      await syncLocalMicrophone(room);
+
+      syncParticipant(room.localParticipant, channelId!);
+    },
+
+    async setAudioLoopbackTesting(testing) {
+      if (get().audioLoopbackTesting === testing) return;
+      set({ audioLoopbackTesting: testing });
+
+      if (!testing) {
+        const track = get().audioLoopbackTrack;
+        set({ audioLoopbackTrack: null });
+        track?.stop();
+        return;
+      }
+
+      try {
+        const track = await createLocalAudioTrack(microphoneCaptureOptions());
+        if (get().audioLoopbackTesting) set({ audioLoopbackTrack: track });
+        else track.stop();
+      } catch (error) {
+        console.error('could not start microphone test', error);
+        set({ audioLoopbackTesting: false });
+        throw error;
+      }
+    },
+
+    participantVolume: (identity) => get().participantAudio[identity]?.volume ?? 1,
+    participantMuted: (identity) => get().participantAudio[identity]?.muted ?? false,
+    participantScreenVolume: (identity) => get().participantAudio[identity]?.screenVolume ?? 1,
+
+    setParticipantVolume: (identity, volume) =>
+      setParticipantAudio(identity, { volume: clampVolume(volume) }),
+    setParticipantMuted: (identity, muted) => setParticipantAudio(identity, { muted }),
+    setParticipantScreenVolume: (identity, volume) =>
+      setParticipantAudio(identity, { screenVolume: clampVolume(volume) }),
+
+    async setCamera(enabled) {
+      const { room, channelId } = get();
+      if (!room) return;
+
+      try {
+        await room.localParticipant.setCameraEnabled(enabled, { facingMode: get().cameraFacing });
+        set({ selfCamera: enabled });
+        play(enabled ? 'camera' : 'cameraOff');
+      } catch {
+        play('cameraOff');
+        set({ selfCamera: false });
+      }
+
+      syncParticipant(room.localParticipant, channelId!);
+    },
+
+    async setCameraFacing(facing) {
+      const previous = get().cameraFacing;
+      set({ cameraFacing: facing });
+
+      const room = get().room;
+      const track = room?.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+      if (!room || !(track instanceof LocalVideoTrack)) return;
+
+      try {
+        await track.restartTrack({ facingMode: facing });
+        syncParticipant(room.localParticipant, get().channelId!);
+      } catch (error) {
+        set({ cameraFacing: previous });
+        console.error('could not change camera', error);
+        throw error;
+      }
+    },
+
+    async setAudioOutput(output) {
+      const previous = get().audioOutput;
+      set({ audioOutput: output });
+
+      // before a call there is no audio session to route yet; join applies it
+      if (!get().room) return;
+
+      try {
+        await AudioSession.selectAudioOutput(toRoute(output));
+      } catch (error) {
+        set({ audioOutput: previous });
+        console.error('could not change audio output', error);
+        throw error;
+      }
+    },
+
+    async setNoiseCancellation(enabled) {
+      settings().update({ noiseCancellation: enabled });
+      await applyCaptureSettings();
+    },
+
+    async setEchoCancellation(enabled) {
+      settings().update({ voiceEchoCancellation: enabled });
+      await applyCaptureSettings();
+    },
+
+    async setAutoGainControl(enabled) {
+      settings().update({ voiceAutoGainControl: enabled });
+      await applyCaptureSettings();
+    },
+  };
+});
+
+// Same name as on the web, for code that runs outside React: `voice().join(channelId)`
+export const voice = useVoice.getState;
+
+// `$derived` fields of the web class: `const connected = useVoice(selectConnected)`
+export const selectConnected = (s: VoiceStore) => s.connectionState === ConnectionState.Connected;
+export const selectConnecting = (s: VoiceStore) => s.connectionState === ConnectionState.Connecting;
+export const selectParticipantCount = (s: VoiceStore) => s.voiceStates.size;
+export const selectLocalIdentity = (s: VoiceStore) => s.room?.localParticipant.identity ?? null;

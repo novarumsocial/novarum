@@ -18,6 +18,8 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { InAppBanner } from '@/components/in-app-banner';
+import '@/lib/notifications'; // sets up the notification handler and tap routing
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
 
@@ -46,6 +48,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <BottomSheetModalProvider>
+            <InAppBanner />
             <StatusBar style={darkMode ? 'light' : 'dark'} />
             <Stack
               screenOptions={{
