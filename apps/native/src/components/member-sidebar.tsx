@@ -53,9 +53,19 @@ export function MemberSidebar({ members }: { server: Server; members: Author[] }
           const name = member.displayName || member.username;
           return (
             <ProfileCard user={member}>
-              <View className={cn('min-h-11 flex-row items-center gap-2 px-1', member.status === 'OFFLINE' && 'opacity-50')}>
+              <View
+                className={cn(
+                  'min-h-11 flex-row items-center gap-2 px-1',
+                  member.status === 'OFFLINE' && 'opacity-50'
+                )}
+              >
                 <View>
-                  <Avatar src={member.avatarUrl} name={name} bgColor={member.avatarColor} className="size-8" />
+                  <Avatar
+                    src={member.avatarUrl}
+                    name={name}
+                    bgColor={member.avatarColor}
+                    className="size-8"
+                  />
                   {member.status !== 'OFFLINE' && (
                     <View
                       className={cn(

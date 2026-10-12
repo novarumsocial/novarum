@@ -54,14 +54,19 @@ export function ProfileSheet({
   const action = friendActions[friendStatus];
 
   const runFriendAction = () => {
-    if (friendStatus === 'NONE') return void friends().request(user.userId, user.username, user.server);
+    if (friendStatus === 'NONE')
+      return void friends().request(user.userId, user.username, user.server);
     if (!friendshipUserId) return;
     if (friendStatus === 'INCOMING') return void friends().accept(friendshipUserId);
     if (friendStatus === 'OUTGOING') return void friends().remove(friendshipUserId);
 
     Alert.alert(`Remove ${name}?`, 'They will no longer be in your friends list.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void friends().remove(friendshipUserId) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => void friends().remove(friendshipUserId),
+      },
     ]);
   };
 

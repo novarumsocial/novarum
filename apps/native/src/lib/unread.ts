@@ -5,7 +5,9 @@ import { useChat } from './chat-state';
 import { useDms } from './dms';
 import { notificationSettings, useNotificationSettings } from './notification-settings';
 
-export const selectGuildMentions = (channelsByServer: ReturnType<typeof useChat.getState>['channelsByServer']) =>
+export const selectGuildMentions = (
+  channelsByServer: ReturnType<typeof useChat.getState>['channelsByServer']
+) =>
   Object.fromEntries(
     Object.entries(channelsByServer).map(([guildId, categories]) => [
       guildId,

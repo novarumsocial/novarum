@@ -37,7 +37,9 @@ export function VideoPlayer({
   const [active, setActive] = useState(autoPlay);
 
   return (
-    <View className={cn('aspect-video w-full overflow-hidden border border-border bg-black', className)}>
+    <View
+      className={cn('aspect-video w-full overflow-hidden border border-border bg-black', className)}
+    >
       {active ? (
         <Playing attachment={attachment} />
       ) : (

@@ -38,11 +38,7 @@ function Controls({
           onPress={onToggle}
           className="size-11 items-center justify-center bg-primary active:opacity-80"
         >
-          <Icon
-            as={playing ? Pause : Play}
-            size={18}
-            className="text-primary-foreground"
-          />
+          <Icon as={playing ? Pause : Play} size={18} className="text-primary-foreground" />
         </Pressable>
         <View className="min-w-0 flex-1">
           <Text className="text-xs" numberOfLines={1}>

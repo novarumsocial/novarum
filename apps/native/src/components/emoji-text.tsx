@@ -2,7 +2,7 @@
 // Unicode emoji become the server's emoji images, links open in the in-app browser and mentions are pills.
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Text } from '@/components/ui/text';
 import { ProfileSheet } from '@/components/profile-card';
 import { useChat } from '@/lib/chat-state';
@@ -16,7 +16,8 @@ export const handlePattern = new RegExp(`(?<![a-zA-Z0-9._])${handleSource}`, 'g'
 const mentionPattern = new RegExp(`((?<![a-zA-Z0-9._])${handleSource})`, 'g');
 const mentionOnly = new RegExp(`^${handleSource}$`);
 // Hermes has no Intl.Segmenter, so emoji sequences (flags, keycaps, skin tones, ZWJ) are matched by range
-const pictograph = '[\\u{1F000}-\\u{1FAFF}\\u{231A}-\\u{23FF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}]';
+const pictograph =
+  '[\\u{1F000}-\\u{1FAFF}\\u{231A}-\\u{23FF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}]';
 const modifier = '\\uFE0F?[\\u{1F3FB}-\\u{1F3FF}]?';
 const emojiPattern = new RegExp(
   `([\\u{1F1E6}-\\u{1F1FF}]{2}|[#*0-9]\\uFE0F?\\u20E3|${pictograph}${modifier}(?:\\u200D${pictograph}${modifier})*)`,
@@ -77,15 +78,18 @@ function mentionUser(mention: string): Author {
   );
 }
 
-// Renders a <Text>, so it can sit anywhere. Pass `className` for the text style (the web inherits it).
+// Renders a <Text>. Pass `className` for the text style: <Text> always sets a size, so nothing is inherited.
 export function EmojiText({
   content,
   links = false,
   className,
+  children,
 }: {
   content: string;
   links?: boolean;
   className?: string;
+  // appended after the text, inside the same <Text> (message.tsx puts "(edited)" here)
+  children?: ReactNode;
 }) {
   const self = useSession((s) => s.user);
   const emojiUrls = useRealtime((s) => s.emojiUrls);
@@ -105,7 +109,7 @@ export function EmojiText({
             return (
               <Text
                 key={index}
-                className="text-link underline"
+                className={cn(className, 'text-link underline')}
                 onPress={() => void WebBrowser.openBrowserAsync(part.text)}
               >
                 {part.text}
@@ -118,7 +122,11 @@ export function EmojiText({
             return (
               <Text
                 key={index}
-                className={cn('font-medium text-link', isSelf ? 'bg-link/25' : 'bg-link/10')}
+                className={cn(
+                  className,
+                  'font-medium text-link',
+                  isSelf ? 'bg-link/25' : 'bg-link/10'
+                )}
                 onPress={links ? () => setProfile(mentionUser(part.text)) : undefined}
               >
                 {part.text}
@@ -141,6 +149,7 @@ export function EmojiText({
 
           return part.text;
         })}
+        {children}
       </Text>
       {profile && <ProfileSheet user={profile} open onClose={() => setProfile(null)} />}
     </>

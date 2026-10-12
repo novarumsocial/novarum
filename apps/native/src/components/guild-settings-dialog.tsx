@@ -34,7 +34,10 @@ export function GuildSettingsDialog({
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function selectPicture() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+    });
     const asset = result.assets?.[0];
     if (!asset) return;
 
@@ -114,7 +117,9 @@ export function GuildSettingsDialog({
               placeholder="Add a description for your guild"
               className="opacity-50"
             />
-            <Text className="text-xs text-muted-foreground">More guild settings are coming soon!</Text>
+            <Text className="text-xs text-muted-foreground">
+              More guild settings are coming soon!
+            </Text>
           </View>
 
           <View className="gap-2">

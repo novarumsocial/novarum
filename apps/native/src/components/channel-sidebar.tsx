@@ -46,7 +46,15 @@ import { cn } from '@/lib/utils';
 type Row =
   | { kind: 'category'; category: ChannelCategory }
   | { kind: 'channel'; channel: Channel; category: ChannelCategory };
-type Menu = 'guild' | 'guildNotify' | 'channel' | 'channelNotify' | 'invite' | 'create' | 'edit' | 'settings';
+type Menu =
+  | 'guild'
+  | 'guildNotify'
+  | 'channel'
+  | 'channelNotify'
+  | 'invite'
+  | 'create'
+  | 'edit'
+  | 'settings';
 
 export function ChannelSidebar({
   server,
@@ -154,7 +162,11 @@ export function ChannelSidebar({
         >
           <Icon
             as={ch.type === 'VOICE' ? Volume2 : Hash}
-            className={highlighted || activeChannel === ch.id ? 'text-sidebar-foreground' : 'text-muted-foreground'}
+            className={
+              highlighted || activeChannel === ch.id
+                ? 'text-sidebar-foreground'
+                : 'text-muted-foreground'
+            }
           />
           <Text
             numberOfLines={1}
@@ -187,7 +199,8 @@ export function ChannelSidebar({
         {connected.map((state) => {
           const name = state.name || nameFor(state.userId);
           const user = memberFor(state.userId);
-          const voiceState = voiceChannelId === ch.id ? voiceUserStates.get(state.userId) : undefined;
+          const voiceState =
+            voiceChannelId === ch.id ? voiceUserStates.get(state.userId) : undefined;
           const row = (
             <View className="min-h-11 flex-row items-center gap-1.5 pr-2 pl-8">
               <View>
@@ -235,7 +248,10 @@ export function ChannelSidebar({
         className="shrink-0 flex-row items-center justify-between border-b border-border px-4 active:bg-accent"
         style={{ height: 48 + insets.top, paddingTop: insets.top }}
       >
-        <Text numberOfLines={1} className="flex-1 text-sm font-semibold tracking-tight text-sidebar-foreground">
+        <Text
+          numberOfLines={1}
+          className="flex-1 text-sm font-semibold tracking-tight text-sidebar-foreground"
+        >
           {server.name}
         </Text>
         <Icon as={ChevronDown} className="text-muted-foreground" />
@@ -243,7 +259,16 @@ export function ChannelSidebar({
 
       <FlashList
         data={rows}
-        extraData={[collapsed, voiceChannelId, voiceUserStates, voiceStates, members, levels, activeChannel, circleIcons]}
+        extraData={[
+          collapsed,
+          voiceChannelId,
+          voiceUserStates,
+          voiceStates,
+          members,
+          levels,
+          activeChannel,
+          circleIcons,
+        ]}
         keyExtractor={(row) => (row.kind === 'category' ? `c:${row.category.id}` : row.channel.id)}
         getItemType={(row) => row.kind}
         contentContainerStyle={{ paddingVertical: 8 }}
@@ -254,7 +279,10 @@ export function ChannelSidebar({
             <View className="min-h-11 flex-row items-center px-3">
               <Pressable
                 onPress={() =>
-                  setCollapsed((current) => ({ ...current, [item.category.id]: !current[item.category.id] }))
+                  setCollapsed((current) => ({
+                    ...current,
+                    [item.category.id]: !current[item.category.id],
+                  }))
                 }
                 className="h-11 flex-1 flex-row items-center gap-1"
               >
@@ -314,13 +342,24 @@ export function ChannelSidebar({
         <SheetItem
           icon={Link}
           label="Copy Link"
-          onPress={() => channel && copy(`https://app.novarum.me${guildPath(server.id, channel.id)}`)}
+          onPress={() =>
+            channel && copy(`https://app.novarum.me${guildPath(server.id, channel.id)}`)
+          }
         />
-        <SheetItem icon={Bell} label="Notification Settings" onPress={() => open('channelNotify')} />
+        <SheetItem
+          icon={Bell}
+          label="Notification Settings"
+          onPress={() => open('channelNotify')}
+        />
         <SheetItem icon={Pencil} label="Edit Channel" onPress={() => open('edit')} />
         {server.canManageChannels && (
           <>
-            <SheetItem icon={ArrowUp} label="Move up" disabled={position <= 0} onPress={() => move(-1)} />
+            <SheetItem
+              icon={ArrowUp}
+              label="Move up"
+              disabled={position <= 0}
+              onPress={() => move(-1)}
+            />
             <SheetItem
               icon={ArrowDown}
               label="Move down"
@@ -329,7 +368,11 @@ export function ChannelSidebar({
             />
           </>
         )}
-        <SheetItem icon={IdCardLanyard} label="Copy Channel ID" onPress={() => channel && copy(channel.id)} />
+        <SheetItem
+          icon={IdCardLanyard}
+          label="Copy Channel ID"
+          onPress={() => channel && copy(channel.id)}
+        />
       </Sheet>
       {channel && (
         <NotificationMenu
@@ -355,7 +398,11 @@ export function ChannelSidebar({
         }}
       />
       <InviteDialog open={menu === 'invite'} onClose={closeIf('invite')} guildId={server.id} />
-      <GuildSettingsDialog open={menu === 'settings'} onClose={closeIf('settings')} server={server} />
+      <GuildSettingsDialog
+        open={menu === 'settings'}
+        onClose={closeIf('settings')}
+        server={server}
+      />
       <EditChannelDialog open={menu === 'edit'} onClose={closeIf('edit')} channel={channel} />
     </View>
   );

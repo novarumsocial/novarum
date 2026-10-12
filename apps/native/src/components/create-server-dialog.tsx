@@ -60,7 +60,10 @@ export function CreateServerDialog({ open, onClose }: { open: boolean; onClose: 
         </View>
         <View className="items-center gap-3">
           <View
-            className={cn('size-16 items-center justify-center bg-primary', circleIcons && 'rounded-full')}
+            className={cn(
+              'size-16 items-center justify-center bg-primary',
+              circleIcons && 'rounded-full'
+            )}
           >
             <Text className="text-lg font-bold text-white">{initials(name) || 'N'}</Text>
           </View>

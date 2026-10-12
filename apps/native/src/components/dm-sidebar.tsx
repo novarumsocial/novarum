@@ -87,7 +87,12 @@ export function DmSidebar() {
           )}
         >
           <View>
-            <Avatar src={other?.avatarUrl} name={name} bgColor={other?.avatarColor} className="size-8" />
+            <Avatar
+              src={other?.avatarUrl}
+              name={name}
+              bgColor={other?.avatarColor}
+              className="size-8"
+            />
             {other && friends().isOnline(other.userId) && (
               <View
                 className={cn(
