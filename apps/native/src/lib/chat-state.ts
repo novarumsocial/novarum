@@ -869,9 +869,11 @@ export const useChat = create<ChatState>((set, get) => {
       nextCursorByChannel.set(channelId, 0);
 
       try {
+        const count = resetCount;
         const result = await anchor().client.message.list.get({
           query: { channelId, cursor: 0, amount: messagesPageSize },
         });
+        if (count !== resetCount) return;
 
         if (result.error || !result.data || 'error' in result.data) {
           if (sendToGuildsIfFederatedServerDown(result.error)) return;
@@ -977,7 +979,9 @@ export const useChat = create<ChatState>((set, get) => {
       }),
 
     async loadMembers(channelId) {
+      const count = resetCount;
       const result = await anchor().client.channel({ id: channelId }).users.get();
+      if (count !== resetCount) return;
 
       if (result.error || !result.data || 'error' in result.data) {
         console.error('Failed to load members', result.error ?? result.data);

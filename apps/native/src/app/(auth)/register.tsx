@@ -10,7 +10,7 @@ import { AuthCard, AuthField, ButtonLabel, TextLink } from '@/components/auth-ca
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { safeRedirect, useRedirectParam } from '@/lib/safe-redirect';
+import { useAuthParams } from '@/lib/safe-redirect';
 import { useSession } from '@/lib/session';
 
 const registerSchema = z
@@ -53,7 +53,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const session = useSession();
-  const redirectParam = useRedirectParam();
+  const { query, done } = useAuthParams();
 
   const { control, handleSubmit, setFocus } = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -91,7 +91,7 @@ export default function Register() {
       return;
     }
 
-    router.replace((redirectParam ? safeRedirect(redirectParam) : '/guilds') as Href);
+    done();
   });
 
   const toggle = (
@@ -112,7 +112,7 @@ export default function Register() {
       footer={
         <>
           <Text className="text-xs text-muted-foreground">Already have an account?</Text>
-          <TextLink onPress={() => router.replace('/login')}>Sign in</TextLink>
+          <TextLink onPress={() => router.replace(`/login${query}` as Href)}>Sign in</TextLink>
         </>
       }
     >

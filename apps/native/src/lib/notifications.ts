@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 import { effectiveLevel, levelAllows, type NotificationEntries } from 'anchor/notification-level';
-import { chatPathSchema } from './push';
+import { chatPathSchema, hasPushSubscription } from './push';
 import { settings } from './settings';
 
 // the app shows its own in-app banner (components/in-app-banner.tsx) while it is open,
@@ -22,7 +22,7 @@ Notifications.setNotificationHandler({
 // a tapped notification opens the chat it came from (a cold start is handled by watchNotificationTaps in push.ts)
 Notifications.addNotificationResponseReceivedListener((response) => {
   const url = chatPathSchema.safeParse(response.notification.request.content.data?.url);
-  if (url.success) router.push(url.data as never);
+  if (url.success) router.navigate(url.data as never);
 });
 
 export function notificationsSupported(): boolean {
@@ -63,6 +63,10 @@ export async function sendNotification(notification: NotificationOptions): Promi
     useInAppBanner.getState().show(notification);
     return true;
   }
+
+  // with a push subscription the server already notifies a user whose app is not in the foreground
+  // (calls are not pushed)
+  if (!notification.tag?.startsWith('call:') && hasPushSubscription()) return false;
 
   if ((await getNotificationPermission()) !== 'granted') {
     return false;

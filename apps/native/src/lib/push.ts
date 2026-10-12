@@ -22,6 +22,9 @@ const isAndroid = Platform.OS === 'android';
 
 export const pushAvailable = () => isAndroid;
 
+// the server pushes to this device for the account on the current homeserver
+export const hasPushSubscription = () => Boolean(storage.getString(subscriptionIdKey()));
+
 async function vapidKey() {
   const result = await anchor().client.notifications['vapid-key'].get();
   if (result.error || !result.data) throw new Error('Could not reach your homeserver');
@@ -133,20 +136,25 @@ function pathOf(url: string) {
 // we read with expo-linking. Android only delivers it to us if the url is absolute and matches an intent filter
 // of the app (`https://app.novarum.me/guilds...` or `novarum://...`): a relative `/guilds/...` payload url like
 // the web's Web Push one can not be resolved by Android, so the backend must send an absolute url for UnifiedPush.
+let coldStartHandled = false;
+
 export function watchNotificationTaps(openUrl: (url: string) => void) {
   const open = (url: string | null | undefined) => {
     const path = chatPathSchema.safeParse(url && pathOf(url));
     if (path.success) openUrl(path.data);
   };
 
-  // CLEAR_TASK restarts the activity, so a tap normally arrives as the initial url
-  void Linking.getInitialURL().then(open);
+  // only once per app start: the shell can mount again (account switch) and must not reopen an old tap
+  if (!coldStartHandled) {
+    coldStartHandled = true;
+    // CLEAR_TASK restarts the activity, so a tap normally arrives as the initial url
+    void Linking.getInitialURL().then(open);
+    // cold start from a local notification (warm taps are routed in notifications.ts)
+    void Notifications.getLastNotificationResponseAsync().then((response) =>
+      open(z.string().safeParse(response?.notification.request.content.data?.url).data)
+    );
+  }
   const link = Linking.addEventListener('url', ({ url }) => open(url));
-
-  // cold start from a local notification (warm taps are routed in notifications.ts)
-  void Notifications.getLastNotificationResponseAsync().then((response) =>
-    open(z.string().safeParse(response?.notification.request.content.data?.url).data)
-  );
 
   return () => link.remove();
 }

@@ -687,3 +687,11 @@ Where the code differs from the plan above:
 - **Push (Android)** uses the `expo-unified-push` package. A tap on its notification opens the payload `url` as an `ACTION_VIEW` intent, and Android cannot open a scheme-less `/guilds/...`. **Backend follow-up (small):** for UnifiedPush subscriptions send `https://app.novarum.me/guilds/...` as `url`. `app.config.ts` already has the intent filter. Later we migrate to native notifications.
 - **Not done yet (Phase 7 and later):** screen share, native incoming calls (CallKit / ConnectionService), mini call view, `expo-updates` channel setup, store builds with EAS, iOS push (decision B2 still open), retry button for failed sends.
 - **Untested on device, check first:** cookie persistence and the cookie on the WebSocket upgrade (Phase 0), the XHR `{ uri }` upload, the Unicode emoji regex on Hermes, the swipe-to-reply vs panel gestures, and the LiveKit audio session.
+
+### Open points after the review pass
+
+- **Phase 7 status:** done: Android screen share, mini call view, accessibility pass, OTA wiring (`EAS_UPDATE_URL`), EAS profiles. Not done: iOS screen share, native incoming calls (they need push for calls; iOS push is deferred on purpose), store builds.
+- **Cookie on Android (check first on device).** The backend sets `Partitioned` on `session_token` for https (`modules/auth/provider.ts`). Android's `CookieManager` may drop a partitioned cookie with no partition key, which would make login fail with `cookieMissing`. If it does: skip `partitioned` for non-browser clients, or do B1.
+- **UnifiedPush tap url** must be absolute (`https://app.novarum.me/guilds/...`); the server sends a relative one today.
+- **Android background mic:** `AudioSession` does not start a microphone foreground service, so a long locked-screen call may lose capture. Test on a device; a small foreground service may be needed.
+- Dev homeservers on `http` work through cleartext/local-network exceptions in `app.config.ts`.

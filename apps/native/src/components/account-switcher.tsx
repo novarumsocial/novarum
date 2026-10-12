@@ -13,11 +13,12 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
   const accounts = useSession((s) => s.accounts);
   const homeServer = useAnchor((s) => s.homeServer);
 
-  // switching re-boots the app on the new homeserver; the web does this with a page reload
+  // switching re-boots the app shell on the new homeserver (the web reloads the page); go home first,
+  // while the shell can still navigate, so the old account's channel is not the route that comes back
   const switchTo = async (server: string) => {
     onClose();
-    await session().switchAccount(server);
     router.replace('/guilds');
+    await session().switchAccount(server);
   };
 
   return (
@@ -66,7 +67,7 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
         accessibilityRole="button"
         onPress={() => {
           onClose();
-          router.push('/login?add');
+          router.push('/login?add=1');
         }}
         className="min-h-14 flex-row items-center gap-3 px-4 active:bg-accent"
       >

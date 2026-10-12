@@ -13,6 +13,7 @@ const config: ExpoConfig = {
     bundleIdentifier: 'me.novarum.mobile',
     supportsTablet: true,
     infoPlist: {
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true }, // http dev homeservers on localhost / LAN
       UIBackgroundModes: ['audio', 'voip'],
       NSCameraUsageDescription: 'Send photos and join video calls',
       NSMicrophoneUsageDescription: 'Talk in voice channels and calls',
@@ -67,7 +68,10 @@ const config: ExpoConfig = {
     ['@livekit/react-native-expo-plugin', { android: { enableScreenShareService: true } }],
     [
       'expo-build-properties',
-      { android: { minSdkVersion: 24 }, ios: { deploymentTarget: '16.4' } },
+      {
+        android: { minSdkVersion: 24, usesCleartextTraffic: true },
+        ios: { deploymentTarget: '16.4' },
+      },
     ],
   ],
   // OTA updates turn on when EAS_UPDATE_URL is set (the `eas update` URL from `eas init`)

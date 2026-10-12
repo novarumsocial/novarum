@@ -1,6 +1,6 @@
 // Port of apps/frontend/src/routes/login/+page.svelte
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { ArrowLeft, AtSign, Lock, LogIn, Mail, Server, Smartphone } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
-import { safeRedirect, useRedirectParam } from '@/lib/safe-redirect';
+import { useAuthParams } from '@/lib/safe-redirect';
 import { useSession, type MfaMethod } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -91,12 +91,10 @@ export default function Login() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showLoginOptions, setShowLoginOptions] = useState(false);
   const session = useSession();
-  const redirectParam = useRedirectParam();
-  const { add } = useLocalSearchParams<{ add?: string }>();
-  const done = () => router.replace(safeRedirect(redirectParam) as Href);
+  const { add, query, done } = useAuthParams();
 
   useEffect(() => {
-    if (add !== undefined) return;
+    if (add) return;
 
     void session.refresh().then((user) => {
       if (user) done();
@@ -196,10 +194,6 @@ export default function Login() {
       : 'Enter the current code from your authenticator app.'
     : 'Sign in to your home server to continue.';
 
-  const redirectQuery = redirectParam
-    ? `?redirect=${encodeURIComponent(safeRedirect(redirectParam))}`
-    : '';
-
   const error = submitError ? (
     <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
       {submitError}
@@ -219,9 +213,7 @@ export default function Login() {
         ) : (
           <>
             <Text className="text-xs text-muted-foreground">Don't have an account?</Text>
-            <TextLink onPress={() => router.push(`/register${redirectQuery}` as Href)}>
-              Register
-            </TextLink>
+            <TextLink onPress={() => router.push(`/register${query}` as Href)}>Register</TextLink>
           </>
         )
       }
@@ -354,7 +346,7 @@ export default function Login() {
             icon={Lock}
             labelRight={
               <Text
-                onPress={() => router.push(`/reset-password${redirectQuery}` as Href)}
+                onPress={() => router.push(`/reset-password${query}` as Href)}
                 className="text-xs text-muted-foreground"
               >
                 Forgot password?

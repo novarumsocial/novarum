@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { anchor } from '@/lib/anchor';
-import { safeRedirect, useRedirectParam } from '@/lib/safe-redirect';
+import { useAuthParams } from '@/lib/safe-redirect';
 import { getErrorMessage } from '@/lib/session';
 
 const homeServerSchema = z
@@ -50,10 +50,8 @@ const resetSchema = z
   });
 
 export default function ResetPassword() {
-  const redirectParam = useRedirectParam();
-  const loginHref = (
-    redirectParam ? `/login?redirect=${encodeURIComponent(safeRedirect(redirectParam))}` : '/login'
-  ) as Href;
+  const { query } = useAuthParams();
+  const loginHref = `/login${query}` as Href;
 
   const [step, setStep] = useState<'request' | 'reset' | 'complete'>('request');
   const [email, setEmail] = useState('');

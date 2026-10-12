@@ -168,7 +168,8 @@ export default function InvitePage() {
 
     setAccepted(true);
     const guildId = data.data.guildId ?? data.data.guild?.id;
-    router.replace((guildId ? `/guilds/${guildId}` : '/guilds') as Href);
+    // dismissTo: when the invite was opened over a running app, go back to that app instead of stacking a second one
+    router.dismissTo((guildId ? `/guilds/${encodeURIComponent(guildId)}` : '/guilds') as Href);
   }
 
   async function copyInvite() {

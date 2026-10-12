@@ -272,7 +272,10 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
   };
 
   // the server skips push for users with an active app, so it has to hear when this one stops being it
-  const sendClientState = () => socket?.send({ type: 'client.state', active: isForeground() });
+  // (a socket that is still connecting throws on `send` in React Native)
+  const sendClientState = () => {
+    if (get().connected) socket?.send({ type: 'client.state', active: isForeground() });
+  };
 
   const flushEmojiQuery = () => {
     emojiQueryTimer = null;
@@ -346,6 +349,12 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
           const channel = chat()
             .channelsByServer[event.data.guildId ?? '']?.flatMap((category) => category.channels)
             .find((item) => item.id === event.data.channelId);
+          // fed: ids stay as they are, so the link opens the shadow guild or DM
+          const url = isDm
+            ? dmPath(event.data.channelId)
+            : `/guilds/${[event.data.guildId!, event.data.channelId, event.data.id]
+                .map(encodeURIComponent)
+                .join('/')}`;
           void sendNotification({
             title: messageNotificationTitle(
               event.data.author,
@@ -358,16 +367,8 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
                 : 'Mentioned you',
             icon: event.data.author.avatarUrl ?? undefined,
             tag: event.data.channelId,
-            onClick: () => {
-              // fed: ids stay as they are, so the link opens the shadow guild or DM
-              void goto(
-                isDm
-                  ? dmPath(event.data.channelId)
-                  : `/guilds/${[event.data.guildId!, event.data.channelId, event.data.id]
-                      .map(encodeURIComponent)
-                      .join('/')}`
-              );
-            },
+            url,
+            onClick: () => void goto(url),
           });
         }
       }
@@ -421,6 +422,7 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
             body: 'Is calling you',
             icon: caller.avatarUrl ?? undefined,
             tag: `call:${channelId}`,
+            url: dmPath(channelId),
             onClick: () => void goto(dmPath(channelId)),
           });
         }
@@ -447,6 +449,14 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     if (event.type === 'dm.created') {
       dms().upsert(event.data);
     }
+  };
+
+  // forgets what only made sense on the old connection
+  const resetConnectionState = () => {
+    if (emojiQueryTimer) clearTimeout(emojiQueryTimer);
+    emojiQueryTimer = null;
+    queuedEmojiUnicodes.clear();
+    pendingEmojiUnicodes.clear();
   };
 
   function openSocket() {
@@ -478,15 +488,15 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
 
       socket = null;
       set({ connected: false });
-      if (emojiQueryTimer) clearTimeout(emojiQueryTimer);
-      emojiQueryTimer = null;
-      queuedEmojiUnicodes.clear();
-      pendingEmojiUnicodes.clear();
+      resetConnectionState();
       shouldRecover = true;
       scheduleReconnect();
     });
 
-    current.subscribe(handleEvent);
+    // a socket that was replaced or closed on purpose must not touch the stores any more
+    current.subscribe((message) => {
+      if (socket === current) void handleEvent(message);
+    });
   }
 
   return {
@@ -508,12 +518,31 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
       const stopNetInfo = NetInfo.addEventListener((state) => {
         if (state.isConnected) reconnectWhenOnline();
       });
-      const appState = AppState.addEventListener('change', sendClientState);
+      // phones suspend sockets in the background without a `close` event, so after a while away
+      // the old one is dropped and a new one recovers whatever was missed
+      let backgroundedAt = 0;
+      const appState = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') backgroundedAt ||= Date.now();
+        else {
+          const away = backgroundedAt ? Date.now() - backgroundedAt : 0;
+          backgroundedAt = 0;
+          if (active && socket && away > 10_000) {
+            const stale = socket;
+            socket = null;
+            set({ connected: false });
+            resetConnectionState();
+            shouldRecover = true;
+            stale.close();
+            clearReconnectTimer();
+            openSocket();
+          }
+        }
+        sendClientState();
+      });
       openSocket();
 
       return () => {
         active = false;
-        set({ connected: false });
         clearReconnectTimer();
         stopNetInfo();
         appState.remove();
@@ -521,6 +550,14 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
         const closing = socket;
         socket = null;
         closing?.close();
+
+        // the next connect() may be another account's
+        resetConnectionState();
+        reconnectAttempt = 0;
+        shouldRecover = false;
+        voiceChannelId = null;
+        missingEmojiUnicodes.clear();
+        set({ connected: false, emojiQuery: '', emojiResults: [], emojiUrls: {} });
       };
     },
 
@@ -563,7 +600,7 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     },
 
     ringCall(channelId, ringing = true) {
-      socket?.send({ type: 'call.ring', channelId, ringing });
+      if (get().connected) socket?.send({ type: 'call.ring', channelId, ringing });
       if (ringing) dms().setOutgoingCall(channelId);
     },
 
