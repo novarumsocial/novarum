@@ -62,6 +62,8 @@ type SessionState = {
   loading: boolean;
   initialized: boolean;
   error: string | null;
+  // bumped when the account behind the shell changes (switch, sign-in): the shell resets its stores and boots again
+  epoch: number;
   refresh: () => Promise<SessionUser | null>;
   login: (input: LoginInput) => Promise<LoginResult>;
   completeMfa: (challenge: string, method: MfaMethod, code: string) => Promise<SessionResult>;
@@ -119,7 +121,7 @@ export const useSession = create<SessionState>((set, get) => {
         return fail(`${action} succeeded, but the server returned no authenticated session.`, '');
       }
 
-      set({ user: data.user, initialized: true });
+      set({ user: data.user, initialized: true, epoch: get().epoch + 1 });
       remember(data.user);
       return { ok: true, user: data.user };
     } catch (error) {
@@ -144,6 +146,7 @@ export const useSession = create<SessionState>((set, get) => {
     loading: false,
     initialized: false,
     error: null,
+    epoch: 0,
 
     async refresh() {
       set({ loading: true, error: null });
@@ -236,10 +239,10 @@ export const useSession = create<SessionState>((set, get) => {
       }
     },
 
-    // the caller re-boots the app afterwards (router.replace('/')); the web reloads the page
+    // the web reloads the page; here the epoch makes the app shell reset its stores and boot again
     async switchAccount(homeServer) {
       await anchor().setHomeServer(homeServer);
-      set({ user: null, initialized: false });
+      set({ user: null, initialized: false, epoch: get().epoch + 1 });
     },
 
     forget: (homeServer) => setAccounts(get().accounts.filter((a) => a.homeServer !== homeServer)),

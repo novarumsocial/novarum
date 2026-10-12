@@ -109,7 +109,12 @@ export function Panels({
           {left}
         </View>
       ) : (
-        <View className="absolute inset-y-0 left-0 bg-sidebar" style={{ width: leftW }}>
+        <View
+          className="absolute inset-y-0 left-0 bg-sidebar"
+          style={{ width: leftW }}
+          importantForAccessibility={open === 'left' ? 'auto' : 'no-hide-descendants'}
+          accessibilityElementsHidden={open !== 'left'}
+        >
           {left}
         </View>
       )}

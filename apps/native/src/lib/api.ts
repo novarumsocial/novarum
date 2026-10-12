@@ -49,31 +49,26 @@ export async function getAnchorInfo(homeServerUrl: string) {
   try {
     response = await fetch(discoveryUrl);
   } catch {
-    throw new Error(`Could not reach ${homeServer}. Check
-      the server address and try again.`);
+    throw new Error(`Could not reach ${homeServer}. Check the server address and try again.`);
   }
 
   if (!response.ok) {
     throw new Error(
-      `${homeServer} returned ${response.status} while
-        looking for its Anchor server information.`
+      `${homeServer} returned ${response.status} while looking for its Anchor server information.`
     );
   }
 
   const infoResult = anchorInfoSchema.safeParse(await response.json().catch(() => null));
 
   if (!infoResult.success) {
-    throw new Error(`${homeServer} returned invalid
-      Anchor server information.`);
+    throw new Error(`${homeServer} returned invalid Anchor server information.`);
   }
 
   const info = infoResult.data;
 
   if (info.homeserver !== homeServer) {
     throw new Error(
-      `The server identified itself as
-        ${info.homeserver}, not ${homeServer}. Check the
-        server address.`
+      `The server identified itself as ${info.homeserver}, not ${homeServer}. Check the server address.`
     );
   }
 
