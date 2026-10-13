@@ -11,6 +11,7 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   ios: {
     bundleIdentifier: 'me.novarum.mobile',
+    buildNumber: process.env.BUILD_NUMBER ?? '1',
     supportsTablet: true,
     infoPlist: {
       NSAppTransportSecurity: { NSAllowsLocalNetworking: true }, // http dev homeservers on localhost / LAN
@@ -22,7 +23,8 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'me.novarum.mobile',
-
+    // CI passes its run number, so every build installs as an update (the Capacitor app was 1)
+    versionCode: Number(process.env.BUILD_NUMBER ?? 1),
     adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#0c090c' },
     permissions: [
       'RECORD_AUDIO',

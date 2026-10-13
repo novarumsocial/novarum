@@ -2,7 +2,6 @@
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import UnifiedPush, { requestPermissions, subscribeDistributorMessages } from 'expo-unified-push';
 import { z } from 'zod';
 import { anchor } from './anchor';
 import { storage } from './storage';
@@ -19,6 +18,12 @@ const subscriptionSchema = z.object({
 });
 
 const isAndroid = Platform.OS === 'android';
+// the module only exists on Android: a plain import would crash the iOS app on start
+const {
+  default: UnifiedPush,
+  requestPermissions,
+  subscribeDistributorMessages,
+}: typeof import('expo-unified-push') = isAndroid ? require('expo-unified-push') : {};
 
 export const pushAvailable = () => isAndroid;
 
