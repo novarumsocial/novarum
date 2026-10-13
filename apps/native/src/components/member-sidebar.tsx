@@ -2,22 +2,19 @@
 import { FlashList } from '@shopify/flash-list';
 import { Users } from 'lucide-react-native';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { ProfileCard } from '@/components/profile-card';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { useSettings } from '@/lib/settings';
-import type { Author, Server } from '@/lib/types/chat';
+import type { Author } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
 
 type Row = { kind: 'title'; label: string; online: boolean } | { kind: 'member'; member: Author };
 
-export function MemberSidebar({ members }: { server: Server; members: Author[] }) {
-  const insets = useSafeAreaInsets();
-  const showMemberList = useSettings((s) => s.showMemberList);
+// the members modal on phones, the right column next to the chat on tablets
+export function MemberSidebar({ members }: { members: Author[] }) {
   const circleIcons = useSettings((s) => s.circleIcons);
-  if (!showMemberList) return null;
 
   const online = members.filter((member) => member.status !== 'OFFLINE');
   const offline = members.filter((member) => member.status === 'OFFLINE');
@@ -34,7 +31,6 @@ export function MemberSidebar({ members }: { server: Server; members: Author[] }
 
   return (
     <View className="flex-1 bg-sidebar">
-      <View className="shrink-0 border-b border-border" style={{ minHeight: 48 + insets.top }} />
       <FlashList
         data={rows}
         getItemType={(row) => row.kind}

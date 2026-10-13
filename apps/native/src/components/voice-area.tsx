@@ -2,13 +2,13 @@
 // Differences: reads the single `voice` store instead of taking it as a prop; no fullscreen button (the app
 // is already full screen); the web's hover-driven controls fade after a few seconds without touches.
 // Screen share is Android only (iOS needs a broadcast extension), so the button is hidden on iOS.
+import { router } from 'expo-router';
 import { ConnectionState } from 'livekit-client';
 import {
   Bluetooth,
   Headphones,
   HeadphoneOff,
   Maximize2,
-  Menu,
   Mic,
   MicOff,
   Minimize2,
@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { VolumeSlider } from '@/components/participant-sheet';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
@@ -60,8 +61,6 @@ export function VoiceArea({
   members,
   onJoin,
   onLeave,
-  onOpenNavigation,
-  onOpenMembers,
   embedded = false,
   expanded = false,
   onToggleExpand,
@@ -70,8 +69,6 @@ export function VoiceArea({
   members: Author[];
   onJoin: () => void;
   onLeave: () => void;
-  onOpenNavigation?: () => void;
-  onOpenMembers?: () => void;
   embedded?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
@@ -222,17 +219,18 @@ export function VoiceArea({
   return (
     <View className="min-h-0 min-w-0 flex-1 bg-background">
       {!embedded && (
-        <View className="h-12 shrink-0 flex-row items-center gap-2 border-b border-border px-2">
-          {onOpenNavigation && (
+        <ScreenHeader
+          actions={
             <Button
               variant="ghost"
               size="icon"
-              accessibilityLabel="Open channels"
-              onPress={onOpenNavigation}
+              accessibilityLabel="Open members"
+              onPress={() => router.push('/guilds/members')}
             >
-              <Icon as={Menu} size={20} />
+              <Icon as={Users} size={20} />
             </Button>
-          )}
+          }
+        >
           <Icon as={Volume2} size={20} className="text-muted-foreground" />
           <Text numberOfLines={1} className="shrink text-sm font-semibold">
             {channel.name}
@@ -240,19 +238,7 @@ export function VoiceArea({
           {active && !connecting && (
             <Text className="text-xs text-muted-foreground">{participantCount}</Text>
           )}
-          <View className="ml-auto flex-row items-center gap-1">
-            {onOpenMembers && (
-              <Button
-                variant="ghost"
-                size="icon"
-                accessibilityLabel="Open members"
-                onPress={onOpenMembers}
-              >
-                <Icon as={Users} size={20} />
-              </Button>
-            )}
-          </View>
-        </View>
+        </ScreenHeader>
       )}
 
       <View

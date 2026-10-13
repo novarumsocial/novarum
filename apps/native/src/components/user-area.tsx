@@ -24,10 +24,8 @@ import { AccountSwitcher } from '@/components/account-switcher';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { chat } from '@/lib/chat-state';
-import { dmPath, dms } from '@/lib/dms';
+import { channelPath } from '@/lib/chat-state';
 import { goto } from '@/lib/navigation';
-import { panels } from '@/lib/panels';
 import type { SessionUser } from '@/lib/session';
 import { useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
@@ -87,9 +85,7 @@ export function UserArea({
 
   const openVoiceChannel = () => {
     if (!channelId) return;
-    if (dms().get(channelId)) goto(dmPath(channelId));
-    else chat().selectChannel(channelId);
-    panels().close();
+    goto(channelPath(channelId));
   };
 
   const toggle = (action: () => unknown) => () => {

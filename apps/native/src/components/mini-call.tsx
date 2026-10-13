@@ -1,33 +1,29 @@
-// Native-only (the plan's "mini call view"): a compact bar over the top of the chat while you are in a call
-// and browsing somewhere else. Tap it to go back to the call; mute and leave work from here.
+// Native-only (the plan's "mini call view"): a compact bar below the header of a channel screen while you are
+// in a call somewhere else. Tap it to go back to the call; mute and leave work from here. The hub has no bar,
+// its user area already shows the call.
 import * as Haptics from 'expo-haptics';
 import { Mic, MicOff, PhoneOff, Volume2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { channelPath, selectActiveChannel, useChannelName, useChat } from '@/lib/chat-state';
+import { goto } from '@/lib/navigation';
 import { useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { selectConnected, useVoice, voice } from '@/lib/voice';
 
-export function MiniCall({
-  name,
-  hidden = false,
-  top = 0,
-  onOpen,
-}: {
-  // the call's channel name
-  name: string;
-  // true while the call's own channel is on screen
-  hidden?: boolean;
-  // distance from the top of the center panel (below its header)
-  top?: number;
-  onOpen: () => void;
-}) {
+export function MiniCall() {
+  const insets = useSafeAreaInsets();
+  const channelId = useVoice((s) => s.channelId);
+  const name = useChannelName(channelId) ?? 'Voice channel';
+  // the hub, or the call's own channel, is on screen
+  const hidden = useChat((s) => s.route.kind === 'home' || selectActiveChannel(s) === channelId);
   const connected = useVoice(selectConnected);
   const selfMuted = useVoice((s) => s.selfMuted);
   const circleIcons = useSettings((s) => s.circleIcons);
 
-  if (!connected || hidden) return null;
+  if (!connected || hidden || !channelId) return null;
 
   return (
     <View
@@ -35,12 +31,12 @@ export function MiniCall({
         'absolute inset-x-2 z-20 flex-row items-center border border-border bg-card',
         circleIcons && 'rounded-full pl-2'
       )}
-      style={{ top }}
+      style={{ top: insets.top + 58 }}
     >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`In a call in ${name}. Return to the call`}
-        onPress={onOpen}
+        onPress={() => goto(channelPath(channelId))}
         className="min-h-11 min-w-0 flex-1 flex-row items-center gap-2 px-3 active:opacity-70"
       >
         <Icon as={Volume2} size={16} className="text-emerald-400" />

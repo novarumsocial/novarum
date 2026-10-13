@@ -309,8 +309,7 @@ export const Message = memo(function Message({
     setMenuOpen(true);
   };
 
-  // swipe left to reply. Right swipes fail right away (the shell uses them for the server panel), the last
-  // 40px are left to the shell's edge swipe for the members panel, and it activates before the shell's pan (14px).
+  // swipe left to reply. Right swipes fail right away so the stack's swipe back keeps working.
   const translateX = useSharedValue(0);
   const crossed = useSharedValue(false);
   const reply = useCallback(() => onReply(message), [onReply, message]);
@@ -321,7 +320,6 @@ export const Message = memo(function Message({
         .activeOffsetX(-10)
         .failOffsetX(10)
         .failOffsetY([-12, 12])
-        .hitSlop({ right: -40 })
         .onUpdate((event) => {
           translateX.value = Math.max(-SWIPE_MAX, Math.min(0, event.translationX));
           const past = translateX.value <= -SWIPE_THRESHOLD;

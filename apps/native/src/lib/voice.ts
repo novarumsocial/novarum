@@ -21,6 +21,7 @@ import {
 import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { anchor } from './anchor';
+import { chat } from './chat-state';
 import { realtime } from './realtime';
 import { settings } from './settings';
 
@@ -361,9 +362,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
       Platform.OS === 'ios' ? (iosOutputs[id] ?? []) : [id as AudioOutput]
     );
     set({
-      audioOutputs: outputs.filter((o) =>
-        ['speaker', 'earpiece', 'bluetooth'].includes(o)
-      ),
+      audioOutputs: outputs.filter((o) => ['speaker', 'earpiece', 'bluetooth'].includes(o)),
     });
   };
 
@@ -662,3 +661,14 @@ export const selectConnected = (s: VoiceStore) => s.connectionState === Connecti
 export const selectConnecting = (s: VoiceStore) => s.connectionState === ConnectionState.Connecting;
 export const selectParticipantCount = (s: VoiceStore) => s.voiceStates.size;
 export const selectLocalIdentity = (s: VoiceStore) => s.room?.localParticipant.identity ?? null;
+
+// join a DM call, and ring the other side when nobody is in it yet
+export function startCall(channelId: string) {
+  const ring = !chat().voiceStates[channelId]?.length;
+  void voice()
+    .join(channelId)
+    .then(() => {
+      if (ring && voice().channelId === channelId) realtime().ringCall(channelId);
+    })
+    .catch(() => null);
+}

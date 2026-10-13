@@ -3,6 +3,7 @@
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Text } from '@/components/ui/text';
 import { ProfileSheet } from '@/components/profile-card';
 import { useChat } from '@/lib/chat-state';
@@ -92,14 +93,18 @@ export function EmojiText({
   children?: ReactNode;
 }) {
   const self = useSession((s) => s.user);
-  const emojiUrls = useRealtime((s) => s.emojiUrls);
   const [profile, setProfile] = useState<Author | null>(null);
   const parts = useMemo(() => parse(content, links), [content, links]);
+  const unicodes = useMemo(
+    () => parts.flatMap((part) => (part.unicode ? [part.unicode] : [])),
+    [parts]
+  );
+  // only this text's emojis, so a new emoji elsewhere doesn't re-render every message
+  const urls = useRealtime(useShallow((s) => unicodes.map((unicode) => s.emojiUrls[unicode])));
 
   useEffect(() => {
-    const unicodes = parts.flatMap((part) => (part.unicode ? [part.unicode] : []));
     if (unicodes.length) useRealtime.getState().queryEmojis(unicodes);
-  }, [parts]);
+  }, [unicodes]);
 
   return (
     <>
@@ -134,7 +139,7 @@ export function EmojiText({
             );
           }
 
-          const url = part.unicode && emojiUrls[part.unicode];
+          const url = part.unicode && urls[unicodes.indexOf(part.unicode)];
           if (url) {
             return (
               <Image

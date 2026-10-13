@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import {
   Check,
   EllipsisVertical,
-  Menu,
   MessageSquare,
   Search,
   Users,
@@ -12,18 +11,10 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
@@ -124,9 +115,7 @@ function Empty({ title, body }: { title: string; body: string }) {
   );
 }
 
-export function FriendsHome({ onOpenNavigation }: { onOpenNavigation: () => void }) {
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+export function FriendsHome() {
   const colors = useThemeColors();
   const circleIcons = useSettings((s) => s.circleIcons);
   const accepted = useFriends((s) => s.accepted);
@@ -227,25 +216,10 @@ export function FriendsHome({ onOpenNavigation }: { onOpenNavigation: () => void
 
   return (
     <View className="min-w-0 flex-1 bg-background">
-      <View
-        className="flex-row items-center gap-2 border-b border-border px-1"
-        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
-      >
-        {width < 768 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="Open channels"
-            onPress={onOpenNavigation}
-          >
-            <Icon as={Menu} size={20} />
-          </Button>
-        )}
-        <View className={cn('flex-row items-center gap-2', width >= 768 && 'pl-3')}>
-          <Icon as={Users} size={20} className="text-muted-foreground" />
-          {width >= 640 && <Text className="text-sm font-semibold">Friends</Text>}
-        </View>
-        <View className="h-6 w-px bg-border" />
+      <ScreenHeader>
+        <Text className="text-base font-semibold">Friends</Text>
+      </ScreenHeader>
+      <View className="flex-row items-center gap-2 border-b border-border px-1">
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

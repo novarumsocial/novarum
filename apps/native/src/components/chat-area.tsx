@@ -3,17 +3,8 @@
 // pages are prepended and follows new messages while you are near the bottom.
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import {
-  BellRing,
-  ChevronDown,
-  Hash,
-  Menu,
-  Phone,
-  RotateCw,
-  Users,
-  Volume2,
-  X,
-} from 'lucide-react-native';
+import { router } from 'expo-router';
+import { BellRing, ChevronDown, Hash, Phone, RotateCw, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
@@ -33,25 +24,17 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { Message } from '@/components/message';
 import { MessageInput } from '@/components/message-input';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
-import {
-  chat,
-  selectActiveMessage,
-  selectCurrentTyping,
-  useChat,
-  type PickedFile,
-} from '@/lib/chat-state';
+import { chat, useChat, type PickedFile, type TypingInput } from '@/lib/chat-state';
 import { useDms } from '@/lib/dms';
 import { formatDate } from '@/lib/format-date';
-import { goto } from '@/lib/navigation';
-import { panels } from '@/lib/panels';
 import { useSession } from '@/lib/session';
 import { useSettings } from '@/lib/settings';
 import type { Channel, Message as ChatMessage } from '@/lib/types/chat';
@@ -80,6 +63,7 @@ type Pending = {
 };
 
 const noCallers: { name: string | null }[] = [];
+const noTyping: TypingInput[] = [];
 const GROUP_WINDOW = 5 * 60 * 1000;
 
 function Skeletons({ count }: { count: number }) {
@@ -196,10 +180,10 @@ export function ChatArea({
   channel,
   messages,
   loading = false,
+  activeMessage = null,
   onSend,
   onDelete,
   onEdit,
-  onOpenNavigation,
   onOpenMembers,
   onCall,
   onRing,
@@ -209,6 +193,8 @@ export function ChatArea({
   channel: Channel;
   messages: ChatMessage[];
   loading?: boolean;
+  // the message the link points at: scrolled to and flashed
+  activeMessage?: string | null;
   onSend?: (
     content: string | null,
     files: PickedFile[],
@@ -216,7 +202,7 @@ export function ChatArea({
   ) => void | Promise<void>;
   onDelete: (messageId: string) => void | Promise<void>;
   onEdit: (messageId: string, content: string | null) => void | Promise<void>;
-  onOpenNavigation?: () => void;
+  // members of a guild channel (phones open them over the chat)
   onOpenMembers?: () => void;
   onCall?: () => void;
   onRing?: () => void;
@@ -224,12 +210,10 @@ export function ChatArea({
   call?: ReactNode;
   callExpanded?: boolean;
 }) {
-  const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const circleIcons = useSettings((s) => s.circleIcons);
   const selfId = useSession((s) => s.user?.id);
-  const activeMessage = useChat(selectActiveMessage);
-  const typing = useChat(selectCurrentTyping);
+  const typing = useChat((s) => s.typingByChannel[channel.id] ?? noTyping);
   const olderLoading = useChat((s) => s.loadingOlderByChannel[channel.id] ?? false);
   const callers = useChat((s) =>
     channel.type === 'DM' ? (s.voiceStates[channel.id] ?? noCallers) : noCallers
@@ -359,11 +343,8 @@ export function ChatArea({
     (id: string, content: string | null) => handlers.current.onEdit(id, content),
     []
   );
-  // the web clears the id off the url once the flash is over
-  const flashEnd = useCallback(
-    () => void goto(chat().existingChannelPath(), { replaceState: true }),
-    []
-  );
+  // the web clears the id off the url once the flash is over (so tapping the same reply flashes again)
+  const flashEnd = useCallback(() => router.setParams({ rest: [channel.id] }), [channel.id]);
 
   // sends in the background: the composer clears right away and the message waits in the list as "sending"
   const send = useCallback(async (item: Pending) => {
@@ -434,74 +415,57 @@ export function ChatArea({
     [activeMessage, deleteMessage, editMessage, flashEnd, send, discard]
   );
 
-  const showMenu = width < 768;
-  const showMembers = width < 1024 && channel.type !== 'DM';
   const callerNames = callers.map((state) => state.name ?? 'Someone').join(', ');
 
   return (
     <View className="min-h-0 min-w-0 flex-1 bg-background">
-      <View
-        className="flex-row items-center gap-2 border-b border-border px-1"
-        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
-      >
-        {showMenu && (
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="Open channels"
-            onPress={onOpenNavigation ?? panels().openLeft}
-          >
-            <Icon as={Menu} size={20} />
-          </Button>
-        )}
-        <View className={cn('min-w-0 flex-1 flex-row items-center gap-2', !showMenu && 'pl-3')}>
-          {channel.type === 'VOICE' ? (
-            <Icon as={Volume2} size={20} className="text-muted-foreground" />
-          ) : channel.type === 'DM' ? (
-            <Avatar
-              src={channel.avatarUrl}
-              name={channel.name}
-              className="size-6"
-              bgColor={channel.avatarColor}
-            />
+      <ScreenHeader
+        actions={
+          channel.type === 'DM' ? (
+            !call ? (
+              <Button variant="ghost" size="icon" accessibilityLabel="Start call" onPress={onCall}>
+                <Icon as={Phone} size={20} />
+              </Button>
+            ) : callers.length <= 1 && !ringing ? (
+              <Button variant="ghost" size="icon" accessibilityLabel="Ring" onPress={onRing}>
+                <Icon as={BellRing} size={20} />
+              </Button>
+            ) : null
           ) : (
-            <Icon as={Hash} size={20} className="text-muted-foreground" />
-          )}
-          <Text className="shrink-0 text-sm font-semibold" numberOfLines={1}>
+            onOpenMembers && (
+              <Button
+                variant="ghost"
+                size="icon"
+                accessibilityLabel="Open members"
+                onPress={onOpenMembers}
+              >
+                <Icon as={Users} size={20} />
+              </Button>
+            )
+          )
+        }
+      >
+        {channel.type === 'DM' ? (
+          <Avatar
+            src={channel.avatarUrl}
+            name={channel.name}
+            className="size-7"
+            bgColor={channel.avatarColor}
+          />
+        ) : (
+          <Icon as={Hash} size={20} className="text-muted-foreground" />
+        )}
+        <View className="min-w-0 flex-1">
+          <Text className="text-[15px] font-semibold" numberOfLines={1}>
             {channel.name}
           </Text>
           {channel.topic ? (
-            <>
-              <Text className="text-muted-foreground/30">|</Text>
-              <Text className="min-w-0 shrink text-xs text-muted-foreground/70" numberOfLines={1}>
-                {channel.topic}
-              </Text>
-            </>
+            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+              {channel.topic}
+            </Text>
           ) : null}
         </View>
-        {channel.type === 'DM' ? (
-          !call ? (
-            <Button variant="ghost" size="icon" accessibilityLabel="Start call" onPress={onCall}>
-              <Icon as={Phone} size={20} />
-            </Button>
-          ) : callers.length <= 1 && !ringing ? (
-            <Button variant="ghost" size="icon" accessibilityLabel="Ring" onPress={onRing}>
-              <Icon as={BellRing} size={20} />
-            </Button>
-          ) : null
-        ) : (
-          showMembers && (
-            <Button
-              variant="ghost"
-              size="icon"
-              accessibilityLabel="Open members"
-              onPress={onOpenMembers ?? panels().openRight}
-            >
-              <Icon as={Users} size={20} />
-            </Button>
-          )
-        )}
-      </View>
+      </ScreenHeader>
 
       {!call && callers.length > 0 && (
         <View className="flex-row items-center gap-2 border-b border-border bg-primary/5 px-4 py-2">

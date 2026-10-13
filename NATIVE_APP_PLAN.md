@@ -99,7 +99,7 @@ apps/native/
         register.tsx          # ≈ routes/register/+page.svelte
         reset-password.tsx    # ≈ routes/reset-password/+page.svelte
       (app)/
-        _layout.tsx           # The three-panel shell (≈ components/app-shell.svelte)
+        _layout.tsx           # Boot (≈ components/app-shell.svelte); guilds/_layout.tsx is the chat stack
         index.tsx             # Home: friends (≈ components/friends-home.svelte)
         guilds/[guildId]/[channelId].tsx   # Text or voice channel
         dms/[channelId].tsx   # DM chat (+ embedded call)
@@ -283,26 +283,24 @@ Other auth notes:
 
 ### Layout
 
-On phones, the web already uses a "panels" layout: swipe right for servers and channels, swipe left for
-members. The native app keeps that layout, but does it with native gestures:
+The first build copied the web's swipe panels. It was slow (one screen re-rendered on every store change)
+and the gestures fought each other, so the chat is now a plain native stack:
 
 ```
- ┌──────┬───────────────┐┌────────────────────┐┌──────────────┐
- │guild │ channel list  ││  chat / voice      ││  members     │
- │ rail │  or DM list   ││  (center panel)    ││  (guilds     │
- │ w-14 │   w-60        ││                    ││   only)      │
- │      ├───────────────┤│                    ││              │
- │      │  user area    ││                    ││              │
- └──────┴───────────────┘└────────────────────┘└──────────────┘
-   left panel (swipe →)      always mounted       right panel (swipe ←)
+ /guilds (hub)                         pushed on top
+ ┌──────┬───────────────┐      ┌────────────────────────┐
+ │guild │ channel list  │  →   │ ‹  # channel   📞 👥   │   members open as a modal,
+ │ rail │  or DMs       │      │  chat / voice          │   friends is its own screen
+ │ w-14 ├───────────────┤      │                        │
+ │      │  user area    │      │                        │
+ └──────┴───────────────┘      └────────────────────────┘
 ```
 
-- Built in `components/panels.tsx` with gesture-handler + Reanimated. The center panel slides over and
-  follows your finger, like Discord.
-- Widths are the web's: rail `w-14`, channel/DM list `w-60`, members `w-56`, headers `h-12`.
-- **Tablets and landscape** (width ≥ 768) show the left panel next to the chat, and members at ≥ 1024. These
-  are the same breakpoints as the web (`md`, `lg`).
-- Android back button and the iOS edge swipe close an open panel first, then go back.
+- `app/(app)/guilds/_layout.tsx` is the stack; `index.tsx` is the hub, `[server]/[...rest].tsx` a channel or DM,
+  `friends.tsx` and `members.tsx` (modal). Opening a channel already in the history goes back to it
+  (`dangerouslySingular`).
+- Every screen subscribes only to what it shows. The system back gesture and button just work.
+- Tablets (≥ 1024) show the members next to a guild chat.
 
 ---
 
@@ -680,13 +678,13 @@ Phases 0 to 6 are written on `feat/native-app` (see `apps/native/README.md` for 
 
 Where the code differs from the plan above:
 
-- **One catch-all route.** The shell is `app/(app)/guilds/[...path].tsx`, the same URL scheme as the web (`/guilds`, `/guilds/dms/<id>`, `/guilds/<server>/<channel>/<message>`), so push urls and deep links need no mapping.
+- **Routes keep the web's URLs.** The stack in `app/(app)/guilds/` uses the same URL scheme as the web (`/guilds`, `/guilds/dms/<id>`, `/guilds/<server>/<channel>/<message>`), so push urls and deep links need no mapping.
 - **NativeWind v4** (Tailwind 3). v5 is not stable yet. `sync-theme` writes `global.css` and `theme.generated.json`; `tailwind.config.ts` reads the latter.
 - **Scripts:** `start` instead of `dev` (so root `bun run dev` does not launch Expo), `bundle` instead of `lint`. Formatting is `oxfmt`, as in the rest of the repo.
-- **Gestures:** swipe right opens servers and channels, swipe left from the right edge opens members, swipe left on a message replies. Reorder uses a long-press sheet (Move up / Move down), not drag.
+- **Gestures:** swipe back (native stack), swipe left on a message replies. Reorder uses a long-press sheet (Move up / Move down), not drag.
 - **Push (Android)** uses the `expo-unified-push` package. A tap on its notification opens the payload `url` as an `ACTION_VIEW` intent, and Android cannot open a scheme-less `/guilds/...`. **Backend follow-up (small):** for UnifiedPush subscriptions send `https://app.novarum.me/guilds/...` as `url`. `app.config.ts` already has the intent filter. Later we migrate to native notifications.
 - **Not done yet (Phase 7 and later):** screen share, native incoming calls (CallKit / ConnectionService), mini call view, `expo-updates` channel setup, store builds with EAS, iOS push (decision B2 still open), retry button for failed sends.
-- **Untested on device, check first:** cookie persistence and the cookie on the WebSocket upgrade (Phase 0), the XHR `{ uri }` upload, the Unicode emoji regex on Hermes, the swipe-to-reply vs panel gestures, and the LiveKit audio session.
+- **Untested on device, check first:** cookie persistence and the cookie on the WebSocket upgrade (Phase 0), the XHR `{ uri }` upload, the Unicode emoji regex on Hermes, the swipe-to-reply vs swipe-back gestures, and the LiveKit audio session.
 
 ### Open points after the review pass
 

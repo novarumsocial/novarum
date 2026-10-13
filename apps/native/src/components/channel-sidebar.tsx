@@ -59,14 +59,12 @@ type Menu =
 export function ChannelSidebar({
   server,
   categories,
-  activeChannel,
   onSelectChannel,
   members = [],
   voiceStates = {},
 }: {
   server: Server;
   categories: ChannelCategory[];
-  activeChannel: string | null;
   onSelectChannel: (id: string) => void;
   members?: Author[];
   voiceStates?: Record<string, { userId: string; name: string | null }[]>;
@@ -149,7 +147,6 @@ export function ChannelSidebar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${ch.type === 'VOICE' ? 'Voice channel' : 'Channel'} ${ch.label || ch.name}${showMention ? `, ${ch.mention} mentions` : showUnread ? ', unread' : ''}`}
-          accessibilityState={{ selected: activeChannel === ch.id }}
           onPress={() => onSelectChannel(ch.id)}
           onLongPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -158,26 +155,17 @@ export function ChannelSidebar({
               category: categories.find((cat) => cat.channels.some((item) => item.id === ch.id)),
             });
           }}
-          className={cn(
-            'min-h-11 flex-row items-center gap-1.5 px-2',
-            activeChannel === ch.id ? 'bg-primary/10' : 'active:bg-accent'
-          )}
+          className="min-h-11 flex-row items-center gap-1.5 px-2 active:bg-accent"
         >
           <Icon
             as={ch.type === 'VOICE' ? Volume2 : Hash}
-            className={
-              highlighted || activeChannel === ch.id
-                ? 'text-sidebar-foreground'
-                : 'text-muted-foreground'
-            }
+            className={highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground'}
           />
           <Text
             numberOfLines={1}
             className={cn(
               'flex-1 text-sm',
-              highlighted || activeChannel === ch.id
-                ? 'text-sidebar-foreground'
-                : 'text-muted-foreground',
+              highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground',
               highlighted && 'font-semibold'
             )}
           >
@@ -270,7 +258,6 @@ export function ChannelSidebar({
           voiceStates,
           members,
           levels,
-          activeChannel,
           circleIcons,
         ]}
         keyExtractor={(row) => (row.kind === 'category' ? `c:${row.category.id}` : row.channel.id)}

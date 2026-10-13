@@ -6,7 +6,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import type { PublicUser } from 'anchor/public-user';
 import { anchor } from './anchor';
 import { dms, dmPath, useDms, type DmEntry } from './dms';
-import { goto } from './navigation';
+import { goHome, goto } from './navigation';
 import { session } from './session';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
 
@@ -64,7 +64,7 @@ type VoicePresenceInput = {
   name: string | null;
 };
 
-type TypingInput = {
+export type TypingInput = {
   userId: string;
   name: string;
   expiresAt: number;
@@ -166,20 +166,37 @@ export function guildPath(serverId?: string, channelId?: string, messageId?: str
   return `/guilds/${path}`;
 }
 
+// the path of any channel the app knows: a DM or a channel of one of your guilds
+export function channelPath(channelId: string, messageId?: string): string {
+  if (dms().get(channelId)) return dmPath(channelId, messageId);
+  const { channelsByServer } = useChat.getState();
+  const guildId = Object.keys(channelsByServer).find((id) =>
+    channelsByServer[id]!.some((category) => category.channels.some((c) => c.id === channelId))
+  );
+  return guildPath(guildId, channelId, messageId);
+}
+
 function sendToGuildsIfFederatedServerDown(error: unknown) {
   const status = z.object({ status: z.coerce.number() }).safeParse(error);
   if (!status.success || status.data.status !== 502) return false;
 
-  void goto('/guilds', { replaceState: true });
+  goHome();
   return true;
 }
 
-// `path` is the `[...path]` param of the single `guilds/[...path]` screen; the web reads it from the URL
+// a catch-all route param is a plain string when it has only one segment
+export const pathSegments = z
+  .string()
+  .transform((segment) => [segment])
+  .or(z.array(z.string()))
+  .catch([]);
+
+// `path` is the URL below `/guilds` (the channel screen's `[server]/[...rest]` params); the web reads it from the URL
 export function routeFromPath(path: string[]): ChatRoute {
   const [first, second, third] = path.filter(Boolean);
 
   if (!first) return { kind: 'home' };
-  if (first === 'dms') return { kind: 'dms', channelId: second ?? null };
+  if (first === 'dms') return { kind: 'dms', channelId: second ?? null, messageId: third ?? null };
 
   return {
     kind: 'guild',
@@ -208,7 +225,9 @@ export const selectActiveChannel = (state: Pick<ChatState, 'route'>) =>
   state.route.kind === 'guild' || state.route.kind === 'dms' ? state.route.channelId : null;
 
 export const selectActiveMessage = (state: Pick<ChatState, 'route'>) =>
-  state.route.kind === 'guild' ? state.route.messageId : null;
+  state.route.kind === 'guild' || state.route.kind === 'dms'
+    ? (state.route.messageId ?? null)
+    : null;
 
 export const selectCurrentServer = (state: ChatStateData) => {
   const activeServer = selectActiveServer(state);
@@ -244,9 +263,11 @@ export const selectCurrentMessagesLoading = (
   state: ChatStateData & Pick<ChatState, 'messagesLoadingByChannel' | 'loadedChannel'>
 ) => {
   const channel = selectCurrentChannel(state);
-  return channel
-    ? (state.messagesLoadingByChannel[channel.id] ?? false) || channel.id !== state.loadedChannel
-    : false;
+  // a channel opened before shows its cached messages while they refresh, instead of skeletons
+  if (!channel || state.messagesByChannel[channel.id]?.length) return false;
+  return (
+    (state.messagesLoadingByChannel[channel.id] ?? false) || channel.id !== state.loadedChannel
+  );
 };
 
 export const selectCurrentTyping = (state: ChatStateData) => {
@@ -264,8 +285,10 @@ type ChatState = {
   typingByChannel: Record<string, TypingInput[]>;
   loadingOlderByChannel: Record<string, boolean>;
   loadedChannel: string | null;
-  // the web derives this from the URL; the `guilds/[...path]` screen sets it with `setRoute(routeFromPath(path))`
+  // the web derives this from the URL; the focused screen sets it: a channel screen its channel, the hub `home`
   route: ChatRoute;
+  // the server picked in the hub's guild rail (null is Home: the DMs)
+  hubServer: string | null;
   editingMessage: boolean;
   editingMessageId: string | null;
   uploadProgress: Record<number, number>;
@@ -274,7 +297,6 @@ type ChatState = {
   selectServer: (id?: string) => void | undefined;
   selectChannel: (id: string) => void | undefined;
   messagePath: (id: string) => string;
-  existingChannelPath: () => string;
   syncActiveChannel: () => void;
   addGuild: (guild: {
     id: string;
@@ -364,6 +386,7 @@ const initialData = () => ({
   loadingOlderByChannel: {},
   loadedChannel: null,
   route: { kind: 'home' } as ChatRoute,
+  hubServer: null as string | null,
   editingMessage: false,
   editingMessageId: null,
   uploadProgress: {},
@@ -503,9 +526,7 @@ export const useChat = create<ChatState>((set, get) => {
     if (!activeServer) return;
 
     const currentServer = selectCurrentServer(get());
-    if (currentServer?.down) {
-      return goto('/guilds', { replaceState: true });
-    }
+    if (currentServer?.down) return goHome();
 
     const serverId = currentServer?.id;
     const channelId =
@@ -560,28 +581,19 @@ export const useChat = create<ChatState>((set, get) => {
     ...initialData(),
 
     setRoute(route) {
-      if (JSON.stringify(route) !== JSON.stringify(get().route)) set({ route });
+      if (JSON.stringify(route) === JSON.stringify(get().route)) return;
+      // going back from a channel shows its server in the hub
+      set(route.kind === 'guild' ? { route, hubServer: route.serverId } : { route });
+      get().syncActiveChannel();
     },
 
-    selectServer: (id) => goto(guildPath(id, firstChannelForServer(id)?.id)),
+    selectServer: (id) => set({ hubServer: id ?? null }),
 
-    selectChannel(id) {
-      const activeServer = selectActiveServer(get());
-      if (activeServer) return goto(guildPath(activeServer, id));
-    },
+    selectChannel: (id) => goto(channelPath(id)),
 
     messagePath(id) {
-      const { route } = get();
       const activeChannel = selectActiveChannel(get());
-      if (route.kind === 'dms' && activeChannel) return dmPath(activeChannel);
-      return guildPath(selectActiveServer(get()) ?? undefined, activeChannel ?? undefined, id);
-    },
-
-    existingChannelPath() {
-      const { route } = get();
-      const activeChannel = selectActiveChannel(get());
-      if (route.kind === 'dms' && activeChannel) return dmPath(activeChannel);
-      return guildPath(selectActiveServer(get()) ?? undefined, activeChannel ?? undefined);
+      return activeChannel ? channelPath(activeChannel, id) : '/guilds';
     },
 
     syncActiveChannel() {
@@ -1031,10 +1043,8 @@ export const useChat = create<ChatState>((set, get) => {
 
       if (result.error || !result.data || 'error' in result.data) return;
 
-      const createdChannel = get().addChannel(result.data);
-
-      get().selectChannel(createdChannel.id);
-      return createdChannel;
+      // the caller opens it (channel-sidebar.tsx)
+      return get().addChannel(result.data);
     },
 
     async createGuildInvite(guildId) {
@@ -1104,3 +1114,20 @@ export const chat = useChat.getState;
 
 // A DM's channel comes from the dms store, so wake `useChat` selectors (they re-render only if their result changed)
 useDms.subscribe(() => useChat.setState({}));
+
+// the name of any channel (a guild channel or the other person of a DM), e.g. for the call bar
+export function useChannelName(id: string | null) {
+  const channelName = useChat((s) =>
+    id
+      ? Object.values(s.channelsByServer)
+          .flat()
+          .flatMap((category) => category.channels)
+          .find((channel) => channel.id === id)?.name
+      : undefined
+  );
+  const dmName = useDms((s) => {
+    const other = id ? s.list.find((dm) => dm.id === id)?.participants[0] : undefined;
+    return other ? other.displayName || other.username : undefined;
+  });
+  return id ? (channelName ?? dmName ?? null) : null;
+}

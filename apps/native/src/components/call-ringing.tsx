@@ -1,5 +1,5 @@
 // Port of apps/frontend/src/lib/components/call-ringing.svelte
-// Mount once in the app shell (above the panels): <CallRinging onAccept={(channelId) => router.push(dmPath(channelId))} />
+// Mounted once above the chat stack: <CallRinging onAccept={(channelId) => router.push(dmPath(channelId))} />
 import * as Haptics from 'expo-haptics';
 import { Phone, PhoneOff } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
