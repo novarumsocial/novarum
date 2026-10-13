@@ -24,13 +24,18 @@ function Slider({ value, onCommit }: { value: number; onCommit: (value: number) 
   const shown = dragging ?? value;
   const at = (x: number) => Math.round(Math.min(1, Math.max(0, x / width)) * 100) / 100;
 
-  const gesture = Gesture.Pan()
+  // a sideways drag moves it and a vertical one scrolls the page instead
+  const drag = Gesture.Pan()
     .runOnJS(true)
-    .minDistance(0)
-    .onBegin((e) => setDragging(at(e.x)))
+    .activeOffsetX([-5, 5])
+    .failOffsetY([-5, 5])
     .onUpdate((e) => setDragging(at(e.x)))
     .onEnd((e) => onCommit(at(e.x)))
     .onFinalize(() => setDragging(null));
+  const tap = Gesture.Tap()
+    .runOnJS(true)
+    .onEnd((e) => onCommit(at(e.x)));
+  const gesture = Gesture.Race(drag, tap);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -38,7 +43,7 @@ function Slider({ value, onCommit }: { value: number; onCommit: (value: number) 
         accessibilityRole="adjustable"
         accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-        className="h-10 justify-center"
+        className="h-11 justify-center"
       >
         <View className="h-1 bg-muted">
           <View className="h-1 bg-primary" style={{ width: `${shown * 100}%` }} />

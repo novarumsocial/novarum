@@ -74,7 +74,7 @@ export function GuildSettingsDialog({
 
   return (
     <>
-      <Sheet open={open} onClose={onClose} scroll>
+      <Sheet open={open} onClose={onClose}>
         <View className="gap-5 px-4 pb-2">
           <View>
             <Text className="text-lg font-semibold">Guild Settings</Text>

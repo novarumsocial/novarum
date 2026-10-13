@@ -2,7 +2,6 @@
 // Differences: the account popover is the `AccountSwitcher` sheet; the settings button opens the settings screens;
 // the noise suppression / mic test popover lives in settings > Voice & audio.
 import { ConnectionState } from 'livekit-client';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
   Headphones,
@@ -88,10 +87,8 @@ export function UserArea({
     goto(channelPath(channelId));
   };
 
-  const toggle = (action: () => unknown) => () => {
-    void Haptics.selectionAsync();
-    void action();
-  };
+  // voice() already buzzes on mute and deafen
+  const toggle = (action: () => unknown) => () => void action();
 
   return (
     <View

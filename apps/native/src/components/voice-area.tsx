@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VolumeSlider } from '@/components/participant-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,9 @@ export function VoiceArea({
   onToggleExpand?: () => void;
 }) {
   const circleIcons = useSettings((s) => s.circleIcons);
+  // the controls sit above the home indicator when the call reaches the bottom of the screen
+  const insets = useSafeAreaInsets();
+  const bottomInset = !embedded || expanded ? insets.bottom : 0;
   const channelId = useVoice((s) => s.channelId);
   const connectionState = useVoice((s) => s.connectionState);
   const connected = useVoice(selectConnected);
@@ -298,9 +302,10 @@ export function VoiceArea({
             <View
               pointerEvents={showControls ? 'box-none' : 'none'}
               className={cn(
-                'absolute inset-x-0 bottom-3 z-10 items-center transition-opacity duration-300',
+                'absolute inset-x-0 z-10 items-center transition-opacity duration-300',
                 !showControls && 'opacity-0'
               )}
+              style={{ bottom: bottomInset + 12 }}
             >
               <View
                 accessibilityLabel="Call controls"
@@ -451,9 +456,10 @@ export function VoiceArea({
                 size="icon"
                 className={cn(
                   controlClass,
-                  'absolute bottom-5 right-3 z-10 transition-opacity duration-300',
+                  'absolute right-3 z-10 transition-opacity duration-300',
                   !showControls && 'opacity-0'
                 )}
+                style={{ bottom: bottomInset + 20 }}
                 pointerEvents={showControls ? 'auto' : 'none'}
                 accessibilityLabel={expanded ? 'Show messages' : 'Expand call'}
                 onPress={onToggleExpand}

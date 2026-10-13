@@ -329,7 +329,10 @@ export const useVoice = create<VoiceStore>((set, get) => {
             voiceStates: new Map(
               [...s.voiceStates].map(([id, state]) => [
                 id,
-                { ...state, speaking: speaking.has(id) },
+                // unchanged people keep their object, so only their own views re-render
+                state.speaking === speaking.has(id)
+                  ? state
+                  : { ...state, speaking: !state.speaking },
               ])
             ),
           };

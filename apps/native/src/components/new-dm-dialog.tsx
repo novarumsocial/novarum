@@ -41,7 +41,6 @@ export function NewDmDialog({ open, onClose }: { open: boolean; onClose: () => v
         onClose();
         setQuery('');
       }}
-      scroll
     >
       <View className="px-4 pt-2 pb-3">
         <Text className="text-lg font-semibold">New Direct Message</Text>

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
 import { ScreenHeader } from '@/components/screen-header';
@@ -116,6 +117,7 @@ function Empty({ title, body }: { title: string; body: string }) {
 }
 
 export function FriendsHome() {
+  const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const circleIcons = useSettings((s) => s.circleIcons);
   const accepted = useFriends((s) => s.accepted);
@@ -215,7 +217,7 @@ export function FriendsHome() {
   );
 
   return (
-    <View className="min-w-0 flex-1 bg-background">
+    <View className="min-w-0 flex-1 bg-background" style={{ paddingBottom: insets.bottom }}>
       <ScreenHeader>
         <Text className="text-base font-semibold">Friends</Text>
       </ScreenHeader>

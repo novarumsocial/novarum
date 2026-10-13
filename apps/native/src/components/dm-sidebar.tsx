@@ -4,7 +4,7 @@
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, LoaderCircle, Phone, Plus, Users, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,10 +37,14 @@ export function DmSidebar() {
   const [menuEntry, setMenuEntry] = useState<DmEntry | null>(null);
   const [menu, setMenu] = useState<'actions' | 'notify' | null>(null);
 
-  const entries = [...list].sort(
-    (a, b) =>
-      new Date(b.lastMessageAt ?? b.joinedAt).getTime() -
-      new Date(a.lastMessageAt ?? a.joinedAt).getTime()
+  const entries = useMemo(
+    () =>
+      [...list].sort(
+        (a, b) =>
+          new Date(b.lastMessageAt ?? b.joinedAt).getTime() -
+          new Date(a.lastMessageAt ?? a.joinedAt).getTime()
+      ),
+    [list]
   );
 
   const closeDm = (entry: DmEntry) => void dms().close(entry.id);

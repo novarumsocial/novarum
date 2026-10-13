@@ -1,10 +1,9 @@
 // The chat is a native stack: the hub (servers, channels and DMs) at the bottom and every channel, call or
 // the friends list pushed on top, so the system back gesture and button work like in any phone app.
-// The bar of the call you are in and an incoming call sit above every screen.
+// An incoming call sits above every screen (the bar of the call you are in is part of ScreenHeader).
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 import { CallRinging } from '@/components/call-ringing';
-import { MiniCall } from '@/components/mini-call';
 import { pathSegments } from '@/lib/chat-state';
 import { dmPath } from '@/lib/dms';
 import { goto } from '@/lib/navigation';
@@ -45,7 +44,6 @@ export default function GuildsLayout() {
           }}
         />
       </Stack>
-      <MiniCall />
       <CallRinging
         onAccept={(id) => {
           goto(dmPath(id));

@@ -345,9 +345,10 @@ export function AttachmentViewer({
       <Animated.View style={backdropStyle} className="absolute inset-0 bg-black/95" />
       <GestureDetector gesture={dismiss}>
         <Animated.View style={contentStyle} className="flex-1">
+          {/* the bars float over the pager, so toggling them doesn't resize the image */}
           {chrome && (
             <View
-              className="z-10 flex-row items-center gap-3 px-3 pb-2"
+              className="absolute inset-x-0 top-0 z-10 flex-row items-center gap-3 bg-black/60 px-3 pb-2"
               style={{ paddingTop: insets.top + 8 }}
             >
               <Avatar src={avatarUrl} name={authorName} bgColor={avatarColor} className="size-9" />
@@ -432,9 +433,9 @@ export function AttachmentViewer({
             )}
           </View>
 
-          {attachments.length > 1 && (
+          {chrome && attachments.length > 1 && (
             <View
-              className="z-10 flex-row justify-center gap-1.5 px-3 pt-2"
+              className="absolute inset-x-0 bottom-0 z-10 flex-row justify-center gap-1.5 bg-black/60 px-3 pt-2"
               style={{ paddingBottom: insets.bottom + 8 }}
             >
               {attachments.map((item, i) => (

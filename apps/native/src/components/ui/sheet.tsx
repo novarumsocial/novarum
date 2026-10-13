@@ -4,10 +4,10 @@ import {
   BottomSheetBackdrop,
   BottomSheetModal,
   BottomSheetScrollView,
-  BottomSheetView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/lib/theme';
 
@@ -15,17 +15,15 @@ export function Sheet({
   open,
   onClose,
   children,
-  scroll = false,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
-  // long lists scroll inside the sheet instead of resizing it
-  scroll?: boolean;
 }) {
   const ref = useRef<BottomSheetModal>(null);
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   useEffect(() => {
     if (open) ref.current?.present();
@@ -48,7 +46,8 @@ export function Sheet({
     <BottomSheetModal
       ref={ref}
       enableDynamicSizing
-      maxDynamicContentSize={800}
+      // grows with its content up to just below the status bar, then scrolls
+      maxDynamicContentSize={height - insets.top - 24}
       onDismiss={onClose}
       backdropComponent={backdrop}
       keyboardBehavior="interactive"
@@ -57,13 +56,9 @@ export function Sheet({
       backgroundStyle={{ backgroundColor: colors.popover, borderRadius: 0 }}
       handleIndicatorStyle={{ backgroundColor: colors['muted-foreground'] }}
     >
-      {scroll ? (
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}>
-          {children}
-        </BottomSheetScrollView>
-      ) : (
-        <BottomSheetView style={{ paddingBottom: insets.bottom + 8 }}>{children}</BottomSheetView>
-      )}
+      <BottomSheetScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}>
+        {children}
+      </BottomSheetScrollView>
     </BottomSheetModal>
   );
 }

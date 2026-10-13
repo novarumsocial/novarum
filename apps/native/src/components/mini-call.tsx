@@ -1,10 +1,8 @@
-// Native-only (the plan's "mini call view"): a compact bar below the header of a channel screen while you are
-// in a call somewhere else. Tap it to go back to the call; mute and leave work from here. The hub has no bar,
+// Native-only (the plan's "mini call view"): a compact bar under the ScreenHeader while you are in a call
+// somewhere else, so it takes its own space instead of covering the chat. Tap it to go back to the call; mute and leave work from here. The hub has no bar,
 // its user area already shows the call.
-import * as Haptics from 'expo-haptics';
 import { Mic, MicOff, PhoneOff, Volume2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { channelPath, selectActiveChannel, useChannelName, useChat } from '@/lib/chat-state';
@@ -14,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { selectConnected, useVoice, voice } from '@/lib/voice';
 
 export function MiniCall() {
-  const insets = useSafeAreaInsets();
   const channelId = useVoice((s) => s.channelId);
   const name = useChannelName(channelId) ?? 'Voice channel';
   // the hub, or the call's own channel, is on screen
@@ -28,10 +25,9 @@ export function MiniCall() {
   return (
     <View
       className={cn(
-        'absolute inset-x-2 z-20 flex-row items-center border border-border bg-card',
+        'mx-2 mb-2 flex-row items-center border border-border bg-card',
         circleIcons && 'rounded-full pl-2'
       )}
-      style={{ top: insets.top + 58 }}
     >
       <Pressable
         accessibilityRole="button"
@@ -48,10 +44,7 @@ export function MiniCall() {
         accessibilityRole="button"
         accessibilityLabel={selfMuted ? 'Unmute' : 'Mute'}
         accessibilityState={{ selected: selfMuted }}
-        onPress={() => {
-          void Haptics.selectionAsync();
-          void voice().setMuted(!selfMuted);
-        }}
+        onPress={() => void voice().setMuted(!selfMuted)}
         className={cn(
           'size-11 items-center justify-center active:bg-accent',
           circleIcons && 'rounded-full'

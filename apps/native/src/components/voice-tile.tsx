@@ -141,7 +141,7 @@ export function VoiceTileView({
         )}
       </Pressable>
 
-      {connected && (
+      {connected && sheetOpen && (
         <ParticipantSheet
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}

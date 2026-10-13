@@ -79,7 +79,7 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
       accessibilityRole="alert"
       accessibilityLabel={`Incoming call from ${name}`}
       className={cn(
-        'absolute inset-x-4 z-50 mx-auto w-full max-w-sm flex-row items-center gap-3 border border-border bg-sidebar/80 p-3',
+        'absolute inset-x-4 z-50 flex-row items-center gap-3 border border-border bg-sidebar/80 p-3',
         circleIcons && 'rounded-xl'
       )}
       style={{ top: insets.top + 16 }}

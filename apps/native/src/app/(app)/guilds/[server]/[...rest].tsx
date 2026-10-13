@@ -49,6 +49,20 @@ export default function ChannelScreen() {
   const inCall = useVoice((s) => !!channel && s.channelId === channel.id);
   // phones have no room for the call and the chat together, so a call starts full screen
   const [callExpanded, setCallExpanded] = useState(width < 768);
+  // a DM call shows you and the other person
+  const callMembers: Author[] = useMemo(
+    () =>
+      dm && user
+        ? [
+            { ...user, userId: user.id, server: user.homeserver },
+            ...dm.participants.map(({ homeserver, ...other }) => ({
+              ...other,
+              server: homeserver,
+            })),
+          ]
+        : members,
+    [dm, user, members]
+  );
 
   if (!channel) {
     return (
@@ -76,14 +90,6 @@ export default function ChannelScreen() {
     return <VoiceArea channel={channel} members={members} onJoin={join} onLeave={leave} />;
   }
 
-  // a DM call shows you and the other person
-  const callMembers: Author[] =
-    dm && user
-      ? [
-          { ...user, userId: user.id, server: user.homeserver },
-          ...dm.participants.map(({ homeserver, ...other }) => ({ ...other, server: homeserver })),
-        ]
-      : members;
   const wide = width >= 1024 && channel.type !== 'DM' && showMemberList;
 
   return (

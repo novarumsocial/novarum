@@ -57,7 +57,7 @@ export function GuildSidebar({
   return (
     <View
       className="w-14 items-center gap-1.5 border-r border-border bg-background pb-3"
-      style={{ paddingTop: insets.top + 12 }}
+      style={{ paddingTop: insets.top + 2 }}
     >
       <Pressable
         accessibilityRole="button"
