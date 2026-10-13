@@ -49,6 +49,8 @@ export function Sheet({
       // grows with its content up to just below the status bar, then scrolls
       maxDynamicContentSize={height - insets.top - 24}
       onDismiss={onClose}
+      // swiping or tapping the backdrop closes it without always firing onDismiss; without this `open` stays true and it never reopens
+      onChange={(index) => index === -1 && onClose()}
       backdropComponent={backdrop}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"

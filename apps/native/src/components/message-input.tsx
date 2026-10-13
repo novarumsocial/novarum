@@ -170,7 +170,7 @@ export function MessageInput({
   }
 
   async function pick(source: 'camera' | 'library' | 'files') {
-    setAttachOpen(false);
+    // the sheet stays up until the picker returns: launching an activity mid-dismiss can swallow it
     try {
       if (source === 'files') {
         const result = await DocumentPicker.getDocumentAsync({
@@ -196,8 +196,11 @@ export function MessageInput({
               selectionLimit: Math.max(1, maxFiles - files.length),
             });
       if (!result.canceled) addFiles(z.array(pickedSchema).parse(result.assets));
-    } catch {
+    } catch (error) {
+      console.error('Attachment picker failed', error);
       setSendError('Could not read that file.');
+    } finally {
+      setAttachOpen(false);
     }
   }
 
@@ -375,11 +378,14 @@ export function MessageInput({
         </Button>
       </View>
 
-      <Sheet open={attachOpen} onClose={() => setAttachOpen(false)}>
-        <SheetItem icon={Camera} label="Camera" onPress={() => void pick('camera')} />
-        <SheetItem icon={ImageIcon} label="Photo library" onPress={() => void pick('library')} />
-        <SheetItem icon={Files} label="Files" onPress={() => void pick('files')} />
-      </Sheet>
+      {/* mounted only while open: an always-mounted sheet in the composer never presented */}
+      {attachOpen && (
+        <Sheet open onClose={() => setAttachOpen(false)}>
+          <SheetItem icon={Camera} label="Camera" onPress={() => void pick('camera')} />
+          <SheetItem icon={ImageIcon} label="Photo library" onPress={() => void pick('library')} />
+          <SheetItem icon={Files} label="Files" onPress={() => void pick('files')} />
+        </Sheet>
+      )}
     </View>
   );
 }

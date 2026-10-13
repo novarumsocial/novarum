@@ -8,6 +8,7 @@ import { anchor } from './anchor';
 import { dms, dmPath, useDms, type DmEntry } from './dms';
 import { goHome, goto } from './navigation';
 import { session } from './session';
+import { storage } from './storage';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
 
 function initialsFor(name: string) {
@@ -875,6 +876,11 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     async loadMessages(channelId) {
+      // show the last session's messages right away while the fresh page loads
+      if (!get().messagesByChannel[channelId]?.length) {
+        const cached = z.string().safeParse(storage.getString(`messages:${channelId}`));
+        if (cached.success) get().setMessages(channelId, JSON.parse(cached.data));
+      }
       setFlag('messagesLoadingByChannel', channelId, true);
       nextCursorByChannel.set(channelId, 0);
 
@@ -894,6 +900,7 @@ export const useChat = create<ChatState>((set, get) => {
 
         hasMoreByChannel.set(channelId, result.data.messages.length === messagesPageSize);
         get().setMessages(channelId, result.data.messages);
+        storage.set(`messages:${channelId}`, JSON.stringify(result.data.messages));
         return result.data.messages.at(-1);
       } finally {
         setFlag('messagesLoadingByChannel', channelId, false);
@@ -1102,6 +1109,7 @@ export const useChat = create<ChatState>((set, get) => {
       lastTypingByChannel.clear();
       nextCursorByChannel.clear();
       hasMoreByChannel.clear();
+      storage.getAllKeys().forEach((key) => key.startsWith('messages:') && storage.remove(key));
       set(initialData());
     },
   };

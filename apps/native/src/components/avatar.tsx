@@ -28,8 +28,9 @@ export function Avatar({
 
   useEffect(() => setFailed(false), [src]);
   useEffect(() => {
-    if (focused) void imageRef.current?.startAnimating();
-    else void imageRef.current?.stopAnimating();
+    // The native view may be gone or not attached yet (frozen/recycled screens); `autoplay` covers that case.
+    const image = imageRef.current;
+    (focused ? image?.startAnimating() : image?.stopAnimating())?.catch(() => {});
   }, [focused]);
 
   return (
