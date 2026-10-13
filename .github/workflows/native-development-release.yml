@@ -2,6 +2,13 @@ name: Release native development build
 
 on:
   workflow_dispatch:
+  # PR builds only upload the APK/IPA as workflow artifacts; they are not published as a release
+  pull_request:
+    paths:
+      - 'apps/native/**'
+      - 'apps/anchor/**'
+      - 'bun.lock'
+      - '.github/workflows/native-development-release.yml'
   push:
     branches:
       - main
@@ -14,6 +21,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   # every build gets a higher build number, so it installs as an update over the previous one
   BUILD_NUMBER: ${{ github.run_number }}
@@ -23,6 +34,8 @@ jobs:
   android:
     name: Build APK
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -71,6 +84,7 @@ jobs:
         working-directory: apps/native/android
 
       - name: Upload APK
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: novarum-apk
@@ -82,6 +96,8 @@ jobs:
     # signing needs an Apple Developer account; this IPA is for sideloading (AltStore, SideStore, ...),
     # which signs it with your own Apple ID on install
     runs-on: macos-26
+    outputs:
+      url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -129,6 +145,7 @@ jobs:
         working-directory: apps/native/ios
 
       - name: Upload IPA
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: novarum-ipa
@@ -139,7 +156,7 @@ jobs:
     name: Publish development release
     needs: [android, ios]
     # the APK is still published when only the iOS build failed
-    if: ${{ !cancelled() && needs.android.result == 'success' }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.android.result == 'success' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
@@ -170,3 +187,33 @@ jobs:
               --notes "$notes" \
               --prerelease
           fi
+
+  comment:
+    name: Comment download links on PR
+    needs: [android, ios]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      # edits the bot's previous comment, so the PR thread only ever has one
+      - name: Create or update PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          ANDROID_URL: ${{ needs.android.outputs.url }}
+          IOS_RESULT: ${{ needs.ios.result }}
+          IOS_URL: ${{ needs.ios.outputs.url }}
+        run: |
+          link() { [ "$1" = success ] && echo "[Download]($2)" || echo "Build $1 ([logs]($RUN_URL))"; }
+          gh pr comment "$PR" --edit-last --create-if-none --body "### Native development builds
+          | Platform | Build |
+          | --- | --- |
+          | Android APK | $(link "$ANDROID_RESULT" "$ANDROID_URL") |
+          | iOS IPA (unsigned, install with AltStore/SideStore) | $(link "$IOS_RESULT" "$IOS_URL") |
+
+          Commit \`${SHA::7}\` · [workflow run]($RUN_URL)"

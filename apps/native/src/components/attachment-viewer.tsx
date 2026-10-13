@@ -9,9 +9,14 @@ import { router, type Href } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { Download, FileText, Music, Share2, Video, X } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+  type GestureType,
+} from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
   runOnJS,
@@ -101,12 +106,14 @@ function ZoomableImage({
   attachment,
   width,
   height,
+  pager,
   onZoomChange,
   onTap,
 }: {
   attachment: Attachment;
   width: number;
   height: number;
+  pager: GestureType;
   onZoomChange: (zoomed: boolean) => void;
   onTap: () => void;
 }) {
@@ -140,7 +147,9 @@ function ZoomableImage({
     setZoomed(false);
   };
 
+  // the pager's scroll view grabs the touch first, so the pinch has to run alongside it
   const pinch = Gesture.Pinch()
+    .simultaneousWithExternalGesture(pager)
     .onUpdate((event) => {
       scale.value = clamp(savedScale.value * event.scale, 1, MAX_ZOOM);
       if (scale.value > 1.02) setZoomed(true);
@@ -172,6 +181,7 @@ function ZoomableImage({
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
+    .maxDistance(10)
     .onEnd((event) => {
       if (scale.value > 1.05) return reset();
       const next = 2.5;
@@ -196,15 +206,21 @@ function ZoomableImage({
       savedY.value = y.value;
       setZoomed(true);
     });
-  const singleTap = Gesture.Tap().onEnd(() => runOnJS(onTap)());
+  const singleTap = Gesture.Tap()
+    .maxDistance(10)
+    .onEnd(() => runOnJS(onTap)());
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }],
   }));
 
+  // taps must not hold the pinch back: whichever activates first wins
   return (
     <GestureDetector
-      gesture={Gesture.Exclusive(doubleTap, Gesture.Simultaneous(pinch, pan), singleTap)}
+      gesture={Gesture.Race(
+        Gesture.Simultaneous(pinch, pan),
+        Gesture.Exclusive(doubleTap, singleTap)
+      )}
     >
       <Animated.View style={[{ width, height }, style]}>
         <Image
@@ -223,6 +239,7 @@ function Page({
   width,
   height,
   active,
+  pager,
   onZoomChange,
   onTap,
 }: {
@@ -230,6 +247,7 @@ function Page({
   width: number;
   height: number;
   active: boolean;
+  pager: GestureType;
   onZoomChange: (zoomed: boolean) => void;
   onTap: () => void;
 }) {
@@ -242,6 +260,7 @@ function Page({
           attachment={attachment}
           width={width}
           height={height}
+          pager={pager}
           onZoomChange={onZoomChange}
           onTap={onTap}
         />
@@ -292,12 +311,14 @@ export function AttachmentViewer({
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
   const [pager, setPager] = useState({ width, height: 0 });
   const list = useRef<FlatList<Attachment>>(null);
+  const pagerGesture = useMemo(() => Gesture.Native(), []);
   const attachment = attachments[index];
 
   // swipe down to close (the pager owns horizontal drags, a zoomed image owns everything)
   const dragY = useSharedValue(0);
   const dismiss = Gesture.Pan()
     .enabled(!zoomed)
+    .maxPointers(1)
     .activeOffsetY([-15, 15])
     .failOffsetX([-15, 15])
     .onUpdate((event) => {
@@ -340,8 +361,9 @@ export function AttachmentViewer({
   const canSave =
     attachment.contentType.startsWith('image/') || attachment.contentType.startsWith('video/');
 
+  // the viewer is a native modal, which needs its own gesture root
   return (
-    <View className="flex-1">
+    <GestureHandlerRootView className="flex-1">
       <Animated.View style={backdropStyle} className="absolute inset-0 bg-black/95" />
       <GestureDetector gesture={dismiss}>
         <Animated.View style={contentStyle} className="flex-1">
@@ -401,35 +423,38 @@ export function AttachmentViewer({
 
           <View className="flex-1" onLayout={(event) => setPager(event.nativeEvent.layout)}>
             {pager.height > 0 && (
-              <FlatList
-                ref={list}
-                data={attachments}
-                keyExtractor={(item) => item.id}
-                horizontal
-                pagingEnabled
-                scrollEnabled={!zoomed}
-                showsHorizontalScrollIndicator={false}
-                initialScrollIndex={start}
-                getItemLayout={(_, i) => ({
-                  length: pager.width,
-                  offset: pager.width * i,
-                  index: i,
-                })}
-                windowSize={3}
-                onMomentumScrollEnd={(event) =>
-                  setIndex(Math.round(event.nativeEvent.contentOffset.x / pager.width))
-                }
-                renderItem={({ item, index: i }) => (
-                  <Page
-                    attachment={item}
-                    width={pager.width}
-                    height={pager.height}
-                    active={i === index}
-                    onZoomChange={setZoomed}
-                    onTap={() => setChrome((value) => !value)}
-                  />
-                )}
-              />
+              <GestureDetector gesture={pagerGesture}>
+                <FlatList
+                  ref={list}
+                  data={attachments}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  pagingEnabled
+                  scrollEnabled={!zoomed}
+                  showsHorizontalScrollIndicator={false}
+                  initialScrollIndex={start}
+                  getItemLayout={(_, i) => ({
+                    length: pager.width,
+                    offset: pager.width * i,
+                    index: i,
+                  })}
+                  windowSize={3}
+                  onMomentumScrollEnd={(event) =>
+                    setIndex(Math.round(event.nativeEvent.contentOffset.x / pager.width))
+                  }
+                  renderItem={({ item, index: i }) => (
+                    <Page
+                      attachment={item}
+                      width={pager.width}
+                      height={pager.height}
+                      active={i === index}
+                      pager={pagerGesture}
+                      onZoomChange={setZoomed}
+                      onTap={() => setChrome((value) => !value)}
+                    />
+                  )}
+                />
+              </GestureDetector>
             )}
           </View>
 
@@ -477,6 +502,6 @@ export function AttachmentViewer({
           )}
         </Animated.View>
       </GestureDetector>
-    </View>
+    </GestureHandlerRootView>
   );
 }
