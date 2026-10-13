@@ -16,7 +16,7 @@ import {
   SignalMedium,
   SignalZero,
 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccountSwitcher } from '@/components/account-switcher';
@@ -38,7 +38,8 @@ const tiers = [
 ];
 const connectingTier = { icon: SignalZero, color: 'bg-amber-500/10', text: 'text-amber-400' };
 
-export function UserArea({
+// memo: the hub re-renders on every server switch, this bar doesn't need to
+export const UserArea = memo(function UserArea({
   user,
   voiceChannelName,
   onLeaveVoice,
@@ -211,4 +212,4 @@ export function UserArea({
       <AccountSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </View>
   );
-}
+});

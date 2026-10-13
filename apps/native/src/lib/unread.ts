@@ -35,6 +35,29 @@ export function useGuildMentions() {
   return useMemo(() => selectGuildMentions(channelsByServer), [channelsByServer, entries]);
 }
 
+// native-only: guilds with an unread channel, for the rail's unread pill
+export function useGuildUnread() {
+  const channelsByServer = useChat((s) => s.channelsByServer);
+  const entries = useNotificationSettings((s) => s.entries);
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(channelsByServer).map(([guildId, categories]) => [
+          guildId,
+          categories.some((category) =>
+            category.channels.some(
+              (channel) =>
+                channel.unread &&
+                notificationSettings().showsUnread({ channelId: channel.id, guildId })
+            )
+          ),
+        ])
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channelsByServer, entries]
+  );
+}
+
 export function useHasUnreadDms() {
   const list = useDms((s) => s.list);
   const entries = useNotificationSettings((s) => s.entries);

@@ -376,6 +376,17 @@ const nextCursorByChannel = new Map<string, number>();
 const hasMoreByChannel = new Map<string, boolean>();
 let resetCount = 0;
 
+// Native-only: where you were, kept across launches like a phone chat app does: the hub's server, the last text
+// channel of each guild (reopened when you tap the guild) and the chat open when the app closed (reopened on
+// launch by the hub). Kept per account, since a reload or the app closing also runs `reset`.
+const navKey = (name: string) => `nav:${session().user?.id ?? ''}:${name}`;
+// the last page of each channel, shown instantly next time while the fresh one loads (also per account)
+const messagesKey = (channelId: string) => `messages:${session().user?.id ?? ''}:${channelId}`;
+export const lastHubServer = () => storage.getString(navKey('hub-server')) ?? null;
+export const lastChat = () => storage.getString(navKey('last-chat')) ?? null;
+export const lastGuildChannel = (guildId: string) =>
+  storage.getString(navKey(`channel:${guildId}`)) ?? null;
+
 const initialData = () => ({
   servers: [],
   channelsByServer: {},
@@ -584,9 +595,26 @@ export const useChat = create<ChatState>((set, get) => {
       // going back from a channel shows its server in the hub
       set(route.kind === 'guild' ? { route, hubServer: route.serverId } : { route });
       get().syncActiveChannel();
+
+      if (route.kind === 'guild' && route.serverId)
+        storage.set(navKey('hub-server'), route.serverId);
+      if (route.kind === 'home') {
+        storage.remove(navKey('last-chat'));
+        return;
+      }
+      const channel = selectCurrentChannel(get());
+      // a voice channel is a call, not somewhere to land
+      if (!channel || channel.type === 'VOICE') return;
+      storage.set(navKey('last-chat'), channel.id);
+      if (route.kind === 'guild' && route.serverId)
+        storage.set(navKey(`channel:${route.serverId}`), channel.id);
     },
 
-    selectServer: (id) => set({ hubServer: id ?? null }),
+    selectServer(id) {
+      set({ hubServer: id ?? null });
+      if (id) storage.set(navKey('hub-server'), id);
+      else storage.remove(navKey('hub-server'));
+    },
 
     selectChannel: (id) => goto(channelPath(id)),
 
@@ -698,8 +726,21 @@ export const useChat = create<ChatState>((set, get) => {
       return nextChannel;
     },
 
-    setMessages: (channelId, messages) =>
-      setChannelMessages(channelId, messages.map(messageFromInput)),
+    setMessages(channelId, messages) {
+      // messages that didn't change keep their object, so a refreshed page doesn't re-render every row
+      const current = get().messagesByChannel[channelId] ?? [];
+      const byId = new Map(current.map((message) => [message.id, message]));
+      const next = messages.map((input) => {
+        const message = messageFromInput(input);
+        const previous = byId.get(message.id);
+        return previous && JSON.stringify(previous) === JSON.stringify(message)
+          ? previous
+          : message;
+      });
+      if (next.length === current.length && next.every((message, i) => message === current[i]))
+        return;
+      setChannelMessages(channelId, next);
+    },
 
     addMessage(message) {
       const channelMessages = get().messagesByChannel[message.channelId] ?? [];
@@ -878,7 +919,7 @@ export const useChat = create<ChatState>((set, get) => {
     async loadMessages(channelId) {
       // show the last session's messages right away while the fresh page loads
       if (!get().messagesByChannel[channelId]?.length) {
-        const cached = z.string().safeParse(storage.getString(`messages:${channelId}`));
+        const cached = z.string().safeParse(storage.getString(messagesKey(channelId)));
         if (cached.success) get().setMessages(channelId, JSON.parse(cached.data));
       }
       setFlag('messagesLoadingByChannel', channelId, true);
@@ -900,7 +941,7 @@ export const useChat = create<ChatState>((set, get) => {
 
         hasMoreByChannel.set(channelId, result.data.messages.length === messagesPageSize);
         get().setMessages(channelId, result.data.messages);
-        storage.set(`messages:${channelId}`, JSON.stringify(result.data.messages));
+        storage.set(messagesKey(channelId), JSON.stringify(result.data.messages));
         return result.data.messages.at(-1);
       } finally {
         setFlag('messagesLoadingByChannel', channelId, false);
@@ -1109,7 +1150,6 @@ export const useChat = create<ChatState>((set, get) => {
       lastTypingByChannel.clear();
       nextCursorByChannel.clear();
       hasMoreByChannel.clear();
-      storage.getAllKeys().forEach((key) => key.startsWith('messages:') && storage.remove(key));
       set(initialData());
     },
   };

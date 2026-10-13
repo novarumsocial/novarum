@@ -1,11 +1,10 @@
 // Port of apps/frontend/src/lib/components/dm-sidebar.svelte
 // Differences: swipe a row left (or long-press it) to close the conversation, pull down to refresh.
 // It is the hub's Home column: Friends and every DM open as their own screen.
-import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, LoaderCircle, Phone, Plus, Users, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
@@ -138,7 +137,8 @@ export function DmSidebar() {
           <Icon as={Plus} size={20} className="text-muted-foreground" />
         </Pressable>
       </View>
-      <FlashList
+      {/* a plain list: FlashList's extra layout passes made switching to Home slow */}
+      <FlatList
         data={entries}
         keyExtractor={(entry) => entry.id}
         renderItem={({ item }) => row(item)}

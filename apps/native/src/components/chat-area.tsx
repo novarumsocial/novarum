@@ -1,12 +1,13 @@
 // Port of apps/frontend/src/lib/components/chat-area.svelte
-// The message list is a FlashList that starts at the bottom, keeps the visible message in place when older
-// pages are prepended and follows new messages while you are near the bottom.
-import { FlashList, type FlashListRef } from '@shopify/flash-list';
+// The message list is an inverted FlatList: offset 0 is the latest message, so it paints at the bottom on the
+// first frame, older pages append at its end without moving what you're reading, and new messages show up
+// in place while you're at the bottom.
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { BellRing, ChevronDown, Hash, Phone, RotateCw, Users, X } from 'lucide-react-native';
+import { BellRing, ChevronDown, Hash, Phone, Reply, RotateCw, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  FlatList,
   Pressable,
   View,
   useWindowDimensions,
@@ -14,7 +15,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { KeyboardAvoidingView, KeyboardEvents } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -220,8 +221,7 @@ export function ChatArea({
   );
   const ringing = useDms((s) => !!call && s.outgoingCall === channel.id);
 
-  const list = useRef<FlashListRef<Row>>(null);
-  const atBottom = useRef(true);
+  const list = useRef<FlatList<Row>>(null);
   const lastMessageId = useRef<string | null>(null);
   const [away, setAway] = useState(false);
   const [unreadBoundary, setUnreadBoundary] = useState<{
@@ -254,7 +254,6 @@ export function ChatArea({
         : null
     );
     setReplyingTo(null);
-    atBottom.current = true;
     lastMessageId.current = null;
     setAway(false);
     // only when the channel changes, not on every unread update
@@ -299,7 +298,8 @@ export function ChatArea({
         result.push({ kind: 'pending', key: `pending-${item.id}`, pending: item });
       }
     }
-    return result;
+    // newest first, for the inverted list
+    return result.reverse();
   }, [messages, pending, unreadBoundary, channel.id]);
 
   const typingText =
@@ -315,8 +315,10 @@ export function ChatArea({
   useEffect(() => {
     if (!activeMessage || loading) return;
     const index = rows.findIndex((row) => row.kind === 'message' && row.key === activeMessage);
-    if (index >= 0) void list.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    if (index >= 0) list.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
   }, [activeMessage, loading, rows]);
+
+  const scrollToLatest = (animated = true) => list.current?.scrollToOffset({ offset: 0, animated });
 
   // your own new message always scrolls into view, even when you were reading further up
   useEffect(() => {
@@ -324,16 +326,8 @@ export function ChatArea({
     if (!last || last.id === lastMessageId.current) return;
     const first = lastMessageId.current === null;
     lastMessageId.current = last.id;
-    if (!first && last.author.userId === selfId) list.current?.scrollToEnd({ animated: true });
+    if (!first && last.author.userId === selfId) scrollToLatest();
   }, [messages, selfId]);
-
-  // the list shrinks when the keyboard opens, so stay on the latest message if we were there
-  useEffect(() => {
-    const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
-      if (atBottom.current) list.current?.scrollToEnd({ animated: false });
-    });
-    return () => subscription.remove();
-  }, []);
 
   // the shell may pass new functions on every render; rows get stable ones
   const handlers = useRef({ onDelete, onEdit, onSend });
@@ -379,14 +373,12 @@ export function ChatArea({
   // a new pending message scrolls into view, like your own sent messages do
   const pendingCount = pending.filter((item) => item.channelId === channel.id).length;
   useEffect(() => {
-    if (pendingCount > 0) list.current?.scrollToEnd({ animated: true });
+    if (pendingCount > 0) scrollToLatest();
   }, [pendingCount]);
 
+  // inverted: the offset is the distance from the latest message
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const distance = contentSize.height - contentOffset.y - layoutMeasurement.height;
-    atBottom.current = distance < 80;
-    setAway(distance > 400);
+    setAway(event.nativeEvent.contentOffset.y > 400);
   }
 
   const renderItem = useCallback(
@@ -552,32 +544,47 @@ export function ChatArea({
               </View>
             </View>
           ) : (
-            <FlashList
+            <FlatList
               key={channel.id}
               ref={list}
+              inverted
+              // an inverted list draws its scrollbar on the left on Android
+              showsVerticalScrollIndicator={false}
               data={rows}
               extraData={activeMessage}
               keyExtractor={(row) => row.key}
-              getItemType={(row) => row.kind}
               renderItem={renderItem}
+              // keeps what you're reading still when a new message arrives, and follows it near the bottom
               maintainVisibleContentPosition={{
-                startRenderingFromBottom: true,
-                autoscrollToBottomThreshold: 0.2,
+                minIndexForVisible: 0,
+                autoscrollToTopThreshold: 120,
               }}
-              onStartReached={() => void chat().loadOlderMessages(channel.id)}
-              onStartReachedThreshold={1}
+              onEndReached={() => void chat().loadOlderMessages(channel.id)}
+              onEndReachedThreshold={1.5}
               onScroll={onScroll}
               scrollEventThrottle={64}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              // a few screens of history around you; more is rendered in the background, which blocks taps and swipes
+              windowSize={9}
+              updateCellsBatchingPeriod={80}
+              onScrollToIndexFailed={({ index, averageItemLength }) => {
+                list.current?.scrollToOffset({
+                  offset: index * averageItemLength,
+                  animated: false,
+                });
+                setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.5 }), 100);
+              }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
-              ListHeaderComponent={
+              ListHeaderComponent={<View className="h-6" />}
+              ListFooterComponent={
                 olderLoading ? (
                   <View className="items-center py-3">
                     <Spinner />
                   </View>
                 ) : null
               }
-              ListFooterComponent={<View className="h-6" />}
             />
           )}
 
@@ -587,7 +594,7 @@ export function ChatArea({
               accessibilityLabel="Jump to latest"
               onPress={() => {
                 void Haptics.selectionAsync();
-                list.current?.scrollToEnd({ animated: true });
+                scrollToLatest();
               }}
               className={cn(
                 'absolute right-3 bottom-8 size-11 items-center justify-center border border-border bg-card active:bg-accent',
@@ -617,13 +624,20 @@ export function ChatArea({
         </View>
 
         {replyingTo && (
-          <View className="min-h-11 flex-row items-center gap-2 border-t border-border pl-3">
-            <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-              Replying to{' '}
-              <Text className="text-xs font-medium">
-                {replyingTo.author.displayName || replyingTo.author.username}
+          <View className="flex-row items-center gap-2 border-t border-border bg-background pl-3">
+            <Icon as={Reply} size={16} className="text-primary" />
+            <View className="min-w-0 flex-1 border-l-2 border-primary/50 py-1.5 pl-2">
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                Replying to{' '}
+                <Text className="text-xs font-semibold text-foreground">
+                  {replyingTo.author.displayName || replyingTo.author.username}
+                </Text>
               </Text>
-            </Text>
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                {replyingTo.content ||
+                  `${replyingTo.attachments.length} attachment${replyingTo.attachments.length === 1 ? '' : 's'}`}
+              </Text>
+            </View>
             <Button
               variant="ghost"
               size="icon"

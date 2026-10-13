@@ -1,7 +1,6 @@
 // Port of apps/frontend/src/lib/components/channel-sidebar.svelte
 // Differences: long-press a channel for a sheet (the web's right-click menu); channels move with "Move up /
 // Move down" instead of drag and drop; web stubs (leave guild, delete, pin, duplicate, mark as read) are hidden.
-import { FlashList } from '@shopify/flash-list';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import {
@@ -21,10 +20,11 @@ import {
   UserRoundPlus,
   Volume2,
 } from 'lucide-react-native';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { memo, useState } from 'react';
+import { FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
+import { Button } from '@/components/ui/button';
 import { CreateChannelDialog } from '@/components/create-channel-dialog';
 import { EditChannelDialog } from '@/components/edit-channel-dialog';
 import { GuildSettingsDialog } from '@/components/guild-settings-dialog';
@@ -35,7 +35,7 @@ import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
-import { chat, guildPath } from '@/lib/chat-state';
+import { chat, guildPath, lastGuildChannel, useChat } from '@/lib/chat-state';
 import { useNotificationSettings } from '@/lib/notification-settings';
 import { useSettings } from '@/lib/settings';
 import type { Author, Channel, ChannelCategory, Server } from '@/lib/types/chat';
@@ -47,16 +47,10 @@ type Row =
   | { kind: 'category'; category: ChannelCategory }
   | { kind: 'channel'; channel: Channel; category: ChannelCategory };
 type Menu =
-  | 'guild'
-  | 'guildNotify'
-  | 'channel'
-  | 'channelNotify'
-  | 'invite'
-  | 'create'
-  | 'edit'
-  | 'settings';
+  'guild' | 'guildNotify' | 'channel' | 'channelNotify' | 'invite' | 'create' | 'edit' | 'settings';
 
-export function ChannelSidebar({
+// memo: see GuildSidebar
+export const ChannelSidebar = memo(function ChannelSidebar({
   server,
   categories,
   onSelectChannel,
@@ -74,6 +68,8 @@ export function ChannelSidebar({
   const voiceChannelId = useVoice((s) => s.channelId);
   const voiceUserStates = useVoice((s) => s.voiceStates);
   const levels = useNotificationSettings((s) => s.entries); // re-render when levels change
+  useChat((s) => s.route); // re-render when you come back from a channel, to mark it as the last one
+  const lastChannel = lastGuildChannel(server.id);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<Menu | null>(null);
   const [category, setCategory] = useState<ChannelCategory | null>(null);
@@ -140,6 +136,7 @@ export function ChannelSidebar({
     const showMention = ch.mention > 0 && useNotificationSettings.getState().showsMentions(target);
     const showUnread = ch.unread && useNotificationSettings.getState().showsUnread(target);
     const highlighted = showUnread || showMention;
+    const current = ch.id === lastChannel || ch.id === voiceChannelId;
     const connected = ch.type === 'VOICE' ? voiceUsersFor(ch.id) : [];
 
     return (
@@ -155,18 +152,30 @@ export function ChannelSidebar({
               category: categories.find((cat) => cat.channels.some((item) => item.id === ch.id)),
             });
           }}
-          className="min-h-11 flex-row items-center gap-1.5 px-2 active:bg-accent"
+          className={cn(
+            'mx-2 min-h-11 flex-row items-center gap-2.5 px-2.5 active:bg-accent',
+            current && 'bg-accent'
+          )}
         >
+          {highlighted && !current && (
+            <View
+              pointerEvents="none"
+              className="absolute top-1/2 -left-2 -mt-1 h-2 w-1 rounded-r-full bg-foreground"
+            />
+          )}
           <Icon
             as={ch.type === 'VOICE' ? Volume2 : Hash}
-            className={highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground'}
+            size={20}
+            className={
+              current || highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground/70'
+            }
           />
           <Text
             numberOfLines={1}
             className={cn(
-              'flex-1 text-sm',
-              highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground',
-              highlighted && 'font-semibold'
+              'flex-1 text-[15px]',
+              current || highlighted ? 'text-sidebar-foreground' : 'text-muted-foreground',
+              (highlighted || current) && 'font-semibold'
             )}
           >
             {ch.label || ch.name}
@@ -193,7 +202,7 @@ export function ChannelSidebar({
           const voiceState =
             voiceChannelId === ch.id ? voiceUserStates.get(state.userId) : undefined;
           const row = (
-            <View className="min-h-11 flex-row items-center gap-1.5 pr-2 pl-8">
+            <View className="min-h-10 flex-row items-center gap-2 pr-2 pl-11">
               <View>
                 <Avatar
                   src={user?.avatarUrl}
@@ -233,23 +242,53 @@ export function ChannelSidebar({
 
   return (
     <View className="flex-1 bg-sidebar">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Server settings"
-        onPress={() => open('guild')}
-        className="shrink-0 flex-row items-center justify-between border-b border-border px-4 active:bg-accent"
-        style={{ minHeight: 52 + insets.top, paddingTop: insets.top }}
-      >
-        <Text
-          numberOfLines={1}
-          className="flex-1 text-sm font-semibold tracking-tight text-sidebar-foreground"
+      <View className="shrink-0 border-b border-border" style={{ paddingTop: insets.top }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${server.name}, server options`}
+          onPress={() => open('guild')}
+          className="min-h-14 flex-row items-center gap-1 px-4 active:opacity-70"
         >
-          {server.name}
-        </Text>
-        <Icon as={ChevronDown} className="text-muted-foreground" />
-      </Pressable>
+          <Text
+            numberOfLines={1}
+            className="shrink text-lg font-bold tracking-tight text-sidebar-foreground"
+          >
+            {server.name}
+          </Text>
+          <Icon as={ChevronRight} size={18} className="text-muted-foreground" />
+        </Pressable>
+        <View className="flex-row gap-2 px-3 pb-3">
+          {server.canManageChannels && (
+            <Button variant="secondary" size="sm" className="flex-1" onPress={() => open('invite')}>
+              <Icon as={UserRoundPlus} size={16} className="text-secondary-foreground" />
+              <Text>Invite</Text>
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            className={server.canManageChannels ? undefined : 'flex-1'}
+            accessibilityLabel="Notification settings"
+            onPress={() => open('guildNotify')}
+          >
+            <Icon as={Bell} size={16} className="text-secondary-foreground" />
+            {!server.canManageChannels && <Text>Notifications</Text>}
+          </Button>
+          {server.canManageChannels && (
+            <Button
+              variant="secondary"
+              size="sm"
+              accessibilityLabel="Server settings"
+              onPress={() => open('settings')}
+            >
+              <Icon as={Settings} size={16} className="text-secondary-foreground" />
+            </Button>
+          )}
+        </View>
+      </View>
 
-      <FlashList
+      {/* a plain list: a server's channels are few, and FlashList's extra layout passes made switching slow */}
+      <FlatList
         data={rows}
         extraData={[
           collapsed,
@@ -261,13 +300,12 @@ export function ChannelSidebar({
           circleIcons,
         ]}
         keyExtractor={(row) => (row.kind === 'category' ? `c:${row.category.id}` : row.channel.id)}
-        getItemType={(row) => row.kind}
-        contentContainerStyle={{ paddingVertical: 8 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
         renderItem={({ item }) =>
           item.kind === 'channel' ? (
             renderChannel(item)
           ) : (
-            <View className="min-h-11 flex-row items-center px-3">
+            <View className="mt-3 min-h-9 flex-row items-center pr-1 pl-3">
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={item.category.label}
@@ -278,14 +316,14 @@ export function ChannelSidebar({
                     [item.category.id]: !current[item.category.id],
                   }))
                 }
-                className="min-h-11 flex-1 flex-row items-center gap-1"
+                className="min-h-9 flex-1 flex-row items-center gap-1"
               >
                 <Icon
                   as={collapsed[item.category.id] ? ChevronRight : ChevronDown}
                   size={12}
                   className="text-muted-foreground"
                 />
-                <Text className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                <Text className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                   {item.category.label}
                 </Text>
               </Pressable>
@@ -401,4 +439,4 @@ export function ChannelSidebar({
       <EditChannelDialog open={menu === 'edit'} onClose={closeIf('edit')} channel={channel} />
     </View>
   );
-}
+});
