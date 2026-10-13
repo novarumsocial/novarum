@@ -4,7 +4,7 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Play } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Icon } from '@/components/ui/icon';
 import type { Attachment } from '@/lib/types/chat';
@@ -35,6 +35,8 @@ export function VideoPlayer({
   className?: string;
 }) {
   const [active, setActive] = useState(autoPlay);
+  // the viewer keeps the pages next to the open one mounted: play when swiped to, stop when swiped away
+  useEffect(() => setActive(autoPlay), [autoPlay]);
 
   return (
     <View

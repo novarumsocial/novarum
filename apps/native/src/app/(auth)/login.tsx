@@ -206,7 +206,7 @@ export default function Login() {
       description={description}
       footer={
         mfaChallenge ? (
-          <Pressable onPress={restartLogin} className="flex-row items-center gap-1.5">
+          <Pressable onPress={restartLogin} hitSlop={14} className="flex-row items-center gap-1.5">
             <Icon as={ArrowLeft} size={14} className="text-muted-foreground" />
             <Text className="text-xs text-muted-foreground">Back to sign in</Text>
           </Pressable>
@@ -345,12 +345,13 @@ export default function Login() {
             label="Password"
             icon={Lock}
             labelRight={
-              <Text
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={14}
                 onPress={() => router.push(`/reset-password${query}` as Href)}
-                className="text-xs text-muted-foreground"
               >
-                Forgot password?
-              </Text>
+                <Text className="text-xs text-muted-foreground">Forgot password?</Text>
+              </Pressable>
             }
             secureTextEntry
             placeholder="••••••••"

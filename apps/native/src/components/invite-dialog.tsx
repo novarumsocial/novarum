@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Check, Copy, RefreshCw, Share2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Share, View } from 'react-native';
+import { Platform, Share, View } from 'react-native';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -109,7 +109,10 @@ export function InviteDialog({
           </Button>
           <Button
             disabled={loading || !code}
-            onPress={() => void Share.share({ message: inviteUrl, url: inviteUrl })}
+            // iOS shares a url and a message as two items, so it gets only the url
+            onPress={() =>
+              void Share.share(Platform.OS === 'ios' ? { url: inviteUrl } : { message: inviteUrl })
+            }
           >
             <Icon as={Share2} className="text-primary-foreground" />
             <Text>Share</Text>

@@ -34,8 +34,10 @@ export function VolumeSlider({
 
   return (
     <View className="gap-2 px-4 py-3">
-      <View className="flex-row justify-between">
-        <Text className="text-base">{label}</Text>
+      <View className="flex-row justify-between gap-3">
+        <Text className="flex-1 text-base" numberOfLines={1}>
+          {label}
+        </Text>
         <Pressable onPress={() => onChange(1)} hitSlop={8}>
           <Text className="text-base text-muted-foreground">{percent}%</Text>
         </Pressable>

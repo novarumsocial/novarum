@@ -14,11 +14,21 @@ import { useSettings } from '@/lib/settings';
 import { useUnreadTotal } from '@/lib/unread';
 import { voice } from '@/lib/voice';
 
+const screenOptions = { headerShown: false };
+
+// the app icon badge, in its own component so unread changes don't re-render the whole app
+function BadgeSync() {
+  const unreadTotal = useUnreadTotal();
+  useEffect(() => {
+    void setBadgeCount(unreadTotal);
+  }, [unreadTotal]);
+  return null;
+}
+
 export default function AppLayout() {
   const user = useSession((s) => s.user);
   const epoch = useSession((s) => s.epoch);
   const pushNotifications = useSettings((s) => s.pushNotifications);
-  const unreadTotal = useUnreadTotal();
   const [booting, setBooting] = useState(true);
   const [bootFinished, setBootFinished] = useState(false);
   const pushSynced = useRef(false);
@@ -72,11 +82,12 @@ export default function AppLayout() {
   // navigate (not push): expo-router already opens the same link when it launched or resumed the app
   useEffect(() => watchNotificationTaps((url) => router.navigate(url as Href)), []);
 
-  useEffect(() => {
-    void setBadgeCount(unreadTotal);
-  }, [unreadTotal]);
-
   if (booting) return <InitialLoader finished={bootFinished} />;
   if (!user) return null;
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <BadgeSync />
+      <Stack screenOptions={screenOptions} />
+    </>
+  );
 }

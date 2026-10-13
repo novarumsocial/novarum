@@ -124,8 +124,7 @@ export default function ResetPassword() {
   const toggle = (
     <Pressable
       onPress={() => setShowPassword(!showPassword)}
-      hitSlop={8}
-      className="px-3"
+      className="h-11 justify-center px-3"
       accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
     >
       <Icon as={showPassword ? EyeOff : Eye} size={16} className="text-muted-foreground" />

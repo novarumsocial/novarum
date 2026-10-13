@@ -231,7 +231,7 @@ export default function InvitePage() {
       footer={
         <>
           <Text className="text-xs text-muted-foreground">Not {homeServer}?</Text>
-          <TextLink onPress={() => router.push('/register')}>
+          <TextLink onPress={() => router.push(loginHref)}>
             Sign in with a different account
           </TextLink>
         </>

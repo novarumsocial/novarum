@@ -47,6 +47,8 @@ export function Button({ className, variant, size, disabled, ...props }: ButtonP
         role="button"
         disabled={disabled}
         className={cn(buttonVariants({ variant, size }), disabled && 'opacity-50', className)}
+        // small buttons still take a finger-sized tap
+        hitSlop={size === 'sm' ? 4 : undefined}
         {...props}
       />
     </TextClassContext.Provider>

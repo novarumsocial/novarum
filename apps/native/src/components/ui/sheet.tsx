@@ -52,11 +52,14 @@ export function Sheet({
       backdropComponent={backdrop}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
       backgroundStyle={{ backgroundColor: colors.popover, borderRadius: 0 }}
       handleIndicatorStyle={{ backgroundColor: colors['muted-foreground'] }}
     >
-      <BottomSheetScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}>
+      <BottomSheetScrollView
+        // a tap on a button while typing presses it instead of only closing the keyboard
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 8 }}
+      >
         {children}
       </BottomSheetScrollView>
     </BottomSheetModal>

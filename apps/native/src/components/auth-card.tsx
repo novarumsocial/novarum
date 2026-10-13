@@ -2,7 +2,7 @@
 import type { LucideIcon } from 'lucide-react-native';
 import { ArrowRight } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -161,7 +161,7 @@ export function ButtonLabel({
 }
 
 export const TextLink = ({ onPress, children }: { onPress: () => void; children: ReactNode }) => (
-  <Text onPress={onPress} className="text-xs font-medium underline">
-    {children}
-  </Text>
+  <Pressable accessibilityRole="link" onPress={onPress} hitSlop={14}>
+    <Text className="text-xs font-medium underline">{children}</Text>
+  </Pressable>
 );
