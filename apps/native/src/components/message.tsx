@@ -196,6 +196,13 @@ function MessageMenu({
 
   return (
     <Sheet open={open} onClose={onClose}>
+      {/* grouped messages hide their time, so the sheet always says who sent it and when */}
+      <Text className="px-4 pt-2 pb-1 text-xs text-muted-foreground" numberOfLines={1}>
+        <Text className="text-xs font-medium">
+          {message.author.displayName || message.author.username}
+        </Text>
+        {` · ${formatDate(message.timestamp)} at ${formatTime(message.timestamp)}`}
+      </Text>
       <SheetItem icon={Reply} label="Reply" onPress={then(onReply)} />
       {own && (
         <SheetItem
@@ -383,11 +390,13 @@ export const Message = memo(function Message({
             {selfMentioned && (
               <View className="absolute inset-y-0 left-0 w-0.5 bg-amber-400" pointerEvents="none" />
             )}
-            <Animated.View
-              pointerEvents="none"
-              style={flashStyle}
-              className="absolute inset-0 bg-primary/20"
-            />
+            {flash && (
+              <Animated.View
+                pointerEvents="none"
+                style={flashStyle}
+                className="absolute inset-0 bg-primary/20"
+              />
+            )}
 
             {grouped ? (
               <View className="w-9 shrink-0" />

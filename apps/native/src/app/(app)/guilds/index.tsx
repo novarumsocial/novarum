@@ -1,7 +1,7 @@
 // The hub: the first screen of the chat stack (the web's left column). The guild rail picks a server, next to it
 // are that server's channels, or your DMs and friends for Home. Opening a channel pushes the channel screen.
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { ChannelSidebar } from '@/components/channel-sidebar';
 import { DmSidebar } from '@/components/dm-sidebar';
@@ -29,6 +29,12 @@ export default function Hub() {
   const guildMentions = useGuildMentions();
   const hasUnreadDms = useHasUnreadDms();
   const server = servers.find((item) => item.id === hubServer) ?? null;
+
+  // the guild's members, for the avatars in its voice channels and its settings
+  const firstChannel = categories[0]?.channels[0]?.id;
+  useEffect(() => {
+    if (firstChannel) void chat().loadMembers(firstChannel);
+  }, [firstChannel]);
 
   // no channel is open while the hub is on screen (notifications and unread marks follow this)
   useFocusEffect(useCallback(() => chat().setRoute({ kind: 'home' }), []));

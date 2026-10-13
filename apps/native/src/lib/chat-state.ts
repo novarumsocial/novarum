@@ -502,10 +502,8 @@ export const useChat = create<ChatState>((set, get) => {
     const channelId = selectCurrentChannel(get())?.id ?? null;
     set({ loadedChannel: channelId });
 
-    if (!channelId) {
-      set({ members: [] });
-      return;
-    }
+    // the hub keeps the last guild's members, so its voice channels still show avatars
+    if (!channelId) return;
 
     const isDm = get().route.kind === 'dms';
     const [lastMessage] = await Promise.all([

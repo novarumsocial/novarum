@@ -238,7 +238,7 @@ export function ChannelSidebar({
         accessibilityLabel="Server settings"
         onPress={() => open('guild')}
         className="shrink-0 flex-row items-center justify-between border-b border-border px-4 active:bg-accent"
-        style={{ minHeight: 48 + insets.top, paddingTop: insets.top }}
+        style={{ minHeight: 52 + insets.top, paddingTop: insets.top }}
       >
         <Text
           numberOfLines={1}
