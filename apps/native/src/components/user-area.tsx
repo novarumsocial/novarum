@@ -178,7 +178,7 @@ export function UserArea({
           onPress={toggle(() =>
             selfDeafened ? voice().setDeafened(false) : voice().setMuted(!selfMuted)
           )}
-          className="size-11 items-center justify-center"
+          className="size-11 items-center justify-center active:bg-sidebar-accent"
         >
           <Icon
             as={selfMuted ? MicOff : Mic}
@@ -190,7 +190,7 @@ export function UserArea({
           accessibilityRole="button"
           accessibilityLabel={selfDeafened ? 'Undeafen' : 'Deafen'}
           onPress={toggle(() => voice().setDeafened(!selfDeafened))}
-          className="size-11 items-center justify-center"
+          className="size-11 items-center justify-center active:bg-sidebar-accent"
         >
           <Icon
             as={selfDeafened ? HeadphoneOff : Headphones}
@@ -202,7 +202,7 @@ export function UserArea({
           accessibilityRole="button"
           accessibilityLabel="User settings"
           onPress={() => router.push('/settings')}
-          className="size-11 items-center justify-center"
+          className="size-11 items-center justify-center active:bg-sidebar-accent"
         >
           <Icon as={Settings} size={18} className="text-muted-foreground" />
         </Pressable>

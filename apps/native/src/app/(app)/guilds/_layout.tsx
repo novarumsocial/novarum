@@ -26,6 +26,8 @@ export default function GuildsLayout() {
         screenOptions={{
           headerShown: false,
           fullScreenGestureEnabled: true,
+          // screens under the one on top (the hub, earlier channels) stop re-rendering until you go back
+          freezeOnBlur: true,
           contentStyle: { backgroundColor: colors.background },
         }}
       >

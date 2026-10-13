@@ -17,6 +17,7 @@ import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { useChat } from '@/lib/chat-state';
 import { dmPath, dms, useDms, type DmEntry } from '@/lib/dms';
+import { formatDate, formatTime } from '@/lib/format-date';
 import { friends, useFriends } from '@/lib/friends';
 import { goto } from '@/lib/navigation';
 import { useNotificationSettings } from '@/lib/notification-settings';
@@ -56,8 +57,12 @@ export function DmSidebar() {
       entry.unread &&
       useNotificationSettings.getState().showsUnread({ channelId: entry.id, guildId: null });
 
+    const last = entry.lastMessageAt ? new Date(entry.lastMessageAt) : null;
+
     return (
+      // keyed so a recycled row never keeps the previous conversation's swipe open
       <ReanimatedSwipeable
+        key={entry.id}
         overshootRight={false}
         renderRightActions={() => (
           <View className="w-20 items-center justify-center bg-destructive">
@@ -103,6 +108,11 @@ export function DmSidebar() {
           >
             {name}
           </Text>
+          {last && (
+            <Text className={cn('text-xs', unread ? 'text-primary' : 'text-muted-foreground')}>
+              {formatDate(last) === 'Today' ? formatTime(last) : formatDate(last)}
+            </Text>
+          )}
           {voiceStates[entry.id]?.length ? (
             <Icon as={Phone} size={14} className="text-green-500" accessibilityLabel="In a call" />
           ) : null}

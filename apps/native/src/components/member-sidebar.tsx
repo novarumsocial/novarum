@@ -2,6 +2,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { Users } from 'lucide-react-native';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { ProfileCard } from '@/components/profile-card';
 import { Icon } from '@/components/ui/icon';
@@ -15,6 +16,7 @@ type Row = { kind: 'title'; label: string; online: boolean } | { kind: 'member';
 // the members modal on phones, the right column next to the chat on tablets
 export function MemberSidebar({ members }: { members: Author[] }) {
   const circleIcons = useSettings((s) => s.circleIcons);
+  const insets = useSafeAreaInsets();
 
   const online = members.filter((member) => member.status !== 'OFFLINE');
   const offline = members.filter((member) => member.status === 'OFFLINE');
@@ -35,7 +37,7 @@ export function MemberSidebar({ members }: { members: Author[] }) {
         data={rows}
         getItemType={(row) => row.kind}
         keyExtractor={(row) => (row.kind === 'title' ? row.label : row.member.userId)}
-        contentContainerStyle={{ padding: 12 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 12 }}
         renderItem={({ item }) => {
           if (item.kind === 'title') {
             return (
