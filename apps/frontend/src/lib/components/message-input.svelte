@@ -8,6 +8,7 @@
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
   import { session } from '$lib/session.svelte';
+  import { cn, formatBytes } from '$lib/utils';
 
   let content = $state('');
   let files = $state<File[]>([]);
@@ -36,6 +37,13 @@
         )
       )
       .slice(0, 8);
+  });
+  const previews = $derived(
+    files.map((file) => (file.type.startsWith('image/') ? URL.createObjectURL(file) : null))
+  );
+  $effect(() => {
+    const urls = previews;
+    return () => urls.forEach((url) => url && URL.revokeObjectURL(url));
   });
   const maxFiles = 5;
   const maxFileSize = $derived(anchor.maxFileSize * 1024 * 1024);
@@ -369,31 +377,47 @@
   {#if files.length > 0}
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
       {#each files as file, index (`${file.name}:${file.size}:${file.lastModified}`)}
-        <div class="flex w-56 shrink-0 flex-col gap-1.5 border border-border bg-muted/30 p-2">
-          <div class="flex items-center gap-2">
-            <FileText class="size-3.5 shrink-0 text-primary" />
-            <div class="min-w-0">
-              <p class="truncate text-[11px] font-medium text-foreground">{file.name}</p>
-              <p class="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-                {(file.size / 1024).toFixed(file.size < 1024 * 10 ? 1 : 0)} KB
-              </p>
+        {@const progress = chat.uploadProgress[index]}
+        <div
+          class="group relative size-24 shrink-0 overflow-hidden rounded-none border border-border bg-muted/30"
+          title={file.name}
+        >
+          {#if previews[index]}
+            <img
+              src={previews[index]}
+              alt={file.name}
+              class={cn(
+                'size-full object-cover transition-opacity',
+                progress !== undefined && 'opacity-60'
+              )}
+            />
+          {:else}
+            <div class="flex size-full flex-col items-center justify-center gap-1.5 px-2 pb-4">
+              <FileText class="size-5 text-primary" />
+              <p class="w-full truncate text-center text-[11px] font-medium">{file.name}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={sending}
-              aria-label={`Remove ${file.name}`}
-              onclick={() => (files = files.filter((item) => item !== file))}
-            >
-              <X class="size-3" />
-            </Button>
-          </div>
-          {#if chat.uploadProgress[index] !== undefined}
+          {/if}
+          <span
+            class="absolute bottom-1 left-1 bg-background/80 px-1 py-px font-mono text-[9px] tracking-wide text-muted-foreground uppercase backdrop-blur"
+          >
+            {formatBytes(file.size)}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            class="absolute top-1 right-1 bg-background/80 backdrop-blur transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
+            disabled={sending}
+            aria-label={`Remove ${file.name}`}
+            onclick={() => (files = files.filter((item) => item !== file))}
+          >
+            <X class="size-3" />
+          </Button>
+          {#if progress !== undefined}
             <Progress
-              value={chat.uploadProgress[index]}
-              class="w-full"
-              aria-hidden="true"
+              value={progress}
               max={1}
+              class="absolute inset-x-0 bottom-0 h-0.5 bg-transparent"
+              aria-hidden="true"
             />
           {/if}
         </div>

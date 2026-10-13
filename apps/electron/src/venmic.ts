@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { basename } from 'node:path';
 import { app, ipcMain } from 'electron';
 
 // @vencord/venmic ships a native pipewire addon and only targets linux (see its
@@ -70,7 +71,10 @@ export function registerVenmicHandlers() {
     if (!bay) return false;
 
     const ownPid = ownAudioServicePid();
-    const exclude: VenmicNode[] = [{ 'media.class': 'Stream/Input/Audio' }];
+    const exclude: VenmicNode[] = [
+      { 'media.class': 'Stream/Input/Audio' },
+      { 'application.process.binary': basename(process.execPath) },
+    ];
     if (ownPid) exclude.push({ 'application.process.id': ownPid });
 
     // include: [] links every node that isn't excluded above, i.e. "whole system audio".
