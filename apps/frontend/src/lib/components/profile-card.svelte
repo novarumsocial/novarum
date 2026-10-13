@@ -7,8 +7,10 @@
   import { settings, settingsDialog } from '$lib/settings.svelte';
   import { friends } from '$lib/friends.svelte';
   import { dms } from '$lib/dms.svelte';
+  import { chat } from '$lib/chat-state.svelte';
   import { useSession } from '$lib/session.svelte';
   import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input/index.js';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { MessageCircle, Phone, UserRoundArrowLeft, UserRoundCheck, UserRoundCog, UserRoundMinus, UserRoundPlus } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
@@ -81,6 +83,22 @@
 
   let open = $state(false);
   let avatarOpen = $state(false);
+  let dmDraft = $state('');
+  let sendingDm = $state(false);
+
+  async function sendDm() {
+    const content = dmDraft.trim();
+    if (!content || sendingDm || !friendshipUserId) return;
+    sendingDm = true;
+    try {
+      const channelId = await dms.open(friendshipUserId);
+      if (!channelId) return;
+      await chat.sendMessage(channelId, content);
+      dmDraft = '';
+    } finally {
+      sendingDm = false;
+    }
+  }
 
   function viewAvatar() {
     if (user.avatarUrl) avatarOpen = true;
@@ -204,7 +222,7 @@
           <UserRoundCog class="size-4" />
           Edit profile
         </Button>
-      {:else if user.username && friendStatus === 'FRIEND'}
+      {:else if user.username && friendStatus === 'FRIEND' && !device.isComputer}
         <div class="mt-3 grid grid-cols-2 gap-2">
           <Button variant="secondary" class="w-full" onclick={() => void openDm()}>
             <MessageCircle class="size-4" />
@@ -228,6 +246,22 @@
             {user.about}
           </p>
         </div>
+      {/if}
+      {#if user.username && !isSelf && friendStatus === 'FRIEND' && device.isComputer}
+        <Input
+          id="direct-message-person"
+          placeholder="Message @{user.username}:{user.server}"
+          class="mt-2.5"
+          autocomplete="off"
+          spellcheck="false"
+          bind:value={dmDraft}
+          onkeydown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void sendDm();
+            }
+          }}
+        />
       {/if}
     </div>
   {#if user.avatarUrl}
