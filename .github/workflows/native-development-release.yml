@@ -33,7 +33,7 @@ env:
 jobs:
   android:
     name: Build APK
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       url: ${{ steps.upload.outputs.artifact-url }}
     steps:
@@ -75,6 +75,7 @@ jobs:
       - name: Build APK
         run: |
           ./gradlew assembleRelease \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=2g" \
             -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
             -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASS }}" \
