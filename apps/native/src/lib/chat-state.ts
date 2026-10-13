@@ -51,6 +51,8 @@ type AddMessageInput = {
     size: number;
     url: string;
     previewUrl: string;
+    width?: number | null;
+    height?: number | null;
   }[];
 };
 

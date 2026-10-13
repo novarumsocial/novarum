@@ -26,7 +26,7 @@ export function createMessage(input: {
   replyTo: string | null;
   nonce: string;
   pingRecipients: PingRecipient[];
-  attachments: { id: string }[];
+  attachments: { id: string; width: number | null; height: number | null }[];
 }) {
   return db.transaction(async (tx) => {
     const [created] = await tx
@@ -46,7 +46,12 @@ export function createMessage(input: {
       // only a PENDING attachment can be claimed, so two messages can't both take the same upload
       const claimed = await tx
         .update(attachments)
-        .set({ messageId: created.id, status: 'ATTACHED' })
+        .set({
+          messageId: created.id,
+          status: 'ATTACHED',
+          width: attachment.width,
+          height: attachment.height,
+        })
         .where(and(eq(attachments.id, attachment.id), eq(attachments.status, 'PENDING')))
         .returning();
       if (claimed.length === 0) throw new Error('Attachment was already claimed');

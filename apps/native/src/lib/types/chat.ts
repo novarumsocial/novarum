@@ -54,6 +54,8 @@ export interface Attachment {
   size: number;
   url: string;
   previewUrl: string;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface VoiceUser {

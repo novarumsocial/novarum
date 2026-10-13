@@ -135,7 +135,7 @@ function PendingMessage({
             <Text className="text-xs text-muted-foreground">{attachments}</Text>
           )}
         </View>
-        {pending.failed ? (
+        {pending.failed && (
           <View className="flex-row items-center">
             <Pressable
               accessibilityRole="button"
@@ -155,10 +155,6 @@ function PendingMessage({
               <Icon as={X} size={16} className="text-muted-foreground" />
             </Pressable>
           </View>
-        ) : (
-          <Text accessibilityLiveRegion="polite" className="text-[11px] text-muted-foreground">
-            Sending…
-          </Text>
         )}
       </View>
     </View>

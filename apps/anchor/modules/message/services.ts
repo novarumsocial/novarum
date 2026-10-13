@@ -13,6 +13,7 @@ import { createMessage, deleteMessage, editMessage, pingedUserIds } from './stor
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
+import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
 const messageSchema = messageResponseBaseSchema.extend({
@@ -515,6 +516,21 @@ export function messageEdited(message: { createdAt: Date | string; updatedAt?: D
   );
 }
 
+// the header is near the start of the file, so a ranged read is enough to get the size
+async function imageSize(attachment: { objectKey: string; contentType: string }) {
+  if (!attachment.contentType.startsWith('image/')) return { width: null, height: null };
+  try {
+    const head = await storage
+      .file(attachment.objectKey)
+      .slice(0, 512 * 1024)
+      .arrayBuffer();
+    const { autoOrient } = await sharp(head).metadata();
+    return { width: autoOrient.width, height: autoOrient.height };
+  } catch {
+    return { width: null, height: null };
+  }
+}
+
 export async function verifyPendingAttachments(
   attachmentIds: string[],
   uploaderId: string,
@@ -550,7 +566,7 @@ export async function verifyPendingAttachments(
       };
     }
 
-    attachments.push(attachment);
+    attachments.push({ ...attachment, ...(await imageSize(attachment)) });
   }
 
   return { ok: true as const, value: attachments };

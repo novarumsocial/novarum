@@ -90,7 +90,12 @@ function ImageTile({
   single: boolean;
   onPress: () => void;
 }) {
-  const [size, setSize] = useState(imageSizes.get(attachment.id) ?? { width: 400, height: 300 });
+  const [size, setSize] = useState(
+    imageSizes.get(attachment.id) ??
+      (attachment.width && attachment.height
+        ? { width: attachment.width, height: attachment.height }
+        : { width: 400, height: 300 })
+  );
   const aspect = size.width / size.height;
 
   return (
@@ -117,7 +122,7 @@ function ImageTile({
         recyclingKey={attachment.id}
         contentFit="cover"
         onLoad={(event) => {
-          if (!single || !event.source.width || !event.source.height) return;
+          if (!single || attachment.width || !event.source.width || !event.source.height) return;
           const { width, height } = event.source;
           imageSizes.set(attachment.id, { width, height });
           setSize({ width, height });

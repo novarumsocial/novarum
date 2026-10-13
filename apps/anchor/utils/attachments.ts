@@ -82,6 +82,8 @@ export function attachmentPayload(attachment: {
   filename: string;
   contentType: string;
   size: number;
+  width?: number | null;
+  height?: number | null;
 }) {
   const path = `/attachment/${encodeURIComponent(attachment.id)}`;
   return {
@@ -89,6 +91,8 @@ export function attachmentPayload(attachment: {
     filename: attachment.filename,
     contentType: attachment.contentType,
     size: attachment.size,
+    width: attachment.width ?? null,
+    height: attachment.height ?? null,
     url: signedAttachmentUrl(path, attachment.id),
     previewUrl: signedAttachmentUrl(`${path}/preview`, attachment.id),
   };
