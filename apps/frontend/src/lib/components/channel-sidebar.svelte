@@ -272,17 +272,16 @@
           {server.name}
         </span>
 
-        <span class="shrink-0 text-muted-foreground transition-colors hover:text-foreground">
+        <button
+          class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Server settings"
+        >
           <ChevronDown class="size-4" />
-        </span>
+        </button>
       </div>
     </DropdownMenu.Trigger>
 
-    <DropdownMenu.Content
-      class="w-52"
-      align="center"
-      onCloseAutoFocus={(e) => e.preventDefault()}
-    >
+    <DropdownMenu.Content class="w-52" align="center">
       <DropdownMenu.Group>
         {#if server.canManageChannels}
           <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
@@ -430,7 +429,7 @@
                   </button>
                 </ContextMenu.Trigger>
 
-                <ContextMenu.Content class="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <ContextMenu.Content class="w-56">
                   {#if ch.type === 'TEXT'}
                     <ContextMenu.Item disabled={!ch.unread && ch.mention === 0}>
                       <Eye class="size-4" />
