@@ -188,6 +188,7 @@ class ChatState {
   messagesByChannel = $state<Record<string, Message[]>>({});
   messagesLoadingByChannel = $state<Record<string, boolean>>({});
   members = $state<Author[]>([]);
+  mentionRequest = $state<Author | null>(null);
   voiceStates = $state<Record<string, VoicePresenceInput[]>>({});
   typingByChannel = $state<Record<string, TypingInput[]>>({});
   loadingOlderByChannel = $state<Record<string, boolean>>({});
@@ -974,6 +975,10 @@ class ChatState {
   async saveChannelOrder(guildId: string, channelIds: string[]) {
     const result = await anchor.client.channel.order.patch({ guildId, channelIds });
     if (result.error || !result.data) return;
+  }
+
+  requestMention(member: Author) {
+    this.mentionRequest = member;
   }
 }
 

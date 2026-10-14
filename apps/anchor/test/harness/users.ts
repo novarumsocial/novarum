@@ -4,7 +4,8 @@ import type { createApp } from '../../src/app';
 // random start: a long-lived stack (FED_KEEP) must not see the same addresses again in the next run
 let ipCounter = Math.floor(Math.random() * 2 ** 24);
 /** every call gets a fresh client address so the in-memory auth rate limits don't interfere */
-export const freshIp = () => `10.${(ipCounter >> 16) & 255}.${(ipCounter >> 8) & 255}.${ipCounter++ & 255}`;
+export const freshIp = () =>
+  `10.${(ipCounter >> 16) & 255}.${(ipCounter >> 8) & 255}.${ipCounter++ & 255}`;
 
 export type TestApp = ReturnType<typeof createApp>;
 export const cookieName = 'session_token';
@@ -45,7 +46,9 @@ export async function signup(
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`signup failed: ${res.status} ${await res.text()}`);
-  const json = (await res.json()) as { user: { id: string; username: string; handle: string; homeserver: string } };
+  const json = (await res.json()) as {
+    user: { id: string; username: string; handle: string; homeserver: string };
+  };
   const cookie = parseSetCookie(res)!;
   return {
     user: json.user,
@@ -60,10 +63,11 @@ export async function signup(
         ...init,
         headers: {
           cookie: `${cookieName}=${cookie}`,
-          ...(init.body && typeof init.body === 'string' ? { 'content-type': 'application/json' } : {}),
+          ...(init.body && typeof init.body === 'string'
+            ? { 'content-type': 'application/json' }
+            : {}),
           ...init.headers,
         },
       }),
   };
 }
-

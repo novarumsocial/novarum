@@ -52,10 +52,17 @@ describe('control', () => {
 });
 
 describe('what a hostile host can make us show', () => {
-  test('a remote author\'s avatar url is never used as the notification icon', async () => {
+  test("a remote author's avatar url is never used as the notification icon", async () => {
     const before = received();
-    const author = { username: 'mallory', displayName: null, homeserver: evil, avatarUrl: 'https://tracker.example/pixel.png' };
-    expect((await sendSigned(await signed(1, 'b', path, push({ author, messageId: 'icon' })))).status).toBe(200);
+    const author = {
+      username: 'mallory',
+      displayName: null,
+      homeserver: evil,
+      avatarUrl: 'https://tracker.example/pixel.png',
+    };
+    expect(
+      (await sendSigned(await signed(1, 'b', path, push({ author, messageId: 'icon' })))).status
+    ).toBe(200);
     await eventually(() => received() === before + 1, { message: 'push delivered' });
     const last = sink.for(device.label).at(-1);
     expect(last.icon).toBeUndefined();
@@ -66,7 +73,9 @@ describe('what a hostile host can make us show', () => {
 describe('forged and mismatched senders', () => {
   test('claiming to be another homeserver while signing with the evil key is 401, and nothing is pushed', async () => {
     const before = received();
-    const res = await sendSigned(await signed(1, 'b', path, push(), { homeserver: anchors.a.homeserver }));
+    const res = await sendSigned(
+      await signed(1, 'b', path, push(), { homeserver: anchors.a.homeserver })
+    );
     expect(res.status).toBe(401);
     await sink.settle();
     expect(received()).toBe(before);
@@ -86,9 +95,18 @@ describe('forged and mismatched senders', () => {
     const owner = await signup('a');
     const { guild } = await createGuild(owner, 'real');
     const { body } = await call(owner, 'POST', `/guilds/${guild.id}/invites`, {});
-    expect((await call(member, 'POST', '/invite/accept', { code: body.invite.code, homeserver: anchors.a.homeserver })).status).toBe(200);
+    expect(
+      (
+        await call(member, 'POST', '/invite/accept', {
+          code: body.invite.code,
+          homeserver: anchors.a.homeserver,
+        })
+      ).status
+    ).toBe(200);
     const before = received();
-    const res = await sendSigned(await signed(1, 'b', path, push({ guildId: guild.id, channelId: 'whatever' })));
+    const res = await sendSigned(
+      await signed(1, 'b', path, push({ guildId: guild.id, channelId: 'whatever' }))
+    );
     expect(res.status).toBe(200);
     await sink.settle();
     expect(received()).toBe(before);
@@ -111,7 +129,9 @@ describe('replay and staleness', () => {
   test('20 parallel copies of one signed push deliver exactly once', async () => {
     const before = received();
     const s = await signed(1, 'b', path, push({ messageId: 'parallel' }));
-    const statuses = (await Promise.all(Array.from({ length: 20 }, () => sendSigned(s)))).map((r) => r.status);
+    const statuses = (await Promise.all(Array.from({ length: 20 }, () => sendSigned(s)))).map(
+      (r) => r.status
+    );
     expect(statuses.filter((code) => code === 200)).toHaveLength(1);
     expect(statuses.filter((code) => code === 401)).toHaveLength(19);
     await sink.settle();
@@ -120,7 +140,11 @@ describe('replay and staleness', () => {
 
   test('a push signed with an old date is 401', async () => {
     const before = received();
-    const res = await sendSigned(await signed(1, 'b', path, push({ messageId: 'old' }), { date: new Date(Date.now() - 3_600_000).toISOString() }));
+    const res = await sendSigned(
+      await signed(1, 'b', path, push({ messageId: 'old' }), {
+        date: new Date(Date.now() - 3_600_000).toISOString(),
+      })
+    );
     expect(res.status).toBe(401);
     await sink.settle();
     expect(received()).toBe(before);
@@ -132,9 +156,18 @@ describe('flooding', () => {
     const statuses: number[] = [];
     for (let batch = 0; batch < 35; batch++) {
       const requests = await Promise.all(
-        Array.from({ length: 20 }, () => signed(2, 'b', path, push({ guildId: 'nope', handles: ['@nobody:' + anchors.b.homeserver] })))
+        Array.from({ length: 20 }, () =>
+          signed(
+            2,
+            'b',
+            path,
+            push({ guildId: 'nope', handles: ['@nobody:' + anchors.b.homeserver] })
+          )
+        )
       );
-      const results = (await Promise.all(requests.map((request) => sendSigned(request)))).map((res) => res.status);
+      const results = (await Promise.all(requests.map((request) => sendSigned(request)))).map(
+        (res) => res.status
+      );
       statuses.push(...results);
     }
     expect(statuses.filter((code) => code === 429).length).toBeGreaterThan(0);
@@ -148,11 +181,24 @@ describe('subscription endpoints', () => {
   test('a public anchor refuses endpoints that point at loopback, link-local or private addresses', async () => {
     const user = await signup('p');
     const keys = { p256dh: 'k', auth: 'a' };
-    for (const endpoint of ['https://127.0.0.1/x', 'https://169.254.169.254/latest', 'https://172.30.0.99/x', 'https://localhost/x', 'http://p.test/x']) {
-      const res = await call(user, 'POST', '/notifications/subscriptions', { kind: 'WEBPUSH', endpoint, keys });
+    for (const endpoint of [
+      'https://127.0.0.1/x',
+      'https://169.254.169.254/latest',
+      'https://172.30.0.99/x',
+      'https://localhost/x',
+      'http://p.test/x',
+    ]) {
+      const res = await call(user, 'POST', '/notifications/subscriptions', {
+        kind: 'WEBPUSH',
+        endpoint,
+        keys,
+      });
       expect(res.status, endpoint).toBe(400);
     }
-    const stored = await withDb('p', (sql) => sql`SELECT 1 FROM push_subscription WHERE "userId" = ${user.user.id}`);
+    const stored = await withDb(
+      'p',
+      (sql) => sql`SELECT 1 FROM push_subscription WHERE "userId" = ${user.user.id}`
+    );
     expect(stored).toHaveLength(0);
   });
 });

@@ -4,7 +4,19 @@ import { createHash, randomUUID } from 'node:crypto';
 import { SQL } from 'bun';
 import { expect } from 'bun:test';
 import { z } from 'zod';
-import { anchors, api, canary, compose, dns, exec, fake, fetchIn, ips, restart, type AnchorName } from './federation';
+import {
+  anchors,
+  api,
+  canary,
+  compose,
+  dns,
+  exec,
+  fake,
+  fetchIn,
+  ips,
+  restart,
+  type AnchorName,
+} from './federation';
 import { freshIp, uniqueName } from './users';
 import { eventually } from './wait';
 
@@ -14,25 +26,56 @@ export type Probe = { status: number; text: string };
 export async function call(
   name: AnchorName,
   path: string,
-  { method = 'GET', headers = {}, json, body }: { method?: string; headers?: Record<string, string>; json?: unknown; body?: string } = {}
+  {
+    method = 'GET',
+    headers = {},
+    json,
+    body,
+  }: { method?: string; headers?: Record<string, string>; json?: unknown; body?: string } = {}
 ): Promise<Probe & { setCookie: string }> {
   const payload = json === undefined ? body : JSON.stringify(json);
   const h = { ...(json === undefined ? {} : { 'content-type': 'application/json' }), ...headers };
   if (name !== 'q') {
     const r = await fetch(api(name) + path, { method, headers: h, body: payload });
-    return { status: r.status, text: await r.text(), setCookie: r.headers.getSetCookie().join(', ') };
+    return {
+      status: r.status,
+      text: await r.text(),
+      setCookie: r.headers.getSetCookie().join(', '),
+    };
   }
-  const r = await fetchIn('q', `http://127.0.0.1${path}`, { method, headers: h, body: payload, timeoutMs: 30_000 });
+  const r = await fetchIn('q', `http://127.0.0.1${path}`, {
+    method,
+    headers: h,
+    body: payload,
+    timeoutMs: 30_000,
+  });
   if (!r.ok) throw new Error(`call(q ${path}): ${r.error}`);
   return { status: r.status, text: r.body, setCookie: r.headers['set-cookie'] ?? '' };
 }
 
 /** runs a script with bun inside a container and returns the last JSON line it printed. HTTP(S)_PROXY is dropped unless `env` sets it */
-export async function bunIn(service: Parameters<typeof exec>[0], script: string, arg: unknown = null, env: Record<string, string | null> = {}) {
+export async function bunIn(
+  service: Parameters<typeof exec>[0],
+  script: string,
+  arg: unknown = null,
+  env: Record<string, string | null> = {}
+) {
   const e = { HTTP_PROXY: null, HTTPS_PROXY: null, ...env };
-  const unset = Object.entries(e).filter(([, v]) => v === null).flatMap(([k]) => ['-u', k]);
-  const set = Object.entries(e).filter(([, v]) => v !== null).map(([k, v]) => `${k}=${v}`);
-  const res = await exec(service, ['env', ...unset, ...set, 'bun', '-e', script, JSON.stringify(arg)]);
+  const unset = Object.entries(e)
+    .filter(([, v]) => v === null)
+    .flatMap(([k]) => ['-u', k]);
+  const set = Object.entries(e)
+    .filter(([, v]) => v !== null)
+    .map(([k, v]) => `${k}=${v}`);
+  const res = await exec(service, [
+    'env',
+    ...unset,
+    ...set,
+    'bun',
+    '-e',
+    script,
+    JSON.stringify(arg),
+  ]);
   try {
     return JSON.parse(res.stdout.trim().split('\n').pop()!) as any;
   } catch {
@@ -40,7 +83,8 @@ export async function bunIn(service: Parameters<typeof exec>[0], script: string,
   }
 }
 
-export const pgFor = (name: AnchorName) => new SQL(`postgresql://novarum:novarum@${ips.postgres}:5432/${anchors[name].db}`);
+export const pgFor = (name: AnchorName) =>
+  new SQL(`postgresql://novarum:novarum@${ips.postgres}:5432/${anchors[name].db}`);
 
 const signupResponse = z.object({ user: z.object({ id: z.string() }) });
 
@@ -59,7 +103,11 @@ export async function makeActor(name: AnchorName) {
     name,
     id,
     username,
-    as: (path: string, init: Parameters<typeof call>[2] = {}) => call(name, path, { ...init, headers: { cookie: `session_token=${cookie}`, ...init.headers } }),
+    as: (path: string, init: Parameters<typeof call>[2] = {}) =>
+      call(name, path, {
+        ...init,
+        headers: { cookie: `session_token=${cookie}`, ...init.headers },
+      }),
   };
 }
 export type Actor = Awaited<ReturnType<typeof makeActor>>;
@@ -76,7 +124,8 @@ export async function seedShadow(pg: SQL, actor: Actor, homeserver: string) {
 }
 
 /** removes the shadow guilds (and, by cascade, their channels and memberships) that `actor` was seeded into */
-export const dropShadows = (pg: SQL, actor: Actor) => pg`delete from guild where "ownerId" = ${actor.id} and id like 'fed:guild:%'`;
+export const dropShadows = (pg: SQL, actor: Actor) =>
+  pg`delete from guild where "ownerId" = ${actor.id} and id like 'fed:guild:%'`;
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('base64');
 
@@ -99,7 +148,11 @@ const wsScript = `
   ws.onerror = () => done(0, 'error');`;
 
 /** opens the unauthenticated bridge WebSocket on an anchor; resolves with the close code (1008 = refused) */
-export async function bridgeSocket(name: AnchorName, homeserver: string, guildId = 'x'): Promise<Probe> {
+export async function bridgeSocket(
+  name: AnchorName,
+  homeserver: string,
+  guildId = 'x'
+): Promise<Probe> {
   const query = new URLSearchParams(garbageFederationHeaders(homeserver));
   const path = `/federation/realtime/guilds/${guildId}?${query}`;
   if (name === 'q') return bunIn('q', wsScript, `ws://127.0.0.1${path}`);
@@ -107,7 +160,10 @@ export async function bridgeSocket(name: AnchorName, homeserver: string, guildId
   return new Promise((resolve) => {
     const ws = new WebSocket(url);
     const timer = setTimeout(() => (ws.close(), resolve({ status: -1, text: 'timeout' })), 20_000);
-    const finish = (status: number, text: string) => (clearTimeout(timer), resolve({ status, text }));
+    const finish = (status: number, text: string) => (
+      clearTimeout(timer),
+      resolve({ status, text })
+    );
     ws.onclose = (e) => finish(e.code, e.reason);
     ws.onerror = () => finish(0, 'error');
   });
@@ -123,10 +179,25 @@ const asciiOnly = (s: string) => /^[\x00-\xff]*$/.test(s);
 export const triggers = {
   /** T1: pre-auth discovery. Skipped (null) for names that cannot be put into an HTTP header */
   T1: async ({ actor }: Ctx, hs: string) =>
-    asciiOnly(hs) ? [await call(actor.name, '/federation/friends/command', { method: 'POST', body: '{}', headers: { ...garbageFederationHeaders(hs, '{}'), 'content-type': 'application/json' } })] : null,
+    asciiOnly(hs)
+      ? [
+          await call(actor.name, '/federation/friends/command', {
+            method: 'POST',
+            body: '{}',
+            headers: { ...garbageFederationHeaders(hs, '{}'), 'content-type': 'application/json' },
+          }),
+        ]
+      : null,
   T2: async ({ actor }: Ctx, hs: string) => [await bridgeSocket(actor.name, hs)],
-  T3: async ({ actor }: Ctx, hs: string) => [await actor.as('/friends/request', { method: 'POST', json: { username: 'alice', homeserver: hs } })],
-  T4: async ({ actor }: Ctx, hs: string) => [await actor.as('/invite/accept', { method: 'POST', json: { code: 'code1', homeserver: hs } })],
+  T3: async ({ actor }: Ctx, hs: string) => [
+    await actor.as('/friends/request', {
+      method: 'POST',
+      json: { username: 'alice', homeserver: hs },
+    }),
+  ],
+  T4: async ({ actor }: Ctx, hs: string) => [
+    await actor.as('/invite/accept', { method: 'POST', json: { code: 'code1', homeserver: hs } }),
+  ],
   T5: async ({ actor, pg }: Ctx, hs: string) => {
     await seedShadow(pg, actor, hs);
     return [await actor.as('/guilds/list')];
@@ -134,7 +205,10 @@ export const triggers = {
   T6: async ({ actor, pg }: Ctx, hs: string) => {
     const { channelId: c } = await seedShadow(pg, actor, hs);
     return [
-      await actor.as('/message/send', { method: 'POST', json: { channelId: c, content: 'hi', nonce: randomUUID() } }),
+      await actor.as('/message/send', {
+        method: 'POST',
+        json: { channelId: c, content: 'hi', nonce: randomUUID() },
+      }),
       await actor.as(`/channel/${encodeURIComponent(c)}/typing`, { method: 'POST' }),
       await actor.as(`/channel/${encodeURIComponent(c)}/call/token`),
       await actor.as(`/channel/${encodeURIComponent(c)}/users`),
@@ -145,10 +219,21 @@ export type TriggerName = keyof typeof triggers;
 export const triggerNames = Object.keys(triggers) as TriggerName[];
 
 /** the clean-failure statuses of each trigger when the target is refused */
-export const refusedStatus: Record<TriggerName, number> = { T1: 400, T2: 1008, T3: 502, T4: 502, T5: 200, T6: 502 };
+export const refusedStatus: Record<TriggerName, number> = {
+  T1: 400,
+  T2: 1008,
+  T3: 502,
+  T4: 502,
+  T5: 200,
+  T6: 502,
+};
 
 /** runs the given triggers (default all) against one target and returns `{T1: [...], ...}` */
-export async function runTriggers(ctx: Ctx, hs: string, names: readonly TriggerName[] = triggerNames) {
+export async function runTriggers(
+  ctx: Ctx,
+  hs: string,
+  names: readonly TriggerName[] = triggerNames
+) {
   const out: Partial<Record<TriggerName, Probe[]>> = {};
   for (const n of names) {
     const r = await triggers[n](ctx, hs);
@@ -162,20 +247,29 @@ export function statuses(results: Partial<Record<TriggerName, Probe[]>>) {
   return Object.fromEntries(Object.entries(results).map(([k, v]) => [k, v!.map((p) => p.status)]));
 }
 export function expectedStatuses(results: Partial<Record<TriggerName, Probe[]>>) {
-  return Object.fromEntries(Object.entries(results).map(([k, v]) => [k, v!.map(() => refusedStatus[k as TriggerName])]));
+  return Object.fromEntries(
+    Object.entries(results).map(([k, v]) => [k, v!.map(() => refusedStatus[k as TriggerName])])
+  );
 }
 
 /** service log lines written since `since` */
 export async function logsSince(service: Parameters<typeof exec>[0], since: Date) {
   const serviceName = service in anchors ? anchors[service as AnchorName].service : service;
-  const { stdout, stderr } = await compose(['logs', '--no-color', '--no-log-prefix', '--since', since.toISOString(), serviceName], { allowFail: true });
+  const { stdout, stderr } = await compose(
+    ['logs', '--no-color', '--no-log-prefix', '--since', since.toISOString(), serviceName],
+    { allowFail: true }
+  );
   return stdout + stderr;
 }
 
 /** publishes `evil.test` as a well-formed public homeserver (discovery says homeserver=evil.test, baseUrl=https://evil.test unless overridden) */
 export const publicDiscovery = (discovery: Record<string, unknown> = {}, identity: 1 | 2 = 1) =>
   fake.respond(identity, '/.well-known/anchor/info', {
-    discovery: { homeserver: identity === 1 ? 'evil.test' : 'evil2.test', baseUrl: identity === 1 ? 'https://evil.test' : 'https://evil2.test', ...discovery },
+    discovery: {
+      homeserver: identity === 1 ? 'evil.test' : 'evil2.test',
+      baseUrl: identity === 1 ? 'https://evil.test' : 'https://evil2.test',
+      ...discovery,
+    },
   });
 
 /**
@@ -184,7 +278,15 @@ export const publicDiscovery = (discovery: Record<string, unknown> = {}, identit
  */
 export async function strayTraffic(ignore?: RegExp) {
   const [hits, f1, f2] = await Promise.all([canary.allHits(), fake.requests(1), fake.requests(2)]);
-  const seen = (rs: typeof f1) => rs.filter((r) => !r.path.startsWith('/federation/friends/sync') && !ignore?.test(r.path) && !r.host.startsWith('172.30.')).map((r) => `${r.method} ${r.host}${r.path}`);
+  const seen = (rs: typeof f1) =>
+    rs
+      .filter(
+        (r) =>
+          !r.path.startsWith('/federation/friends/sync') &&
+          !ignore?.test(r.path) &&
+          !r.host.startsWith('172.30.')
+      )
+      .map((r) => `${r.method} ${r.host}${r.path}`);
   return { canary: hits, fake1: seen(f1), fake2: seen(f2) };
 }
 export const noStray = { canary: [], fake1: [], fake2: [] };
@@ -199,15 +301,34 @@ export const clean = async () => {
  * the fakes, and (with `reason`) the anchor's log names why. The log line is written by the first trigger that reaches
  * discovery; later ones hit the 30s failure cache, so the reason is only checked once.
  */
-export async function expectRefused(ctx: Ctx, hs: string, { reason, logHost = hs, names, ignoreFake }: { reason?: string | RegExp; logHost?: string; names?: readonly TriggerName[]; ignoreFake?: RegExp } = {}) {
+export async function expectRefused(
+  ctx: Ctx,
+  hs: string,
+  {
+    reason,
+    logHost = hs,
+    names,
+    ignoreFake,
+  }: {
+    reason?: string | RegExp;
+    logHost?: string;
+    names?: readonly TriggerName[];
+    ignoreFake?: RegExp;
+  } = {}
+) {
   const since = new Date();
   const results = await runTriggers(ctx, hs, names);
   expect(statuses(results)).toEqual(expectedStatuses(results));
   expect(await strayTraffic(ignoreFake)).toEqual(noStray);
   if (reason) {
     const prefix = `https://${logHost}/.well-known/anchor/info: `;
-    const matches = (l: string) => l.includes(prefix) && (typeof reason === 'string' ? l.includes(prefix + reason) : reason.test(l));
-    await eventually(async () => (await logsSince(ctx.actor.name, since)).split('\n').some(matches), { timeout: 10_000, message: `log line "${prefix}${reason}"` });
+    const matches = (l: string) =>
+      l.includes(prefix) &&
+      (typeof reason === 'string' ? l.includes(prefix + reason) : reason.test(l));
+    await eventually(
+      async () => (await logsSince(ctx.actor.name, since)).split('\n').some(matches),
+      { timeout: 10_000, message: `log line "${prefix}${reason}"` }
+    );
   }
   return results;
 }
@@ -215,7 +336,11 @@ export async function expectRefused(ctx: Ctx, hs: string, { reason, logHost = hs
 /** restarts an anchor (empty discovery cache, no bridge timers) and waits until its canary sidecar answers again, then resets the harness */
 export async function freshAnchor(name: AnchorName) {
   await restart(name);
-  if (name === 'p' || name === 'a') await eventually(() => canary.hits(name).then(() => true), { timeout: 20_000, message: `canary-${name} up` });
+  if (name === 'p' || name === 'a')
+    await eventually(() => canary.hits(name).then(() => true), {
+      timeout: 20_000,
+      message: `canary-${name} up`,
+    });
   await clean();
 }
 

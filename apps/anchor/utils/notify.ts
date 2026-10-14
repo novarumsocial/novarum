@@ -67,7 +67,9 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
     : `/guilds/dms/${encodeURIComponent(payload.channelId)}`;
 
   for (const userId of new Set(userIds)) {
-    const userSubscriptions = subscriptions.filter((subscription) => subscription.userId === userId);
+    const userSubscriptions = subscriptions.filter(
+      (subscription) => subscription.userId === userId
+    );
     if (!userSubscriptions.length || isUserActive(userId)) continue;
 
     const preference = preferences.find((item) => item.userId === userId);
@@ -93,7 +95,10 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
             : 'Sent you a message',
       // a remote author's avatar lives on a server we don't control, and showing it would tell that
       // server when and where this user got the notification
-      icon: payload.author.homeserver.toLowerCase() === localHomeserver ? (payload.author.avatarUrl ?? undefined) : undefined,
+      icon:
+        payload.author.homeserver.toLowerCase() === localHomeserver
+          ? (payload.author.avatarUrl ?? undefined)
+          : undefined,
       tag: payload.channelId,
       url,
       channelId: payload.channelId,
@@ -104,10 +109,7 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
   }
 }
 
-async function sendPush(
-  subscription: typeof pushSubscriptions.$inferSelect,
-  message: string
-) {
+async function sendPush(subscription: typeof pushSubscriptions.$inferSelect, message: string) {
   try {
     const vapid = await getVapidKeys();
     const request = webpush.generateRequestDetails(

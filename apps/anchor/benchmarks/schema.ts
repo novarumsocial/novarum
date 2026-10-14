@@ -21,4 +21,5 @@ export const benchResultSchema = z.object({
 });
 export type BenchResult = z.infer<typeof benchResultSchema>;
 
-export const readResult = async (path: string) => benchResultSchema.parse(await Bun.file(path).json());
+export const readResult = async (path: string) =>
+  benchResultSchema.parse(await Bun.file(path).json());

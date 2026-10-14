@@ -84,7 +84,7 @@
     <span
       class={cn(
         'absolute -right-1 -bottom-1 size-3.5 border-[3px] border-background group-hover:border-card',
-        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-muted-foreground/60'
+        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-neutral-500'
       )}
       class:rounded-full={settings.value.circleIcons}
     ></span>
@@ -92,8 +92,8 @@
   <div class="min-w-0 flex-1 leading-tight select-none">
     <p class="truncate text-sm font-semibold">
       {name}
-      <span class="ml-1 hidden text-xs font-normal text-muted-foreground group-hover:inline"
-        >{handleFor(entry)}</span
+      <span class="ml-1 hidden text-[10px] font-normal text-muted-foreground group-hover:inline"
+        >({entry.user.homeserver})</span
       >
     </p>
     <p class="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
@@ -145,7 +145,9 @@
         <span class="hidden sm:inline">Friends</span>
       </div>
       <div class="h-6 w-px shrink-0 bg-border"></div>
-      <Tabs.List class="h-auto min-w-0 justify-start gap-2 overflow-x-auto overflow-y-hidden bg-transparent p-0 [scrollbar-width:none]">
+      <Tabs.List
+        class="h-auto min-w-0 justify-start gap-2 overflow-x-auto overflow-y-hidden bg-transparent p-0 [scrollbar-width:none]"
+      >
         {#each [{ value: 'online', label: 'Online' }, { value: 'all', label: 'All' }, { value: 'pending', label: 'Pending' }] as item (item.value)}
           <Tabs.Trigger
             value={item.value}

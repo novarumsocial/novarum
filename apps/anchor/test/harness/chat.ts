@@ -7,7 +7,10 @@ export const anonymous = (url: string): Actor => ({
   fetch: (path, init = {}) =>
     fetch(`${url}${path}`, {
       ...init,
-      headers: { ...(typeof init.body === 'string' ? { 'content-type': 'application/json' } : {}), ...init.headers },
+      headers: {
+        ...(typeof init.body === 'string' ? { 'content-type': 'application/json' } : {}),
+        ...init.headers,
+      },
     }),
 });
 
@@ -44,7 +47,10 @@ export async function createGuild(owner: TestUser, name = 'guild') {
 
 /** owner creates an invite, `user` accepts it; returns the invite code */
 export async function join(owner: TestUser, guildId: string, user: TestUser) {
-  const { invite } = ok(await call(owner, 'POST', `/guilds/${guildId}/invites`, {}), 'invite create');
+  const { invite } = ok(
+    await call(owner, 'POST', `/guilds/${guildId}/invites`, {}),
+    'invite create'
+  );
   ok(await call(user, 'POST', '/invite/accept', { code: invite.code }), 'invite accept');
   return invite.code as string;
 }
@@ -52,10 +58,19 @@ export async function join(owner: TestUser, guildId: string, user: TestUser) {
 let nonceCounter = 0;
 export const nonce = () => `n${Date.now().toString(36)}${nonceCounter++}`;
 
-export async function send(user: TestUser, channelId: string, content: string | null, extra: object = {}) {
+export async function send(
+  user: TestUser,
+  channelId: string,
+  content: string | null,
+  extra: object = {}
+) {
   return call(user, 'POST', '/message/send', { channelId, content, nonce: nonce(), ...extra });
 }
 
 export async function list(user: TestUser, channelId: string, cursor = 0, amount = 50) {
-  return call(user, 'GET', `/message/list?channelId=${channelId}&cursor=${cursor}&amount=${amount}`);
+  return call(
+    user,
+    'GET',
+    `/message/list?channelId=${channelId}&cursor=${cursor}&amount=${amount}`
+  );
 }

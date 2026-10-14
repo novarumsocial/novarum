@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { anchors, resetHarness, signup, stackIsUp } from '../harness/federation';
 import { call, createGuild, send } from '../harness/chat';
-import { closePg, fedChannelId, fedGuildId, idOf, makeFriends, signerFor } from '../harness/fedflows';
+import {
+  closePg,
+  fedChannelId,
+  fedGuildId,
+  idOf,
+  makeFriends,
+  signerFor,
+} from '../harness/fedflows';
 import { startPushSink } from '../harness/push';
 import { eventually } from '../harness/wait';
 
@@ -26,19 +33,34 @@ async function threeWayGuild() {
   const { body } = await call(owner, 'POST', `/guilds/${guild.id}/invites`, {});
   const [b, c] = [await signup('b'), await signup('c')];
   for (const u of [b, c]) {
-    expect((await call(u, 'POST', '/invite/accept', { code: body.invite.code, homeserver: hostA })).status).toBe(200);
+    expect(
+      (await call(u, 'POST', '/invite/accept', { code: body.invite.code, homeserver: hostA }))
+        .status
+    ).toBe(200);
   }
   const devices = { b: await sink.subscribe(b), c: await sink.subscribe(c) };
-  return { owner, b, c, guild, channel, devices, fedGuild: fedGuildId(hostA, guild.id), fedChannel: fedChannelId(hostA, channel.id) };
+  return {
+    owner,
+    b,
+    c,
+    guild,
+    channel,
+    devices,
+    fedGuild: fedGuildId(hostA, guild.id),
+    fedChannel: fedChannelId(hostA, channel.id),
+  };
 }
 
 describe('mentions in a guild hosted elsewhere', () => {
-  test('push arrives on the mentioned user\'s own homeserver, with fed: ids in the deep link', async () => {
+  test("push arrives on the mentioned user's own homeserver, with fed: ids in the deep link", async () => {
     const { owner, b, devices, fedGuild, fedChannel, channel } = await threeWayGuild();
     const sent = await send(owner, channel.id, `hello ${b.user.handle}`);
     expect(sent.status).toBe(200);
 
-    const [push] = await eventually(() => (sink.for(devices.b.label).length ? sink.for(devices.b.label) : null), { timeout: 15_000, message: 'push on B' });
+    const [push] = await eventually(
+      () => (sink.for(devices.b.label).length ? sink.for(devices.b.label) : null),
+      { timeout: 15_000, message: 'push on B' }
+    );
     expect(push).toMatchObject({
       body: `hello ${b.user.handle}`,
       tag: fedChannel,
@@ -51,7 +73,10 @@ describe('mentions in a guild hosted elsewhere', () => {
   test('one message mentioning users on two homeservers pushes each of them exactly once', async () => {
     const { owner, b, c, devices, channel } = await threeWayGuild();
     await send(owner, channel.id, `${b.user.handle} and ${c.user.handle}`);
-    await eventually(() => sink.for(devices.b.label).length && sink.for(devices.c.label).length, { timeout: 15_000, message: 'push on B and C' });
+    await eventually(() => sink.for(devices.b.label).length && sink.for(devices.c.label).length, {
+      timeout: 15_000,
+      message: 'push on B and C',
+    });
     await sink.settle();
     expect(sink.for(devices.b.label)).toHaveLength(1);
     expect(sink.for(devices.c.label)).toHaveLength(1);
@@ -60,14 +85,23 @@ describe('mentions in a guild hosted elsewhere', () => {
   test('a mention written by a member on a third homeserver reaches the other member', async () => {
     const { b, c, devices, fedChannel } = await threeWayGuild();
     expect((await send(c, fedChannel, `over to you ${b.user.handle}`)).status).toBe(200);
-    await eventually(() => sink.for(devices.b.label).length === 1, { timeout: 15_000, message: 'push on B' });
+    await eventually(() => sink.for(devices.b.label).length === 1, {
+      timeout: 15_000,
+      message: 'push on B',
+    });
     await sink.settle();
     expect(sink.for(devices.c.label)).toHaveLength(0);
   });
 
   test('a muted remote guild produces nothing', async () => {
     const { owner, b, devices, fedGuild, channel } = await threeWayGuild();
-    expect((await call(b, 'PUT', `/notifications/settings/${encodeURIComponent(fedGuild)}`, { level: 'NONE' })).status).toBe(200);
+    expect(
+      (
+        await call(b, 'PUT', `/notifications/settings/${encodeURIComponent(fedGuild)}`, {
+          level: 'NONE',
+        })
+      ).status
+    ).toBe(200);
     await send(owner, channel.id, `ping ${b.user.handle}`);
     await sink.settle();
     expect(sink.for(devices.b.label)).toHaveLength(0);
@@ -76,8 +110,15 @@ describe('mentions in a guild hosted elsewhere', () => {
   test('an edit that adds a mention in the remote guild pushes', async () => {
     const { owner, b, devices, channel } = await threeWayGuild();
     const sent = await send(owner, channel.id, 'hello');
-    await call(owner, 'POST', '/message/edit', { channelId: channel.id, messageId: sent.body.message.id, content: `hello ${b.user.handle}` });
-    await eventually(() => sink.for(devices.b.label).length === 1, { timeout: 15_000, message: 'edit push' });
+    await call(owner, 'POST', '/message/edit', {
+      channelId: channel.id,
+      messageId: sent.body.message.id,
+      content: `hello ${b.user.handle}`,
+    });
+    await eventually(() => sink.for(devices.b.label).length === 1, {
+      timeout: 15_000,
+      message: 'edit push',
+    });
   });
 });
 
@@ -89,15 +130,27 @@ describe('DMs between homeservers', () => {
     const devices = { a: await sink.subscribe(a), b: await sink.subscribe(b) };
     const dmOnA = (await call(a, 'POST', '/dm', { userId: await idOf(a, b) })).body.id as string;
     const dmOnB = fedChannelId(hostA, dmOnA);
-    await eventually(async () => ((await call(b, 'GET', `/dm/homeserver/${hostA}`)).body.dms ?? []).some((dm: any) => dm.id === dmOnB), { message: 'DM on B' });
+    await eventually(
+      async () =>
+        ((await call(b, 'GET', `/dm/homeserver/${hostA}`)).body.dms ?? []).some(
+          (dm: any) => dm.id === dmOnB
+        ),
+      { message: 'DM on B' }
+    );
     // listing the DMs on B brings its realtime bridge up, which must not add a second notification
     await call(b, 'GET', '/dm');
     await Bun.sleep(1500);
 
     expect((await send(a, dmOnA, 'hi from a')).status).toBe(200);
-    await eventually(() => sink.for(devices.b.label).length >= 1, { timeout: 15_000, message: 'push on B' });
+    await eventually(() => sink.for(devices.b.label).length >= 1, {
+      timeout: 15_000,
+      message: 'push on B',
+    });
     expect((await send(b, dmOnB, 'hi from b')).status).toBe(200);
-    await eventually(() => sink.for(devices.a.label).length >= 1, { timeout: 15_000, message: 'push on A' });
+    await eventually(() => sink.for(devices.a.label).length >= 1, {
+      timeout: 15_000,
+      message: 'push on A',
+    });
     await sink.settle();
 
     expect(sink.for(devices.b.label).map((m) => m.body)).toEqual(['hi from a']);
@@ -117,10 +170,15 @@ describe('POST /federation/push', () => {
     ...over,
   });
 
-  test('a homeserver can only push for its own guilds: C naming A\'s guild reaches nobody', async () => {
+  test("a homeserver can only push for its own guilds: C naming A's guild reaches nobody", async () => {
     const { b, devices, guild } = await threeWayGuild();
     const fromC = await signerFor('c');
-    const res = await fromC.send('b', 'POST', '/federation/push', body({ guildId: guild.id, channelId: 'x', handles: [b.user.handle] }));
+    const res = await fromC.send(
+      'b',
+      'POST',
+      '/federation/push',
+      body({ guildId: guild.id, channelId: 'x', handles: [b.user.handle] })
+    );
     expect(res.status).toBe(200);
     await sink.settle();
     expect(sink.for(devices.b.label)).toHaveLength(0);
@@ -131,13 +189,27 @@ describe('POST /federation/push', () => {
     const outsider = await signup('b');
     const outsiderDevice = await sink.subscribe(outsider);
     const fromA = await signerFor('a');
-    const res = await fromA.send('b', 'POST', '/federation/push', body({
-      guildId: guild.id,
-      channelId: channel.id,
-      handles: [outsider.user.handle, c.user.handle, '@ghost:' + anchors.b.homeserver, 'not a handle', b.user.handle],
-    }));
+    const res = await fromA.send(
+      'b',
+      'POST',
+      '/federation/push',
+      body({
+        guildId: guild.id,
+        channelId: channel.id,
+        handles: [
+          outsider.user.handle,
+          c.user.handle,
+          '@ghost:' + anchors.b.homeserver,
+          'not a handle',
+          b.user.handle,
+        ],
+      })
+    );
     expect(res.status).toBe(200);
-    await eventually(() => sink.for(devices.b.label).length === 1, { timeout: 15_000, message: 'member push' });
+    await eventually(() => sink.for(devices.b.label).length === 1, {
+      timeout: 15_000,
+      message: 'member push',
+    });
     await sink.settle();
     expect(sink.for(outsiderDevice.label)).toHaveLength(0);
     expect(sink.for(devices.c.label)).toHaveLength(0);
@@ -146,22 +218,36 @@ describe('POST /federation/push', () => {
   test('the snippet is capped and treated as text', async () => {
     const { b, devices, guild, channel } = await threeWayGuild();
     const fromA = await signerFor('a');
-    await fromA.send('b', 'POST', '/federation/push', body({
-      guildId: guild.id,
-      channelId: channel.id,
-      snippet: '<img src=x onerror=alert(1)>' + 'a'.repeat(1000),
-      handles: [b.user.handle],
-    }));
-    const [push] = await eventually(() => (sink.for(devices.b.label).length ? sink.for(devices.b.label) : null), { timeout: 15_000, message: 'push' });
+    await fromA.send(
+      'b',
+      'POST',
+      '/federation/push',
+      body({
+        guildId: guild.id,
+        channelId: channel.id,
+        snippet: '<img src=x onerror=alert(1)>' + 'a'.repeat(1000),
+        handles: [b.user.handle],
+      })
+    );
+    const [push] = await eventually(
+      () => (sink.for(devices.b.label).length ? sink.for(devices.b.label) : null),
+      { timeout: 15_000, message: 'push' }
+    );
     expect(push.body.length).toBeLessThanOrEqual(200);
     expect(push.body.startsWith('<img')).toBe(true);
   });
 
   test('unsigned, malformed and replayed requests are rejected', async () => {
     const fromA = await signerFor('a');
-    const unsigned = await fetch(`${anchors.b.url}/federation/push`, { method: 'POST', body: JSON.stringify(body({ handles: ['@x:y'] })), headers: { 'content-type': 'application/json' } });
+    const unsigned = await fetch(`${anchors.b.url}/federation/push`, {
+      method: 'POST',
+      body: JSON.stringify(body({ handles: ['@x:y'] })),
+      headers: { 'content-type': 'application/json' },
+    });
     expect([400, 401]).toContain(unsigned.status);
     expect((await fromA.send('b', 'POST', '/federation/push', { nope: true })).status).toBe(400);
-    expect((await fromA.send('b', 'POST', '/federation/push', body({ handles: [] }))).status).toBe(400);
+    expect((await fromA.send('b', 'POST', '/federation/push', body({ handles: [] }))).status).toBe(
+      400
+    );
   });
 });

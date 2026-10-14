@@ -20,20 +20,20 @@ timeout to 60 s (restarts, 10 s federation timeouts).
 
 ## Topology
 
-| Service | Address | Notes |
-| --- | --- | --- |
-| `anchor-a` / `-b` / `-c` | 172.30.0.11 / .12 / .13 (fed) | `homeserver` = the IP, `base_url` `http://<ip>`, port 80. Anchor-a also has 169.254.169.11 on `meta` and is the only one with `s3_disable_cors = false` |
-| `anchor-p` | 203.0.113.10 (pub) + 172.30.0.20 (fed) + 169.254.169.20 (meta) | `p.test`, `https://p.test`, public mode; trusts the CA (`NODE_EXTRA_CA_CERTS`); resolver `dns` |
-| `anchor-q` | 172.31.0.10 (egress, `internal: true`) | `q.test`, public mode, all outbound through `proxy`; trusts the CA. **Not reachable from the host**: use `fetchIn('q', ...)` |
-| `fake` | 172.30.0.66/.67 (http :80), 203.0.113.66/.67 (https :443), admin `172.30.0.66:9000` | identities 1 and 2 (see below) |
-| `dns` | 172.30.0.53 / 203.0.113.53 / 172.31.0.53, admin `:9053` | authoritative `*.test`; UDP + TCP 53 |
-| `proxy` | 203.0.113.80 / 172.31.0.80 / 172.30.0.80, port 3128 | **smokescreen** (Stripe), built from `proxy/Dockerfile`. `--allow-range 203.0.113.0/24` (TEST-NET-3 is otherwise denied), private/loopback/link-local denied. Denies are JSON log lines with `"allow":false` |
-| `b-proxy` | 203.0.113.12 (+ 172.30.0.112) | Caddy 2, `https://b.test` -> `172.30.0.12:80`, cert from the test CA |
-| `canary` | 172.30.0.99, admin `:9999` | listeners `http80`, `tcp443`, `tcp6379`, `http8080` |
-| `canary-meta` | 169.254.169.254 (meta) + 172.30.0.98, admin `172.30.0.98:9999` | listeners `metadata` (:80), `metadata8080`; only anchor-a and anchor-p are on `meta` |
-| `canary-p`, `canary-a` | inside anchor-p / anchor-a's netns (`network_mode: service:`), admin `<anchor ip>:9999` | listeners `loopback8080` (127.0.0.1:8080), `loopback443` (tcp). `restart('p')` also restarts `canary-p` (a netns owner restart orphans it) |
-| `postgres` | 172.30.0.5 (+172.31.0.5), tmpfs | DBs `anchor_a/b/c/p/q`, user/password `novarum` |
-| `garage`, `mailpit` | 172.30.0.6, 172.30.0.7 (+172.31.0.7) | Mailpit API: `mailpitUrl` = `http://172.30.0.7:8025` |
+| Service                  | Address                                                                                 | Notes                                                                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `anchor-a` / `-b` / `-c` | 172.30.0.11 / .12 / .13 (fed)                                                           | `homeserver` = the IP, `base_url` `http://<ip>`, port 80. Anchor-a also has 169.254.169.11 on `meta` and is the only one with `s3_disable_cors = false`                                                      |
+| `anchor-p`               | 203.0.113.10 (pub) + 172.30.0.20 (fed) + 169.254.169.20 (meta)                          | `p.test`, `https://p.test`, public mode; trusts the CA (`NODE_EXTRA_CA_CERTS`); resolver `dns`                                                                                                               |
+| `anchor-q`               | 172.31.0.10 (egress, `internal: true`)                                                  | `q.test`, public mode, all outbound through `proxy`; trusts the CA. **Not reachable from the host**: use `fetchIn('q', ...)`                                                                                 |
+| `fake`                   | 172.30.0.66/.67 (http :80), 203.0.113.66/.67 (https :443), admin `172.30.0.66:9000`     | identities 1 and 2 (see below)                                                                                                                                                                               |
+| `dns`                    | 172.30.0.53 / 203.0.113.53 / 172.31.0.53, admin `:9053`                                 | authoritative `*.test`; UDP + TCP 53                                                                                                                                                                         |
+| `proxy`                  | 203.0.113.80 / 172.31.0.80 / 172.30.0.80, port 3128                                     | **smokescreen** (Stripe), built from `proxy/Dockerfile`. `--allow-range 203.0.113.0/24` (TEST-NET-3 is otherwise denied), private/loopback/link-local denied. Denies are JSON log lines with `"allow":false` |
+| `b-proxy`                | 203.0.113.12 (+ 172.30.0.112)                                                           | Caddy 2, `https://b.test` -> `172.30.0.12:80`, cert from the test CA                                                                                                                                         |
+| `canary`                 | 172.30.0.99, admin `:9999`                                                              | listeners `http80`, `tcp443`, `tcp6379`, `http8080`                                                                                                                                                          |
+| `canary-meta`            | 169.254.169.254 (meta) + 172.30.0.98, admin `172.30.0.98:9999`                          | listeners `metadata` (:80), `metadata8080`; only anchor-a and anchor-p are on `meta`                                                                                                                         |
+| `canary-p`, `canary-a`   | inside anchor-p / anchor-a's netns (`network_mode: service:`), admin `<anchor ip>:9999` | listeners `loopback8080` (127.0.0.1:8080), `loopback443` (tcp). `restart('p')` also restarts `canary-p` (a netns owner restart orphans it)                                                                   |
+| `postgres`               | 172.30.0.5 (+172.31.0.5), tmpfs                                                         | DBs `anchor_a/b/c/p/q`, user/password `novarum`                                                                                                                                                              |
+| `garage`, `mailpit`      | 172.30.0.6, 172.30.0.7 (+172.31.0.7)                                                    | Mailpit API: `mailpitUrl` = `http://172.30.0.7:8025`                                                                                                                                                         |
 
 Default DNS records: `b.test` 203.0.113.12, `p.test` 203.0.113.10, `q.test` 172.31.0.10, `evil.test`/`wrongcert.test`/`selfsigned.test`/`expired.test`
 203.0.113.66, `evil2.test` 203.0.113.67; everything else NXDOMAIN. `fake` serves https for `evil.test`, `evil2.test` (valid), `wrongcert.test`
@@ -50,8 +50,27 @@ Discovery on both sides returns `homeserver: <private ip>`, `baseUrl: http://<pr
 ## Client API (`test/harness/federation.ts`)
 
 ```ts
-import { api, signup, fake, dns, canary, proxy, fetchIn, exec, logs, restart, stop, start, pause, unpause,
-         resetHarness, stackIsUp, anchors, ips, mailpitUrl } from '../harness/federation';
+import {
+  api,
+  signup,
+  fake,
+  dns,
+  canary,
+  proxy,
+  fetchIn,
+  exec,
+  logs,
+  restart,
+  stop,
+  start,
+  pause,
+  unpause,
+  resetHarness,
+  stackIsUp,
+  anchors,
+  ips,
+  mailpitUrl,
+} from '../harness/federation';
 ```
 
 - Addressing: `api('a'|'b'|'c'|'p')` -> base url; `anchors.a.{ip,homeserver,baseUrl,url,db,service}`; `ips.*`. `signup('b', overrides?)` is `users.ts signup(api('b'))`.
@@ -66,7 +85,7 @@ import { api, signup, fake, dns, canary, proxy, fetchIn, exec, logs, restart, st
   Unmatched routes answer 404; `/.well-known/anchor/info` answers a valid document. `fake.clearRoutes(id)`, `fake.reset()` (rules + request logs of both identities; keys untouched).
 - `fake.requests(identity, {path?: prefix, since?: id})` -> `[{id, ts, scheme, method, path, host, headers, body, sourceIp, localIp}]` over http and https; `fake.clearRequests(id)`.
 - `fake.sign({identity, method, path, host, homeserver?, body?, date?, dateOffsetSeconds?, nonce?, bodyHash?, keyId?, key?: 'current'|'previous'|'random', tamper?})` -> `{headers, signingString}`
-  (v1 signing string `v1\nMETHOD\npath\nhost\nhomeserver\ndate\nnonce\nbodyHash`, ed25519; `host` is the host the *recipient* sees; `bodyHash` overrides both header and signed value).
+  (v1 signing string `v1\nMETHOD\npath\nhost\nhomeserver\ndate\nnonce\nbodyHash`, ed25519; `host` is the host the _recipient_ sees; `bodyHash` overrides both header and signed value).
   `fake.send(identity, 'a', 'POST', path, body, signOverrides?)` signs and posts to a real anchor -> `{status, text, headers}`. `fake.rotateKey(id)`, `fake.info(id)`.
 - `dns.set(name, 'ip' | {type:'CNAME',value} | [...], ttl=60)`, `dns.rebind(name, ['1.2.3.4', ['127.0.0.1']], ttl=0)` (each **A** query advances; the last set repeats), `dns.nxdomain/servfail/drop(name)`,
   `dns.slow(name, ms, ips)`, `dns.remove(name)`, `dns.queries(name?)`, `dns.reset()` (defaults back, log cleared). `*.suffix.test` wildcards work.

@@ -23,11 +23,22 @@ test(`both sides request each other at once, ${iterations} times: converge to AC
         const settled = await eventually(
           async () => {
             await Promise.all([friendList(a), friendList(b)]);
-            const [ra, rb] = await Promise.all([relationOn('a', a.user.username, b.user.username), relationOn('b', a.user.username, b.user.username)]);
+            const [ra, rb] = await Promise.all([
+              relationOn('a', a.user.username, b.user.username),
+              relationOn('b', a.user.username, b.user.username),
+            ]);
             if (!ra || !rb || ra.syncPending || rb.syncPending) return null;
-            return ra.status === rb.status && ra.version === rb.version && ra.requestedBy === rb.requestedBy ? ra : null;
+            return ra.status === rb.status &&
+              ra.version === rb.version &&
+              ra.requestedBy === rb.requestedBy
+              ? ra
+              : null;
           },
-          { timeout: 45_000, interval: 500, message: `${a.user.username}<->${b.user.username} converged` }
+          {
+            timeout: 45_000,
+            interval: 500,
+            message: `${a.user.username}<->${b.user.username} converged`,
+          }
         );
         expect(['ACCEPTED', 'PENDING']).toContain(settled.status);
         // the lists agree with the rows

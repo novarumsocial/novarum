@@ -2,9 +2,28 @@
 // safety check with the public address and the next lookup (the one fetch does) with the private one.
 //  - anchor-p resolves in-process, so the request lands on the canary: known gap, written as test.failing.
 //  - anchor-q goes through smokescreen, which resolves again and denies the private answer: the same rows pass.
-import { afterAll, beforeAll, beforeEach, describe, expect, test, setDefaultTimeout } from 'bun:test';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  setDefaultTimeout,
+} from 'bun:test';
 import { canary, dns, proxy, stackIsUp } from '../harness/federation';
-import { call, clean, dropShadows, freshAnchor, garbageFederationHeaders, makeActor, pgFor, publicDiscovery, runTriggers, type Actor } from '../harness/ssrf';
+import {
+  call,
+  clean,
+  dropShadows,
+  freshAnchor,
+  garbageFederationHeaders,
+  makeActor,
+  pgFor,
+  publicDiscovery,
+  runTriggers,
+  type Actor,
+} from '../harness/ssrf';
 import { eventually } from '../harness/wait';
 
 // restarts and 10s federation timeouts do not fit bun's 5s default (the harness's own call only reaches later files)
@@ -14,12 +33,19 @@ const pub = '203.0.113.66';
 const pgs = { p: pgFor('p'), q: pgFor('q') };
 const ctxs = {} as Record<'p' | 'q', { actor: Actor; pg: (typeof pgs)['p'] }>;
 
-const t1 = (name: 'p' | 'q', hs: string) => call(name, '/federation/friends/command', { method: 'POST', body: '{}', headers: { ...garbageFederationHeaders(hs, '{}'), 'content-type': 'application/json' } });
-const deniedFor = async (host: string) => (await proxy.denies()).filter((l) => l.includes(`"requested_host":"${host}:443"`));
+const t1 = (name: 'p' | 'q', hs: string) =>
+  call(name, '/federation/friends/command', {
+    method: 'POST',
+    body: '{}',
+    headers: { ...garbageFederationHeaders(hs, '{}'), 'content-type': 'application/json' },
+  });
+const deniedFor = async (host: string) =>
+  (await proxy.denies()).filter((l) => l.includes(`"requested_host":"${host}:443"`));
 
 beforeAll(async () => {
   await stackIsUp();
-  for (const name of ['p', 'q'] as const) ctxs[name] = { actor: await makeActor(name), pg: pgs[name] };
+  for (const name of ['p', 'q'] as const)
+    ctxs[name] = { actor: await makeActor(name), pg: pgs[name] };
 }, 120_000);
 afterAll(async () => {
   for (const name of ['p', 'q'] as const) {
@@ -53,7 +79,9 @@ describe('E1. discovery: the check sees the public answer, fetch the private one
     await dns.rebind('rb1.test', [pub, '172.30.0.99']);
     expect((await t1('q', 'rb1.test')).status).toBe(400);
     await noCanaryHits();
-    expect(await eventually(() => deniedFor('rb1.test'), { message: 'proxy deny log for rb1.test' })).not.toEqual([]);
+    expect(
+      await eventually(() => deniedFor('rb1.test'), { message: 'proxy deny log for rb1.test' })
+    ).not.toEqual([]);
   });
 });
 
@@ -68,10 +96,13 @@ describe('E2. baseUrl rebinds to a private address inside the 5 minute cache, th
   };
 
   // anchor-q is refused by the same check, so the request never reaches smokescreen
-  test.each(['p', 'q'] as const)('anchor-%s: the check before the signed POST refuses it', async (name) => {
-    expect(await rebindAfterDiscovery(name)).toBe(502);
-    await noCanaryHits();
-  });
+  test.each(['p', 'q'] as const)(
+    'anchor-%s: the check before the signed POST refuses it',
+    async (name) => {
+      expect(await rebindAfterDiscovery(name)).toBe(502);
+      await noCanaryHits();
+    }
+  );
 });
 
 describe('E3. same rebind, then the paths that never re-check the address', () => {
@@ -99,7 +130,9 @@ describe('E3. same rebind, then the paths that never re-check the address', () =
     await warm('q');
     await runTriggers(ctxs.q, 'evil.test', ['T3']);
     await noCanaryHits();
-    expect(await eventually(() => deniedFor('rb3.test'), { message: 'proxy deny log for rb3.test' })).not.toEqual([]);
+    expect(
+      await eventually(() => deniedFor('rb3.test'), { message: 'proxy deny log for rb3.test' })
+    ).not.toEqual([]);
   });
 });
 
@@ -114,6 +147,8 @@ describe('E4. rebind to the anchor itself (127.0.0.1)', () => {
   test('anchor-q: smokescreen denies loopback', async () => {
     await dns.rebind('rb4.test', [pub, '127.0.0.1']);
     await t1('q', 'rb4.test');
-    expect(await eventually(() => deniedFor('rb4.test'), { message: 'proxy deny log for rb4.test' })).not.toEqual([]);
+    expect(
+      await eventually(() => deniedFor('rb4.test'), { message: 'proxy deny log for rb4.test' })
+    ).not.toEqual([]);
   });
 });

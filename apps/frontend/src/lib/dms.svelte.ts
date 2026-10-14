@@ -85,19 +85,22 @@ class DmsState {
     this.pending = this.pending.filter((item) => item !== homeserver);
   }
 
-  async open(userId: string) {
+  // resolves the DM channel with a friend, creating it if needed, without navigating.
+  async ensure(userId: string) {
     const existing = this.withUser(userId);
-    if (existing) {
-      void goto(dmPath(existing.id));
-      return existing.id;
-    }
+    if (existing) return existing.id;
 
     const result = await anchor.client.dm.post({ userId });
     if (result.error || !result.data || 'error' in result.data) return null;
 
     this.upsert(result.data);
-    void goto(dmPath(result.data.id));
     return result.data.id;
+  }
+
+  async open(userId: string) {
+    const channelId = await this.ensure(userId);
+    if (channelId) void goto(dmPath(channelId));
+    return channelId;
   }
 
   async close(channelId: string) {

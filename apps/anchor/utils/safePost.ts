@@ -5,11 +5,7 @@ import { getConfig } from './config';
 import { allowLocalFederationTargets, assertSafeFederationUrl, isPrivateIp } from './discovery';
 
 export function guardedLookup(allowLocal: boolean) {
-  return (
-    hostname: string,
-    options: dns.LookupOptions,
-    callback: (...args: any[]) => void
-  ) =>
+  return (hostname: string, options: dns.LookupOptions, callback: (...args: any[]) => void) =>
     dns.lookup(hostname, options, (error, result, family) => {
       const addresses = Array.isArray(result) ? result.map((item) => item.address) : [result];
       if (!error && !allowLocal && addresses.some((address) => isPrivateIp(address))) {
@@ -19,7 +15,12 @@ export function guardedLookup(allowLocal: boolean) {
     });
 }
 
-export async function safePost(url: string, headers: Record<string, string>, body: Uint8Array<ArrayBuffer>, timeoutMs: number) {
+export async function safePost(
+  url: string,
+  headers: Record<string, string>,
+  body: Uint8Array<ArrayBuffer>,
+  timeoutMs: number
+) {
   const target = new URL(url);
   // literal ips and local names never reach the lookup, so they are refused up front
   await assertSafeFederationUrl(target);

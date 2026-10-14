@@ -28,7 +28,9 @@ const dms = async (user: Actor) => (await call(user, 'GET', '/dm')).body.dms as 
 const dmIds = async (user: Actor) => (await dms(user)).map((d) => d.id);
 const closedFlags = async (channelId: string) =>
   Object.fromEntries(
-    (await sql`SELECT "userId", closed FROM channel_member WHERE "channelId" = ${channelId}`).map((r: any) => [r.userId, r.closed])
+    (await sql`SELECT "userId", closed FROM channel_member WHERE "channelId" = ${channelId}`).map(
+      (r: any) => [r.userId, r.closed]
+    )
   );
 
 describe('open', () => {
@@ -44,7 +46,11 @@ describe('open', () => {
   });
 
   test('no friendship is 403, and so is a pending request in either direction', async () => {
-    const [a, b, c] = await Promise.all([signup(anchor.url), signup(anchor.url), signup(anchor.url)]);
+    const [a, b, c] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
     expect((await open(a, b)).status).toBe(403);
     await a.fetch('/friends/request', {
       method: 'POST',
@@ -53,7 +59,9 @@ describe('open', () => {
     expect((await open(a, b)).status).toBe(403);
     expect((await open(b, a)).status).toBe(403);
     expect((await open(a, c)).status).toBe(403);
-    expect(await sql`SELECT 1 FROM channel WHERE type = 'DM' AND "dmKey" LIKE ${`%${a.user.id}%`}`).toHaveLength(0);
+    expect(
+      await sql`SELECT 1 FROM channel WHERE type = 'DM' AND "dmKey" LIKE ${`%${a.user.id}%`}`
+    ).toHaveLength(0);
   });
 
   test('yourself and unknown users are 404, anonymous is 401, bad body is 422', async () => {
@@ -72,16 +80,27 @@ describe('open', () => {
     expect([again.body.id, reverse.body.id]).toEqual([first.body.id, first.body.id]);
     const rows = await sql`SELECT "dmKey" FROM channel WHERE id = ${first.body.id}`;
     expect(rows[0].dmKey).toBe([a.user.id, b.user.id].sort().join(':'));
-    expect(await sql`SELECT 1 FROM channel_member WHERE "channelId" = ${first.body.id}`).toHaveLength(2);
+    expect(
+      await sql`SELECT 1 FROM channel_member WHERE "channelId" = ${first.body.id}`
+    ).toHaveLength(2);
     expect(await dmIds(a)).toEqual([first.body.id]);
   });
 
   test('concurrent opens from both sides settle on one channel', async () => {
     const { a, b } = await friends();
-    const results = await Promise.all([open(a, b), open(b, a), open(a, b), open(b, a), open(a, b), open(b, a)]);
+    const results = await Promise.all([
+      open(a, b),
+      open(b, a),
+      open(a, b),
+      open(b, a),
+      open(a, b),
+      open(b, a),
+    ]);
     expect(results.map((r) => r.status)).toEqual(Array(6).fill(200));
     expect(new Set(results.map((r) => r.body.id)).size).toBe(1);
-    expect(await sql`SELECT 1 FROM channel WHERE "dmKey" = ${[a.user.id, b.user.id].sort().join(':')}`).toHaveLength(1);
+    expect(
+      await sql`SELECT 1 FROM channel WHERE "dmKey" = ${[a.user.id, b.user.id].sort().join(':')}`
+    ).toHaveLength(1);
   });
 
   test('the other user is told with dm.created the first time, not on re-open', async () => {
@@ -109,9 +128,26 @@ describe('open', () => {
     expect((await list(c, dm.id)).status).toBe(403);
     expect((await send(c, dm.id, 'hi')).status).toBe(403);
     expect((await call(c, 'POST', `/channel/${dm.id}/typing`)).status).toBe(401);
-    expect((await call(c, 'POST', `/channel/${dm.id}/read`, { messageId: msg.id, createdAt: msg.createdAt })).status).toBe(403);
-    expect((await call(c, 'POST', '/message/edit', { channelId: dm.id, messageId: msg.id, content: 'x' })).status).toBe(403);
-    expect((await call(c, 'POST', '/message/delete', { channelId: dm.id, messageId: msg.id })).status).toBe(403);
+    expect(
+      (
+        await call(c, 'POST', `/channel/${dm.id}/read`, {
+          messageId: msg.id,
+          createdAt: msg.createdAt,
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await call(c, 'POST', '/message/edit', {
+          channelId: dm.id,
+          messageId: msg.id,
+          content: 'x',
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (await call(c, 'POST', '/message/delete', { channelId: dm.id, messageId: msg.id })).status
+    ).toBe(403);
   });
 });
 
@@ -136,7 +172,10 @@ describe('messages and unread', () => {
     const msg = (await send(a, dm.id, 'hello')).body.message;
     expect((await dms(a))[0].unread).toBe(false);
     expect((await dms(b))[0].unread).toBe(true);
-    await call(b, 'POST', `/channel/${dm.id}/read`, { messageId: msg.id, createdAt: msg.createdAt });
+    await call(b, 'POST', `/channel/${dm.id}/read`, {
+      messageId: msg.id,
+      createdAt: msg.createdAt,
+    });
     expect((await dms(b))[0].unread).toBe(false);
   });
 });
@@ -213,10 +252,19 @@ describe('after unfriending', () => {
       expect((await call(user, 'POST', `/channel/${dm.id}/typing`)).status).toBe(401);
     }
     // reads: history, DM list, read state
-    expect((await list(a, dm.id)).body.messages.map((m: any) => m.content)).toEqual(['while friends']);
+    expect((await list(a, dm.id)).body.messages.map((m: any) => m.content)).toEqual([
+      'while friends',
+    ]);
     expect((await list(b, dm.id)).status).toBe(200);
     expect(await dmIds(b)).toEqual([dm.id]);
-    expect((await call(b, 'POST', `/channel/${dm.id}/read`, { messageId: msg.id, createdAt: msg.createdAt })).status).toBe(200);
+    expect(
+      (
+        await call(b, 'POST', `/channel/${dm.id}/read`, {
+          messageId: msg.id,
+          createdAt: msg.createdAt,
+        })
+      ).status
+    ).toBe(200);
     // opening a new DM needs friendship again; the stored one is unchanged
     expect((await open(a, b)).status).toBe(403);
     expect((await list(a, dm.id)).body.messages).toHaveLength(1);
@@ -244,10 +292,24 @@ describe('after unfriending', () => {
     const dm = (await open(a, b)).body;
     const msg = (await send(a, dm.id, 'old')).body.message;
     await unfriend(a, b);
-    const edit = await call(a, 'POST', '/message/edit', { channelId: dm.id, messageId: msg.id, content: 'edited' });
+    const edit = await call(a, 'POST', '/message/edit', {
+      channelId: dm.id,
+      messageId: msg.id,
+      content: 'edited',
+    });
     expect(edit.status).toBe(200);
-    expect((await call(b, 'POST', '/message/edit', { channelId: dm.id, messageId: msg.id, content: 'x' })).status).toBe(403);
-    expect((await call(a, 'POST', '/message/delete', { channelId: dm.id, messageId: msg.id })).status).toBe(200);
+    expect(
+      (
+        await call(b, 'POST', '/message/edit', {
+          channelId: dm.id,
+          messageId: msg.id,
+          content: 'x',
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (await call(a, 'POST', '/message/delete', { channelId: dm.id, messageId: msg.id })).status
+    ).toBe(200);
   });
 });
 

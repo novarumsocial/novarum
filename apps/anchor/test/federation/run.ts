@@ -31,22 +31,43 @@ if (sub === 'down') {
 const isSoak = (f: string) => f.endsWith('.soak.test.ts');
 const isNightly = (f: string) => f.endsWith('.nightly.test.ts');
 const files = [...new Glob('test/federation/**/*.test.ts').scanSync({ cwd: anchorRoot })]
-  .filter((f) => (env.FED_SUITE === 'soak' ? isSoak(f) : env.FED_SUITE === 'smoke' ? !isSoak(f) && !isNightly(f) : !isSoak(f)))
+  .filter((f) =>
+    env.FED_SUITE === 'soak'
+      ? isSoak(f)
+      : env.FED_SUITE === 'smoke'
+        ? !isSoak(f) && !isNightly(f)
+        : !isSoak(f)
+  )
   .sort();
 const extra = process.argv.slice(sub === '--' ? 3 : 2);
 
-const sh = async (cmd: string[], cwd = anchorRoot) => (await Bun.spawn(cmd, { cwd, stdio: ['inherit', 'inherit', 'inherit'] }).exited);
+const sh = async (cmd: string[], cwd = anchorRoot) =>
+  await Bun.spawn(cmd, { cwd, stdio: ['inherit', 'inherit', 'inherit'] }).exited;
 
 async function saveArtifacts() {
   const dir = path.join(federationDir, 'artifacts');
   mkdirSync(dir, { recursive: true });
   for (const s of ['a', 'b', 'c', 'p', 'q'] as const) {
-    const res = await compose(['logs', '--no-color', '--no-log-prefix', anchors[s].service], { allowFail: true });
+    const res = await compose(['logs', '--no-color', '--no-log-prefix', anchors[s].service], {
+      allowFail: true,
+    });
     writeFileSync(path.join(dir, `${anchors[s].service}.log`), res.stdout + res.stderr);
-    const dump = await compose(['exec', '-T', 'postgres', 'pg_dump', '-U', 'novarum', anchors[s].db], { allowFail: true });
+    const dump = await compose(
+      ['exec', '-T', 'postgres', 'pg_dump', '-U', 'novarum', anchors[s].db],
+      { allowFail: true }
+    );
     writeFileSync(path.join(dir, `${anchors[s].db}.sql`), dump.stdout);
   }
-  for (const s of ['fake', 'dns', 'canary', 'canary-a', 'canary-p', 'canary-meta', 'proxy', 'b-proxy']) {
+  for (const s of [
+    'fake',
+    'dns',
+    'canary',
+    'canary-a',
+    'canary-p',
+    'canary-meta',
+    'proxy',
+    'b-proxy',
+  ]) {
     const res = await compose(['logs', '--no-color', '--no-log-prefix', s], { allowFail: true });
     writeFileSync(path.join(dir, `${s}.log`), res.stdout + res.stderr);
   }
@@ -58,7 +79,24 @@ try {
   if (!env.FED_SKIP_UP) {
     if (env.FED_BUILD_CACHE === 'gha') {
       // best effort: seed the local image from the GitHub Actions layer cache, then compose's --build is a cache hit
-      await sh(['docker', 'buildx', 'build', '-f', 'apps/anchor/Dockerfile', '-t', 'anchor-test:local', '--cache-from', 'type=gha', '--cache-to', 'type=gha,mode=max', '--load', '.'], path.resolve(anchorRoot, '../..'));
+      await sh(
+        [
+          'docker',
+          'buildx',
+          'build',
+          '-f',
+          'apps/anchor/Dockerfile',
+          '-t',
+          'anchor-test:local',
+          '--cache-from',
+          'type=gha',
+          '--cache-to',
+          'type=gha,mode=max',
+          '--load',
+          '.',
+        ],
+        path.resolve(anchorRoot, '../..')
+      );
     }
     await startStack();
   }
@@ -74,7 +112,10 @@ try {
   console.error(error);
   await saveArtifacts().catch(() => null);
 } finally {
-  if (env.FED_KEEP) console.log('[fed] FED_KEEP=1: stack left running (`bun test/federation/run.ts down` to remove it)');
+  if (env.FED_KEEP)
+    console.log(
+      '[fed] FED_KEEP=1: stack left running (`bun test/federation/run.ts down` to remove it)'
+    );
   else await stopStack();
 }
 process.exit(code);

@@ -26,7 +26,14 @@ describe('create', () => {
     expect(guilds).toHaveLength(1);
     expect(guilds[0]).toMatchObject({ id: guild.id, canManageChannels: true });
     expect(guilds[0].channels).toEqual([
-      expect.objectContaining({ id: channel.id, name: 'general', type: 'TEXT', position: 0, unread: false, mention: 0 }),
+      expect.objectContaining({
+        id: channel.id,
+        name: 'general',
+        type: 'TEXT',
+        position: 0,
+        unread: false,
+        mention: 0,
+      }),
     ]);
   });
 
@@ -50,7 +57,9 @@ describe('create', () => {
 
   test('accepts a 100 char name', async () => {
     const owner = await signup(anchor.url);
-    expect((await call(owner, 'POST', '/guilds/create', { name: 'x'.repeat(100) })).status).toBe(200);
+    expect((await call(owner, 'POST', '/guilds/create', { name: 'x'.repeat(100) })).status).toBe(
+      200
+    );
   });
 });
 
@@ -75,9 +84,15 @@ describe('list and order', () => {
 
   test('PATCH /guilds/order reorders the caller list and persists it', async () => {
     const user = await signup(anchor.url);
-    const ids = [(await createGuild(user)).guild.id, (await createGuild(user)).guild.id, (await createGuild(user)).guild.id];
+    const ids = [
+      (await createGuild(user)).guild.id,
+      (await createGuild(user)).guild.id,
+      (await createGuild(user)).guild.id,
+    ];
     const wanted = [ids[1]!, ids[0]!, ids[2]!];
-    expect((await call(user, 'PATCH', '/guilds/order', { guildIds: wanted })).body).toEqual({ success: true });
+    expect((await call(user, 'PATCH', '/guilds/order', { guildIds: wanted })).body).toEqual({
+      success: true,
+    });
     expect(await guildIds(user)).toEqual(wanted);
   });
 
@@ -99,7 +114,16 @@ describe('list and order', () => {
     const a = (await createGuild(user)).guild.id;
     const b = (await createGuild(user)).guild.id;
     const foreign = (await createGuild(stranger)).guild.id;
-    for (const guildIds of [[], [a], [a, a], [a, b, b], [a, b, a], [a, foreign], [a, b, foreign], [a, b, 'nope']]) {
+    for (const guildIds of [
+      [],
+      [a],
+      [a, a],
+      [a, b, b],
+      [a, b, a],
+      [a, foreign],
+      [a, b, foreign],
+      [a, b, 'nope'],
+    ]) {
       expect((await call(user, 'PATCH', '/guilds/order', { guildIds })).status).toBe(400);
     }
     // a rejected reorder changes nothing
@@ -128,8 +152,12 @@ describe('avatar permissions', () => {
   test('GET /guilds/avatar/:id is 404 without an avatar and for unknown guilds (no auth needed)', async () => {
     const owner = await signup(anchor.url);
     const { guild } = await createGuild(owner);
-    expect((await fetch(`${anchor.url}/guilds/avatar/${guild.id}`, { redirect: 'manual' })).status).toBe(404);
-    expect((await fetch(`${anchor.url}/guilds/avatar/nope`, { redirect: 'manual' })).status).toBe(404);
+    expect(
+      (await fetch(`${anchor.url}/guilds/avatar/${guild.id}`, { redirect: 'manual' })).status
+    ).toBe(404);
+    expect((await fetch(`${anchor.url}/guilds/avatar/nope`, { redirect: 'manual' })).status).toBe(
+      404
+    );
   });
 
   test('non-owners (member or not) get 403, unknown guild 404, anonymous 401', async () => {
@@ -143,7 +171,10 @@ describe('avatar permissions', () => {
     expect((await upload(owner, 'nope', png())).status).toBe(404);
     const form = new FormData();
     form.set('avatar', png());
-    const anon = await fetch(`${anchor.url}/guilds/${guild.id}/avatar`, { method: 'POST', body: form });
+    const anon = await fetch(`${anchor.url}/guilds/${guild.id}/avatar`, {
+      method: 'POST',
+      body: form,
+    });
     expect(anon.status).toBe(401);
   });
 
@@ -187,7 +218,9 @@ describe('avatar upload (needs Garage)', () => {
 
   // 1x1 transparent png
   const png = Uint8Array.from(
-    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),
+    atob(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+    ),
     (c) => c.charCodeAt(0)
   );
 

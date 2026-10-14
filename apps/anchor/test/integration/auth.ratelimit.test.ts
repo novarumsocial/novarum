@@ -12,7 +12,8 @@ afterAll(() => anchor?.destroy());
 
 const statuses = async (path: string, count: number, ip: () => string, body: () => unknown) => {
   const out: number[] = [];
-  for (let i = 0; i < count; i++) out.push((await post(anchor.url, path, body(), { 'x-forwarded-for': ip() })).status);
+  for (let i = 0; i < count; i++)
+    out.push((await post(anchor.url, path, body(), { 'x-forwarded-for': ip() })).status);
   return out;
 };
 const badLogin = () => ({ username: uniqueName('ghost'), password: 'not-the-password' });
@@ -31,7 +32,9 @@ describe('login: 10 per minute per IP', () => {
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toEqual({ error: 'Too many requests. Try again later.' });
 
-    const other = await post(anchor.url, '/auth/login', badLogin(), { 'x-forwarded-for': freshIp() });
+    const other = await post(anchor.url, '/auth/login', badLogin(), {
+      'x-forwarded-for': freshIp(),
+    });
     expect(other.status).toBe(401);
   });
 
@@ -41,7 +44,12 @@ describe('login: 10 per minute per IP', () => {
     const body = newSignup();
     await post(anchor.url, '/auth/signup', body, { 'x-forwarded-for': freshIp() });
     await statuses('/auth/login', 10, () => ip, badLogin);
-    const res = await post(anchor.url, '/auth/login', { username: body.username, password: body.password }, { 'x-forwarded-for': ip });
+    const res = await post(
+      anchor.url,
+      '/auth/login',
+      { username: body.username, password: body.password },
+      { 'x-forwarded-for': ip }
+    );
     expect(res.status).toBe(429);
   });
 
@@ -60,7 +68,12 @@ test('signup: the 6th attempt in an hour from one IP is 429', async () => {
 
 test('login/mfa/email: the 4th request from one IP is 429', async () => {
   const ip = freshIp();
-  const results = await statuses('/auth/login/mfa/email', 4, () => ip, () => ({ challenge: 'x'.repeat(24) }));
+  const results = await statuses(
+    '/auth/login/mfa/email',
+    4,
+    () => ip,
+    () => ({ challenge: 'x'.repeat(24) })
+  );
   expect(results).toEqual([401, 401, 401, 429]);
 });
 
@@ -68,25 +81,40 @@ test('login/mfa/email: the 4th request from one IP is 429', async () => {
 // password-reset/request limiter (3 per 15 min, same as login/mfa/email) is never applied
 test.failing('password-reset/request: the 4th request from one IP is 429', async () => {
   const ip = freshIp();
-  const results = await statuses('/auth/password-reset/request', 4, () => ip, () => ({ email: `${uniqueName()}@example.test` }));
+  const results = await statuses(
+    '/auth/password-reset/request',
+    4,
+    () => ip,
+    () => ({ email: `${uniqueName()}@example.test` })
+  );
   expect(results).toEqual([200, 200, 200, 429]);
 });
 
 // gap: same dedup as above, the login/mfa limiter (10 per minute) is the same plugin instance as /login's
 test.failing('login/mfa: the 11th attempt from one IP is 429', async () => {
   const ip = freshIp();
-  const results = await statuses('/auth/login/mfa', 11, () => ip, () => ({ challenge: 'x'.repeat(24), method: 'TOTP', code: '123456' }));
+  const results = await statuses(
+    '/auth/login/mfa',
+    11,
+    () => ip,
+    () => ({ challenge: 'x'.repeat(24), method: 'TOTP', code: '123456' })
+  );
   expect(results.slice(0, 10)).toEqual(Array(10).fill(401));
   expect(results[10]).toBe(429);
 });
 
 test('reset-password: the 6th attempt from one IP is 429', async () => {
   const ip = freshIp();
-  const results = await statuses('/auth/reset-password', 6, () => ip, () => ({
-    email: `${uniqueName()}@example.test`,
-    newPassword: 'a-brand-new-password',
-    verificationCode: 123456,
-  }));
+  const results = await statuses(
+    '/auth/reset-password',
+    6,
+    () => ip,
+    () => ({
+      email: `${uniqueName()}@example.test`,
+      newPassword: 'a-brand-new-password',
+      verificationCode: 123456,
+    })
+  );
   expect(results).toEqual([400, 400, 400, 400, 400, 429]);
 });
 

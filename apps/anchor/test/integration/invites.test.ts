@@ -17,13 +17,21 @@ afterAll(async () => {
 });
 
 async function world() {
-  const [owner, joiner, stranger] = await Promise.all([signup(anchor.url), signup(anchor.url), signup(anchor.url)]);
+  const [owner, joiner, stranger] = await Promise.all([
+    signup(anchor.url),
+    signup(anchor.url),
+    signup(anchor.url),
+  ]);
   const { guild, channel } = await createGuild(owner);
   return { owner, joiner, stranger, guild, channel };
 }
-const createInvite = async (owner: Awaited<ReturnType<typeof signup>>, guildId: string, body: object = {}) =>
-  (await call(owner, 'POST', `/guilds/${guildId}/invites`, body)).body.invite;
-const memberRows = (guildId: string) => sql`SELECT "userId", position FROM guild_member WHERE "guildId" = ${guildId}`;
+const createInvite = async (
+  owner: Awaited<ReturnType<typeof signup>>,
+  guildId: string,
+  body: object = {}
+) => (await call(owner, 'POST', `/guilds/${guildId}/invites`, body)).body.invite;
+const memberRows = (guildId: string) =>
+  sql`SELECT "userId", position FROM guild_member WHERE "guildId" = ${guildId}`;
 
 describe('create and read', () => {
   test('only the owner can create an invite (403 member and non-member, 404 unknown guild)', async () => {
@@ -33,7 +41,9 @@ describe('create and read', () => {
     expect((await call(joiner, 'POST', `/guilds/${guild.id}/invites`, {})).status).toBe(403);
     expect((await call(stranger, 'POST', `/guilds/${guild.id}/invites`, {})).status).toBe(403);
     expect((await call(owner, 'POST', '/guilds/nope/invites', {})).status).toBe(404);
-    expect((await call(anonymous(anchor.url), 'POST', `/guilds/${guild.id}/invites`, {})).status).toBe(401);
+    expect(
+      (await call(anonymous(anchor.url), 'POST', `/guilds/${guild.id}/invites`, {})).status
+    ).toBe(401);
   });
 
   test('GET /guilds/:id/invites: owner 404 before creation then 200; non-owners get 401 (not 403)', async () => {
@@ -83,8 +93,12 @@ describe('create and read', () => {
 
   test('a federated guild id is refused with 400', async () => {
     const { owner } = await world();
-    expect((await call(owner, 'POST', '/guilds/fed:guild:example.test:abc/invites', {})).status).toBe(400);
-    expect((await call(owner, 'GET', '/guilds/fed:guild:example.test:abc/invites')).status).toBe(400);
+    expect(
+      (await call(owner, 'POST', '/guilds/fed:guild:example.test:abc/invites', {})).status
+    ).toBe(400);
+    expect((await call(owner, 'GET', '/guilds/fed:guild:example.test:abc/invites')).status).toBe(
+      400
+    );
   });
 });
 
@@ -96,7 +110,10 @@ describe('preview', () => {
     const before = await call(anon, 'GET', `/invite/${invite.code}`);
     expect(before.status).toBe(200);
     expect(before.body.guild).toMatchObject({ id: guild.id, name: guild.name, memberCount: 1 });
-    expect(before.body.invite.creator).toMatchObject({ id: owner.user.id, username: owner.user.username });
+    expect(before.body.invite.creator).toMatchObject({
+      id: owner.user.id,
+      username: owner.user.username,
+    });
     await call(joiner, 'POST', '/invite/accept', { code: invite.code });
     expect((await call(anon, 'GET', `/invite/${invite.code}`)).body.guild.memberCount).toBe(2);
   });
@@ -140,7 +157,9 @@ describe('accept', () => {
   test.failing('concurrent accepts by one user never fail and leave one membership', async () => {
     const { owner, joiner, guild } = await world();
     const { code } = await createInvite(owner, guild.id);
-    const results = await Promise.all(Array.from({ length: 8 }, () => call(joiner, 'POST', '/invite/accept', { code })));
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => call(joiner, 'POST', '/invite/accept', { code }))
+    );
     expect(results.map((r) => r.status)).toEqual(Array(8).fill(200));
     expect(await memberRows(guild.id)).toHaveLength(2);
   });
@@ -155,8 +174,11 @@ describe('accept', () => {
   test('new guild lands at position 0 and shifts the joiner other guilds down', async () => {
     const { owner, joiner, guild } = await world();
     const mine = await createGuild(joiner, 'mine');
-    await call(joiner, 'POST', '/invite/accept', { code: (await createInvite(owner, guild.id)).code });
-    const rows = await sql`SELECT "guildId", position FROM guild_member WHERE "userId" = ${joiner.user.id} ORDER BY position`;
+    await call(joiner, 'POST', '/invite/accept', {
+      code: (await createInvite(owner, guild.id)).code,
+    });
+    const rows =
+      await sql`SELECT "guildId", position FROM guild_member WHERE "userId" = ${joiner.user.id} ORDER BY position`;
     expect(rows.map((r: any) => [r.guildId, r.position])).toEqual([
       [guild.id, 0],
       [mine.guild.id, 1],
@@ -174,14 +196,21 @@ describe('accept', () => {
   test('naming our own homeserver explicitly takes the local path', async () => {
     const { owner, joiner, guild } = await world();
     const { code } = await createInvite(owner, guild.id);
-    const res = await call(joiner, 'POST', '/invite/accept', { code, homeserver: joiner.user.homeserver });
+    const res = await call(joiner, 'POST', '/invite/accept', {
+      code,
+      homeserver: joiner.user.homeserver,
+    });
     expect(res).toEqual({ status: 200, body: { guildId: guild.id } });
   });
 
   test('unknown code 404, anonymous 401, empty code rejected', async () => {
     const { joiner } = await world();
-    expect((await call(joiner, 'POST', '/invite/accept', { code: 'nonexistent' })).status).toBe(404);
-    expect((await call(anonymous(anchor.url), 'POST', '/invite/accept', { code: 'x' })).status).toBe(401);
+    expect((await call(joiner, 'POST', '/invite/accept', { code: 'nonexistent' })).status).toBe(
+      404
+    );
+    expect(
+      (await call(anonymous(anchor.url), 'POST', '/invite/accept', { code: 'x' })).status
+    ).toBe(401);
     expect((await call(joiner, 'POST', '/invite/accept', { code: '' })).status).toBe(422);
   });
 
@@ -190,7 +219,9 @@ describe('accept', () => {
     const ws = await openRealtime(anchor.url, owner.cookie);
     try {
       await Bun.sleep(200);
-      await call(joiner, 'POST', '/invite/accept', { code: (await createInvite(owner, guild.id)).code });
+      await call(joiner, 'POST', '/invite/accept', {
+        code: (await createInvite(owner, guild.id)).code,
+      });
       const event = await ws.waitFor('member.joined', (e) => e.data?.guildId === guild.id);
       expect(event.data.user).toMatchObject({ username: joiner.user.username });
     } finally {

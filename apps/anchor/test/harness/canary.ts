@@ -3,13 +3,24 @@
 // CANARY_SETUP: newline-separated shell commands run first (add IPs on lo, iptables REDIRECT rules, ...).
 import { json, runSetup } from './net';
 
-type Hit = { ts: number; listener: string; port: number; source: string; method?: string; path?: string; host?: string; headers?: Record<string, string>; firstBytes?: string };
+type Hit = {
+  ts: number;
+  listener: string;
+  port: number;
+  source: string;
+  method?: string;
+  path?: string;
+  host?: string;
+  headers?: Record<string, string>;
+  firstBytes?: string;
+};
 let hits: Hit[] = [];
 
 if (import.meta.main) {
   runSetup(process.env.CANARY_SETUP);
   const spec =
-    process.env.CANARY_LISTEN ?? '0.0.0.0:80=http80,0.0.0.0:443=tcp443:tcp,0.0.0.0:6379=tcp6379:tcp,0.0.0.0:8080=http8080';
+    process.env.CANARY_LISTEN ??
+    '0.0.0.0:80=http80,0.0.0.0:443=tcp443:tcp,0.0.0.0:6379=tcp6379:tcp,0.0.0.0:8080=http8080';
   for (const item of spec.split(',')) {
     const [addr, rest = ''] = item.split('=');
     const [hostname = '0.0.0.0', portText] = addr!.split(':');
@@ -24,7 +35,9 @@ if (import.meta.main) {
             hits.push({ ts: Date.now(), listener: label, port, source: s.remoteAddress });
           },
           data(s, chunk) {
-            const hit = hits.findLast((h) => h.listener === label && h.source === s.remoteAddress && !h.firstBytes);
+            const hit = hits.findLast(
+              (h) => h.listener === label && h.source === s.remoteAddress && !h.firstBytes
+            );
             if (hit) hit.firstBytes = Buffer.from(chunk.subarray(0, 256)).toString('base64');
             s.end();
           },
@@ -58,7 +71,7 @@ if (import.meta.main) {
       const url = new URL(req.url);
       if (url.pathname === '/health') return json({ ok: true });
       if (url.pathname === '/hits') {
-        if (req.method === 'DELETE') return (hits = []), json({ ok: true });
+        if (req.method === 'DELETE') return ((hits = []), json({ ok: true }));
         const listener = url.searchParams.get('listener');
         return json(hits.filter((h) => !listener || h.listener === listener));
       }

@@ -9,12 +9,18 @@
     targetId,
     guildId = null,
     noun,
-  }: { targetId: string; guildId?: string | null; noun: 'Server' | 'Channel' | 'Conversation' } =
-    $props();
+  }: {
+    targetId: string;
+    guildId?: string | null;
+    noun: 'Server' | 'Channel' | 'Conversation';
+  } = $props();
 
   // a guild is its own parent here, so it falls back to the guild default (mentions)
   const level = $derived(
-    notificationSettings.level({ channelId: targetId, guildId: noun === 'Server' ? targetId : guildId })
+    notificationSettings.level({
+      channelId: targetId,
+      guildId: noun === 'Server' ? targetId : guildId,
+    })
   );
   const muted = $derived(notificationSettings.isMuted(targetId));
   const hasSetting = $derived(!!notificationSettings.entries[targetId]);

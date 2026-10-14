@@ -3,15 +3,15 @@
 Run: `bun run test:migrations` (needs `bun run test:infra`; about 40s). Docker is only needed by the rollback test, which
 skips itself when `docker exec anchor-test-postgres-1 pg_dump` does not work (override the name with `ANCHOR_TEST_PG_CONTAINER`).
 
-| file | plan | what |
-| --- | --- | --- |
-| `static.test.ts` | 6.1 | no drift (`drizzle-kit generate` into a temp copy), `drizzle-kit check`, snapshot chain, old migrations unchanged vs `origin/main` or `main` (skipped without git or such a ref), dangerous-SQL lint |
-| `fresh.test.ts` | 6.2 | empty DB boot records every folder in `drizzle/`, schema equals `drizzle-kit push` on another DB, second boot is a no-op |
-| `upgrade.test.ts` | 6.3 | for each migration N: apply 1..N-1, load `seeds/<N>.sql`, apply N, row counts preserved plus per-migration invariants |
-| `prodlike.ts` / `prodlike.test.ts` | 6.4 | large synthetic upgrade with lock sampling; the test is a tiny smoke run |
-| `fixpush.test.ts` | 6.5 | `src/db/fix-push.ts` after `db:push` |
-| `failure.test.ts` | 6.6 | broken migration and unreachable DB |
-| `rollback.test.ts` | 6.7 | backup, upgrade, restore |
+| file                               | plan | what                                                                                                                                                                                                 |
+| ---------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static.test.ts`                   | 6.1  | no drift (`drizzle-kit generate` into a temp copy), `drizzle-kit check`, snapshot chain, old migrations unchanged vs `origin/main` or `main` (skipped without git or such a ref), dangerous-SQL lint |
+| `fresh.test.ts`                    | 6.2  | empty DB boot records every folder in `drizzle/`, schema equals `drizzle-kit push` on another DB, second boot is a no-op                                                                             |
+| `upgrade.test.ts`                  | 6.3  | for each migration N: apply 1..N-1, load `seeds/<N>.sql`, apply N, row counts preserved plus per-migration invariants                                                                                |
+| `prodlike.ts` / `prodlike.test.ts` | 6.4  | large synthetic upgrade with lock sampling; the test is a tiny smoke run                                                                                                                             |
+| `fixpush.test.ts`                  | 6.5  | `src/db/fix-push.ts` after `db:push`                                                                                                                                                                 |
+| `failure.test.ts`                  | 6.6  | broken migration and unreachable DB                                                                                                                                                                  |
+| `rollback.test.ts`                 | 6.7  | backup, upgrade, restore                                                                                                                                                                             |
 
 ## Adding a migration
 

@@ -15,7 +15,8 @@ afterAll(() => anchor?.destroy());
 const request = (email: string) => post(anchor.url, '/auth/password-reset/request', { email });
 const reset = (email: string, code: string, newPassword = 'a-brand-new-password') =>
   post(anchor.url, '/auth/reset-password', { email, newPassword, verificationCode: Number(code) });
-const login = (username: string, password: string) => post(anchor.url, '/auth/login', { username, password });
+const login = (username: string, password: string) =>
+  post(anchor.url, '/auth/login', { username, password });
 
 async function requestCode(email: string) {
   const since = Date.now() - 1000;

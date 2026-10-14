@@ -84,7 +84,9 @@ try {
   for (const ws of sockets) ws.close();
 
   if (loaded > env.PRESENCE_MAX_TX_PER_SECOND) {
-    throw new Error(`presence loop load ${loaded.toFixed(1)} tx/s > ${env.PRESENCE_MAX_TX_PER_SECOND}`);
+    throw new Error(
+      `presence loop load ${loaded.toFixed(1)} tx/s > ${env.PRESENCE_MAX_TX_PER_SECOND}`
+    );
   }
   console.log(`idle baseline ${idle.toFixed(1)} tx/s; loaded ${loaded.toFixed(1)} tx/s`);
 } finally {

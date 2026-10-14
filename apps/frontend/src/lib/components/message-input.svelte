@@ -7,6 +7,7 @@
   import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
+  import { session } from '$lib/session.svelte';
   import { cn, formatBytes } from '$lib/utils';
 
   let content = $state('');
@@ -115,6 +116,18 @@
       return;
     }
 
+    if (e.key === 'ArrowUp' && !content && files.length === 0) {
+      const lastOwn = chat.currentMessages.findLast(
+        (message) => message.author.userId === session.user?.id
+      );
+      if (lastOwn) {
+        e.preventDefault();
+        chat.editingMessage = true;
+        chat.editingMessageId = lastOwn.id;
+      }
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -165,6 +178,18 @@
   function memberHandle(member: Author) {
     return `${member.username}:${member.server}`;
   }
+
+  $effect(() => {
+    const member = chat.mentionRequest;
+    if (!member) return;
+    chat.mentionRequest = null;
+    const mention = `@${memberHandle(member)} `;
+    content = content ? `${content.trimEnd()} ${mention}` : mention;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(content.length, content.length);
+    });
+  });
 
   function insertMention(member: Author) {
     if (mentionStart === null) return;

@@ -82,7 +82,12 @@ async function subscribeWebPush(retry = true) {
   // a browser subscription is tied to one VAPID key, and every homeserver has its own
   const current = subscription?.options.applicationServerKey;
   const bytes = toBytes(key);
-  if (current && !(current.byteLength === bytes.length && new Uint8Array(current).every((v, i) => v === bytes[i]))) {
+  if (
+    current &&
+    !(
+      current.byteLength === bytes.length && new Uint8Array(current).every((v, i) => v === bytes[i])
+    )
+  ) {
     await subscription!.unsubscribe();
     subscription = null;
   }
@@ -115,7 +120,10 @@ function subscribeUnifiedPush() {
     handles.push(
       UnifiedPush.addListener('endpoint', (data) => {
         if (data.instance === instance)
-          void saveEndpoint(data).then(() => finish(), (error: Error) => finish(error));
+          void saveEndpoint(data).then(
+            () => finish(),
+            (error: Error) => finish(error)
+          );
       }),
       UnifiedPush.addListener('registrationFailed', (data) => {
         if (data.instance === instance)
@@ -155,7 +163,11 @@ export async function enablePush() {
 export async function disablePush() {
   const id = localStorage.getItem(subscriptionIdKey());
   localStorage.removeItem(subscriptionIdKey());
-  if (id) await anchor.client.notifications.subscriptions({ id }).delete().catch(() => null);
+  if (id)
+    await anchor.client.notifications
+      .subscriptions({ id })
+      .delete()
+      .catch(() => null);
 
   if (isAndroid()) await UnifiedPush.unregister({ instance: anchor.homeServer }).catch(() => null);
   else if (webPushSupported()) {
@@ -172,8 +184,7 @@ export async function syncPush() {
       const endpoint = await UnifiedPush.getEndpoint({ instance: anchor.homeServer });
       if (endpoint.endpoint) await saveEndpoint(endpoint);
       else await subscribeUnifiedPush();
-    }
-    else if (webPushSupported()) await subscribeWebPush();
+    } else if (webPushSupported()) await subscribeWebPush();
   } catch (error) {
     console.warn('Could not refresh push subscription', error);
   }
@@ -188,7 +199,9 @@ export function watchNotificationTaps(openUrl: (url: string) => void) {
     if (path.success) openUrl(path.data);
   };
   const onMessage = (event: MessageEvent) => {
-    const message = z.object({ type: z.literal('navigate'), url: z.string() }).safeParse(event.data);
+    const message = z
+      .object({ type: z.literal('navigate'), url: z.string() })
+      .safeParse(event.data);
     if (message.success) open(message.data.url);
   };
   if (browser && 'serviceWorker' in navigator) {

@@ -35,7 +35,9 @@ const prefix = `bench-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const homeserver = `${prefix}.invalid`;
 
 const chunks = <T>(rows: T[], size = 2000) =>
-  Array.from({ length: Math.ceil(rows.length / size) }, (_, i) => rows.slice(i * size, (i + 1) * size));
+  Array.from({ length: Math.ceil(rows.length / size) }, (_, i) =>
+    rows.slice(i * size, (i + 1) * size)
+  );
 
 async function insertAll<T>(insert: (rows: T[]) => PromiseLike<unknown>, rows: T[]) {
   for (const chunk of chunks(rows)) await insert(chunk);
@@ -70,7 +72,13 @@ async function setup() {
   await db.insert(guilds).values({ id: guildId, name: 'Benchmark', ownerId: userId });
   await db
     .insert(guildMembers)
-    .values(Array.from({ length: 10 }, (_, i) => ({ guildId, userId: `${prefix}-user-${i}`, position: 0 })));
+    .values(
+      Array.from({ length: 10 }, (_, i) => ({
+        guildId,
+        userId: `${prefix}-user-${i}`,
+        position: 0,
+      }))
+    );
   await db.insert(channels).values({ id: channelId, guildId, name: 'benchmark', position: 0 });
 
   // distinct timestamps so ordering is stable, spread over the last day
@@ -97,7 +105,14 @@ async function setup() {
   const guildChannelIds = guildIds.map((_, i) => `${prefix}-member-channel-${i}`);
   await db
     .insert(channels)
-    .values(guildIds.map((id, i) => ({ id: guildChannelIds[i]!, guildId: id, name: 'general', position: 0 })));
+    .values(
+      guildIds.map((id, i) => ({
+        id: guildChannelIds[i]!,
+        guildId: id,
+        name: 'general',
+        position: 0,
+      }))
+    );
   const guildMessages = guildChannelIds.map((id, i) => ({
     id: `${prefix}-member-message-${i}`,
     channelId: id,
@@ -168,7 +183,10 @@ const scenarios: [string, (f: Fixture, n: number) => Promise<unknown>][] = [
           orderBy: { position: 'asc' },
         }),
         db.query.channelReadStates.findMany({ where: { userId: memberUserId } }),
-        db.query.messagePings.findMany({ where: { userId: memberUserId }, with: { message: true } }),
+        db.query.messagePings.findMany({
+          where: { userId: memberUserId },
+          with: { message: true },
+        }),
       ]),
   ],
   [

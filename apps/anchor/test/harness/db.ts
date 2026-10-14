@@ -3,7 +3,11 @@ import { adminDatabaseUrl } from './env';
 
 const admin = () => new SQL(adminDatabaseUrl);
 
-const safeName = (name: string) => name.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 40);
+const safeName = (name: string) =>
+  name
+    .replace(/[^a-z0-9_]/gi, '_')
+    .toLowerCase()
+    .slice(0, 40);
 
 export function databaseUrl(database: string) {
   const url = new URL(adminDatabaseUrl);

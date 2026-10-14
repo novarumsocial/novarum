@@ -6,7 +6,8 @@ export async function befriend(a: TestUser, b: TestUser) {
     method: 'POST',
     body: JSON.stringify({ username: b.user.username, homeserver: b.user.homeserver }),
   });
-  if (!request.ok) throw new Error(`friend request failed: ${request.status} ${await request.text()}`);
+  if (!request.ok)
+    throw new Error(`friend request failed: ${request.status} ${await request.text()}`);
   const accept = await b.fetch(`/friends/requests/${a.user.id}/accept`, { method: 'POST' });
   if (!accept.ok) throw new Error(`friend accept failed: ${accept.status} ${await accept.text()}`);
 }

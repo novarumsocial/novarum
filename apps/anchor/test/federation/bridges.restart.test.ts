@@ -12,7 +12,8 @@ beforeAll(async () => {
 });
 afterAll(closePg);
 
-const typingCount = (rt: { events: { type: string }[] }) => rt.events.filter((e) => e.type === 'channel.typing').length;
+const typingCount = (rt: { events: { type: string }[] }) =>
+  rt.events.filter((e) => e.type === 'channel.typing').length;
 
 test('A restarts: B reconnects with backoff and the events resume', async () => {
   const { owner, channel, shadowChannel, rt } = await joinedRoom();
