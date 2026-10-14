@@ -10,7 +10,10 @@ export function parseJson<T>(json: string): T | null {
 export const maxRemoteJsonBytes = 16 * 1024 * 1024;
 
 /** the body parsed as JSON, or null when it is not JSON, fails mid-stream or grows past `maxBytes` */
-export async function readJson(response: Response, maxBytes = maxRemoteJsonBytes): Promise<unknown> {
+export async function readJson(
+  response: Response,
+  maxBytes = maxRemoteJsonBytes
+): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) return null;
   const chunks: Uint8Array[] = [];

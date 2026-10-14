@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { fetchIn, resetHarness } from '../harness/federation';
-import { ready, ensurePingUser, pingBody, pingPath, restartAnchor, sendSigned, signed, withDb } from '../harness/fedVerify';
+import {
+  ready,
+  ensurePingUser,
+  pingBody,
+  pingPath,
+  restartAnchor,
+  sendSigned,
+  signed,
+  withDb,
+} from '../harness/fedVerify';
 
 setDefaultTimeout(120_000); // hooks restart anchors and wait on canaries; a multi-file run resets bun's timeout
 
@@ -22,18 +31,26 @@ describe('replay', () => {
     expect(replay.status).toBe(401);
     expect(replay.json?.error).toContain('nonce');
     const nonce = s.headers['X-Novarum-Nonce']!;
-    const rows = await withDb('a', (sql) => sql`select 1 from federation_nonce where nonce = ${nonce}`);
+    const rows = await withDb(
+      'a',
+      (sql) => sql`select 1 from federation_nonce where nonce = ${nonce}`
+    );
     expect(rows.length).toBe(1);
   });
 
   test('20 parallel copies of one signed request -> exactly one 2xx, the rest 401 (3 rounds)', async () => {
     for (let round = 0; round < 3; round++) {
       const s = await signed(1, 'a', pingPath, pingBody('172.30.0.66'));
-      const statuses = (await Promise.all(Array.from({ length: 20 }, () => sendSigned(s)))).map((r) => r.status);
+      const statuses = (await Promise.all(Array.from({ length: 20 }, () => sendSigned(s)))).map(
+        (r) => r.status
+      );
       expect(statuses.filter((c) => c >= 200 && c < 300)).toHaveLength(1);
       expect(statuses.filter((c) => c === 401)).toHaveLength(19);
       const nonce = s.headers['X-Novarum-Nonce']!;
-      const rows = await withDb('a', (sql) => sql`select 1 from federation_nonce where nonce = ${nonce}`);
+      const rows = await withDb(
+        'a',
+        (sql) => sql`select 1 from federation_nonce where nonce = ${nonce}`
+      );
       expect(rows).toHaveLength(1);
     }
   });
@@ -46,7 +63,11 @@ describe('Host header handling behind Caddy (b-proxy)', () => {
   const body = pingBody('172.30.0.66');
   const viaProxy = async (signedHost: string, extra: Record<string, string> = {}) => {
     const s = await signed(1, 'b', pingPath, body, { host: signedHost });
-    const res = await fetchIn('p', `https://b.test${pingPath}`, { method: 'POST', headers: { ...s.headers, ...extra }, body: s.text });
+    const res = await fetchIn('p', `https://b.test${pingPath}`, {
+      method: 'POST',
+      headers: { ...s.headers, ...extra },
+      body: s.text,
+    });
     if (!res.ok) throw new Error(res.error);
     return res.status;
   };
@@ -64,7 +85,12 @@ describe('Host header handling behind Caddy (b-proxy)', () => {
   });
 
   test('a spoofed X-Forwarded-Host / Forwarded cannot make a signature for another host verify', async () => {
-    expect(await viaProxy('172.30.0.12', { 'x-forwarded-host': '172.30.0.12', forwarded: 'host=172.30.0.12' })).toBe(401);
+    expect(
+      await viaProxy('172.30.0.12', {
+        'x-forwarded-host': '172.30.0.12',
+        forwarded: 'host=172.30.0.12',
+      })
+    ).toBe(401);
     expect(await viaProxy('evil.example', { 'x-forwarded-host': 'evil.example' })).toBe(401);
   });
 

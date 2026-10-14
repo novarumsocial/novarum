@@ -49,10 +49,10 @@ Every step has to follow these:
 
 The work is split into three parts:
 
-| Part | What it does | Changes how servers talk? |
-| --- | --- | --- |
-| 1. Clean up the code | Split the big file, remove the repeated code | No |
-| 2. Fewer database queries | Ask the database only for what we need | No |
+| Part                              | What it does                                      | Changes how servers talk?                          |
+| --------------------------------- | ------------------------------------------------- | -------------------------------------------------- |
+| 1. Clean up the code              | Split the big file, remove the repeated code      | No                                                 |
+| 2. Fewer database queries         | Ask the database only for what we need            | No                                                 |
 | 3. Fewer connections and requests | Share one socket per server, batch status updates | Yes, but only between servers that both support it |
 
 ---
@@ -179,15 +179,15 @@ that really differs becomes an explicit option, so nothing changes by accident.
 
 Still no change in what other servers see. We just stop asking the database for things we don't need.
 
-| Where | What happens today | What we change | Why it's safe |
-| --- | --- | --- | --- |
-| Replay check on every request | 3 queries: "seen it?", then "seen it?" again, then save | Keep the first quick check; save with a single "insert unless it already exists" | The database already has a unique rule on these IDs, so the insert alone blocks replays. 3 queries become 2 |
-| Every channel request (even typing) | Rewrites the remote user's profile every time | Only write when the name/avatar actually changed | The stored profile ends up the same. Only `updatedAt` stops changing on no-op requests, so we first check nothing uses it as "last seen" |
-| Channel access check | Loads the channel, then the user, one after the other | Load both at the same time | They don't depend on each other |
-| `/unread-mentions` | Loads **every mention the user has ever had**, then filters in code | Ask the database only for mentions in the requested channels | Same mentions get counted. We keep the "after the last read message" comparison in code, because the database stores time more precisely than JavaScript |
-| Invite preview | Loads every member just to count them | Ask the database for the count | Same number |
-| `/push` | Loads every member of the guild | Load only the users we are trying to notify | Same result |
-| WebSocket access check | Loads every member and their user to check one thing | Ask the database "is there any member from this server?" | Same check |
+| Where                               | What happens today                                                  | What we change                                                                   | Why it's safe                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Replay check on every request       | 3 queries: "seen it?", then "seen it?" again, then save             | Keep the first quick check; save with a single "insert unless it already exists" | The database already has a unique rule on these IDs, so the insert alone blocks replays. 3 queries become 2                                              |
+| Every channel request (even typing) | Rewrites the remote user's profile every time                       | Only write when the name/avatar actually changed                                 | The stored profile ends up the same. Only `updatedAt` stops changing on no-op requests, so we first check nothing uses it as "last seen"                 |
+| Channel access check                | Loads the channel, then the user, one after the other               | Load both at the same time                                                       | They don't depend on each other                                                                                                                          |
+| `/unread-mentions`                  | Loads **every mention the user has ever had**, then filters in code | Ask the database only for mentions in the requested channels                     | Same mentions get counted. We keep the "after the last read message" comparison in code, because the database stores time more precisely than JavaScript |
+| Invite preview                      | Loads every member just to count them                               | Ask the database for the count                                                   | Same number                                                                                                                                              |
+| `/push`                             | Loads every member of the guild                                     | Load only the users we are trying to notify                                      | Same result                                                                                                                                              |
+| WebSocket access check              | Loads every member and their user to check one thing                | Ask the database "is there any member from this server?"                         | Same check                                                                                                                                               |
 
 Each row is its own small commit, so any one of them is easy to revert.
 
@@ -233,6 +233,7 @@ one, so callers don't need to change. If the connection drops, everyone on it is
 and the reconnect resubscribes everything at once.
 
 **Security:**
+
 - Every guild and DM is still checked one by one. Being connected doesn't give access to anything extra.
 - Limit how many guilds/DMs can be subscribed per message and per connection, and check messages with Zod.
 - One gap exists today: if a server loses access to a guild, it keeps getting events until it reconnects. The new

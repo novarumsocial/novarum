@@ -9,7 +9,10 @@ const adminPort = Number(process.env.DNS_ADMIN_PORT ?? 9053);
 const types = { A: 1, NS: 2, CNAME: 5, TXT: 16, AAAA: 28 } as const;
 type Rtype = keyof typeof types;
 
-const recordSchema = z.object({ type: z.enum(['A', 'AAAA', 'CNAME', 'TXT']).optional(), value: z.string() });
+const recordSchema = z.object({
+  type: z.enum(['A', 'AAAA', 'CNAME', 'TXT']).optional(),
+  value: z.string(),
+});
 export const ruleSchema = z.object({
   /** answer records; `type` defaults to A/AAAA by the shape of `value` */
   records: z.array(recordSchema).optional(),
@@ -38,9 +41,19 @@ const defaults: Record<string, z.input<typeof ruleSchema>> = {
 };
 
 let rules = new Map<string, Rule & { calls: number }>();
-let queries: { ts: number; name: string; type: string; transport: 'udp' | 'tcp'; source: string; rcode: string; answers: string[] }[] = [];
+let queries: {
+  ts: number;
+  name: string;
+  type: string;
+  transport: 'udp' | 'tcp';
+  source: string;
+  rcode: string;
+  answers: string[];
+}[] = [];
 const reset = () => {
-  rules = new Map(Object.entries(defaults).map(([n, r]) => [n, { ...ruleSchema.parse(r), calls: 0 }]));
+  rules = new Map(
+    Object.entries(defaults).map(([n, r]) => [n, { ...ruleSchema.parse(r), calls: 0 }])
+  );
   queries = [];
 };
 reset();
@@ -73,7 +86,9 @@ function encodeRdata(r: Rec) {
       const [head = '', tail = ''] = r.value.split('::');
       const h = head ? head.split(':') : [];
       const t = tail ? tail.split(':') : [];
-      const groups = r.value.includes('::') ? [...h, ...Array(8 - h.length - t.length).fill('0'), ...t] : h;
+      const groups = r.value.includes('::')
+        ? [...h, ...Array(8 - h.length - t.length).fill('0'), ...t]
+        : h;
       const buf = Buffer.alloc(16);
       groups.forEach((g, i) => buf.writeUInt16BE(parseInt(g, 16), i * 2));
       return buf;
@@ -97,10 +112,22 @@ function parseQuery(msg: Buffer) {
     off += len + 1;
   }
   off++;
-  return { id: msg.readUInt16BE(0), flags: msg.readUInt16BE(2), name: labels.join('.').toLowerCase(), qtype: msg.readUInt16BE(off), qclass: msg.readUInt16BE(off + 2), end: off + 4 };
+  return {
+    id: msg.readUInt16BE(0),
+    flags: msg.readUInt16BE(2),
+    name: labels.join('.').toLowerCase(),
+    qtype: msg.readUInt16BE(off),
+    qclass: msg.readUInt16BE(off + 2),
+    end: off + 4,
+  };
 }
 
-type Answer = { rcode: number; records: { name: string; rec: Rec; ttl: number }[]; drop?: boolean; delayMs?: number };
+type Answer = {
+  rcode: number;
+  records: { name: string; rec: Rec; ttl: number }[];
+  drop?: boolean;
+  delayMs?: number;
+};
 
 function resolve(name: string, qtype: number): Answer {
   const records: Answer['records'] = [];
@@ -109,7 +136,12 @@ function resolve(name: string, qtype: number): Answer {
     const rule = lookupRule(current);
     if (!rule) return { rcode: 3, records };
     if (rule.drop) return { rcode: 0, records: [], drop: true };
-    if (rule.rcode && rule.rcode !== 'NOERROR') return { rcode: { NXDOMAIN: 3, SERVFAIL: 2, REFUSED: 5 }[rule.rcode]!, records: [], delayMs: rule.delayMs };
+    if (rule.rcode && rule.rcode !== 'NOERROR')
+      return {
+        rcode: { NXDOMAIN: 3, SERVFAIL: 2, REFUSED: 5 }[rule.rcode]!,
+        records: [],
+        delayMs: rule.delayMs,
+      };
     let set = rule.records ?? [];
     if (rule.sequence) {
       // only A queries advance the sequence, so a parallel AAAA query does not skip a step
@@ -122,7 +154,8 @@ function resolve(name: string, qtype: number): Answer {
       current = cname.value.toLowerCase();
       continue;
     }
-    for (const rec of set) if (types[recType(rec)] === qtype) records.push({ name: current, rec, ttl: rule.ttl });
+    for (const rec of set)
+      if (types[recType(rec)] === qtype) records.push({ name: current, rec, ttl: rule.ttl });
     return { rcode: 0, records, delayMs: rule.delayMs };
   }
   return { rcode: 2, records };
@@ -152,12 +185,24 @@ async function answer(msg: Buffer, transport: 'udp' | 'tcp', source: string) {
   if (!q) return null;
   const typeName = Object.entries(types).find(([, v]) => v === q.qtype)?.[0] ?? String(q.qtype);
   const a = resolve(q.name, q.qtype);
-  const log = (rcode: string, answers: string[]) => queries.push({ ts: Date.now(), name: q.name, type: typeName, transport, source, rcode, answers });
+  const log = (rcode: string, answers: string[]) =>
+    queries.push({
+      ts: Date.now(),
+      name: q.name,
+      type: typeName,
+      transport,
+      source,
+      rcode,
+      answers,
+    });
   if (a.drop) {
     log('DROP', []);
     return null;
   }
-  log(['NOERROR', 'FORMERR', 'SERVFAIL', 'NXDOMAIN', 'NOTIMP', 'REFUSED'][a.rcode] ?? String(a.rcode), a.records.map((r) => r.rec.value));
+  log(
+    ['NOERROR', 'FORMERR', 'SERVFAIL', 'NXDOMAIN', 'NOTIMP', 'REFUSED'][a.rcode] ?? String(a.rcode),
+    a.records.map((r) => r.rec.value)
+  );
   if (a.delayMs) await Bun.sleep(a.delayMs);
   return buildResponse(msg, q, a);
 }
@@ -208,7 +253,8 @@ if (import.meta.main) {
       const url = new URL(req.url);
       try {
         if (url.pathname === '/health') return json({ ok: true });
-        if (url.pathname === '/reset' && req.method === 'POST') return reset(), json({ ok: true });
+        if (url.pathname === '/reset' && req.method === 'POST')
+          return (reset(), json({ ok: true }));
         if (url.pathname === '/records' && req.method === 'PUT') {
           const { name, ...rule } = setSchema.parse(await req.json());
           rules.set(name.toLowerCase(), { ...rule, calls: 0 });
@@ -218,12 +264,14 @@ if (import.meta.main) {
           rules.delete(z.string().parse(url.searchParams.get('name')).toLowerCase());
           return json({ ok: true });
         }
-        if (url.pathname === '/records' && req.method === 'GET') return json(Object.fromEntries(rules));
+        if (url.pathname === '/records' && req.method === 'GET')
+          return json(Object.fromEntries(rules));
         if (url.pathname === '/queries' && req.method === 'GET') {
           const name = url.searchParams.get('name')?.toLowerCase();
           return json(queries.filter((x) => !name || x.name === name));
         }
-        if (url.pathname === '/queries' && req.method === 'DELETE') return (queries = []), json({ ok: true });
+        if (url.pathname === '/queries' && req.method === 'DELETE')
+          return ((queries = []), json({ ok: true }));
         return json({ error: 'not found' }, 404);
       } catch (error) {
         return json({ error: String(error) }, 400);

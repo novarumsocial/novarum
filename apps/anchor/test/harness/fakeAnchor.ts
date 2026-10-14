@@ -44,7 +44,11 @@ export const behaviourSchema = z.object({
   hangMs: z.number().optional(),
   /** stream `bytes` bytes in `chunkBytes` chunks every `intervalMs` (slowloris-style response; bytes -1 = forever) */
   drip: z
-    .object({ bytes: z.number().default(-1), chunkBytes: z.number().default(1), intervalMs: z.number().default(100) })
+    .object({
+      bytes: z.number().default(-1),
+      chunkBytes: z.number().default(1),
+      intervalMs: z.number().default(100),
+    })
     .optional(),
   /** stream a JSON-looking body of this many bytes as fast as the reader pulls */
   hugeBytes: z.number().optional(),
@@ -102,7 +106,13 @@ const signSchema = z.object({
   tamper: z.boolean().optional(),
 });
 
-type RouteRule = { method?: string; path: string; prefix: boolean; behaviour: z.output<typeof behaviourSchema>; left?: number };
+type RouteRule = {
+  method?: string;
+  path: string;
+  prefix: boolean;
+  behaviour: z.output<typeof behaviourSchema>;
+  left?: number;
+};
 type Recorded = {
   id: number;
   ts: number;
@@ -128,7 +138,19 @@ const identities = Object.fromEntries(
       requests: [] as Recorded[],
     },
   ])
-) as Record<(typeof identityIds)[number], { id: string; privateIp: string; publicIp: string; publicName: string; key: Key; previousKey: Key | null; rules: RouteRule[]; requests: Recorded[] }>;
+) as Record<
+  (typeof identityIds)[number],
+  {
+    id: string;
+    privateIp: string;
+    publicIp: string;
+    publicName: string;
+    key: Key;
+    previousKey: Key | null;
+    rules: RouteRule[];
+    requests: Recorded[];
+  }
+>;
 type Identity = (typeof identities)['1'];
 
 let requestCounter = 0;
@@ -149,15 +171,25 @@ const discoveryDoc = (identity: Identity, b?: z.output<typeof behaviourSchema>) 
   Object.assign(doc, Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)));
   if (publicKey !== undefined) {
     doc.publicKey =
-      publicKey && typeof publicKey === 'object' ? { ...(doc.publicKey as object), ...publicKey } : publicKey;
+      publicKey && typeof publicKey === 'object'
+        ? { ...(doc.publicKey as object), ...publicKey }
+        : publicKey;
   }
   return doc;
 };
 
-const stream = (pull: (controller: ReadableStreamDefaultController<Uint8Array>) => void | Promise<void>) =>
-  new ReadableStream<Uint8Array>({ pull });
+const stream = (
+  pull: (controller: ReadableStreamDefaultController<Uint8Array>) => void | Promise<void>
+) => new ReadableStream<Uint8Array>({ pull });
 
-function bodyFor(b: z.output<typeof behaviourSchema>, defaultJson: unknown): { body: ConstructorParameters<typeof Response>[0]; type?: string; extra?: Record<string, string> } {
+function bodyFor(
+  b: z.output<typeof behaviourSchema>,
+  defaultJson: unknown
+): {
+  body: ConstructorParameters<typeof Response>[0];
+  type?: string;
+  extra?: Record<string, string>;
+} {
   if (b.drip) {
     let sent = 0;
     const chunk = new Uint8Array(b.drip.chunkBytes).fill(0x20);
@@ -198,24 +230,44 @@ function bodyFor(b: z.output<typeof behaviourSchema>, defaultJson: unknown): { b
       while (left > 0 && !gz.destroyed) {
         const n = Math.min(chunk.length, left);
         left -= n;
-        if (!gz.write(n === chunk.length ? chunk : chunk.subarray(0, n))) await new Promise((r) => gz.once('drain', r));
+        if (!gz.write(n === chunk.length ? chunk : chunk.subarray(0, n)))
+          await new Promise((r) => gz.once('drain', r));
       }
       gz.end('"}');
     })().catch(() => null);
-    return { body: Readable.toWeb(gz) as unknown as ReadableStream, type: 'application/json', extra: { 'content-encoding': 'gzip' } };
+    return {
+      body: Readable.toWeb(gz) as unknown as ReadableStream,
+      type: 'application/json',
+      extra: { 'content-encoding': 'gzip' },
+    };
   }
   if (b.bodyBase64 !== undefined) return { body: Buffer.from(b.bodyBase64, 'base64') };
   if (b.body !== undefined) return { body: b.body, type: 'text/plain' };
   if (b.json !== undefined) return { body: JSON.stringify(b.json), type: 'application/json' };
   if (b.nonJson) return { body: '<html><body>not json</body></html>', type: 'text/html' };
-  if (b.invalidUtf8) return { body: Buffer.concat([Buffer.from('{"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}')]), type: 'application/json' };
-  if (b.deepJson !== undefined) return { body: '{"a":'.repeat(b.deepJson) + '1' + '}'.repeat(b.deepJson), type: 'application/json' };
+  if (b.invalidUtf8)
+    return {
+      body: Buffer.concat([Buffer.from('{"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}')]),
+      type: 'application/json',
+    };
+  if (b.deepJson !== undefined)
+    return {
+      body: '{"a":'.repeat(b.deepJson) + '1' + '}'.repeat(b.deepJson),
+      type: 'application/json',
+    };
   return { body: JSON.stringify(defaultJson), type: 'application/json' };
 }
 
 type WsData = NonNullable<z.output<typeof behaviourSchema>['ws']>;
 
-async function respond(identity: Identity, req: Request, scheme: 'http' | 'https', localIp: string, sourceIp: string, server: Bun.Server<WsData>): Promise<Response | undefined> {
+async function respond(
+  identity: Identity,
+  req: Request,
+  scheme: 'http' | 'https',
+  localIp: string,
+  sourceIp: string,
+  server: Bun.Server<WsData>
+): Promise<Response | undefined> {
   const url = new URL(req.url);
   const bodyText = req.method === 'GET' || req.method === 'HEAD' ? '' : await req.text();
   identity.requests.push({
@@ -247,25 +299,51 @@ async function respond(identity: Identity, req: Request, scheme: 'http' | 'https
     if (b.hangMs < 0) return new Promise<Response>(() => {});
     await sleep(b.hangMs);
   }
-  if (b.redirect) return new Response(null, { status: b.status ?? 302, headers: { location: b.redirect } });
-  if (b.ws && req.headers.get('upgrade')?.toLowerCase() === 'websocket' && server.upgrade(req, { data: b.ws })) return undefined;
+  if (b.redirect)
+    return new Response(null, { status: b.status ?? 302, headers: { location: b.redirect } });
+  if (
+    b.ws &&
+    req.headers.get('upgrade')?.toLowerCase() === 'websocket' &&
+    server.upgrade(req, { data: b.ws })
+  )
+    return undefined;
 
   const defaultJson = isInfo ? discoveryDoc(identity, b) : { error: 'not found' };
   const { body, type, extra } = bodyFor(b, defaultJson);
   const status = b.status ?? (isInfo || rule ? 200 : 404);
-  const headers = new Headers({ ...(type ? { 'content-type': type } : {}), ...extra, ...b.headers });
+  const headers = new Headers({
+    ...(type ? { 'content-type': type } : {}),
+    ...extra,
+    ...b.headers,
+  });
   return new Response(body, { status, headers });
 }
 
 async function sign(input: z.output<typeof signSchema>) {
   const identity = identities[input.identity];
-  const key = input.key === 'random' ? newKey() : input.key === 'previous' ? identity.previousKey : identity.key;
+  const key =
+    input.key === 'random'
+      ? newKey()
+      : input.key === 'previous'
+        ? identity.previousKey
+        : identity.key;
   if (!key) throw new Error('no previous key (rotate first)');
-  const bodyHash = input.bodyHash ?? crypto.createHash('sha256').update(input.body, 'utf8').digest('base64');
+  const bodyHash =
+    input.bodyHash ?? crypto.createHash('sha256').update(input.body, 'utf8').digest('base64');
   const homeserver = input.homeserver ?? identity.privateIp;
-  const date = input.date ?? new Date(Date.now() + (input.dateOffsetSeconds ?? 0) * 1000).toISOString();
+  const date =
+    input.date ?? new Date(Date.now() + (input.dateOffsetSeconds ?? 0) * 1000).toISOString();
   const nonce = input.nonce ?? crypto.randomBytes(16).toString('hex');
-  const signingString = ['v1', input.method.toUpperCase(), input.path, input.host, homeserver, date, nonce, bodyHash].join('\n');
+  const signingString = [
+    'v1',
+    input.method.toUpperCase(),
+    input.path,
+    input.host,
+    homeserver,
+    date,
+    nonce,
+    bodyHash,
+  ].join('\n');
   let signature = crypto.sign(null, Buffer.from(signingString, 'utf8'), key.privateKey);
   if (input.tamper) signature[0]! ^= 0xff;
   return {
@@ -306,15 +384,27 @@ async function admin(req: Request) {
       }
       return json({ ok: true });
     }
-    if (url.pathname === '/sign' && req.method === 'POST') return json(await sign(signSchema.parse(await req.json())));
+    if (url.pathname === '/sign' && req.method === 'POST')
+      return json(await sign(signSchema.parse(await req.json())));
     if (p[0] === 'identity') {
       const identity = idFrom(p[1]);
       const sub = p[2];
       if (!sub && req.method === 'GET')
-        return json({ id: identity.id, privateIp: identity.privateIp, publicIp: identity.publicIp, publicName: identity.publicName, keyId: identity.key.id, publicKey: identity.key.publicKey });
+        return json({
+          id: identity.id,
+          privateIp: identity.privateIp,
+          publicIp: identity.publicIp,
+          publicName: identity.publicName,
+          keyId: identity.key.id,
+          publicKey: identity.key.publicKey,
+        });
       if (sub === 'routes' && req.method === 'PUT') {
         const { route, behaviour } = ruleSchema.parse(await req.json());
-        const rule = { ...parseRoute(route), behaviour: behaviourSchema.parse(behaviour), left: behaviour.times };
+        const rule = {
+          ...parseRoute(route),
+          behaviour: behaviourSchema.parse(behaviour),
+          left: behaviour.times,
+        };
         identity.rules.push(rule);
         return json({ ok: true });
       }
@@ -325,7 +415,9 @@ async function admin(req: Request) {
       if (sub === 'requests' && req.method === 'GET') {
         const prefix = url.searchParams.get('path');
         const since = Number(url.searchParams.get('since') ?? 0);
-        return json(identity.requests.filter((r) => r.id > since && (!prefix || r.path.startsWith(prefix))));
+        return json(
+          identity.requests.filter((r) => r.id > since && (!prefix || r.path.startsWith(prefix)))
+        );
       }
       if (sub === 'requests' && req.method === 'DELETE') {
         identity.requests = [];
@@ -334,7 +426,11 @@ async function admin(req: Request) {
       if (sub === 'rotate' && req.method === 'POST') {
         identity.previousKey = identity.key;
         identity.key = newKey();
-        return json({ keyId: identity.key.id, publicKey: identity.key.publicKey, previousKeyId: identity.previousKey.id });
+        return json({
+          keyId: identity.key.id,
+          publicKey: identity.key.publicKey,
+          previousKeyId: identity.previousKey.id,
+        });
       }
     }
     return json({ error: 'not found' }, 404);
@@ -346,9 +442,14 @@ async function admin(req: Request) {
 if (import.meta.main) {
   runSetup(process.env.FAKE_SETUP);
   // the compose file assigns .66 on each network; .67 is added here
-  for (const cidr of (process.env.FAKE_EXTRA_IPS ?? '172.30.0.67/24,203.0.113.67/24').split(',')) addIp(cidr);
+  for (const cidr of (process.env.FAKE_EXTRA_IPS ?? '172.30.0.67/24,203.0.113.67/24').split(','))
+    addIp(cidr);
 
-  const certs = (name: string) => ({ serverName: name, cert: readFileSync(`${certDir}/${name}.crt`), key: readFileSync(`${certDir}/${name}.key`) });
+  const certs = (name: string) => ({
+    serverName: name,
+    cert: readFileSync(`${certDir}/${name}.crt`),
+    key: readFileSync(`${certDir}/${name}.key`),
+  });
   const names = ['evil.test', 'evil2.test', 'wrongcert.test', 'selfsigned.test', 'expired.test'];
 
   for (const identity of Object.values(identities)) {
@@ -365,7 +466,8 @@ if (import.meta.main) {
           async open(ws) {
             // frames sent in the same tick as the upgrade can be lost by the client (seen with Bun 1.3.9), so give it a moment
             await sleep(150);
-            for (const m of ws.data.messages) ws.send(typeof m === 'string' ? m : JSON.stringify(m));
+            for (const m of ws.data.messages)
+              ws.send(typeof m === 'string' ? m : JSON.stringify(m));
             if (ws.data.close) ws.close(ws.data.close.code, ws.data.close.reason);
           },
           message() {},
@@ -373,9 +475,13 @@ if (import.meta.main) {
         // the identity's own name first so it is the default for unknown SNI / IP-literal requests
         tls:
           scheme === 'https'
-            ? [certs(identity.publicName), ...names.filter((n) => n !== identity.publicName).map(certs)]
+            ? [
+                certs(identity.publicName),
+                ...names.filter((n) => n !== identity.publicName).map(certs),
+              ]
             : undefined,
-        fetch: (req, server) => respond(identity, req, scheme, hostname, server.requestIP(req)?.address ?? '', server),
+        fetch: (req, server) =>
+          respond(identity, req, scheme, hostname, server.requestIP(req)?.address ?? '', server),
       });
     }
   }

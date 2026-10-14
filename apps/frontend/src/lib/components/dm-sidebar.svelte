@@ -63,54 +63,55 @@
       {@const other = entry.participants[0]}
       {@const name = other ? other.displayName || other.username : 'Direct Message'}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
-      {@const unread = entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
+      {@const unread =
+        entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
       <ContextMenu.Root>
         <ContextMenu.Trigger class="block">
-      <div
-        role="button"
-        tabindex="0"
-        class={itemClass(active) + ' group cursor-pointer'}
-        onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}
-        onkeydown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            goto(`/guilds/dms/${encodeURIComponent(entry.id)}`);
-          }
-        }}
-      >
-        <div class="relative shrink-0">
-          <Avatar
-            src={other?.avatarUrl}
-            {name}
-            class="size-6 text-[10px]"
-            bgColor={other?.avatarColor}
-          />
-          {#if other && friends.isOnline(other.userId)}
-            <span
-              class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
-              class:rounded-full={settings.value.circleIcons}
-            ></span>
-          {/if}
-        </div>
-        <span class="flex-1 truncate" class:font-semibold={unread}>{name}</span>
-        {#if chat.voiceStates[entry.id]?.length}
-          <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
-        {/if}
-        {#if unread}
-          <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
-        {/if}
-        <button
-          class="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
-          aria-label="Close direct message"
-          onclick={(event) => {
-            event.stopPropagation();
-            void dms.close(entry.id);
-            if (active) void goto('/guilds/dms');
-          }}
-        >
-          <X class="size-3.5" />
-        </button>
-      </div>
+          <div
+            role="button"
+            tabindex="0"
+            class={itemClass(active) + ' group cursor-pointer'}
+            onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}
+            onkeydown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                goto(`/guilds/dms/${encodeURIComponent(entry.id)}`);
+              }
+            }}
+          >
+            <div class="relative shrink-0">
+              <Avatar
+                src={other?.avatarUrl}
+                {name}
+                class="size-6 text-[10px]"
+                bgColor={other?.avatarColor}
+              />
+              {#if other && friends.isOnline(other.userId)}
+                <span
+                  class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+                  class:rounded-full={settings.value.circleIcons}
+                ></span>
+              {/if}
+            </div>
+            <span class="flex-1 truncate" class:font-semibold={unread}>{name}</span>
+            {#if chat.voiceStates[entry.id]?.length}
+              <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
+            {/if}
+            {#if unread}
+              <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
+            {/if}
+            <button
+              class="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
+              aria-label="Close direct message"
+              onclick={(event) => {
+                event.stopPropagation();
+                void dms.close(entry.id);
+                if (active) void goto('/guilds/dms');
+              }}
+            >
+              <X class="size-3.5" />
+            </button>
+          </div>
         </ContextMenu.Trigger>
         <ContextMenu.Content class="w-56">
           <NotificationMenu targetId={entry.id} noun="Conversation" />
@@ -123,9 +124,7 @@
 
           <ContextMenu.Separator />
 
-          <ContextMenu.Item onclick={() => console.log('not done')}>
-            Profile
-          </ContextMenu.Item>
+          <ContextMenu.Item onclick={() => console.log('not done')}>Profile</ContextMenu.Item>
           <ContextMenu.Item
             onclick={() => {
               void goto(dmPath(entry.id));

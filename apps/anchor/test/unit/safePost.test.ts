@@ -22,9 +22,18 @@ describe('guardedLookup', () => {
 
 describe('safePost', () => {
   test('posts to a local server when the config allows local targets (the test config does)', async () => {
-    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response(null, { status: 201 }) });
+    const server = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => new Response(null, { status: 201 }),
+    });
     try {
-      const res = await safePost(`http://127.0.0.1:${server.port}/x`, { 'content-type': 'text/plain' }, new Uint8Array([1, 2]), 2000);
+      const res = await safePost(
+        `http://127.0.0.1:${server.port}/x`,
+        { 'content-type': 'text/plain' },
+        new Uint8Array([1, 2]),
+        2000
+      );
       expect(res.status).toBe(201);
     } finally {
       void server.stop(true);
@@ -33,11 +42,18 @@ describe('safePost', () => {
 
   test('goes through the configured egress proxy', async () => {
     const seen: string[] = [];
-    const proxy = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: (request) => (seen.push(request.url), new Response(null, { status: 202 })) });
+    const proxy = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: (request) => (seen.push(request.url), new Response(null, { status: 202 })),
+    });
     const original = process.env.ANCHOR_CONFIG!;
     const dir = mkdtempSync(path.join(tmpdir(), 'safepost-'));
     const config = path.join(dir, 'config.toml');
-    writeFileSync(config, `${readFileSync(original, 'utf8')}\n[network]\nproxy_url = "http://127.0.0.1:${proxy.port}"\n`);
+    writeFileSync(
+      config,
+      `${readFileSync(original, 'utf8')}\n[network]\nproxy_url = "http://127.0.0.1:${proxy.port}"\n`
+    );
     process.env.ANCHOR_CONFIG = config;
     try {
       const res = await safePost('http://127.0.0.1:9/never-reached', {}, new Uint8Array([1]), 2000);

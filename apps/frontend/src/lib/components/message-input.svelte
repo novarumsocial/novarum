@@ -189,7 +189,7 @@
       textarea.focus();
       textarea.setSelectionRange(content.length, content.length);
     });
-  })
+  });
 
   function insertMention(member: Author) {
     if (mentionStart === null) return;

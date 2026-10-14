@@ -8,7 +8,13 @@ x-anchor: &anchor
   image: anchor-test:local
   restart: 'no'
   healthcheck:
-    test: ['CMD', 'bun', '-e', "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))"]
+    test:
+      [
+        'CMD',
+        'bun',
+        '-e',
+        "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))",
+      ]
     interval: 1s
     timeout: 3s
     retries: 60
@@ -53,7 +59,8 @@ networks:
 services:
   postgres:
     image: postgres:18-alpine
-    command: ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
+    command:
+      ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
     environment:
       POSTGRES_USER: novarum
       POSTGRES_PASSWORD: novarum
@@ -97,7 +104,12 @@ services:
 
   anchor-a:
     <<: *anchor
-    depends_on: { postgres: { condition: service_healthy }, garage: { condition: service_healthy }, mailpit: { condition: service_started } }
+    depends_on:
+      {
+        postgres: { condition: service_healthy },
+        garage: { condition: service_healthy },
+        mailpit: { condition: service_started },
+      }
     volumes:
       - ${FED_CONFIG_DIR:?}/a/config.toml:/app/config.toml:ro
     dns: [172.30.0.53]
@@ -107,7 +119,8 @@ services:
 
   anchor-b:
     <<: *anchor
-    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
+    depends_on:
+      { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
     volumes:
       - ${FED_CONFIG_DIR:?}/b/config.toml:/app/config.toml:ro
     dns: [172.30.0.53]
@@ -116,7 +129,8 @@ services:
 
   anchor-c:
     <<: *anchor
-    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
+    depends_on:
+      { postgres: { condition: service_healthy }, mailpit: { condition: service_started } }
     volumes:
       - ${FED_CONFIG_DIR:?}/c/config.toml:/app/config.toml:ro
     dns: [172.30.0.53]
@@ -126,7 +140,12 @@ services:
   # public mode, also on fed so private targets are routable; trusts the test CA
   anchor-p:
     <<: *anchor
-    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started }, dns: { condition: service_healthy } }
+    depends_on:
+      {
+        postgres: { condition: service_healthy },
+        mailpit: { condition: service_started },
+        dns: { condition: service_healthy },
+      }
     environment:
       NODE_EXTRA_CA_CERTS: /certs/ca.crt
     volumes:
@@ -141,7 +160,13 @@ services:
   # public mode behind the egress-only network; outbound goes through `proxy` (config network.proxy_url)
   anchor-q:
     <<: *anchor
-    depends_on: { postgres: { condition: service_healthy }, mailpit: { condition: service_started }, dns: { condition: service_healthy }, proxy: { condition: service_healthy } }
+    depends_on:
+      {
+        postgres: { condition: service_healthy },
+        mailpit: { condition: service_started },
+        dns: { condition: service_healthy },
+        proxy: { condition: service_healthy },
+      }
     environment:
       NODE_EXTRA_CA_CERTS: /certs/ca.crt
       # Bun 1.3.9 only reads HTTP(S)_PROXY at process start, so the `network.proxy_url` that utils/config.ts exports into
@@ -150,7 +175,18 @@ services:
       HTTP_PROXY: ${FED_Q_STARTUP_PROXY-http://172.31.0.80:3128}
       HTTPS_PROXY: ${FED_Q_STARTUP_PROXY-http://172.31.0.80:3128}
     healthcheck:
-      test: ['CMD', 'env', '-u', 'HTTP_PROXY', '-u', 'HTTPS_PROXY', 'bun', '-e', "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'env',
+          '-u',
+          'HTTP_PROXY',
+          '-u',
+          'HTTPS_PROXY',
+          'bun',
+          '-e',
+          "fetch('http://127.0.0.1/').then(r=>r.text()).then(t=>process.exit(t==='this is anchor'?0:1),()=>process.exit(1))",
+        ]
       interval: 1s
       timeout: 3s
       retries: 60
@@ -191,7 +227,8 @@ services:
   canary-meta:
     <<: *tools
     command: ['bun', 'test/harness/canary.ts']
-    environment: { ADMIN_PORT: '9999', CANARY_LISTEN: '0.0.0.0:80=metadata,0.0.0.0:8080=metadata8080' }
+    environment:
+      { ADMIN_PORT: '9999', CANARY_LISTEN: '0.0.0.0:80=metadata,0.0.0.0:8080=metadata8080' }
     networks:
       meta: { ipv4_address: 169.254.169.254 }
       fed: { ipv4_address: 172.30.0.98 }
@@ -230,7 +267,17 @@ services:
   # smokescreen: denies private, loopback and link-local destinations. Also on fed so the harness can reach its logs/port.
   proxy:
     image: smokescreen:local
-    command: ['--listen-port', '3128', '--allow-range', '203.0.113.0/24', '--resolver-address', '203.0.113.53:53', '--statsd-address', '127.0.0.1:8200']
+    command:
+      [
+        '--listen-port',
+        '3128',
+        '--allow-range',
+        '203.0.113.0/24',
+        '--resolver-address',
+        '203.0.113.53:53',
+        '--statsd-address',
+        '127.0.0.1:8200',
+      ]
     healthcheck:
       test: ['CMD-SHELL', 'nc -z 127.0.0.1 3128']
       interval: 1s

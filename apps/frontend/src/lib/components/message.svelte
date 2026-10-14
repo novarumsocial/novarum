@@ -309,7 +309,11 @@
         <div class="min-w-0 flex-1">
           {#if !grouped}
             <div class="flex items-baseline gap-2">
-              <ProfileCard user={message.author} onCall={onProfileCall} class="text-sm font-semibold text-foreground">
+              <ProfileCard
+                user={message.author}
+                onCall={onProfileCall}
+                class="text-sm font-semibold text-foreground"
+              >
                 {authorName}
               </ProfileCard>
               <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>

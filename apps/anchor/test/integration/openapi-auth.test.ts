@@ -42,8 +42,12 @@ const specSchema = z.object({
     z.record(
       z.string(),
       z.object({
-        parameters: z.array(z.looseObject({ in: z.string(), name: z.string(), schema: z.any().optional() })).optional(),
-        requestBody: z.object({ content: z.record(z.string(), z.object({ schema: z.any().optional() })) }).optional(),
+        parameters: z
+          .array(z.looseObject({ in: z.string(), name: z.string(), schema: z.any().optional() }))
+          .optional(),
+        requestBody: z
+          .object({ content: z.record(z.string(), z.object({ schema: z.any().optional() })) })
+          .optional(),
       })
     )
   ),
@@ -60,7 +64,10 @@ function sample(schema: any): any {
   if (!schema) return 'x';
   if (schema.$ref) return sample(spec.components?.schemas?.[schema.$ref.split('/').pop()!]);
   const options = schema.anyOf ?? schema.oneOf;
-  if (options) return sample(options.find((s: any) => s.type !== 'null' && s.format !== 'integer') ?? options[0]); // t.Integer() also accepts its string form
+  if (options)
+    return sample(
+      options.find((s: any) => s.type !== 'null' && s.format !== 'integer') ?? options[0]
+    ); // t.Integer() also accepts its string form
   if (schema.allOf) return Object.assign({}, ...schema.allOf.map(sample));
   if (schema.enum) return schema.enum[0];
   if (schema.const !== undefined) return schema.const;
@@ -69,9 +76,13 @@ function sample(schema: any): any {
       if (schema.format === 'date-time') return new Date().toISOString();
       if (schema.format === 'email') return 'a@example.test';
       if (schema.format === 'uri') return 'https://example.test/';
-      if (schema.format === 'binary') return new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' });
+      if (schema.format === 'binary')
+        return new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' });
       const text = ['abcdef', '123456', '#aabbcc', 'ab'.repeat(12)].find(
-        (s) => (!schema.pattern || new RegExp(schema.pattern).test(s)) && s.length >= (schema.minLength ?? 0) && s.length <= (schema.maxLength ?? 1e9)
+        (s) =>
+          (!schema.pattern || new RegExp(schema.pattern).test(s)) &&
+          s.length >= (schema.minLength ?? 0) &&
+          s.length <= (schema.maxLength ?? 1e9)
       );
       return text ?? 'x'.repeat(schema.minLength ?? 1);
     }
@@ -83,13 +94,19 @@ function sample(schema: any): any {
     case 'array':
       return Array.from({ length: schema.minItems ?? 0 }, () => sample(schema.items));
     case 'object':
-      return Object.fromEntries((schema.required ?? []).map((k: string) => [k, sample(schema.properties?.[k])]));
+      return Object.fromEntries(
+        (schema.required ?? []).map((k: string) => [k, sample(schema.properties?.[k])])
+      );
     default:
       return 'x';
   }
 }
 
-function build(method: string, path: string, op: z.infer<typeof specSchema>['paths'][string][string]) {
+function build(
+  method: string,
+  path: string,
+  op: z.infer<typeof specSchema>['paths'][string][string]
+) {
   const params = op.parameters ?? [];
   const query = new URLSearchParams();
   let url = path;
@@ -104,7 +121,14 @@ function build(method: string, path: string, op: z.infer<typeof specSchema>['pat
   const body = sample(content['application/json']?.schema ?? Object.values(content)[0]?.schema);
   const hasFile = Object.values(body ?? {}).some((v) => v instanceof File);
   if (!hasFile) {
-    return { url: url + qs, init: { method, body: JSON.stringify(body), headers: { 'content-type': 'application/json' } } as RequestInit };
+    return {
+      url: url + qs,
+      init: {
+        method,
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+      } as RequestInit,
+    };
   }
   const form = new FormData();
   for (const [k, v] of Object.entries(body)) form.set(k, v as any);
@@ -112,7 +136,12 @@ function build(method: string, path: string, op: z.infer<typeof specSchema>['pat
 }
 
 const routes = Object.entries(spec.paths).flatMap(([path, ops]) =>
-  Object.entries(ops).map(([method, op]) => ({ key: `${method.toUpperCase()} ${path}`, method: method.toUpperCase(), path, op }))
+  Object.entries(ops).map(([method, op]) => ({
+    key: `${method.toUpperCase()} ${path}`,
+    method: method.toUpperCase(),
+    path,
+    op,
+  }))
 );
 
 const [victimId, victimSecret] = victim.cookie.split('.') as [string, string];
@@ -128,7 +157,11 @@ describe('allow-lists', () => {
   test('the spec lists routes and every allow-list entry still exists', () => {
     expect(routes.length).toBeGreaterThan(40);
     const keys = new Set(routes.map((r) => r.key));
-    for (const key of [...Object.keys(publicRoutes), ...Object.keys(otherCredential), ...websocketRoutes]) {
+    for (const key of [
+      ...Object.keys(publicRoutes),
+      ...Object.keys(otherCredential),
+      ...websocketRoutes,
+    ]) {
       expect(keys.has(key), `stale allow-list entry: ${key}`).toBe(true);
     }
   });
@@ -141,7 +174,13 @@ describe('allow-lists', () => {
 // guilds/channels/messages/DMs/realtime behaviour beyond the 401 contract is covered by their own suites
 describe('authenticated routes answer 401 without a valid session', () => {
   for (const r of routes) {
-    if (r.key in publicRoutes || r.key in otherCredential || isFederation(r.key) || websocketRoutes.has(r.key)) continue;
+    if (
+      r.key in publicRoutes ||
+      r.key in otherCredential ||
+      isFederation(r.key) ||
+      websocketRoutes.has(r.key)
+    )
+      continue;
     for (const [label, token] of Object.entries(sessions)) {
       test(`${r.key} (${label})`, async () => {
         const { url, init } = build(r.method, r.path, r.op);

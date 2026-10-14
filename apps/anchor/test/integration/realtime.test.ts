@@ -75,7 +75,11 @@ describe('subscriptions', () => {
     const rx = await connect(outsider);
     rx.send({ type: 'subscribe.guild', guildId });
 
-    const { message } = await post(owner, '/message/send', { channelId, content: 'secret', nonce: 'n' });
+    const { message } = await post(owner, '/message/send', {
+      channelId,
+      content: 'secret',
+      nonce: 'n',
+    });
     await ro.waitFor('message.created', (e) => e.data.id === message.id);
     // the outsider got neither a snapshot for that guild nor the event (they share the same server, so give it a beat)
     await Bun.sleep(300);
@@ -91,7 +95,11 @@ describe('subscriptions', () => {
     const { guildId, channelId } = await createGuild(owner);
     await joinGuild(owner, guest, guildId);
     const rg = await connect(guest);
-    const { message } = await post(owner, '/message/send', { channelId, content: 'hi', nonce: 'n' });
+    const { message } = await post(owner, '/message/send', {
+      channelId,
+      content: 'hi',
+      nonce: 'n',
+    });
     await rg.waitFor('message.created', (e) => e.data.id === message.id);
     rg.close();
   });

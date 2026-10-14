@@ -204,23 +204,23 @@
     {#if attachment}
       <header class="relative z-10 flex shrink-0 items-center gap-3 p-3 sm:px-4">
         {#if !plain}
-        <Avatar
-          src={author.avatarUrl}
-          name={authorName}
-          bgColor={author.avatarColor}
-          class="size-9 text-xs"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="flex items-baseline gap-2">
-            <span class="truncate text-sm font-semibold">{authorName}</span>
-            <span class="shrink-0 text-[11px] text-muted-foreground">
-              {formatDate(timestamp)} at {formatTime(timestamp)}
-            </span>
-          </p>
-          <p class="truncate text-[11px] text-muted-foreground">
-            {attachment.filename}, {formatBytes(attachment.size)}
-          </p>
-        </div>
+          <Avatar
+            src={author.avatarUrl}
+            name={authorName}
+            bgColor={author.avatarColor}
+            class="size-9 text-xs"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="flex items-baseline gap-2">
+              <span class="truncate text-sm font-semibold">{authorName}</span>
+              <span class="shrink-0 text-[11px] text-muted-foreground">
+                {formatDate(timestamp)} at {formatTime(timestamp)}
+              </span>
+            </p>
+            <p class="truncate text-[11px] text-muted-foreground">
+              {attachment.filename}, {formatBytes(attachment.size)}
+            </p>
+          </div>
         {/if}
         <div class="ml-auto flex shrink-0 items-center">
           {@render action('Open in new tab', ExternalLink, {

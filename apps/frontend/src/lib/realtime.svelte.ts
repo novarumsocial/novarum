@@ -388,7 +388,10 @@ class RealtimeState {
         ) {
           // the sound follows its own switch, so it plays even with system notifications off
           if (settings.value.mentionSound) notificationSound();
-          if (settings.value.pushNotifications && (await getNotificationPermission()) === 'granted') {
+          if (
+            settings.value.pushNotifications &&
+            (await getNotificationPermission()) === 'granted'
+          ) {
             const guild = chat.servers.find((server) => server.id === event.data.guildId);
             const channel = chat.channelsByServer[event.data.guildId ?? '']
               ?.flatMap((category) => category.channels)

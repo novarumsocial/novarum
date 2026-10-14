@@ -94,11 +94,18 @@
             </ContextMenu.Trigger>
             <ContextMenu.Content>
               <ContextMenu.Item>Profile</ContextMenu.Item>
-              <ContextMenu.Item onclick={() => chat.requestMention(member)}>Mention</ContextMenu.Item>
+              <ContextMenu.Item onclick={() => chat.requestMention(member)}
+                >Mention</ContextMenu.Item
+              >
               {#if isFriend(member)}
                 <ContextMenu.Item onclick={() => void openDm(member)}>Message</ContextMenu.Item>
                 <!-- intentionally left out incase we wanna add personal notes like on signal -->
-                <ContextMenu.Item onclick={() => void openDm(member).then((channelId) => {if (channelId && onCall) onCall(channelId);})}>Start a Call</ContextMenu.Item>
+                <ContextMenu.Item
+                  onclick={() =>
+                    void openDm(member).then((channelId) => {
+                      if (channelId && onCall) onCall(channelId);
+                    })}>Start a Call</ContextMenu.Item
+                >
               {/if}
               <ContextMenu.Separator />
               <ContextMenu.Item>Mute</ContextMenu.Item>
@@ -150,11 +157,18 @@
               </ContextMenu.Trigger>
               <ContextMenu.Content>
                 <ContextMenu.Item>Profile</ContextMenu.Item>
-                <ContextMenu.Item onclick={() => chat.requestMention(member)}>Mention</ContextMenu.Item>
+                <ContextMenu.Item onclick={() => chat.requestMention(member)}
+                  >Mention</ContextMenu.Item
+                >
                 {#if isFriend(member)}
                   <ContextMenu.Item onclick={() => void openDm(member)}>Message</ContextMenu.Item>
                   <!-- intentionally left out Message from !isSelf incase we wanna add personal notes like on signal -->
-                  <ContextMenu.Item onclick={() => void openDm(member).then((channelId) => {if (channelId && onCall) onCall(channelId);})}>Start a Call</ContextMenu.Item>
+                  <ContextMenu.Item
+                    onclick={() =>
+                      void openDm(member).then((channelId) => {
+                        if (channelId && onCall) onCall(channelId);
+                      })}>Start a Call</ContextMenu.Item
+                  >
                 {/if}
                 <ContextMenu.Separator />
                 <ContextMenu.Item>Mute</ContextMenu.Item>

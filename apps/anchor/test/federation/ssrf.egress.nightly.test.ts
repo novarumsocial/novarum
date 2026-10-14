@@ -1,8 +1,28 @@
 // TESTING_PLAN.md 5.4 F: egress-proxy variant. anchor-q sits on an internal network whose only way out is smokescreen, and has
 // HTTP(S)_PROXY in its container environment (see README quirks). Requests to anchor-q go through `fetchIn`/`exec`.
-import { afterAll, beforeAll, beforeEach, describe, expect, test, setDefaultTimeout } from 'bun:test';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  setDefaultTimeout,
+} from 'bun:test';
 import { dns, fake, ips, start, stop, stackIsUp } from '../harness/federation';
-import { bunIn, clean, dropShadows, expectRefused, freshAnchor, makeActor, pgFor, publicDiscovery, runTriggers, strayTraffic, type Actor } from '../harness/ssrf';
+import {
+  bunIn,
+  clean,
+  dropShadows,
+  expectRefused,
+  freshAnchor,
+  makeActor,
+  pgFor,
+  publicDiscovery,
+  runTriggers,
+  strayTraffic,
+  type Actor,
+} from '../harness/ssrf';
 import { eventually } from '../harness/wait';
 
 // restarts and 10s federation timeouts do not fit bun's 5s default (the harness's own call only reaches later files)
@@ -28,9 +48,15 @@ beforeEach(clean, 60_000);
 
 describe('F. the A-group targets through T1-T6 on anchor-q', () => {
   // refused either by assertSafeFederationUrl or, for names that only look public, by smokescreen
-  test.each(['127.0.0.1', '10.0.0.1', '169.254.169.254', '172.30.0.99', '0x7f000001'])('%s', async (hs) => {
-    await expectRefused(ctx, hs, { reason: policy, logHost: hs === '0x7f000001' ? '127.0.0.1' : hs });
-  });
+  test.each(['127.0.0.1', '10.0.0.1', '169.254.169.254', '172.30.0.99', '0x7f000001'])(
+    '%s',
+    async (hs) => {
+      await expectRefused(ctx, hs, {
+        reason: policy,
+        logHost: hs === '0x7f000001' ? '127.0.0.1' : hs,
+      });
+    }
+  );
   test('localhost', () => expectRefused(ctx, 'localhost', { reason: policy }));
 
   test.each([
@@ -48,11 +74,14 @@ describe('F. the A-group targets through T1-T6 on anchor-q', () => {
   });
 
   // the in-process check misses these (see the address suite); with the proxy in front they are refused anyway
-  test.each(['::127.0.0.1', '64:ff9b::a00:1', '2002:a00:1::'])('DNS: AAAA %s (missed by isPrivateIp) is still refused', async (ip) => {
-    const hs = `egress-v6-${ip.replace(/\W/g, '')}.test`;
-    await dns.set(hs, ip);
-    await expectRefused(ctx, hs);
-  });
+  test.each(['::127.0.0.1', '64:ff9b::a00:1', '2002:a00:1::'])(
+    'DNS: AAAA %s (missed by isPrivateIp) is still refused',
+    async (ip) => {
+      const hs = `egress-v6-${ip.replace(/\W/g, '')}.test`;
+      await dns.set(hs, ip);
+      await expectRefused(ctx, hs);
+    }
+  );
 });
 
 describe('F. positive control: evil.test through the proxy', () => {
@@ -60,9 +89,17 @@ describe('F. positive control: evil.test through the proxy', () => {
     await freshAnchor('q');
     await publicDiscovery();
     const results = await runTriggers(ctx, 'evil.test', ['T1', 'T3', 'T4']);
-    expect([results.T1![0]!.status, results.T3![0]!.status, results.T4![0]!.status]).toEqual([401, 404, 404]);
+    expect([results.T1![0]!.status, results.T3![0]!.status, results.T4![0]!.status]).toEqual([
+      401, 404, 404,
+    ]);
     const seen = await fake.requests(1);
-    expect(seen.map((r) => `${r.method} ${r.path}`)).toEqual(expect.arrayContaining(['GET /.well-known/anchor/info', 'GET /federation/users/alice', 'POST /federation/invites/code1/accept']));
+    expect(seen.map((r) => `${r.method} ${r.path}`)).toEqual(
+      expect.arrayContaining([
+        'GET /.well-known/anchor/info',
+        'GET /federation/users/alice',
+        'POST /federation/invites/code1/accept',
+      ])
+    );
     expect(new Set(seen.map((r) => r.sourceIp))).toEqual(new Set([ips.proxy.pub]));
   });
 });
@@ -73,18 +110,31 @@ describe('F. WebSockets bypass the proxy', () => {
     await freshAnchor('q');
     await publicDiscovery();
     await runTriggers(ctx, 'evil.test', ['T5']);
-    await eventually(async () => (await fake.requests(1, { path: '/federation/realtime' })).some((r) => r.host === 'evil.test'), { timeout: 15_000, message: 'bridge handshake at the fake' });
+    await eventually(
+      async () =>
+        (await fake.requests(1, { path: '/federation/realtime' })).some(
+          (r) => r.host === 'evil.test'
+        ),
+      { timeout: 15_000, message: 'bridge handshake at the fake' }
+    );
   });
 
   // the same without the anchor: a bare WebSocket in anchor-q's container with the proxy configured as the runtime expects
-  test.failing('known gap: a bare WebSocket with HTTPS_PROXY set reaches evil.test through the proxy', async () => {
-    const script = `
+  test.failing(
+    'known gap: a bare WebSocket with HTTPS_PROXY set reaches evil.test through the proxy',
+    async () => {
+      const script = `
       const ws = new WebSocket('wss://evil.test/federation/realtime/guilds/x');
       const done = (s) => { console.log(JSON.stringify({ s })); process.exit(0); };
       ws.onclose = () => done('close'); ws.onerror = () => done('error'); setTimeout(() => done('timeout'), 8000);`;
-    await bunIn('q', script, null, { HTTPS_PROXY: proxyUrl, HTTP_PROXY: proxyUrl });
-    expect((await fake.requests(1, { path: '/federation/realtime' })).filter((r) => r.host === 'evil.test').length).toBeGreaterThan(0);
-  });
+      await bunIn('q', script, null, { HTTPS_PROXY: proxyUrl, HTTP_PROXY: proxyUrl });
+      expect(
+        (await fake.requests(1, { path: '/federation/realtime' })).filter(
+          (r) => r.host === 'evil.test'
+        ).length
+      ).toBeGreaterThan(0);
+    }
+  );
 });
 
 describe('F. network.proxy_url works without HTTP(S)_PROXY at process start', () => {
@@ -100,7 +150,11 @@ describe('F. network.proxy_url works without HTTP(S)_PROXY at process start', ()
 
   test('control: the configured proxy_url works when handed to fetch explicitly', async () => {
     await publicDiscovery();
-    expect(await bunIn('q', probe, true)).toMatchObject({ ok: true, status: 200, proxy_url: proxyUrl });
+    expect(await bunIn('q', probe, true)).toMatchObject({
+      ok: true,
+      status: 200,
+      proxy_url: proxyUrl,
+    });
     expect((await fake.requests(1))[0]!.sourceIp).toBe(ips.proxy.pub);
   });
 
@@ -117,12 +171,18 @@ describe('F. the resolver is a dependency of the check: dns stopped', () => {
     await stop('dns');
     try {
       await expectRefused(ctx, 'evil.test');
-      expect((await ctx.actor.as('/guilds/create', { method: 'POST', json: { name: 'still works' } })).status).toBe(200);
+      expect(
+        (await ctx.actor.as('/guilds/create', { method: 'POST', json: { name: 'still works' } }))
+          .status
+      ).toBe(200);
       expect((await ctx.actor.as('/guilds/list')).status).toBe(200);
       expect(await strayTraffic()).toEqual({ canary: [], fake1: [], fake2: [] });
     } finally {
       await start('dns');
-      await eventually(() => dns.queries().then(() => true), { timeout: 30_000, message: 'dns admin back' });
+      await eventually(() => dns.queries().then(() => true), {
+        timeout: 30_000,
+        message: 'dns admin back',
+      });
       await dns.reset();
     }
   });

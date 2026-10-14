@@ -13,7 +13,11 @@ afterAll(() => anchor.destroy());
 
 /** owner, member and non-member around one guild */
 async function world() {
-  const [owner, member, stranger] = await Promise.all([signup(anchor.url), signup(anchor.url), signup(anchor.url)]);
+  const [owner, member, stranger] = await Promise.all([
+    signup(anchor.url),
+    signup(anchor.url),
+    signup(anchor.url),
+  ]);
   const { guild, channel } = await createGuild(owner);
   await join(owner, guild.id, member);
   return { owner, member, stranger, guild, channel };
@@ -24,10 +28,23 @@ const channelsOf = async (user: Awaited<ReturnType<typeof signup>>, guildId: str
 describe('create', () => {
   test('the owner creates channels, each new one goes to position 0 and pushes the rest down', async () => {
     const { owner, guild, channel } = await world();
-    const text = await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'random', type: 'TEXT' });
+    const text = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'random',
+      type: 'TEXT',
+    });
     expect(text.status).toBe(200);
-    expect(text.body).toMatchObject({ name: 'random', type: 'TEXT', position: 0, guildId: guild.id });
-    const voice = await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'talk', type: 'VOICE' });
+    expect(text.body).toMatchObject({
+      name: 'random',
+      type: 'TEXT',
+      position: 0,
+      guildId: guild.id,
+    });
+    const voice = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'talk',
+      type: 'VOICE',
+    });
     expect(voice.body).toMatchObject({ type: 'VOICE', position: 0 });
 
     const channels = await channelsOf(owner, guild.id);
@@ -40,7 +57,11 @@ describe('create', () => {
 
   test('spaces in the name become dashes', async () => {
     const { owner, guild } = await world();
-    const res = await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'a b c', type: 'TEXT' });
+    const res = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'a b c',
+      type: 'TEXT',
+    });
     expect(res.body.name).toBe('a-b-c');
   });
 
@@ -49,12 +70,18 @@ describe('create', () => {
     const body = { guildId: guild.id, name: 'nope', type: 'TEXT' };
     expect((await call(member, 'POST', '/channel/create', body)).status).toBe(403);
     expect((await call(stranger, 'POST', '/channel/create', body)).status).toBe(403);
-    expect((await call(stranger, 'POST', '/channel/create', { ...body, guildId: 'nope' })).status).toBe(404);
+    expect(
+      (await call(stranger, 'POST', '/channel/create', { ...body, guildId: 'nope' })).status
+    ).toBe(404);
   });
 
   test('a federated guild id is refused with 400', async () => {
     const { owner } = await world();
-    const res = await call(owner, 'POST', '/channel/create', { guildId: 'fed:guild:example.test:abc', name: 'x', type: 'TEXT' });
+    const res = await call(owner, 'POST', '/channel/create', {
+      guildId: 'fed:guild:example.test:abc',
+      name: 'x',
+      type: 'TEXT',
+    });
     expect(res.status).toBe(400);
   });
 
@@ -65,7 +92,12 @@ describe('create', () => {
     ['unknown type', { type: 'FORUM' }],
   ])('rejects %s', async (_, override) => {
     const { owner, guild } = await world();
-    const res = await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'ok', type: 'TEXT', ...override });
+    const res = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'ok',
+      type: 'TEXT',
+      ...override,
+    });
     expect(res.status).toBe(422);
   });
 
@@ -74,7 +106,11 @@ describe('create', () => {
     const ws = await openRealtime(anchor.url, member.cookie);
     try {
       await Bun.sleep(200); // memberships are subscribed right after open
-      const created = await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'live', type: 'TEXT' });
+      const created = await call(owner, 'POST', '/channel/create', {
+        guildId: guild.id,
+        name: 'live',
+        type: 'TEXT',
+      });
       const event = await ws.waitFor('channel.created', (e) => e.data?.id === created.body.id);
       expect(event.data).toMatchObject({ name: 'live', guildId: guild.id });
     } finally {
@@ -86,15 +122,30 @@ describe('create', () => {
 describe('order', () => {
   async function withThree() {
     const w = await world();
-    const a = (await call(w.owner, 'POST', '/channel/create', { guildId: w.guild.id, name: 'a', type: 'TEXT' })).body.id;
-    const b = (await call(w.owner, 'POST', '/channel/create', { guildId: w.guild.id, name: 'b', type: 'TEXT' })).body.id;
+    const a = (
+      await call(w.owner, 'POST', '/channel/create', {
+        guildId: w.guild.id,
+        name: 'a',
+        type: 'TEXT',
+      })
+    ).body.id;
+    const b = (
+      await call(w.owner, 'POST', '/channel/create', {
+        guildId: w.guild.id,
+        name: 'b',
+        type: 'TEXT',
+      })
+    ).body.id;
     return { ...w, ids: [a as string, b as string, w.channel.id] };
   }
 
   test('the owner reorders and the list reflects it', async () => {
     const { owner, guild, ids } = await withThree();
     const wanted = [ids[2]!, ids[0]!, ids[1]!];
-    const res = await call(owner, 'PATCH', '/channel/order', { guildId: guild.id, channelIds: wanted });
+    const res = await call(owner, 'PATCH', '/channel/order', {
+      guildId: guild.id,
+      channelIds: wanted,
+    });
     expect(res.body).toEqual({ success: true });
     expect((await channelsOf(owner, guild.id)).map((c: any) => c.id)).toEqual(wanted);
   });
@@ -104,13 +155,21 @@ describe('order', () => {
     const body = { guildId: guild.id, channelIds: ids };
     expect((await call(member, 'PATCH', '/channel/order', body)).status).toBe(403);
     expect((await call(stranger, 'PATCH', '/channel/order', body)).status).toBe(403);
-    expect((await call(member, 'PATCH', '/channel/order', { ...body, guildId: 'nope' })).status).toBe(404);
+    expect(
+      (await call(member, 'PATCH', '/channel/order', { ...body, guildId: 'nope' })).status
+    ).toBe(404);
   });
 
   test('must contain every channel of the guild exactly once', async () => {
     const { owner, guild, ids } = await withThree();
     const other = await createGuild(owner);
-    for (const channelIds of [[], [ids[0]], [ids[0], ids[0], ids[1]], [...ids, ids[0]], [ids[0], ids[1], other.channel.id]]) {
+    for (const channelIds of [
+      [],
+      [ids[0]],
+      [ids[0], ids[0], ids[1]],
+      [...ids, ids[0]],
+      [ids[0], ids[1], other.channel.id],
+    ]) {
       const res = await call(owner, 'PATCH', '/channel/order', { guildId: guild.id, channelIds });
       expect(res.status).toBe(400);
     }
@@ -122,7 +181,10 @@ describe('users', () => {
     const { owner, member, guild, channel } = await world();
     const { users } = (await call(member, 'GET', `/channel/${channel.id}/users`)).body;
     expect(users.map((u: any) => [u.userId, u.role]).sort()).toEqual(
-      [[owner.user.id, 'OWNER'], [member.user.id, 'MEMBER']].sort()
+      [
+        [owner.user.id, 'OWNER'],
+        [member.user.id, 'MEMBER'],
+      ].sort()
     );
     expect(guild.id).toBeTruthy();
   });
@@ -153,7 +215,11 @@ describe('read state', () => {
     const unread = async () => (await channelsOf(member, guildId))[0].unread;
     expect(await unread()).toBe(true);
 
-    const read = (m: any) => call(member, 'POST', `/channel/${channel.id}/read`, { messageId: m.id, createdAt: m.createdAt });
+    const read = (m: any) =>
+      call(member, 'POST', `/channel/${channel.id}/read`, {
+        messageId: m.id,
+        createdAt: m.createdAt,
+      });
     expect((await read(second)).body).toEqual({ success: true });
     expect(await unread()).toBe(true);
     expect((await read(third)).body).toEqual({ success: true });
@@ -166,24 +232,54 @@ describe('read state', () => {
     const { owner, member, channel } = await world();
     const msg = (await send(owner, channel.id, 'hi')).body.message;
     const path = `/channel/${channel.id}/read`;
-    expect((await call(member, 'POST', path, { messageId: 'nope', createdAt: msg.createdAt })).status).toBe(400);
-    expect((await call(member, 'POST', path, { messageId: msg.id, createdAt: '2001-01-01T00:00:00.000Z' })).status).toBe(400);
-    expect((await call(member, 'POST', '/channel/nope/read', { messageId: msg.id, createdAt: msg.createdAt })).status).toBe(404);
-    expect((await call(member, 'POST', path, { messageId: msg.id, createdAt: 'yesterday' })).status).toBe(422);
+    expect(
+      (await call(member, 'POST', path, { messageId: 'nope', createdAt: msg.createdAt })).status
+    ).toBe(400);
+    expect(
+      (
+        await call(member, 'POST', path, {
+          messageId: msg.id,
+          createdAt: '2001-01-01T00:00:00.000Z',
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await call(member, 'POST', '/channel/nope/read', {
+          messageId: msg.id,
+          createdAt: msg.createdAt,
+        })
+      ).status
+    ).toBe(404);
+    expect(
+      (await call(member, 'POST', path, { messageId: msg.id, createdAt: 'yesterday' })).status
+    ).toBe(422);
   });
 
   test('non-members get 403', async () => {
     const { owner, stranger, channel } = await world();
     const msg = (await send(owner, channel.id, 'hi')).body.message;
-    const res = await call(stranger, 'POST', `/channel/${channel.id}/read`, { messageId: msg.id, createdAt: msg.createdAt });
+    const res = await call(stranger, 'POST', `/channel/${channel.id}/read`, {
+      messageId: msg.id,
+      createdAt: msg.createdAt,
+    });
     expect(res.status).toBe(403);
   });
 
   test('a message from another channel is not a valid cursor', async () => {
     const { owner, member, guild, channel } = await world();
-    const other = (await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'other', type: 'TEXT' })).body;
+    const other = (
+      await call(owner, 'POST', '/channel/create', {
+        guildId: guild.id,
+        name: 'other',
+        type: 'TEXT',
+      })
+    ).body;
     const msg = (await send(owner, other.id, 'elsewhere')).body.message;
-    const res = await call(member, 'POST', `/channel/${channel.id}/read`, { messageId: msg.id, createdAt: msg.createdAt });
+    const res = await call(member, 'POST', `/channel/${channel.id}/read`, {
+      messageId: msg.id,
+      createdAt: msg.createdAt,
+    });
     expect(res.status).toBe(400);
     expect((await list(member, other.id)).status).toBe(200);
   });
@@ -195,7 +291,9 @@ describe('typing', () => {
     const ws = await openRealtime(anchor.url, owner.cookie);
     try {
       await Bun.sleep(200); // memberships are subscribed right after open
-      expect((await call(member, 'POST', `/channel/${channel.id}/typing`)).body).toEqual({ ok: true });
+      expect((await call(member, 'POST', `/channel/${channel.id}/typing`)).body).toEqual({
+        ok: true,
+      });
       const event = await ws.waitFor('channel.typing');
       expect(event.data).toMatchObject({ channelId: channel.id, userId: member.user.id });
     } finally {

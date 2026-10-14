@@ -16,12 +16,20 @@ type User = Awaited<ReturnType<typeof signup>>;
 const pair = async () => [await signup(anchor.url), await signup(anchor.url)] as const;
 
 const request = (from: User, to: User, homeserver = 'localhost') =>
-  from.fetch('/friends/request', { method: 'POST', body: JSON.stringify({ username: to.user.username, homeserver }) });
-const accept = (by: User, requester: User) => by.fetch(`/friends/requests/${requester.user.id}/accept`, { method: 'POST' });
-const decline = (by: User, requester: User) => by.fetch(`/friends/requests/${requester.user.id}/decline`, { method: 'POST' });
+  from.fetch('/friends/request', {
+    method: 'POST',
+    body: JSON.stringify({ username: to.user.username, homeserver }),
+  });
+const accept = (by: User, requester: User) =>
+  by.fetch(`/friends/requests/${requester.user.id}/accept`, { method: 'POST' });
+const decline = (by: User, requester: User) =>
+  by.fetch(`/friends/requests/${requester.user.id}/decline`, { method: 'POST' });
 const del = (by: User, other: User) => by.fetch(`/friends/${other.user.id}`, { method: 'DELETE' });
 const list = async (u: User) =>
-  (await (await u.fetch('/friends')).json()) as Record<'accepted' | 'incoming' | 'outgoing', { user: { userId: string } }[]>;
+  (await (await u.fetch('/friends')).json()) as Record<
+    'accepted' | 'incoming' | 'outgoing',
+    { user: { userId: string } }[]
+  >;
 const ids = (entries: { user: { userId: string } }[]) => entries.map((e) => e.user.userId);
 
 describe('request / accept / remove', () => {
@@ -29,7 +37,12 @@ describe('request / accept / remove', () => {
     const [a, b] = await pair();
     const res = await request(a, b);
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ status: 'PENDING', requestedById: a.user.id, version: 1, acceptedAt: null });
+    expect(await res.json()).toMatchObject({
+      status: 'PENDING',
+      requestedById: a.user.id,
+      version: 1,
+      acceptedAt: null,
+    });
     expect(ids((await list(a)).outgoing)).toEqual([b.user.id]);
     expect(ids((await list(b)).incoming)).toEqual([a.user.id]);
     expect((await list(a)).incoming).toEqual([]);
@@ -42,7 +55,10 @@ describe('request / accept / remove', () => {
     const res = await accept(b, a);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ status: 'ACCEPTED', version: 2 });
-    for (const [me, other] of [[a, b], [b, a]] as const) {
+    for (const [me, other] of [
+      [a, b],
+      [b, a],
+    ] as const) {
       const l = await list(me);
       expect(ids(l.accepted)).toEqual([other.user.id]);
       expect(l.incoming).toEqual([]);
@@ -202,7 +218,8 @@ describe('validation', () => {
 
   test('username and homeserver bounds are enforced', async () => {
     const a = await signup(anchor.url);
-    const post = (body: object) => a.fetch('/friends/request', { method: 'POST', body: JSON.stringify(body) });
+    const post = (body: object) =>
+      a.fetch('/friends/request', { method: 'POST', body: JSON.stringify(body) });
     expect((await post({ username: 'a', homeserver: 'localhost' })).status).toBe(422);
     expect((await post({ username: 'ab', homeserver: '' })).status).toBe(422);
     expect((await post({ username: 'ab' })).status).toBe(422);
@@ -226,7 +243,9 @@ describe('realtime', () => {
     const [wa, wb] = await Promise.all([connectRealtime(a), connectRealtime(b)]);
     const count = (ws: typeof wa) => ws.events.filter((e) => e.type === 'friends.changed').length;
     const expectCounts = async (n: number) => {
-      await eventually(() => count(wa) === n && count(wb) === n, { message: `friends.changed x${n}` });
+      await eventually(() => count(wa) === n && count(wb) === n, {
+        message: `friends.changed x${n}`,
+      });
     };
     try {
       await request(a, b);

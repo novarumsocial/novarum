@@ -17,7 +17,11 @@ type User = Awaited<ReturnType<typeof signup>>;
 
 const totpNow = (secret: string) => generateTOTP(decodeBase32(secret), 30, 6);
 const totpAt = (secret: string, offsetSeconds: number) =>
-  generateHOTP(decodeBase32(secret), BigInt(Math.floor((Date.now() + offsetSeconds * 1000) / 30_000)), 6);
+  generateHOTP(
+    decodeBase32(secret),
+    BigInt(Math.floor((Date.now() + offsetSeconds * 1000) / 30_000)),
+    6
+  );
 
 async function enableTotp(u: User) {
   const qr = await u.fetch('/auth/mfa/totp/qr');
@@ -76,7 +80,10 @@ describe('TOTP', () => {
     const u = await signup(anchor.url);
     const { secret } = (await (await u.fetch('/auth/mfa/totp/qr')).json()) as { secret: string };
     const wrong = totpAt(secret, 600);
-    const res = await u.fetch('/auth/mfa/totp/enable', { method: 'POST', body: JSON.stringify({ secret, code: wrong }) });
+    const res = await u.fetch('/auth/mfa/totp/enable', {
+      method: 'POST',
+      body: JSON.stringify({ secret, code: wrong }),
+    });
     expect(res.status).toBe(400);
     expect(await (await u.fetch('/auth/mfa')).json()).toEqual({ mfaOptions: [] });
   });
@@ -158,20 +165,25 @@ describe('email MFA', () => {
     expect(send.status).toBe(200);
     const code = await latestOtpFor(u.email, { since });
 
-    expect((await mfaLogin(c.challenge, 'EMAIL', code === '000000' ? '111111' : '000000')).status).toBe(401);
+    expect(
+      (await mfaLogin(c.challenge, 'EMAIL', code === '000000' ? '111111' : '000000')).status
+    ).toBe(401);
     const res = await mfaLogin(c.challenge, 'EMAIL', code);
     expect(res.status).toBe(200);
     expect(await meStatus(anchor.url, parseSetCookie(res)!)).toBe(200);
     // consumed
     expect((await mfaLogin(c.challenge, 'EMAIL', code)).status).toBe(401);
-    expect((await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status).toBe(401);
+    expect(
+      (await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status
+    ).toBe(401);
   });
 
   test('the code cannot be guessed before one is requested', async () => {
     const u = await signup(anchor.url);
     await toggleEmail(u, true);
     const c = await challenge(u);
-    for (const code of ['000000', '123456']) expect((await mfaLogin(c.challenge, 'EMAIL', code)).status).toBe(401);
+    for (const code of ['000000', '123456'])
+      expect((await mfaLogin(c.challenge, 'EMAIL', code)).status).toBe(401);
   });
 
   test('a challenge for a user without email MFA cannot send mail', async () => {
@@ -179,7 +191,9 @@ describe('email MFA', () => {
     await toggleEmail(u, true);
     const c = await challenge(u);
     await toggleEmail(u, false);
-    expect((await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status).toBe(401);
+    expect(
+      (await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status
+    ).toBe(401);
   });
 
   test('an expired challenge is rejected', async () => {
@@ -192,7 +206,9 @@ describe('email MFA', () => {
     } finally {
       await sql.close();
     }
-    expect((await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status).toBe(401);
+    expect(
+      (await post(anchor.url, '/auth/login/mfa/email', { challenge: c.challenge })).status
+    ).toBe(401);
     expect((await mfaLogin(c.challenge, 'EMAIL', '123456')).status).toBe(401);
   });
 

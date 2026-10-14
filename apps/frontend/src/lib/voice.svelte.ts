@@ -543,7 +543,8 @@ export class Voice {
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
     const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-      LocalAudioTrack | undefined;
+      | LocalAudioTrack
+      | undefined;
     if (!(track instanceof LocalAudioTrack)) return;
     if (this.noiseProcessorTrack === track) return;
 
@@ -652,7 +653,8 @@ export class Voice {
       .catch(() => undefined)
       .then(async () => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-          LocalAudioTrack | undefined;
+          | LocalAudioTrack
+          | undefined;
         if (this.room !== room || !(track instanceof LocalAudioTrack)) return;
 
         await this.removeNoiseCancellation();

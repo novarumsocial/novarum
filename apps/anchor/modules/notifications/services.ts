@@ -2,12 +2,7 @@ import Elysia from 'elysia';
 import { z } from 'zod';
 import { and, eq, inArray } from 'drizzle-orm';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
-import {
-  db,
-  notificationPreferences,
-  notificationSettings,
-  pushSubscriptions,
-} from '../../src/db';
+import { db, notificationPreferences, notificationSettings, pushSubscriptions } from '../../src/db';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { assertSafeFederationUrl } from '../../utils/discovery';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -108,7 +103,11 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
     },
     {
       body: z.object({ level: levelSchema, mutedUntil: z.iso.datetime().nullable().optional() }),
-      response: { 200: settingSchema, 401: genericResponseErrorSchema, 403: genericResponseErrorSchema },
+      response: {
+        200: settingSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+      },
     }
   )
   .delete(
@@ -161,7 +160,10 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
         const stale = owned.slice(0, Math.max(0, owned.length - maxSubscriptionsPerUser + 1));
         if (stale.length) {
           await db.delete(pushSubscriptions).where(
-            inArray(pushSubscriptions.id, stale.map((item) => item.id))
+            inArray(
+              pushSubscriptions.id,
+              stale.map((item) => item.id)
+            )
           );
         }
       }

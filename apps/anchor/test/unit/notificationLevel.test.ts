@@ -21,14 +21,22 @@ describe('effectiveLevel', () => {
   test('a mute that has not expired means nothing, and an expired one is ignored', () => {
     expect(effectiveLevel({ c1: { level: 'ALL', mutedUntil: future } }, guild)).toBe('NONE');
     expect(effectiveLevel({ c1: { level: 'ALL', mutedUntil: past } }, guild)).toBe('ALL');
-    expect(effectiveLevel({ g1: { level: 'ALL', mutedUntil: future }, c1: { level: 'MENTIONS' } }, guild)).toBe('MENTIONS');
+    expect(
+      effectiveLevel({ g1: { level: 'ALL', mutedUntil: future }, c1: { level: 'MENTIONS' } }, guild)
+    ).toBe('MENTIONS');
   });
 });
 
 describe('levelAllows', () => {
   test('ALL always, MENTIONS only for mentions, NONE never', () => {
     expect([true, false].map((mentioned) => levelAllows('ALL', mentioned))).toEqual([true, true]);
-    expect([true, false].map((mentioned) => levelAllows('MENTIONS', mentioned))).toEqual([true, false]);
-    expect([true, false].map((mentioned) => levelAllows('NONE', mentioned))).toEqual([false, false]);
+    expect([true, false].map((mentioned) => levelAllows('MENTIONS', mentioned))).toEqual([
+      true,
+      false,
+    ]);
+    expect([true, false].map((mentioned) => levelAllows('NONE', mentioned))).toEqual([
+      false,
+      false,
+    ]);
   });
 });

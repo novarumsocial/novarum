@@ -4,19 +4,32 @@ import { anchorRoot } from '../harness/env';
 
 const repoRoot = path.resolve(anchorRoot, '../..');
 const git = (...args: string[]) => Bun.spawnSync(['git', ...args], { cwd: repoRoot });
-const allowed = ['apps/anchor/test/config.toml', 'apps/anchor/test/compose.yml', 'apps/anchor/test/livekit.yaml', 'dev/compose.yml', 'dev/livekit.yaml', 'apps/anchor/test/federation/compose.yml'];
+const allowed = [
+  'apps/anchor/test/config.toml',
+  'apps/anchor/test/compose.yml',
+  'apps/anchor/test/livekit.yaml',
+  'dev/compose.yml',
+  'dev/livekit.yaml',
+  'apps/anchor/test/federation/compose.yml',
+];
 // a quoted/assigned value of 8+ chars next to a secret-looking key name
-const secretLike = /(secret|access_key|api_key|livekit_key|pepper|password|pass|token)[\w"']*\s*[=:]\s*['"]?[A-Za-z0-9+/_-]{8,}/i;
+const secretLike =
+  /(secret|access_key|api_key|livekit_key|pepper|password|pass|token)[\w"']*\s*[=:]\s*['"]?[A-Za-z0-9+/_-]{8,}/i;
 
 // only config-style files are scanned (source files assign test fixtures all over the place; gitleaks covers those in CI)
 // tracked or not-yet-committed (but not ignored) files, so a new file is checked before its first commit
-const files = git('ls-files', '-co', '--exclude-standard', '--', 'apps/anchor', 'dev').stdout.toString().split('\n').filter((f) => f && !f.endsWith('bun.lock'));
+const files = git('ls-files', '-co', '--exclude-standard', '--', 'apps/anchor', 'dev')
+  .stdout.toString()
+  .split('\n')
+  .filter((f) => f && !f.endsWith('bun.lock'));
 
 describe('secrets', () => {
   test('config.toml (real config) is gitignored, test/config.toml is not', () => {
     expect(git('check-ignore', '-q', 'apps/anchor/config.toml').exitCode).toBe(0);
     expect(git('check-ignore', '-q', 'apps/anchor/test/config.toml').exitCode).toBe(1);
-    expect(files.filter((f) => f.endsWith('config.toml'))).toEqual(['apps/anchor/test/config.toml']);
+    expect(files.filter((f) => f.endsWith('config.toml'))).toEqual([
+      'apps/anchor/test/config.toml',
+    ]);
   });
 
   test('key directories are gitignored and no key material is committed', () => {
@@ -26,8 +39,17 @@ describe('secrets', () => {
   });
 
   test('test/config.toml only has placeholder values', async () => {
-    const cfg = Bun.TOML.parse(await Bun.file(path.join(repoRoot, allowed[0]!)).text()) as Record<string, Record<string, unknown>>;
-    const sensitive = [cfg.voice!.livekit_secret, cfg.files!.s3_secret_key, cfg.files!.s3_access_key, cfg.misc!.otp_pepper, cfg.email!.smtp_pass].map(String);
+    const cfg = Bun.TOML.parse(await Bun.file(path.join(repoRoot, allowed[0]!)).text()) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const sensitive = [
+      cfg.voice!.livekit_secret,
+      cfg.files!.s3_secret_key,
+      cfg.files!.s3_access_key,
+      cfg.misc!.otp_pepper,
+      cfg.email!.smtp_pass,
+    ].map(String);
     for (const v of sensitive) expect(v).toMatch(/test|dev|not-real/i);
     expect(JSON.stringify(cfg)).not.toMatch(/AKIA|-----BEGIN|sk_live|ghp_/);
     expect(cfg.server!.database_url).toMatch(/@(127\.0\.0\.1|localhost)[:/]/);

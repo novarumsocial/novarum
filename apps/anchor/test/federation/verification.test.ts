@@ -1,6 +1,18 @@
 import { afterEach, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { canary, fake, resetHarness, signup } from '../harness/federation';
-import { editHeader, ensurePingUser, ready, fakeUser, restartAnchor, pingBody, pingPath, sendFrom, sendSigned, signed, withDb } from '../harness/fedVerify';
+import {
+  editHeader,
+  ensurePingUser,
+  ready,
+  fakeUser,
+  restartAnchor,
+  pingBody,
+  pingPath,
+  sendFrom,
+  sendSigned,
+  signed,
+  withDb,
+} from '../harness/fedVerify';
 import { eventually } from '../harness/wait';
 
 setDefaultTimeout(120_000); // hooks restart anchors and wait on canaries; a multi-file run resets bun's timeout
@@ -22,11 +34,24 @@ const guildIds: string[] = [];
 /** a shadow guild of `homeserver` on anchor-a, as `fed:guild:<homeserver>:*` rows are; extAnchorDown starts false */
 async function shadowGuild(homeserver: string) {
   const id = `fed:guild:${encodeURIComponent(homeserver)}:${crypto.randomUUID()}`;
-  await withDb('a', (sql) => sql`insert into guild (id, name, "ownerId", "extAnchorDown") values (${id}, 'shadow', ${ownerId}, false)`);
+  await withDb(
+    'a',
+    (sql) =>
+      sql`insert into guild (id, name, "ownerId", "extAnchorDown") values (${id}, 'shadow', ${ownerId}, false)`
+  );
   guildIds.push(id);
   return id;
 }
-const isDown = (id: string) => withDb('a', async (sql) => ((await sql`select "extAnchorDown" as down from guild where id = ${id}`) as { down: boolean }[])[0]!.down);
+const isDown = (id: string) =>
+  withDb(
+    'a',
+    async (sql) =>
+      (
+        (await sql`select "extAnchorDown" as down from guild where id = ${id}`) as {
+          down: boolean;
+        }[]
+      )[0]!.down
+  );
 
 beforeAll(async () => {
   await ready();
@@ -38,7 +63,8 @@ beforeAll(async () => {
 });
 afterEach(async () => {
   await resetHarness();
-  if (guildIds.length) await withDb('a', (sql) => sql`delete from guild where id in ${sql(guildIds.splice(0))}`);
+  if (guildIds.length)
+    await withDb('a', (sql) => sql`delete from guild where id in ${sql(guildIds.splice(0))}`);
 });
 
 describe('signed request checks', () => {
@@ -47,20 +73,27 @@ describe('signed request checks', () => {
     expect(res.status).toBe(200);
   });
 
-  test.each(['X-Novarum-Homeserver', 'X-Novarum-Key-Id', 'X-Novarum-Date', 'X-Novarum-Nonce', 'X-Novarum-Signature', 'X-Novarum-Body-SHA256'])(
-    'missing %s -> 400',
-    async (header) => {
-      const s = await signed(1, 'a', pingPath, pingBody(hsOf(1)));
-      const res = await sendSigned(s, (h) => editHeader(h, header));
-      expect(res.status).toBe(400);
+  test.each([
+    'X-Novarum-Homeserver',
+    'X-Novarum-Key-Id',
+    'X-Novarum-Date',
+    'X-Novarum-Nonce',
+    'X-Novarum-Signature',
+    'X-Novarum-Body-SHA256',
+  ])('missing %s -> 400', async (header) => {
+    const s = await signed(1, 'a', pingPath, pingBody(hsOf(1)));
+    const res = await sendSigned(s, (h) => editHeader(h, header));
+    expect(res.status).toBe(400);
+  });
+
+  test.each([-330, 330])(
+    'Date %is from now (max age 300s) -> 401 Stale',
+    async (dateOffsetSeconds) => {
+      const res = await ping(1, { dateOffsetSeconds });
+      expect(res.status).toBe(401);
+      expect(res.json?.error).toContain('Stale');
     }
   );
-
-  test.each([-330, 330])('Date %is from now (max age 300s) -> 401 Stale', async (dateOffsetSeconds) => {
-    const res = await ping(1, { dateOffsetSeconds });
-    expect(res.status).toBe(401);
-    expect(res.json?.error).toContain('Stale');
-  });
 
   test('unparseable Date -> 401', async () => {
     expect((await ping(1, { date: 'not a date' })).status).toBe(401);
@@ -85,7 +118,9 @@ describe('signed request checks', () => {
   test('same nonce sent concurrently -> exactly one 2xx, the other 401, never 500', async () => {
     for (let i = 0; i < 5; i++) {
       const s = await signed(1, 'a', pingPath, pingBody(hsOf(1)));
-      const statuses = (await Promise.all([sendSigned(s), sendSigned(s)])).map((r) => r.status).sort();
+      const statuses = (await Promise.all([sendSigned(s), sendSigned(s)]))
+        .map((r) => r.status)
+        .sort();
       expect(statuses).toEqual([200, 401]);
     }
   });
@@ -111,11 +146,17 @@ describe('signed request checks', () => {
 
   describe('a signature over something else is rejected (401 Invalid signature)', () => {
     test('different path', async () => {
-      const res = await sendSigned({ ...(await signed(1, 'a', '/federation/dms/latest', pingBody(hsOf(1)))), path: pingPath });
+      const res = await sendSigned({
+        ...(await signed(1, 'a', '/federation/dms/latest', pingBody(hsOf(1)))),
+        path: pingPath,
+      });
       expect([res.status, res.json?.error]).toEqual([401, 'Invalid signature']);
     });
     test('different method', async () => {
-      const res = await sendSigned({ ...(await signed(1, 'a', pingPath, pingBody(hsOf(1)), {}, 'PUT')), method: 'POST' });
+      const res = await sendSigned({
+        ...(await signed(1, 'a', pingPath, pingBody(hsOf(1)), {}, 'PUT')),
+        method: 'POST',
+      });
       expect([res.status, res.json?.error]).toEqual([401, 'Invalid signature']);
     });
     test('different host', async () => {
@@ -125,7 +166,9 @@ describe('signed request checks', () => {
     test('different homeserver (header says .67, signed as .66 with .67 advertising .66 key)', async () => {
       await restartAnchor('a');
       const k = await fake.info(1);
-      await fake.respond(2, infoPath, { discovery: { publicKey: { id: k.keyId, key: k.publicKey } } });
+      await fake.respond(2, infoPath, {
+        discovery: { publicKey: { id: k.keyId, key: k.publicKey } },
+      });
       const s = await signed(1, 'a', pingPath, pingBody(hsOf(2)));
       const res = await sendSigned(s, (h) => editHeader(h, 'X-Novarum-Homeserver', hsOf(2)));
       expect([res.status, res.json?.error]).toEqual([401, 'Invalid signature']);
@@ -158,11 +201,14 @@ describe('discovery', () => {
     expect([res.status, res.json?.error]).toEqual([400, 'Could not discover remote anchor']);
   });
 
-  test.each(['http://172.30.0.66/?x=1', 'http://user:pw@172.30.0.66', 'http://172.30.0.66/#frag'])('discovery baseUrl %s is rejected', async (baseUrl) => {
-    await fresh();
-    await fake.respond(1, infoPath, { discovery: { baseUrl } });
-    expect((await ping()).status).toBe(400);
-  });
+  test.each(['http://172.30.0.66/?x=1', 'http://user:pw@172.30.0.66', 'http://172.30.0.66/#frag'])(
+    'discovery baseUrl %s is rejected',
+    async (baseUrl) => {
+      await fresh();
+      await fake.respond(1, infoPath, { discovery: { baseUrl } });
+      expect((await ping()).status).toBe(400);
+    }
+  );
 
   test('public anchor: a baseUrl pointing at a private address, or plain http, is rejected (https control passes verification)', async () => {
     await restartAnchor('p');
@@ -228,7 +274,9 @@ describe('extAnchorDown follows the remote', () => {
   test('discovery connection refused -> shadow guilds down', async () => {
     await fresh();
     const g = await shadowGuild('172.30.0.5'); // postgres: nothing listens on :80
-    const res = await sendFrom(1, 'a', pingPath, pingBody('172.30.0.5'), { homeserver: '172.30.0.5' });
+    const res = await sendFrom(1, 'a', pingPath, pingBody('172.30.0.5'), {
+      homeserver: '172.30.0.5',
+    });
     expect(res.status).toBe(400);
     expect(await isDown(g)).toBe(true);
   });
@@ -245,17 +293,27 @@ describe('extAnchorDown follows the remote', () => {
   const triggerSync = async () => {
     const actor = fakeUser(hsOf(1));
     const peer = (await signup('a')).user.username;
-    const body = { commandId: crypto.randomUUID(), actor, peerUsername: peer, action: 'REQUEST', expectedVersion: 0 };
+    const body = {
+      commandId: crypto.randomUUID(),
+      actor,
+      peerUsername: peer,
+      action: 'REQUEST',
+      expectedVersion: 0,
+    };
     return sendFrom(1, 'a', '/federation/friends/command', body);
   };
-  const syncAttempts = async () => (await fake.requests(1, { path: '/federation/friends/sync' })).length;
+  const syncAttempts = async () =>
+    (await fake.requests(1, { path: '/federation/friends/sync' })).length;
 
   test('signed POST answered with a 3xx fails: guilds down, redirect target untouched, next call re-discovers', async () => {
     await fresh();
     const g = await shadowGuild(hsOf(1));
     await fake.respond(1, 'POST /federation/friends/sync', { redirect: landing });
     expect((await triggerSync()).status).toBe(200);
-    await eventually(async () => (await syncAttempts()) >= 1 && (await isDown(g)), { timeout: 8_000, message: 'sync attempted and guild marked down' });
+    await eventually(async () => (await syncAttempts()) >= 1 && (await isDown(g)), {
+      timeout: 8_000,
+      message: 'sync attempted and guild marked down',
+    });
     expect(await canary.allHits()).toEqual([]);
 
     // the failed call dropped the 5-minute discovery cache: the next call fetches discovery again
@@ -271,7 +329,10 @@ describe('extAnchorDown follows the remote', () => {
     const g = await shadowGuild(hsOf(1));
     await fake.respond(1, 'POST /federation/friends/sync', { hangMs: -1 });
     expect((await triggerSync()).status).toBe(200);
-    await eventually(async () => await isDown(g), { timeout: 15_000, message: 'guild marked down after the sync timeout' });
+    await eventually(async () => await isDown(g), {
+      timeout: 15_000,
+      message: 'guild marked down after the sync timeout',
+    });
     const before = await discoveryHits();
     await fake.clearRoutes(1);
     expect((await ping()).status).toBe(200);

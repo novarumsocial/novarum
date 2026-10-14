@@ -43,7 +43,9 @@ describe('federation stack boot smoke', () => {
     // /federation/users is served by the owning anchor; asking b directly proves the route and database
     const direct = await fetch(`${api('b')}/federation/users/${user.user.username}`);
     expect(direct.status).toBe(200);
-    expect(((await direct.json()) as any).user.handle).toBe(`@${user.user.username}:${anchors.b.homeserver}`);
+    expect(((await direct.json()) as any).user.handle).toBe(
+      `@${user.user.username}:${anchors.b.homeserver}`
+    );
     expect(res.status).toBe(404); // a has no such local user
   });
 
@@ -53,7 +55,9 @@ describe('federation stack boot smoke', () => {
 
   test('fake serves discovery for both identities and records the requests', async () => {
     for (const id of [1, 2] as const) {
-      const info = (await (await fetch(`${fake.identityInfo(id).baseUrl}/.well-known/anchor/info`)).json()) as any;
+      const info = (await (
+        await fetch(`${fake.identityInfo(id).baseUrl}/.well-known/anchor/info`)
+      ).json()) as any;
       expect(info.homeserver).toBe(ips.fake[id]);
       expect(info.publicKey.key).toBe((await fake.info(id)).publicKey);
       expect((await fake.requests(id, { path: '/.well-known' })).length).toBeGreaterThan(0);
@@ -66,8 +70,18 @@ describe('federation stack boot smoke', () => {
     await fake.respond(1, '/x', { status: 418, json: { teapot: true } });
     expect((await fetch(`http://${ips.fake[1]}/x`)).status).toBe(418);
     await fake.respond(1, '/r', { redirect: 'http://172.30.0.99/hit' });
-    expect((await fetch(`http://${ips.fake[1]}/r`, { redirect: 'manual' })).headers.get('location')).toBe('http://172.30.0.99/hit');
-    const { headers, signingString } = await fake.sign({ identity: 2, method: 'POST', path: '/p', host: 'h', body: '{}', nonce: 'n1', date: 'd' });
+    expect(
+      (await fetch(`http://${ips.fake[1]}/r`, { redirect: 'manual' })).headers.get('location')
+    ).toBe('http://172.30.0.99/hit');
+    const { headers, signingString } = await fake.sign({
+      identity: 2,
+      method: 'POST',
+      path: '/p',
+      host: 'h',
+      body: '{}',
+      nonce: 'n1',
+      date: 'd',
+    });
     expect(headers['X-Novarum-Nonce']).toBe('n1');
     expect(signingString.split('\n').slice(0, 3)).toEqual(['v1', 'POST', '/p']);
     await fake.reset();
@@ -109,7 +123,10 @@ describe('federation stack boot smoke', () => {
   test('canary-p sees loopback:8080 hits and canary-meta sees metadata hits from anchor-p', async () => {
     await canary.reset();
     expect(await fetchIn('p', 'http://127.0.0.1:8080/lo')).toMatchObject({ ok: true, status: 200 });
-    expect(await fetchIn('p', 'http://169.254.169.254/latest/meta-data')).toMatchObject({ ok: true, status: 200 });
+    expect(await fetchIn('p', 'http://169.254.169.254/latest/meta-data')).toMatchObject({
+      ok: true,
+      status: 200,
+    });
     expect((await canary.hits('p')).map((h) => h.listener)).toEqual(['loopback8080']);
     expect((await canary.hits('meta')).map((h) => h.listener)).toEqual(['metadata']);
     expect(await canary.hits('a')).toEqual([]);
@@ -120,11 +137,16 @@ describe('federation stack boot smoke', () => {
     await fake.reset();
     const res = await fetchIn('p', 'https://evil.test/.well-known/anchor/info');
     expect(res).toMatchObject({ ok: true, status: 200 });
-    expect((await fake.requests(1, { path: '/.well-known' }))[0]).toMatchObject({ scheme: 'https', host: 'evil.test' });
+    expect((await fake.requests(1, { path: '/.well-known' }))[0]).toMatchObject({
+      scheme: 'https',
+      host: 'evil.test',
+    });
   });
 
   test('without NODE_EXTRA_CA_CERTS anchor-p refuses the same host', async () => {
-    const res = await fetchIn('p', 'https://evil.test/.well-known/anchor/info', { env: { NODE_EXTRA_CA_CERTS: null } });
+    const res = await fetchIn('p', 'https://evil.test/.well-known/anchor/info', {
+      env: { NODE_EXTRA_CA_CERTS: null },
+    });
     expect(res.ok).toBe(false);
   });
 
@@ -137,28 +159,54 @@ describe('federation stack boot smoke', () => {
 
   test('anchor-q fetches evil.test through the smokescreen proxy and not directly', async () => {
     await fake.reset();
-    const via = await fetchIn('q', 'https://evil.test/.well-known/anchor/info', { env: { HTTPS_PROXY: `http://${ips.proxy.egress}:3128` } });
+    const via = await fetchIn('q', 'https://evil.test/.well-known/anchor/info', {
+      env: { HTTPS_PROXY: `http://${ips.proxy.egress}:3128` },
+    });
     expect(via).toMatchObject({ ok: true, status: 200 });
-    const direct = await fetchIn('q', 'https://evil.test/.well-known/anchor/info', { env: { HTTPS_PROXY: null } });
+    const direct = await fetchIn('q', 'https://evil.test/.well-known/anchor/info', {
+      env: { HTTPS_PROXY: null },
+    });
     expect(direct.ok).toBe(false);
   });
 
   test('anchor-p and anchor-q discover evil.test over https (q via the proxy configured in its config.toml)', async () => {
-    for (const [name, expectedSource] of [['p', '203.0.113.10'], ['q', ips.proxy.pub]] as const) {
+    for (const [name, expectedSource] of [
+      ['p', '203.0.113.10'],
+      ['q', ips.proxy.pub],
+    ] as const) {
       await restart(name); // discovery results are cached in memory for 5 minutes
       await fake.reset();
-      await fake.respond(1, '/.well-known/anchor/info', { discovery: { homeserver: 'evil.test', baseUrl: 'https://evil.test' } });
-      const { headers } = await fake.sign({ identity: 1, method: 'POST', path: '/federation/friends/status', host: '127.0.0.1', homeserver: 'evil.test', body: '{}' });
-      const res = await fetchIn(name, 'http://127.0.0.1/federation/friends/status', { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
+      await fake.respond(1, '/.well-known/anchor/info', {
+        discovery: { homeserver: 'evil.test', baseUrl: 'https://evil.test' },
+      });
+      const { headers } = await fake.sign({
+        identity: 1,
+        method: 'POST',
+        path: '/federation/friends/status',
+        host: '127.0.0.1',
+        homeserver: 'evil.test',
+        body: '{}',
+      });
+      const res = await fetchIn(name, 'http://127.0.0.1/federation/friends/status', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: '{}',
+      });
       expect(res.ok && res.body).not.toMatch(/discover/i); // "Invalid federation user" is fine: verification passed
       const seen = await fake.requests(1, { path: '/.well-known' });
-      expect({ name, source: seen[0]?.sourceIp, scheme: seen[0]?.scheme }).toEqual({ name, source: expectedSource, scheme: 'https' });
+      expect({ name, source: seen[0]?.sourceIp, scheme: seen[0]?.scheme }).toEqual({
+        name,
+        source: expectedSource,
+        scheme: 'https',
+      });
     }
     await fake.reset();
   });
 
   test('the proxy denies private destinations', async () => {
-    const res = await fetchIn('q', `http://${ips.canary}/`, { env: { HTTP_PROXY: `http://${ips.proxy.egress}:3128` } });
+    const res = await fetchIn('q', `http://${ips.canary}/`, {
+      env: { HTTP_PROXY: `http://${ips.proxy.egress}:3128` },
+    });
     expect(res.ok && res.status).not.toBe(200);
     expect(await canary.hits()).toEqual([]);
     expect((await proxy.denies()).length).toBeGreaterThan(0);
