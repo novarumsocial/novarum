@@ -1,10 +1,11 @@
 // The hub: the first screen of the chat stack (the web's left column). The guild rail picks a server, next to it
 // are that server's channels, or your DMs and friends for Home. Opening a channel pushes the channel screen.
-// Switching to a server reopens the channel you were last in there (swipe right to get back to its list), and a
-// launch reopens the chat that was open when the app closed.
+// Switching to a server shows its channel list with the channel you were last in there selected (swipe left to
+// open it), and a launch reopens the chat that was open when the app closed.
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { ChannelSidebar } from '@/components/channel-sidebar';
 import { DmSidebar } from '@/components/dm-sidebar';
 import { GuildSidebar } from '@/components/guild-sidebar';
@@ -19,7 +20,7 @@ import {
   useChannelName,
   useChat,
 } from '@/lib/chat-state';
-import { goto, instantChats } from '@/lib/navigation';
+import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import type { ChannelCategory } from '@/lib/types/chat';
 import { useGuildMentions, useGuildUnread, useHasUnreadDms } from '@/lib/unread';
@@ -66,24 +67,28 @@ export default function Hub() {
   // no channel is open while the hub is on screen (notifications and unread marks follow this)
   useFocusEffect(useCallback(() => chat().setRoute({ kind: 'home' }), []));
 
-  const selectServer = useCallback((id?: string) => {
-    const switching = id !== chat().hubServer;
-    chat().selectServer(id);
-    if (!id || !switching) return;
-
-    // the last text channel you were in there, or its first one
-    const text = (chat().channelsByServer[id] ?? [])
-      .flatMap((category) => category.channels)
-      .filter((item) => item.type !== 'VOICE');
-    const last = lastGuildChannel(id);
-    const channel = text.find((item) => item.id === last) ?? text[0];
-    if (!channel) return;
-    // straight into the chat, no slide over the channel list
-    instantChats.add(`${id}/${channel.id}`);
-    goto(guildPath(id, channel.id));
-  }, []);
+  const selectServer = useCallback((id?: string) => chat().selectServer(id), []);
   const serverId = server?.id;
   const openChannel = useCallback((id: string) => goto(guildPath(serverId, id)), [serverId]);
+
+  // swipe left on the channel list to open the selected channel (the last one you were in, or the first)
+  const openSelected = () => {
+    if (!serverId) return;
+    const text = categories
+      .flatMap((category) => category.channels)
+      .filter((item) => item.type !== 'VOICE');
+    const channel = text.find((item) => item.id === lastGuildChannel(serverId)) ?? text[0];
+    if (channel) openChannel(channel.id);
+  };
+  const swipe = Gesture.Pan()
+    .runOnJS(true)
+    .enabled(!!server)
+    .activeOffsetX(-15)
+    .failOffsetX(15)
+    .failOffsetY([-15, 15])
+    .onEnd((event) => {
+      if (event.translationX < -60 || event.velocityX < -800) openSelected();
+    });
 
   return (
     <View className="flex-1 bg-sidebar">
@@ -96,21 +101,23 @@ export default function Hub() {
           hasUnreadDms={hasUnreadDms}
           onSelect={selectServer}
         />
-        <View className="flex-1">
-          {/* Home's list stays mounted while a server is open, so switching back to it is instant */}
-          <View className="flex-1" style={server ? { display: 'none' } : undefined}>
-            <DmSidebar />
+        <GestureDetector gesture={swipe}>
+          <View className="flex-1">
+            {/* Home's list stays mounted while a server is open, so switching back to it is instant */}
+            <View className="flex-1" style={server ? { display: 'none' } : undefined}>
+              <DmSidebar />
+            </View>
+            {server && (
+              <ChannelSidebar
+                server={server}
+                categories={categories}
+                onSelectChannel={openChannel}
+                members={members}
+                voiceStates={voiceStates}
+              />
+            )}
           </View>
-          {server && (
-            <ChannelSidebar
-              server={server}
-              categories={categories}
-              onSelectChannel={openChannel}
-              members={members}
-              voiceStates={voiceStates}
-            />
-          )}
-        </View>
+        </GestureDetector>
       </View>
       {user && (
         <UserArea user={user} voiceChannelName={voiceChannelName} onLeaveVoice={leaveVoice} />

@@ -12,7 +12,7 @@ import { CallRinging } from '@/components/call-ringing';
 import { SwipeBack } from '@/components/swipe-back';
 import { pathSegments } from '@/lib/chat-state';
 import { dmPath } from '@/lib/dms';
-import { goto, instantChats } from '@/lib/navigation';
+import { goto } from '@/lib/navigation';
 import { useThemeColors } from '@/lib/theme';
 import { startCall } from '@/lib/voice';
 
@@ -72,15 +72,7 @@ export default function GuildsLayout() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen
-          name="[server]/[...rest]"
-          {...singularChannel}
-          options={({ route }: { route: { params?: object } }) =>
-            instantChats.has(channelKey(route.params as Record<string, unknown>))
-              ? { animation: 'none' }
-              : {}
-          }
-        />
+        <Stack.Screen name="[server]/[...rest]" {...singularChannel} />
         <Stack.Screen
           name="members"
           options={{
