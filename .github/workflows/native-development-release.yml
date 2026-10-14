@@ -35,7 +35,7 @@ jobs:
     name: Build APK
     runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
-      url: ${{ steps.upload.outputs.artifact-url }}
+      id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
     # which signs it with your own Apple ID on install
     runs-on: macos-26
     outputs:
-      url: ${{ steps.upload.outputs.artifact-url }}
+      id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -206,15 +206,15 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ANDROID_RESULT: ${{ needs.android.result }}
-          ANDROID_URL: ${{ needs.android.outputs.url }}
+          ANDROID_ID: ${{ needs.android.outputs.id }}
           IOS_RESULT: ${{ needs.ios.result }}
-          IOS_URL: ${{ needs.ios.outputs.url }}
+          IOS_ID: ${{ needs.ios.outputs.id }}
         run: |
-          link() { [ "$1" = success ] && echo "[Download]($2)" || echo "Build $1 ([logs]($RUN_URL))"; }
+          link() { [ "$1" = success ] && echo "[Download](https://nightly.link/$GH_REPO/actions/artifacts/$2.zip)" || echo "Build $1 ([logs]($RUN_URL))"; }
           gh pr comment "$PR" --edit-last --create-if-none --body "### Native development builds
           | Platform | Build |
           | --- | --- |
-          | Android APK | $(link "$ANDROID_RESULT" "$ANDROID_URL") |
-          | iOS IPA (unsigned, install with AltStore/SideStore) | $(link "$IOS_RESULT" "$IOS_URL") |
+          | Android APK | $(link "$ANDROID_RESULT" "$ANDROID_ID") |
+          | iOS IPA (unsigned, install with AltStore/SideStore) | $(link "$IOS_RESULT" "$IOS_ID") |
 
           Commit \`${SHA::7}\` · [workflow run]($RUN_URL)"
