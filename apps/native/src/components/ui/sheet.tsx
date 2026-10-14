@@ -25,9 +25,14 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
 
+  // dismiss() on a sheet that isn't shown leaves it stuck "dismissing", and its next present() renders nothing
+  const shown = useRef(false);
+
   useEffect(() => {
-    if (open) ref.current?.present();
-    else ref.current?.dismiss();
+    if (open) {
+      shown.current = true;
+      ref.current?.present();
+    } else if (shown.current) ref.current?.dismiss();
   }, [open]);
 
   const backdrop = useCallback(
@@ -48,7 +53,10 @@ export function Sheet({
       enableDynamicSizing
       // grows with its content up to just below the status bar, then scrolls
       maxDynamicContentSize={height - insets.top - 24}
-      onDismiss={onClose}
+      onDismiss={() => {
+        shown.current = false;
+        onClose();
+      }}
       // swiping or tapping the backdrop closes it without always firing onDismiss; without this `open` stays true and it never reopens
       onChange={(index) => index === -1 && onClose()}
       backdropComponent={backdrop}
