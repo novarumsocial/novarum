@@ -1,6 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 
-// Same app id as the Capacitor app (the old apps/mobile) so the native app installs as an update over it
+// Same app id as the Capacitor app (apps/mobile) so the native app installs as an update over it
 const config: ExpoConfig = {
   name: 'Novarum',
   slug: 'novarum',

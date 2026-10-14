@@ -1,294 +1,254 @@
 ---
 import '../styles/global.css';
+import Footer from '../components/Footer.astro';
+
+const releases = 'https://github.com/novarumsocial/novarum/releases';
+// nightly.link serves the latest artifact of a workflow on a branch, without needing a GitHub login
+const nightly = 'https://nightly.link/novarumsocial/novarum/workflows/native-development-release/main';
+
+// Phosphor icons (regular)
+const icons = {
+  download:
+    'M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z',
+  back: 'M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z',
+  windows:
+    'M208,136H128a8,8,0,0,0-8,8v57.45a8,8,0,0,0,6.57,7.88l80,14.54A7.61,7.61,0,0,0,208,224a8,8,0,0,0,8-8V144A8,8,0,0,0,208,136Zm-8,70.41-64-11.63V152h64ZM96,136H32a8,8,0,0,0-8,8v40a8,8,0,0,0,6.57,7.87l64,11.64a8.54,8.54,0,0,0,1.43.13,8,8,0,0,0,8-8V144A8,8,0,0,0,96,136Zm-8,50.05-48-8.73V152H88ZM213.13,33.86a8,8,0,0,0-6.56-1.73l-80,14.55A8,8,0,0,0,120,54.55V112a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V40A8,8,0,0,0,213.13,33.86ZM200,104H136V61.22l64-11.63ZM101.13,54.22a8,8,0,0,0-6.56-1.73l-64,11.64A8,8,0,0,0,24,72v40a8,8,0,0,0,8,8H96a8,8,0,0,0,8-8V60.36A8,8,0,0,0,101.13,54.22ZM88,104H40V78.68L88,70Z',
+  apple:
+    'M223.3,169.59a8.07,8.07,0,0,0-2.8-3.4C203.53,154.53,200,134.64,200,120c0-17.67,13.47-33.06,21.5-40.67a8,8,0,0,0,0-11.62C208.82,55.74,187.82,48,168,48a72.2,72.2,0,0,0-40,12.13,71.56,71.56,0,0,0-90.71,9.09A74.63,74.63,0,0,0,16,123.4a127.06,127.06,0,0,0,40.14,89.73A39.8,39.8,0,0,0,83.59,224h87.68a39.84,39.84,0,0,0,29.12-12.57,125,125,0,0,0,17.82-24.6C225.23,174,224.33,172,223.3,169.59Zm-34.63,30.94a23.76,23.76,0,0,1-17.4,7.47H83.59a23.82,23.82,0,0,1-16.44-6.51A111.14,111.14,0,0,1,32,123,58.5,58.5,0,0,1,48.65,80.47,54.81,54.81,0,0,1,88,64h.78A55.45,55.45,0,0,1,123,76.28a8,8,0,0,0,10,0A55.44,55.44,0,0,1,168,64a70.64,70.64,0,0,1,36,10.35c-13,14.52-20,30.47-20,45.65,0,23.77,7.64,42.73,22.18,55.3A105.82,105.82,0,0,1,188.67,200.53ZM128.23,30A40,40,0,0,1,167,0h1a8,8,0,0,1,0,16h-1a24,24,0,0,0-23.24,18,8,8,0,1,1-15.5-4Z',
+  linux:
+    'M229,214.25A8,8,0,0,1,217.76,213C216.39,211.27,184,169.86,184,88A56,56,0,0,0,72,88c0,81.86-32.37,123.27-33.75,125a8,8,0,0,1-12.51-10c.15-.2,7.69-9.9,15.13-28.74C47.77,156.8,56,127.64,56,88a72,72,0,0,1,144,0c0,39.64,8.23,68.8,15.13,86.28,7.48,18.94,15.06,28.64,15.14,28.74A8,8,0,0,1,229,214.25ZM100,88a12,12,0,1,0,12,12A12,12,0,0,0,100,88Zm68,12a12,12,0,1,0-12,12A12,12,0,0,0,168,100ZM99.58,128.84a8,8,0,0,0-7.15,14.31l32,16a7.94,7.94,0,0,0,7.15,0l32-16a8,8,0,0,0-7.16-14.31L128,143.05ZM128,176a54.07,54.07,0,0,0-47,28.11,8,8,0,1,0,14,7.78,37.35,37.35,0,0,1,66,0,8,8,0,0,0,14-7.78A54.07,54.07,0,0,0,128,176Z',
+  android:
+    'M176,148a12,12,0,1,1-12-12A12,12,0,0,1,176,148ZM92,136a12,12,0,1,0,12,12A12,12,0,0,0,92,136Zm148,24v24a16,16,0,0,1-16,16H32a16,16,0,0,1-16-16V161.13A113.38,113.38,0,0,1,51.4,78.72L26.34,53.66A8,8,0,0,1,37.66,42.34L63.82,68.5a111.43,111.43,0,0,1,128.55-.19l26-26a8,8,0,0,1,11.32,11.32L204.82,78.5c.75.71,1.5,1.43,2.24,2.17A111.25,111.25,0,0,1,240,160Zm-16,0a96,96,0,0,0-96-96h-.34C74.91,64.18,32,107.75,32,161.13V184H224Z',
+  flask:
+    'M221.69,199.77,160,96.92V40h8a8,8,0,0,0,0-16H88a8,8,0,0,0,0,16h8V96.92L34.31,199.77A16,16,0,0,0,48,224H208a16,16,0,0,0,13.72-24.23ZM110.86,103.25A7.93,7.93,0,0,0,112,99.14V40h32V99.14a7.93,7.93,0,0,0,1.14,4.11L183.36,167c-12,2.37-29.07,1.37-51.75-10.11-15.91-8.05-31.05-12.32-45.22-12.81ZM48,208l28.54-47.58c14.25-1.74,30.31,1.85,47.82,10.72,19,9.61,35,12.88,48,12.88a69.89,69.89,0,0,0,19.55-2.7L208,208Z',
+};
+
+const groups = [
+  {
+    title: 'Desktop',
+    version: 'desktop',
+    rows: [
+      { icon: icons.windows, name: 'Windows', detail: 'x64 installer', files: [{ key: 'windows', label: '.exe', href: releases }] },
+      { icon: icons.apple, name: 'macOS', detail: 'Apple Silicon', files: [{ key: 'macos', label: '.dmg', href: releases }] },
+      {
+        icon: icons.linux,
+        name: 'Linux',
+        detail: 'Debian or AppImage',
+        files: [
+          { key: 'deb', label: '.deb', href: releases },
+          { key: 'linux', label: '.AppImage', href: releases },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Mobile',
+    rows: [
+      {
+        icon: icons.android,
+        name: 'Android',
+        detail: 'The current app, updates itself',
+        version: 'android',
+        files: [{ key: 'android', label: '.apk', href: releases }],
+      },
+      {
+        icon: icons.flask,
+        name: 'Nightly',
+        badge: 'Preview',
+        detail: 'The new native app, built from main',
+        version: 'nightly',
+        files: [
+          { key: 'nightly-apk', label: 'Android', href: `${nightly}/novarum-apk.zip` },
+          { key: 'nightly-ipa', label: 'iOS', href: `${nightly}/novarum-ipa.zip` },
+        ],
+      },
+    ],
+  },
+];
+
+const link = 'text-inherit underline! underline-offset-2 transition-colors duration-500 hover:text-accent-500';
+const version =
+  'text-xs font-normal text-gray-500 tabular-nums dark:text-gray-400 data-loading:animate-pulse data-loading:rounded data-loading:bg-gray-200 data-loading:text-transparent dark:data-loading:bg-[#272727]';
+
+const button =
+  'inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold whitespace-nowrap text-inherit transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-accent-500 hover:text-accent-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:scale-[0.98] dark:border-[#313131] dark:bg-[#272727]';
 ---
 
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <meta
-      name="description"
-      content="Download the Novarum desktop and Android apps."
-    />
+    <meta name="description" content="Download Novarum for Windows, macOS, Linux, Android and iOS." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Download - Novarum</title>
 
     <script is:inline>
       const storedTheme = localStorage.getItem('starlight-theme');
-      const systemTheme = matchMedia('(prefers-color-scheme: light)').matches
-        ? 'light'
-        : 'dark';
+      const systemTheme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 
       document.documentElement.dataset.theme =
-        storedTheme === 'light' || storedTheme === 'dark'
-          ? storedTheme
-          : systemTheme;
+        storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : systemTheme;
     </script>
   </head>
-  <body class="m-0 bg-white dark:bg-gray-950 dark:text-white">
-    <main class="mx-auto flex w-full max-w-4xl flex-col items-center px-6 py-16 text-center">
+  <body class="m-0 [&_a]:no-underline bg-white dark:bg-gray-950 dark:text-white">
+    <!-- the arbitrary variants beat Starlight's base margins and list indent; spacing below only uses gap -->
+    <main
+      class="mx-auto flex w-full max-w-3xl flex-col gap-16 px-6 py-12 [&_:is(h1,h2,p,ul,li)]:m-0 [&_ul]:list-none [&_ul]:p-0"
+    >
       <a
         href="/"
-        class="mb-8 inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+        class="inline-flex w-max items-center gap-2 rounded-md text-sm text-gray-500 transition-colors duration-500 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-accent-500 dark:text-gray-400 dark:hover:text-white"
       >
-        <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path d="m15 18-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        <svg viewBox="0 0 256 256" class="size-4" fill="currentColor" aria-hidden="true"><path d={icons.back} /></svg>
         Home
       </a>
 
-      <h1 class="mb-2 text-4xl font-bold">Download Novarum</h1>
-      <p class="mb-10 text-lg text-gray-600 dark:text-gray-300">
-        Pick your platform! Updates will be automatic.
-      </p>
-
-      <div class="grid w-full gap-6 text-left md:grid-cols-2">
-        <section
-          class="flex flex-col rounded-[2rem] border-2 border-gray-900 p-6 dark:border-gray-200 sm:p-8"
-          aria-labelledby="desktop-title"
-        >
-          <div class="mb-2 flex items-baseline justify-between gap-4">
-            <h2 id="desktop-title" class="text-xl font-semibold">Desktop</h2>
-            <span class="version"><span data-version="desktop" class="loading">…</span></span>
-          </div>
-
-          <ul class="divide-y divide-gray-200 dark:divide-gray-800">
-            <li class="py-3.5">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="font-medium">Windows</p>
-                <a class="btn" data-desktop="windows" href="https://github.com/novarumsocial/novarum/releases">.exe</a>
-              </div>
-              <p class="sub mt-0.5">x64 installer<span data-size="windows"></span></p>
-            </li>
-            <li class="py-3.5">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="font-medium">macOS</p>
-                <a class="btn" data-desktop="macos" href="https://github.com/novarumsocial/novarum/releases">.dmg</a>
-              </div>
-              <p class="sub mt-0.5">Apple Silicon<span data-size="macos"></span></p>
-            </li>
-            <li class="py-3.5">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="font-medium">Linux</p>
-                <div class="flex gap-2">
-                  <a class="btn" data-desktop="deb" href="https://github.com/novarumsocial/novarum/releases">.deb</a>
-                  <a class="btn" data-desktop="linux" href="https://github.com/novarumsocial/novarum/releases">.AppImage</a>
-                </div>
-              </div>
-              <p class="sub mt-0.5">Debian / AppImage<span data-size="linux"></span></p>
-            </li>
-          </ul>
-        </section>
-
-        <section
-          class="flex flex-col rounded-[2rem] border-2 border-gray-900 p-6 dark:border-gray-200 sm:p-8"
-          aria-labelledby="android-title"
-        >
-          <div class="mb-2 flex items-baseline justify-between gap-4">
-            <h2 id="android-title" class="text-xl font-semibold">Android</h2>
-            <span class="version"><span data-version="android" class="loading">…</span></span>
-          </div>
-
-          <p class="sub my-auto py-6">
-            Just an APK you can sideload. It's not very optimized, but we're on it!
+      <header class="flex flex-col items-center gap-6 text-center">
+        <div class="flex max-w-[680px] flex-col gap-4">
+          <h1 class="bg-linear-to-r from-black to-[#666666] bg-clip-text text-5xl text-transparent dark:from-white dark:to-[#9b9b9b] font-bold tracking-tight text-balance">Download Novarum</h1>
+          <p class="text-lg text-pretty text-gray-600 dark:text-gray-300">
+            A calm place to talk, on every device you own.
           </p>
+        </div>
 
-          <div class="flex justify-center">
-            <a class="cta" data-android href="https://github.com/novarumsocial/novarum/releases">
-              Download APK<span data-android-size></span>
-            </a>
-          </div>
-        </section>
+        <a
+          data-primary
+          href="#platforms"
+          class="inline-flex items-center gap-2 rounded-full bg-accent-600 px-6 py-3 text-base font-semibold text-accent-50 transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-accent-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 active:scale-[0.98]"
+        >
+          <svg viewBox="0 0 256 256" class="size-5" fill="currentColor" aria-hidden="true">
+            <path d={icons.download} />
+          </svg>
+          <span data-primary-label>See all downloads</span>
+        </a>
+      </header>
+
+      <div id="platforms" class="flex scroll-mt-12 flex-col gap-12">
+        {
+          groups.map((group) => (
+            <section class="flex flex-col gap-4" aria-label={group.title}>
+              <div class="flex items-baseline justify-between gap-4 px-2">
+                <h2 class="text-sm font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                  {group.title}
+                </h2>
+                {group.version && <span class={version} data-loading data-version={group.version}>v0.0.0</span>}
+              </div>
+
+              <ul class="divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:divide-[#272727] dark:border-[#272727] dark:bg-[#181818]">
+                {group.rows.map((row) => (
+                  <li class="flex flex-wrap items-center gap-4 p-4 sm:flex-nowrap">
+                    <span class="grid size-10 shrink-0 place-items-center rounded-lg bg-gray-200 dark:bg-[#272727]">
+                      <svg viewBox="0 0 256 256" class="size-5" fill="currentColor" aria-hidden="true">
+                        <path d={row.icon} />
+                      </svg>
+                    </span>
+
+                    <div class="flex min-w-0 flex-1 flex-col">
+                      <p class="flex items-center gap-2 font-semibold">
+                        {row.name}
+                        {row.badge && (
+                          <span class="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-800 dark:bg-accent-950 dark:text-accent-200">
+                            {row.badge}
+                          </span>
+                        )}
+                        {row.version && <span class={version} data-loading data-version={row.version}>v0.0.0</span>}
+                      </p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {row.detail}
+                        <span data-size={row.files[0].key} />
+                      </p>
+                    </div>
+
+                    <div class="flex gap-2">
+                      {row.files.map((file) => (
+                        <a class={button} data-file={file.key} href={file.href}>
+                          <svg viewBox="0 0 256 256" class="size-4" fill="currentColor" aria-hidden="true">
+                            <path d={icons.download} />
+                          </svg>
+                          {file.label}
+                        </a>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        }
+
+        <p class="px-2 text-sm text-pretty text-gray-500 dark:text-gray-400">
+          Nightly builds come zipped. The APK installs over the current Android app, and the IPA is unsigned, so
+          install it with{' '}<a class={link} href="https://altstore.io">AltStore</a> or{' '}
+          <a class={link} href="https://sidestore.io">SideStore</a>. Older builds are on{' '}
+          <a class={link} href={releases}>GitHub Releases</a>.
+        </p>
       </div>
-
-      <p class="mt-8 text-sm gap-1 flex text-gray-500 dark:text-gray-400">
-        For development builds see 
-        <a class="foot-link" href="https://github.com/novarumsocial/novarum/releases">GitHub Releases</a>
-      </p>
     </main>
 
-    <footer class="bg-gray-900 [&_a]:text-accent-500 [&_a:hover]:text-accent-400">
-      <div class="mx-auto w-full max-w-7xl p-4 py-6 lg:py-8">
-        <div class="md:flex md:justify-between">
-          <div class="mb-6 md:mb-0">
-            <a href="https://novarum.me/" class="flex items-center">
-              <img src={'/favicon.svg'} class="h-7 me-3" alt="Novarum Logo" />
-              <span class="text-heading self-center text-2xl font-semibold whitespace-nowrap">Novarum</span>
-            </a>
-          </div>
-          <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3">
-            <div>
-              <h2 class="mb-6 text-sm font-semibold text-heading uppercase">Resources</h2>
-              <ul class="text-body font-medium">
-                <li class="mb-4">
-                  <a href="/docs">Documentation</a>
-                </li>
-                <li class="mb-4">
-                  <a href="/download">Download</a>
-                </li>
-                <li>
-                  <a href="/guides/deployment">Deploying an Anchor</a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h2 class="mb-6 text-sm font-semibold text-heading uppercase">On the net</h2>
-              <ul class="text-body font-medium">
-                <li class="mb-4">
-                  <a href="https://github.com/novarumsocial/novarum">Github</a>
-                </li>
-                <li>
-                  <a href="#">HCB (soon?)</a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <hr class="my-6 border-default sm:mx-auto lg:my-8" />
-        <div class="sm:flex sm:items-center sm:justify-between">
-          <span class="text-sm text-body sm:text-center">© 2026 <a href="https://novarum.me/">Novarum</a>, under GNU AGPL v3.0 license. All Rights Reserved.
-          </span>
-        </div>
-      </div>
-    </footer>
+    <Footer />
 
     <script is:inline>
       const base = 'https://github.com/novarumsocial/novarum/releases/download/';
-
       const mb = (bytes) => ` · ${Math.round(bytes / 1024 / 1024)} MB`;
+
+      // the big button downloads the build for the visitor's platform
+      const ua = navigator.userAgent;
+      const [key, label] = /iPhone|iPad/.test(ua)
+        ? ['nightly-ipa', 'Download the iOS preview']
+        : /Android/.test(ua)
+          ? ['android', 'Download for Android']
+          : /Windows/.test(ua)
+            ? ['windows', 'Download for Windows']
+            : /Mac/.test(ua)
+              ? ['macos', 'Download for macOS']
+              : /Linux/.test(ua)
+                ? ['linux', 'Download for Linux']
+                : [];
+
+      const primary = document.querySelector('[data-primary]');
+      const pick = () => {
+        const file = key && document.querySelector(`[data-file="${key}"]`);
+        if (!file) return;
+        primary.href = file.href;
+        document.querySelector('[data-primary-label]').textContent = label;
+      };
+      pick();
+
+      const setVersion = (name, tag) =>
+        document.querySelectorAll(`[data-version="${name}"]`).forEach((el) => {
+          el.textContent = tag ?? 'unavailable';
+          el.removeAttribute('data-loading');
+        });
 
       fetch('https://cors.notesnook.com/https://api.github.com/repos/novarumsocial/novarum/releases?per_page=100')
         .then((res) => res.json())
         .then((releases) => {
           const desktop = releases.find((r) => /^v\d/.test(r.tag_name));
           const mobile = releases.find((r) => /^mobile-v/.test(r.tag_name));
+          const native = releases.find((r) => /^native-v/.test(r.tag_name));
 
-          if (desktop) {
-            const v = desktop.tag_name.slice(1);
-            const names = {
-              windows: `Novarum-${v}-x64.exe`,
-              macos: `Novarum-${v}-arm64.dmg`,
-              linux: `Novarum-${v}-x86_64.AppImage`,
-              deb: `Novarum-${v}-amd64.deb`,
-            };
-            document.querySelectorAll('[data-desktop]').forEach((a) => {
-              const asset = desktop.assets.find((x) => x.name === names[a.dataset.desktop]);
-              if (asset) {
-                a.href = `${base}${desktop.tag_name}/${asset.name}`;
-                const size = a.closest('li')?.querySelector('[data-size]');
-                if (size) size.textContent = mb(asset.size);
-              }
-            });
-          }
-
-          if (mobile) {
-            const asset = mobile.assets.find((x) => x.name === 'app-release-signed.apk');
-            if (asset) {
-              document.querySelectorAll('[data-android]').forEach((a) => {
-                a.href = `${base}${mobile.tag_name}/${asset.name}`;
-              });
-              const size = document.querySelector('[data-android-size]');
-              if (size) size.textContent = mb(asset.size);
-            }
-          }
-
-          [
-            ['desktop', desktop?.tag_name],
-            ['android', mobile?.tag_name],
-          ].forEach(([key, tag]) => {
-            const el = document.querySelector(`[data-version="${key}"]`);
-            if (el) {
-              el.textContent = tag ?? 'unavailable';
-              el.classList.remove('loading');
-            }
+          const v = desktop?.tag_name.slice(1);
+          const assets = {
+            windows: [desktop, `Novarum-${v}-x64.exe`],
+            macos: [desktop, `Novarum-${v}-arm64.dmg`],
+            linux: [desktop, `Novarum-${v}-x86_64.AppImage`],
+            deb: [desktop, `Novarum-${v}-amd64.deb`],
+            android: [mobile, 'app-release-signed.apk'],
+          };
+          Object.entries(assets).forEach(([name, [release, file]]) => {
+            const asset = release?.assets.find((x) => x.name === file);
+            if (!asset) return;
+            document.querySelector(`[data-file="${name}"]`).href = `${base}${release.tag_name}/${asset.name}`;
+            const size = document.querySelector(`[data-size="${name}"]`);
+            if (size) size.textContent = mb(asset.size);
           });
+          pick();
+
+          setVersion('desktop', desktop?.tag_name);
+          setVersion('android', mobile?.tag_name.replace(/^mobile-/, ''));
+          setVersion('nightly', native?.tag_name.replace(/^native-/, ''));
         })
-        .catch(() => {});
+        .catch(() => ['desktop', 'android', 'nightly'].forEach((name) => setVersion(name)));
     </script>
   </body>
 </html>
-
-<style>
-  .sub {
-    font-size: 0.8125rem;
-    color: var(--color-gray-500, oklch(0.45 0.02 323));
-  }
-
-  [data-theme='dark'] .sub {
-    color: var(--color-gray-400, oklch(0.542 0.034 322.5));
-  }
-
-  .version {
-    font-size: 0.8125rem;
-    color: var(--color-gray-500, oklch(0.45 0.02 323));
-    font-variant-numeric: tabular-nums;
-  }
-
-  [data-theme='dark'] .version {
-    color: var(--color-gray-400, oklch(0.542 0.034 322.5));
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    color: inherit;
-    border: 1px solid var(--color-gray-300, oklch(0.711 0.019 323));
-    border-radius: 0.5rem;
-    padding: 0.4rem 0.85rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    white-space: nowrap;
-    transition:
-      border-color 0.15s,
-      color 0.15s;
-  }
-
-  [data-theme='dark'] .btn {
-    border-color: var(--color-gray-700, oklch(0.263 0.024 320));
-  }
-
-  .btn:hover {
-    border-color: var(--color-accent-500, oklch(0.53 0.11 218));
-    color: var(--color-accent-500, oklch(0.53 0.11 218));
-  }
-
-  .cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--color-accent-600, oklch(0.45 0.085 224));
-    color: var(--color-accent-50, oklch(0.984 0.019 200));
-    border-radius: 999rem;
-    padding: 0.75rem 1.75rem;
-    font-weight: 600;
-    transition: filter 0.15s;
-  }
-
-  .cta:hover {
-    filter: brightness(1.1);
-  }
-
-  .foot-link {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .foot-link:hover {
-    color: var(--color-accent-500, oklch(0.53 0.11 218));
-  }
-
-  .loading {
-    animation: blink 1.2s ease-in-out infinite;
-  }
-
-  @keyframes blink {
-    50% {
-      opacity: 0.3;
-    }
-  }
-
-  * {
-    text-decoration: none;
-  }
-</style>
