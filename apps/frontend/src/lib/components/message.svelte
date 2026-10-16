@@ -39,6 +39,7 @@
     onDelete,
     onReply,
     onEdit,
+    onProfileCall,
   }: {
     message: Message;
     repliedMessage: Message | null;
@@ -46,6 +47,7 @@
     onDelete: (messageId: string) => void | Promise<void>;
     onReply: () => void;
     onEdit: (messageId: string, content: string | null) => void | Promise<void>;
+    onProfileCall?: (channelId: string) => void;
   } = $props();
 
   let shiftPressed = $state(false);
@@ -59,6 +61,12 @@
   let editContent = $state('');
   let editMsgTextarea = $state<HTMLTextAreaElement | null>(null);
   let savingEdit = $state(false);
+
+  $effect(() => {
+    if (!chat.editingMessage || chat.editingMessageId !== message.id) return;
+    editContent = message.content;
+    setTimeout(() => editMsgTextarea?.focus(), 0);
+  });
 
   const dropdownItems: DropdownItems[] = $derived([
     {
@@ -76,13 +84,9 @@
             variant: 'default' as const,
             hideFromShift: true,
             onclick: () => {
-              editContent = message.content;
               chat.editingMessage = true;
               chat.editingMessageId = message.id;
               dropdownOpen = false;
-              setTimeout(() => {
-                editMsgTextarea?.focus();
-              }, 0);
             },
           },
         ]
@@ -290,7 +294,7 @@
           <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
         {/if}
         {#if !grouped}
-          <ProfileCard user={message.author} class="self-start">
+          <ProfileCard user={message.author} onCall={onProfileCall} class="self-start">
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
@@ -305,7 +309,11 @@
         <div class="min-w-0 flex-1">
           {#if !grouped}
             <div class="flex items-baseline gap-2">
-              <ProfileCard user={message.author} class="text-sm font-semibold text-foreground">
+              <ProfileCard
+                user={message.author}
+                onCall={onProfileCall}
+                class="text-sm font-semibold text-foreground"
+              >
                 {authorName}
               </ProfileCard>
               <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
@@ -392,14 +400,9 @@
                     size="icon-xs"
                     aria-label="Edit"
                     onclick={() => {
-                      editContent = message.content;
                       chat.editingMessage = true;
                       chat.editingMessageId = message.id;
                       dropdownOpen = false;
-                      // should wait a small bit to open up the textarea before focusing it
-                      setTimeout(() => {
-                        editMsgTextarea?.focus();
-                      }, 0);
                     }}><Pencil class="size-3" /></Button
                   >
                 {/if}

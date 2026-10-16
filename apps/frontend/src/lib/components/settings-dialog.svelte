@@ -78,6 +78,8 @@
   let aboutError = $state<string | null>(null);
   let aboutSaved = $state(false);
   let logoutLoading = $state(false);
+  let confirmLogout = $state(false);
+  let confirmLogoutTimer: ReturnType<typeof setTimeout> | undefined;
   let audioDevices = $state<{
     input: MediaDeviceInfo[];
     output: MediaDeviceInfo[];
@@ -628,6 +630,17 @@
     { value: 'de', label: 'Deutsch' },
     { value: 'la', label: 'Latin' },
   ];
+
+  function requestLogout() {
+    if (!confirmLogout) {
+      confirmLogout = true;
+      confirmLogoutTimer = setTimeout(() => (confirmLogout = false), 5000);
+      return;
+    }
+    clearTimeout(confirmLogoutTimer);
+    confirmLogout = false;
+    void logout();
+  }
 </script>
 
 {#snippet head(title: string, description: string)}
@@ -719,10 +732,10 @@
           variant="destructive"
           class="hidden w-full sm:inline-flex"
           disabled={logoutLoading}
-          onclick={logout}
+          onclick={requestLogout}
         >
           <LogOut class="size-4" />
-          Log out
+          {confirmLogout ? 'You sure?' : 'Log out'}
         </Button>
       </nav>
 

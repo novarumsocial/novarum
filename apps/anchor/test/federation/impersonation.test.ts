@@ -14,11 +14,18 @@ const source = readdirSync(routesDir)
   .map((file) => readFileSync(path.join(routesDir, file), 'utf8'))
   .join('\n');
 // /push names no user: its ids are rebuilt from the signer (forged senders are in notify.hostile.test.ts)
-const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)].map((m) => m[1]!).filter((route) => route !== '/push');
+const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)]
+  .map((m) => m[1]!)
+  .filter((route) => route !== '/push');
 
 type Family = 'user' | 'friends' | 'participants';
 // friends/command and /sync -> 403; everything else with a `user` payload (guild, channel, message, invite, DM, voice, status) -> 401
-const familyOf = (route: string): Family => (route.startsWith('/friends/') && /\/(command|sync)$/.test(route) ? 'friends' : route === '/dms/notify' ? 'participants' : 'user');
+const familyOf = (route: string): Family =>
+  route.startsWith('/friends/') && /\/(command|sync)$/.test(route)
+    ? 'friends'
+    : route === '/dms/notify'
+      ? 'participants'
+      : 'user';
 const expectedStatus = { user: 401, friends: 403, participants: 401 } as const;
 
 const concrete = (route: string) => `/federation${route.replace(/:[a-zA-Z]+/g, 'x')}`;
@@ -28,7 +35,13 @@ function bodyFor(family: Family, victim: string, local: string) {
   const user = fakeUser(victim);
   if (family === 'user') return { user };
   if (family === 'participants') return { channelId: 'x', participants: [fakeUser(local), user] };
-  return { commandId: 'c1', actor: user, peerUsername: 'someone', action: 'REQUEST', expectedVersion: 0 };
+  return {
+    commandId: 'c1',
+    actor: user,
+    peerUsername: 'someone',
+    action: 'REQUEST',
+    expectedVersion: 0,
+  };
 }
 const syncBody = (victim: string) => ({
   commandId: null,
@@ -58,7 +71,9 @@ describe('on anchor-a (private IP homeservers)', () => {
 
   const claim = (route: string, victim: string) => {
     const family = familyOf(route);
-    return route.endsWith('/friends/sync') ? syncBody(victim) : bodyFor(family, victim, '172.30.0.11');
+    return route.endsWith('/friends/sync')
+      ? syncBody(victim)
+      : bodyFor(family, victim, '172.30.0.11');
   };
 
   for (const route of postRoutes) {
@@ -66,12 +81,18 @@ describe('on anchor-a (private IP homeservers)', () => {
       const s = await signed(1, 'a', concrete(route), claim(route, '172.30.0.12'));
       const res = await sendSigned(s);
       expect(res.status).toBe(expectedStatus[familyOf(route)]);
-      if (familyOf(route) !== 'friends') expect(res.json?.error).toBe('Federation user homeserver mismatch');
+      if (familyOf(route) !== 'friends')
+        expect(res.json?.error).toBe('Federation user homeserver mismatch');
     });
   }
 
   test('control: the same payload naming the signer itself gets past the homeserver check', async () => {
-    const res = await sendSigned(await signed(1, 'a', '/federation/unread-mentions', { user: fakeUser('172.30.0.66'), channels: [] }));
+    const res = await sendSigned(
+      await signed(1, 'a', '/federation/unread-mentions', {
+        user: fakeUser('172.30.0.66'),
+        channels: [],
+      })
+    );
     expect(res.status).toBe(403); // verified, user unknown: not the 401 mismatch
   });
 });
@@ -80,13 +101,20 @@ describe('on anchor-a (private IP homeservers)', () => {
 describe('on anchor-p (mixed-case host names)', () => {
   const infoPath = '/.well-known/anchor/info';
   const signer = 'evil.test';
-  const send = async (route: string, body: unknown) => sendSigned(await signed(1, 'p', concrete(route), body, { host: 'p.test', homeserver: signer }), undefined, { host: 'p.test' });
+  const send = async (route: string, body: unknown) =>
+    sendSigned(
+      await signed(1, 'p', concrete(route), body, { host: 'p.test', homeserver: signer }),
+      undefined,
+      { host: 'p.test' }
+    );
 
   beforeAll(async () => {
     await ready();
     await restartAnchor('p');
     await resetHarness();
-    await fake.respond(1, infoPath, { discovery: { homeserver: signer, baseUrl: 'https://evil.test' } });
+    await fake.respond(1, infoPath, {
+      discovery: { homeserver: signer, baseUrl: 'https://evil.test' },
+    });
   });
   afterAll(async () => {
     await resetHarness();
@@ -96,14 +124,18 @@ describe('on anchor-p (mixed-case host names)', () => {
   for (const route of postRoutes) {
     test(`POST ${route} claiming "B.TEST"/"Anchor-B.Test" while signed as evil.test -> ${expectedStatus[familyOf(route)]}`, async () => {
       const family = familyOf(route);
-      const body = route.endsWith('/friends/sync') ? syncBody('B.TEST') : bodyFor(family, 'B.TEST', 'P.Test');
+      const body = route.endsWith('/friends/sync')
+        ? syncBody('B.TEST')
+        : bodyFor(family, 'B.TEST', 'P.Test');
       const res = await send(route, body);
       expect(res.status).toBe(expectedStatus[family]);
     });
   }
 
   test('control: user.homeserver differing from the signer only in case is accepted (normalised)', async () => {
-    expect((await send('/unread-mentions', { user: fakeUser('EVIL.Test'), channels: [] })).status).toBe(403); // not the 401 mismatch
+    expect(
+      (await send('/unread-mentions', { user: fakeUser('EVIL.Test'), channels: [] })).status
+    ).toBe(403); // not the 401 mismatch
   });
 
   test('a mixed-case spelling of the signer cannot be used to claim a different user: friends/command with actor "Evil.TEST" is not rejected as foreign', async () => {

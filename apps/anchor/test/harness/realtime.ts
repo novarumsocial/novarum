@@ -18,13 +18,22 @@ export async function post<T = any>(user: TestUser, path: string, body?: object,
 export async function createGuild(owner: TestUser, name = 'testguild') {
   const { guild } = await post<{ guild: { id: string } }>(owner, '/guilds/create', { name });
   const guildId = guild.id;
-  const list = await post<{ guilds: { id: string; channels: { id: string }[] }[] }>(owner, '/guilds/list', undefined, 'GET');
+  const list = await post<{ guilds: { id: string; channels: { id: string }[] }[] }>(
+    owner,
+    '/guilds/list',
+    undefined,
+    'GET'
+  );
   const channelId = list.guilds.find((g) => g.id === guildId)!.channels[0]!.id;
   return { guildId, channelId };
 }
 
 export async function joinGuild(owner: TestUser, guestUser: TestUser, guildId: string) {
-  const { invite } = await post<{ invite: { code: string } }>(owner, `/guilds/${guildId}/invites`, {});
+  const { invite } = await post<{ invite: { code: string } }>(
+    owner,
+    `/guilds/${guildId}/invites`,
+    {}
+  );
   await post(guestUser, '/invite/accept', { code: invite.code });
 }
 

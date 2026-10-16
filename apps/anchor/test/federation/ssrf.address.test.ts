@@ -1,8 +1,30 @@
 // TESTING_PLAN.md 5.4 A: address policy for homeserver names and DNS answers. anchor-p (public mode) is the anchor under test;
 // every target is attempted through all triggers T1-T6 and must leave canaries and fakes untouched.
-import { afterAll, beforeAll, beforeEach, describe, expect, test, setDefaultTimeout } from 'bun:test';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  setDefaultTimeout,
+} from 'bun:test';
 import { canary, dns, fake, resetHarness, stackIsUp } from '../harness/federation';
-import { bridgeSocket, clean, dropShadows, freshAnchor, expectRefused, logsSince, makeActor, noStray, pgFor, publicDiscovery, runTriggers, strayTraffic, type Actor } from '../harness/ssrf';
+import {
+  bridgeSocket,
+  clean,
+  dropShadows,
+  freshAnchor,
+  expectRefused,
+  logsSince,
+  makeActor,
+  noStray,
+  pgFor,
+  publicDiscovery,
+  runTriggers,
+  strayTraffic,
+  type Actor,
+} from '../harness/ssrf';
 
 // restarts and 10s federation timeouts do not fit bun's 5s default (the harness's own call only reaches later files)
 setDefaultTimeout(180_000);
@@ -25,15 +47,29 @@ afterAll(async () => {
 beforeEach(clean);
 
 describe('A. literal addresses are refused by policy', () => {
-  test.each(['127.0.0.1', '10.0.0.1', '172.30.0.99', '169.254.169.254', '0.0.0.0', '100.64.0.1', '192.168.1.1', '198.18.0.1', '224.0.0.1', '255.255.255.255'])('%s', async (hs) => {
+  test.each([
+    '127.0.0.1',
+    '10.0.0.1',
+    '172.30.0.99',
+    '169.254.169.254',
+    '0.0.0.0',
+    '100.64.0.1',
+    '192.168.1.1',
+    '198.18.0.1',
+    '224.0.0.1',
+    '255.255.255.255',
+  ])('%s', async (hs) => {
     await expectRefused(ctx, hs, { reason: policy });
   });
 
   // URL parsing turns these into 127.0.0.1; the log line shows the normalised hostname the policy actually judged
-  test.each(['2130706433', '0x7f000001', '0177.0.0.1', '127.1', '017700000001'])('numeric loopback form %s', async (hs) => {
-    expect(new URL(`https://${hs}`).hostname).toBe('127.0.0.1');
-    await expectRefused(ctx, hs, { reason: policy, logHost: '127.0.0.1' });
-  });
+  test.each(['2130706433', '0x7f000001', '0177.0.0.1', '127.1', '017700000001'])(
+    'numeric loopback form %s',
+    async (hs) => {
+      expect(new URL(`https://${hs}`).hostname).toBe('127.0.0.1');
+      await expectRefused(ctx, hs, { reason: policy, logHost: '127.0.0.1' });
+    }
+  );
 
   // LOCALHOST is the same cache key as localhost (normalised), so only the first spelling logs a reason
   test.each(['localhost', 'LOCALHOST', 'foo.localhost'])('%s', async (hs) => {
@@ -42,9 +78,23 @@ describe('A. literal addresses are refused by policy', () => {
 });
 
 describe('A. malformed names are rejected before any network I/O', () => {
-  test.each(['localhost.', 'evil.test.', 'evil..test', 'evil_test', 'a:80.test', 'a/b.test', 'a@b.test', 'a\\b.test', 'bücher.test', 'exаmple.test', '🙂.test'])('%j', async (hs) => {
+  test.each([
+    'localhost.',
+    'evil.test.',
+    'evil..test',
+    'evil_test',
+    'a:80.test',
+    'a/b.test',
+    'a@b.test',
+    'a\\b.test',
+    'bücher.test',
+    'exаmple.test',
+    '🙂.test',
+  ])('%j', async (hs) => {
     // T2 is covered below for names that do not fit a latin1 header
-    await expectRefused(ctx, hs, { names: /^[\x00-\xff]*$/.test(hs) ? undefined : ['T3', 'T4', 'T5', 'T6'] });
+    await expectRefused(ctx, hs, {
+      names: /^[\x00-\xff]*$/.test(hs) ? undefined : ['T3', 'T4', 'T5', 'T6'],
+    });
     // dns may log names (IDNs as punycode) from unrelated work, but never one of ours
     const asked = (await dns.queries()).map((q) => q.name);
     expect(asked.filter((n) => /evil|localhost|^a\b|xn--|bücher/.test(n))).toEqual([]);
@@ -53,9 +103,12 @@ describe('A. malformed names are rejected before any network I/O', () => {
 
 // found while writing this suite: open() builds the verification headers from the query string, `headers.set` throws a TypeError
 // for a non-latin1 X-Novarum-Homeserver, and nothing closes the (unauthenticated) socket, so it stays open until the client leaves
-test.failing('known gap: a bridge WebSocket with a non-latin1 homeserver is closed, not left open', async () => {
-  expect(await bridgeSocket('p', 'ex\u0430mple.test')).toMatchObject({ status: 1008 });
-});
+test.failing(
+  'known gap: a bridge WebSocket with a non-latin1 homeserver is closed, not left open',
+  async () => {
+    expect(await bridgeSocket('p', 'ex\u0430mple.test')).toMatchObject({ status: 1008 });
+  }
+);
 
 describe('A. DNS answers', () => {
   const seq = (() => {

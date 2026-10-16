@@ -2,7 +2,10 @@ import { execSync } from 'node:child_process';
 
 /** runs shell commands (newline separated) at boot of an in-container harness process; throws on failure */
 export const runSetup = (script = '') => {
-  for (const cmd of script.split('\n').map((c) => c.trim()).filter(Boolean)) {
+  for (const cmd of script
+    .split('\n')
+    .map((c) => c.trim())
+    .filter(Boolean)) {
     console.log(`[setup] ${cmd}`);
     execSync(cmd, { stdio: 'inherit' });
   }

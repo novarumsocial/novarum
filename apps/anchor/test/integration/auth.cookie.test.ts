@@ -10,7 +10,8 @@ beforeAll(async () => {
 });
 afterAll(() => anchor?.destroy());
 
-const sessionCookie = (res: Response) => res.headers.getSetCookie().find((c) => c.startsWith('session_token='))!;
+const sessionCookie = (res: Response) =>
+  res.headers.getSetCookie().find((c) => c.startsWith('session_token='))!;
 
 test('signup and login cookies are Secure, SameSite=None and Partitioned when base_url is https', async () => {
   const u = await signup(anchor.url);
@@ -20,7 +21,10 @@ test('signup and login cookies are Secure, SameSite=None and Partitioned when ba
     email: `${username}@example.test`,
     password: 'correct-horse-battery',
   });
-  const login = await post(anchor.url, '/auth/login', { username: u.user.username, password: u.password });
+  const login = await post(anchor.url, '/auth/login', {
+    username: u.user.username,
+    password: u.password,
+  });
   for (const raw of [sessionCookie(res), sessionCookie(login)]) {
     expect(raw).toContain('HttpOnly');
     expect(raw).toContain('Secure');

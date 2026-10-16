@@ -24,7 +24,7 @@
   import Switch from './ui/switch/switch.svelte';
   import Label from './ui/label/label.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { settings } from '$lib/settings.svelte';
+  import { settings, settingsDialog } from '$lib/settings.svelte';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { session, type SessionUser } from '$lib/session.svelte';
   import { anchor } from '$lib/anchor.svelte';
@@ -42,7 +42,6 @@
     voiceChannelName: string | null;
     onLeaveVoice: () => void;
   } = $props();
-  let settingsOpen = $state(false);
   let acctSwitcherOpen = $state(false);
   const otherAccounts = $derived(
     session.accounts.filter((account) => account.homeServer !== anchor.homeServer)
@@ -224,13 +223,13 @@
             bgColor={user.avatarColor}
             class="size-8 text-xs"
           />
-          {#if voice.connected && voice.voiceStates.get(user.id)?.speaking}
-            <div
-              class="pointer-events-none absolute inset-0"
-              style:box-shadow="inset 0 0 0 1.5px {user.speakingRingColor ?? '#00d492'}, inset 0 0 0
-              2.5px var(--color-sidebar)"
-              class:rounded-full={settings.value.circleIcons}
-            ></div>
+          <span
+            class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+          ></span>
+          {#if settings.value.circleIcons}
+            <span
+              class="rounded-full absolute -right-px -bottom-px size-2.75 border-2 border-sidebar bg-emerald-500"
+            ></span>
           {/if}
         </div>
         <div class="min-w-0 flex-1">
@@ -331,7 +330,7 @@
       <button
         class="flex size-7 items-center justify-center text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="User settings"
-        onclick={() => (settingsOpen = true)}
+        onclick={() => (settingsDialog.open = true)}
       >
         <Settings class="size-4" />
       </button>
@@ -339,4 +338,4 @@
   </div>
 </div>
 
-<SettingsDialog bind:open={settingsOpen} {voice} />
+<SettingsDialog bind:open={settingsDialog.open} {voice} />

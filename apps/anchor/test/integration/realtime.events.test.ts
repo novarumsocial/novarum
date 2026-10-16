@@ -52,7 +52,8 @@ let anchor: RunningAnchor;
 beforeAll(async () => {
   anchor = await spawnAnchor({ name: 'rtevents' });
   const sql = dbConnect(anchor.databaseUrl);
-  for (const e of emojis) await sql`INSERT INTO emojis (name, unicode, url) VALUES (${e.name}, ${e.unicode}, ${e.url})`;
+  for (const e of emojis)
+    await sql`INSERT INTO emojis (name, unicode, url) VALUES (${e.name}, ${e.unicode}, ${e.url})`;
   await sql.close();
 });
 afterAll(() => anchor.destroy());
@@ -69,7 +70,11 @@ describe('realtime events', () => {
     const rt = await connect(a);
     const snap = await rt.waitFor('voice.states.snapshot');
     const data = z
-      .object({ guildIds: z.array(z.string()), dmIds: z.array(z.string()), states: z.array(voicePresenceSchema) })
+      .object({
+        guildIds: z.array(z.string()),
+        dmIds: z.array(z.string()),
+        states: z.array(voicePresenceSchema),
+      })
       .parse(snap.data);
     expect(data.guildIds).toEqual([guildId]);
     expect(data.dmIds).toEqual([]);
@@ -104,15 +109,25 @@ describe('realtime events', () => {
     ra.send({ type: 'subscribe.guild', guildId });
     await ra.waitFor('voice.states.snapshot', (e) => e.data.guildIds[0] === guildId);
 
-    const created = await post(a, '/channel/create', { name: 'second chan', guildId, type: 'VOICE' });
+    const created = await post(a, '/channel/create', {
+      name: 'second chan',
+      guildId,
+      type: 'VOICE',
+    });
     for (const rt of [ra, rb]) {
       const ev = await rt.waitFor('channel.created', (e) => e.data.id === created.id);
-      expect(channelSchema.parse(ev.data)).toMatchObject({ name: 'second-chan', type: 'VOICE', guildId });
+      expect(channelSchema.parse(ev.data)).toMatchObject({
+        name: 'second-chan',
+        type: 'VOICE',
+        guildId,
+      });
     }
 
     await post(a, '/channel/order', { guildId, channelIds: [channelId, created.id] }, 'PATCH');
     const reorder = await rb.waitFor('guild.channels.reordered');
-    expect(z.object({ guildId: z.string(), channelIds: z.array(z.string()) }).parse(reorder.data)).toEqual({
+    expect(
+      z.object({ guildId: z.string(), channelIds: z.array(z.string()) }).parse(reorder.data)
+    ).toEqual({
       guildId,
       channelIds: [channelId, created.id],
     });
@@ -144,7 +159,11 @@ describe('realtime events', () => {
     await rb.waitFor('voice.states.snapshot', (e) => e.data.guildIds[0] === guildId);
     await ra.waitFor('voice.states.snapshot', (e) => e.data.guildIds[0] === guildId);
 
-    const { message: sent } = await post(a, '/message/send', { channelId, content: 'hello', nonce: 'n1' });
+    const { message: sent } = await post(a, '/message/send', {
+      channelId,
+      content: 'hello',
+      nonce: 'n1',
+    });
     const created = await rb.waitFor('message.created', (e) => e.data.id === sent.id);
     expect(messageEventSchema.parse(created.data)).toMatchObject({
       content: 'hello',
@@ -161,7 +180,9 @@ describe('realtime events', () => {
     await post(a, '/message/delete', { channelId, messageId: sent.id });
     const deleted = await rb.waitFor('message.deleted', (e) => e.data.id === sent.id);
     expect(
-      z.object({ id: z.string(), channelId: z.string(), guildId: z.string().nullable() }).parse(deleted.data)
+      z
+        .object({ id: z.string(), channelId: z.string(), guildId: z.string().nullable() })
+        .parse(deleted.data)
     ).toEqual({ id: sent.id, channelId, guildId });
     ra.close();
     rb.close();
@@ -176,7 +197,10 @@ describe('realtime events', () => {
 
     const joined = await ra.waitFor('member.joined');
     const data = z
-      .object({ guildId: z.literal(guildId), user: publicUserSchema.extend({ status: z.enum(['ONLINE', 'OFFLINE']) }) })
+      .object({
+        guildId: z.literal(guildId),
+        user: publicUserSchema.extend({ status: z.enum(['ONLINE', 'OFFLINE']) }),
+      })
       .parse(joined.data);
     expect(data.user.userId).toBe(b.user.id);
     const created = await rb.waitFor('guild.created', (e) => e.data.id === guildId);
@@ -190,7 +214,12 @@ describe('realtime events', () => {
     await post(a, '/friends/request', { username: b.user.username, homeserver: b.user.homeserver });
     await rb.waitFor('friends.changed');
     await post(b, `/friends/requests/${a.user.id}/accept`);
-    expect(z.object({}).strict().parse((await ra.waitFor('friends.changed', () => true)).data)).toEqual({});
+    expect(
+      z
+        .object({})
+        .strict()
+        .parse((await ra.waitFor('friends.changed', () => true)).data)
+    ).toEqual({});
     await eventuallyCount(ra.events, 'friends.changed', 1);
 
     const dm = await post(a, '/dm', { userId: b.user.id });
@@ -229,9 +258,15 @@ describe('realtime events', () => {
 
     const ra = await connect(a);
     const online = await rb.waitFor('user.status.changed', (e) => e.data.userId === a.user.id);
-    expect(z.object({ userId: z.string(), status: z.literal('ONLINE') }).parse(online.data).userId).toBe(a.user.id);
+    expect(
+      z.object({ userId: z.string(), status: z.literal('ONLINE') }).parse(online.data).userId
+    ).toBe(a.user.id);
     ra.close();
-    const offline = await rb.waitFor('user.status.changed', (e) => e.data.status === 'OFFLINE', 8000);
+    const offline = await rb.waitFor(
+      'user.status.changed',
+      (e) => e.data.status === 'OFFLINE',
+      8000
+    );
     expect(offline.data.userId).toBe(a.user.id);
     rb.close();
   });
@@ -246,7 +281,9 @@ describe('realtime events', () => {
 
     ra.send({ type: 'voice.join', channelId: voice.id });
     const joined = await rb.waitFor('voice.state.changed', (e) => e.data.connected);
-    expect(voicePresenceSchema.extend({ connected: z.literal(true) }).parse(joined.data)).toMatchObject({
+    expect(
+      voicePresenceSchema.extend({ connected: z.literal(true) }).parse(joined.data)
+    ).toMatchObject({
       channelId: voice.id,
       userId: a.user.id,
       guildId,
@@ -279,7 +316,9 @@ describe('realtime events', () => {
     ra.send({ type: 'call.ring', channelId: dm.id, ringing: true });
     const ev = await rb.waitFor('call.ringing');
     expect(
-      z.object({ channelId: z.string(), user: publicUserSchema, ringing: z.boolean() }).parse(ev.data)
+      z
+        .object({ channelId: z.string(), user: publicUserSchema, ringing: z.boolean() })
+        .parse(ev.data)
     ).toMatchObject({ channelId: dm.id, ringing: true, user: { userId: a.user.id } });
     expect(rb.events.filter((e) => e.type === 'call.ringing')).toHaveLength(1);
     ra.close();
@@ -291,14 +330,18 @@ describe('realtime events', () => {
     const rt = await connect(a);
     rt.send({ type: 'emoji.search', query: 'rocket' });
     const search = await rt.waitFor('emoji.search.results');
-    expect(z.object({ query: z.string(), emojis: z.array(emojiSchema) }).parse(search.data)).toEqual({
+    expect(
+      z.object({ query: z.string(), emojis: z.array(emojiSchema) }).parse(search.data)
+    ).toEqual({
       query: 'rocket',
       emojis: [emojis[1]!],
     });
 
     rt.send({ type: 'emoji.query', unicodes: ['1f600', '1F680', '1F680', 'ABCDE'] });
     const query = await rt.waitFor('emoji.query.results');
-    const data = z.object({ unicodes: z.array(z.string()), emojis: z.array(emojiSchema) }).parse(query.data);
+    const data = z
+      .object({ unicodes: z.array(z.string()), emojis: z.array(emojiSchema) })
+      .parse(query.data);
     expect(data.unicodes).toEqual(['1F600', '1F680', 'ABCDE']);
     expect(data.emojis).toEqual(emojis);
     rt.close();

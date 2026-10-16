@@ -19,10 +19,18 @@ type Fx = Awaited<ReturnType<typeof guildFixture>>;
 async function guildFixture() {
   const owner = await signup(anchor.url);
   const { guild, channel } = await createGuild(owner);
-  const voice = (await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'voice', type: 'VOICE' })).body;
+  const voice = (
+    await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'voice',
+      type: 'VOICE',
+    })
+  ).body;
   const member = await signup(anchor.url);
   const code = await join(owner, guild.id, member);
-  const refreshCode = async () => (fx.code = (await call(owner, 'POST', `/guilds/${guild.id}/invites`, {})).body.invite.code as string);
+  const refreshCode = async () =>
+    (fx.code = (await call(owner, 'POST', `/guilds/${guild.id}/invites`, {})).body.invite
+      .code as string);
   const memberMessage = (await send(member, channel.id, 'by member')).body.message;
   const fx = {
     refreshCode,
@@ -34,7 +42,9 @@ async function guildFixture() {
     memberMessage,
     ownerMessage: async () => (await send(owner, channel.id, 'by owner')).body.message,
     channelIds: async () =>
-      (await call(owner, 'GET', '/guilds/list')).body.guilds.find((g: any) => g.id === guild.id).channels.map((c: any) => c.id),
+      (await call(owner, 'GET', '/guilds/list')).body.guilds
+        .find((g: any) => g.id === guild.id)
+        .channels.map((c: any) => c.id),
   };
   return fx;
 }
@@ -56,18 +66,79 @@ const textFile = () => {
 };
 
 const guildRoutes: Route[] = [
-  { key: 'POST /guilds/create', method: 'POST', path: () => '/guilds/create', body: () => ({ name: 'x' }), expected: [401, 200, 200, 200] },
-  { key: 'GET /guilds/list', method: 'GET', path: () => '/guilds/list', expected: [401, 200, 200, 200] },
-  { key: 'GET /guilds/avatar/{id}', method: 'GET', path: (fx) => `/guilds/avatar/${fx.guild.id}`, expected: [404, 404, 404, 404] },
+  {
+    key: 'POST /guilds/create',
+    method: 'POST',
+    path: () => '/guilds/create',
+    body: () => ({ name: 'x' }),
+    expected: [401, 200, 200, 200],
+  },
+  {
+    key: 'GET /guilds/list',
+    method: 'GET',
+    path: () => '/guilds/list',
+    expected: [401, 200, 200, 200],
+  },
+  {
+    key: 'GET /guilds/avatar/{id}',
+    method: 'GET',
+    path: (fx) => `/guilds/avatar/${fx.guild.id}`,
+    expected: [404, 404, 404, 404],
+  },
   // owner reaches the 415 type check (jpeg), so owner passed every permission check
-  { key: 'POST /guilds/{id}/avatar', method: 'POST', path: (fx) => `/guilds/${fx.guild.id}/avatar`, body: textFile, expected: [401, 403, 403, 415] },
-  { key: 'GET /guilds/{id}/invites', method: 'GET', path: (fx) => `/guilds/${fx.guild.id}/invites`, expected: [401, 401, 401, 200] },
-  { key: 'POST /guilds/{id}/invites', method: 'POST', path: (fx) => `/guilds/${fx.guild.id}/invites`, body: () => ({}), expected: [401, 403, 403, 200] },
-  { key: 'GET /invite/{code}', method: 'GET', path: (fx) => `/invite/${fx.code}`, expected: [200, 200, 200, 200] },
-  { key: 'POST /invite/accept', method: 'POST', path: () => '/invite/accept', body: (fx) => ({ code: fx.code }), expected: [401, 200, 200, 200] },
-  { key: 'POST /channel/create', method: 'POST', path: () => '/channel/create', body: (fx) => ({ guildId: fx.guild.id, name: 'c', type: 'TEXT' }), expected: [401, 403, 403, 200] },
-  { key: 'PATCH /channel/order', method: 'PATCH', path: () => '/channel/order', body: async (fx) => ({ guildId: fx.guild.id, channelIds: await fx.channelIds() }), expected: [401, 403, 403, 200] },
-  { key: 'GET /channel/{id}/users', method: 'GET', path: (fx) => `/channel/${fx.channel.id}/users`, expected: [401, 401, 200, 200] },
+  {
+    key: 'POST /guilds/{id}/avatar',
+    method: 'POST',
+    path: (fx) => `/guilds/${fx.guild.id}/avatar`,
+    body: textFile,
+    expected: [401, 403, 403, 415],
+  },
+  {
+    key: 'GET /guilds/{id}/invites',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/invites`,
+    expected: [401, 401, 401, 200],
+  },
+  {
+    key: 'POST /guilds/{id}/invites',
+    method: 'POST',
+    path: (fx) => `/guilds/${fx.guild.id}/invites`,
+    body: () => ({}),
+    expected: [401, 403, 403, 200],
+  },
+  {
+    key: 'GET /invite/{code}',
+    method: 'GET',
+    path: (fx) => `/invite/${fx.code}`,
+    expected: [200, 200, 200, 200],
+  },
+  {
+    key: 'POST /invite/accept',
+    method: 'POST',
+    path: () => '/invite/accept',
+    body: (fx) => ({ code: fx.code }),
+    expected: [401, 200, 200, 200],
+  },
+  {
+    key: 'POST /channel/create',
+    method: 'POST',
+    path: () => '/channel/create',
+    body: (fx) => ({ guildId: fx.guild.id, name: 'c', type: 'TEXT' }),
+    expected: [401, 403, 403, 200],
+  },
+  {
+    key: 'PATCH /channel/order',
+    method: 'PATCH',
+    path: () => '/channel/order',
+    body: async (fx) => ({ guildId: fx.guild.id, channelIds: await fx.channelIds() }),
+    expected: [401, 403, 403, 200],
+  },
+  {
+    key: 'GET /channel/{id}/users',
+    method: 'GET',
+    path: (fx) => `/channel/${fx.channel.id}/users`,
+    expected: [401, 401, 200, 200],
+  },
   {
     key: 'POST /channel/{id}/read',
     method: 'POST',
@@ -75,16 +146,41 @@ const guildRoutes: Route[] = [
     body: (fx) => ({ messageId: fx.memberMessage.id, createdAt: fx.memberMessage.createdAt }),
     expected: [401, 403, 200, 200],
   },
-  { key: 'POST /channel/{id}/typing', method: 'POST', path: (fx) => `/channel/${fx.channel.id}/typing`, expected: [401, 401, 200, 200] },
-  { key: 'GET /channel/{id}/call/token', method: 'GET', path: (fx) => `/channel/${fx.voice.id}/call/token`, expected: [401, 401, 200, 200] },
-  { key: 'GET /message/list', method: 'GET', path: (fx) => `/message/list?channelId=${fx.channel.id}&cursor=0&amount=20`, expected: [401, 403, 200, 200] },
-  { key: 'POST /message/send', method: 'POST', path: () => '/message/send', body: (fx) => ({ channelId: fx.channel.id, content: 'hi', nonce: `n${Math.random()}` }), expected: [401, 403, 200, 200] },
+  {
+    key: 'POST /channel/{id}/typing',
+    method: 'POST',
+    path: (fx) => `/channel/${fx.channel.id}/typing`,
+    expected: [401, 401, 200, 200],
+  },
+  {
+    key: 'GET /channel/{id}/call/token',
+    method: 'GET',
+    path: (fx) => `/channel/${fx.voice.id}/call/token`,
+    expected: [401, 401, 200, 200],
+  },
+  {
+    key: 'GET /message/list',
+    method: 'GET',
+    path: (fx) => `/message/list?channelId=${fx.channel.id}&cursor=0&amount=20`,
+    expected: [401, 403, 200, 200],
+  },
+  {
+    key: 'POST /message/send',
+    method: 'POST',
+    path: () => '/message/send',
+    body: (fx) => ({ channelId: fx.channel.id, content: 'hi', nonce: `n${Math.random()}` }),
+    expected: [401, 403, 200, 200],
+  },
   // messages below are authored by the guild owner: only the author (owner column) may change them
   {
     key: 'POST /message/edit',
     method: 'POST',
     path: () => '/message/edit',
-    body: async (fx) => ({ channelId: fx.channel.id, messageId: (await fx.ownerMessage()).id, content: 'edited' }),
+    body: async (fx) => ({
+      channelId: fx.channel.id,
+      messageId: (await fx.ownerMessage()).id,
+      content: 'edited',
+    }),
     expected: [401, 403, 403, 200],
   },
   {
@@ -144,7 +240,12 @@ describe('guild routes: anonymous / non-member / member / owner', () => {
         const body = await route.body?.(fx);
         const res = await fetch(`${anchor.url}${route.path(fx)}`, {
           method: route.method,
-          headers: { cookie: `session_token=${token}`, ...(typeof body === 'object' && !(body instanceof FormData) ? { 'content-type': 'application/json' } : {}) },
+          headers: {
+            cookie: `session_token=${token}`,
+            ...(typeof body === 'object' && !(body instanceof FormData)
+              ? { 'content-type': 'application/json' }
+              : {}),
+          },
           body: body === undefined ? undefined : body instanceof FormData ? body : json(body),
         });
         expect(res.status, `${route.key} with token "${token}"`).toBe(401);
@@ -153,7 +254,9 @@ describe('guild routes: anonymous / non-member / member / owner', () => {
   });
 
   test('every OpenAPI route of the area is in the table or explicitly excluded', async () => {
-    const doc = (await (await fetch(`${anchor.url}/openapi/json`)).json()) as { paths: Record<string, Record<string, unknown>> };
+    const doc = (await (await fetch(`${anchor.url}/openapi/json`)).json()) as {
+      paths: Record<string, Record<string, unknown>>;
+    };
     const keys = Object.entries(doc.paths)
       .filter(([path]) => /^\/(guilds|channel|message|invite)\//.test(path))
       .flatMap(([path, methods]) => Object.keys(methods).map((m) => `${m.toUpperCase()} ${path}`));
@@ -170,37 +273,84 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
     request: (fx: DmFx) => { method: string; path: string; body?: unknown };
     expected: Expected; // the 4th column is a participant whose friendship ended
   }[] = [
-    { name: 'GET /message/list', request: (fx) => ({ method: 'GET', path: `/message/list?channelId=${fx.dmId}&cursor=0&amount=20` }), expected: [401, 403, 200, 200] },
-    { name: 'POST /message/send', request: (fx) => ({ method: 'POST', path: '/message/send', body: { channelId: fx.dmId, content: 'x', nonce: `n${Math.random()}` } }), expected: [401, 403, 200, 403] },
-    { name: 'POST /channel/{id}/typing', request: (fx) => ({ method: 'POST', path: `/channel/${fx.dmId}/typing` }), expected: [401, 401, 200, 401] },
     {
-      name: 'POST /channel/{id}/read',
-      request: (fx) => ({ method: 'POST', path: `/channel/${fx.dmId}/read`, body: { messageId: fx.message.id, createdAt: fx.message.createdAt } }),
+      name: 'GET /message/list',
+      request: (fx) => ({
+        method: 'GET',
+        path: `/message/list?channelId=${fx.dmId}&cursor=0&amount=20`,
+      }),
       expected: [401, 403, 200, 200],
     },
-    { name: 'GET /channel/{id}/users', request: (fx) => ({ method: 'GET', path: `/channel/${fx.dmId}/users` }), expected: [401, 404, 404, 404] },
-    { name: 'POST /dm/{id}/close', request: (fx) => ({ method: 'POST', path: `/dm/${fx.dmId}/close` }), expected: [401, 404, 200, 200] },
+    {
+      name: 'POST /message/send',
+      request: (fx) => ({
+        method: 'POST',
+        path: '/message/send',
+        body: { channelId: fx.dmId, content: 'x', nonce: `n${Math.random()}` },
+      }),
+      expected: [401, 403, 200, 403],
+    },
+    {
+      name: 'POST /channel/{id}/typing',
+      request: (fx) => ({ method: 'POST', path: `/channel/${fx.dmId}/typing` }),
+      expected: [401, 401, 200, 401],
+    },
+    {
+      name: 'POST /channel/{id}/read',
+      request: (fx) => ({
+        method: 'POST',
+        path: `/channel/${fx.dmId}/read`,
+        body: { messageId: fx.message.id, createdAt: fx.message.createdAt },
+      }),
+      expected: [401, 403, 200, 200],
+    },
+    {
+      name: 'GET /channel/{id}/users',
+      request: (fx) => ({ method: 'GET', path: `/channel/${fx.dmId}/users` }),
+      expected: [401, 404, 404, 404],
+    },
+    {
+      name: 'POST /dm/{id}/close',
+      request: (fx) => ({ method: 'POST', path: `/dm/${fx.dmId}/close` }),
+      expected: [401, 404, 200, 200],
+    },
   ];
   const actors = ['anonymous', 'outsider', 'participant', 'ex-friend'] as const;
 
   for (const outcome of outcomes) {
     actors.forEach((who, i) => {
       test(`${outcome.name} as ${who} -> ${outcome.expected[i]}`, async () => {
-        const [a, b, outsider] = await Promise.all([signup(anchor.url), signup(anchor.url), signup(anchor.url)]);
+        const [a, b, outsider] = await Promise.all([
+          signup(anchor.url),
+          signup(anchor.url),
+          signup(anchor.url),
+        ]);
         await befriend(a, b);
         const dmId = (await call(a, 'POST', '/dm', { userId: b.user.id })).body.id;
         const message = (await send(b, dmId, 'hello')).body.message;
-        const actor = { anonymous: anonymous(anchor.url), outsider, participant: a, 'ex-friend': a }[who];
+        const actor = {
+          anonymous: anonymous(anchor.url),
+          outsider,
+          participant: a,
+          'ex-friend': a,
+        }[who];
         if (who === 'ex-friend') await unfriend(a, b);
         const { method, path, body } = outcome.request({ a, dmId, message });
-        const res = await actor.fetch(path, { method, body: body === undefined ? undefined : json(body) });
+        const res = await actor.fetch(path, {
+          method,
+          body: body === undefined ? undefined : json(body),
+        });
         expect(res.status, await res.clone().text()).toBe(outcome.expected[i]!);
       });
     });
   }
 
   test('POST /dm: anonymous 401, non-friend 403, friend 200', async () => {
-    const [a, friend, stranger] = await Promise.all([signup(anchor.url), signup(anchor.url), signup(anchor.url)]);
+    const [a, friend, stranger] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
     await befriend(a, friend);
     const open = (actor: Actor, userId: string) => call(actor, 'POST', '/dm', { userId });
     expect((await open(anonymous(anchor.url), friend.user.id)).status).toBe(401);

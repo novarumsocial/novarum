@@ -36,9 +36,13 @@ export function startPushSink({ endpointHost = '127.0.0.1' } = {}) {
       const res = await call(user, 'POST', '/notifications/subscriptions', {
         kind,
         endpoint: `http://${endpointHost}:${server.port}/${label}`,
-        keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: auth.toString('base64url') },
+        keys: {
+          p256dh: ecdh.getPublicKey().toString('base64url'),
+          auth: auth.toString('base64url'),
+        },
       });
-      if (res.status !== 200) throw new Error(`subscribe failed: ${res.status} ${JSON.stringify(res.body)}`);
+      if (res.status !== 200)
+        throw new Error(`subscribe failed: ${res.status} ${JSON.stringify(res.body)}`);
       return { label, id: res.body.id as string };
     },
     /** gives a push that should not arrive time to show up */

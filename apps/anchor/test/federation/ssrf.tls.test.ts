@@ -1,7 +1,25 @@
 // TESTING_PLAN.md 5.4 B: scheme and TLS. anchor-p must validate certificates and refuse plain http for public targets.
-import { afterAll, beforeAll, beforeEach, describe, expect, test, setDefaultTimeout } from 'bun:test';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  setDefaultTimeout,
+} from 'bun:test';
 import { dns, fake, stackIsUp } from '../harness/federation';
-import { bunIn, clean, dropShadows, expectRefused, freshAnchor, makeActor, pgFor, publicDiscovery, type Actor } from '../harness/ssrf';
+import {
+  bunIn,
+  clean,
+  dropShadows,
+  expectRefused,
+  freshAnchor,
+  makeActor,
+  pgFor,
+  publicDiscovery,
+  type Actor,
+} from '../harness/ssrf';
 
 // restarts and 10s federation timeouts do not fit bun's 5s default (the harness's own call only reaches later files)
 setDefaultTimeout(180_000);

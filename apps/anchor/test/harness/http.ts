@@ -1,7 +1,12 @@
 import { cookieName, freshIp } from './users';
 
 /** JSON POST with a fresh client IP (so the per-IP auth rate limits don't interfere); pass `headers` to override */
-export const post = (url: string, path: string, body: unknown, headers: Record<string, string> = {}) =>
+export const post = (
+  url: string,
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {}
+) =>
   fetch(`${url}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-forwarded-for': freshIp(), ...headers },

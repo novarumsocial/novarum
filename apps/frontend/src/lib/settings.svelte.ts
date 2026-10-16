@@ -79,3 +79,5 @@ class SettingsStore {
 }
 
 export const settings = new SettingsStore();
+
+export const settingsDialog = $state({ open: false });

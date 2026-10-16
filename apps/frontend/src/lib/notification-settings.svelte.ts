@@ -17,7 +17,9 @@ class NotificationSettingsState {
     const result = await anchor.client.notifications.settings.get();
     if (result.error || !result.data) return;
 
-    this.entries = Object.fromEntries(result.data.settings.map((item: { targetId: string }) => [item.targetId, item]));
+    this.entries = Object.fromEntries(
+      result.data.settings.map((item: { targetId: string }) => [item.targetId, item])
+    );
   }
 
   level(target: Target) {
@@ -52,14 +54,18 @@ class NotificationSettingsState {
     const current = this.entries[targetId];
     const next = {
       level: change.level ?? current?.level ?? defaultLevel,
-      mutedUntil: change.mutedUntil === undefined ? (current?.mutedUntil ?? null) : change.mutedUntil,
+      mutedUntil:
+        change.mutedUntil === undefined ? (current?.mutedUntil ?? null) : change.mutedUntil,
     };
     const previous = this.entries;
     this.entries = { ...this.entries, [targetId]: next };
 
     const result = await anchor.client.notifications
       .settings({ targetId: encodeURIComponent(targetId) })
-      .put({ ...next, mutedUntil: next.mutedUntil ? new Date(next.mutedUntil).toISOString() : null });
+      .put({
+        ...next,
+        mutedUntil: next.mutedUntil ? new Date(next.mutedUntil).toISOString() : null,
+      });
     if (result.error) this.entries = previous;
   }
 

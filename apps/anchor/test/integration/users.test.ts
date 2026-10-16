@@ -7,14 +7,25 @@ import { signup } from '../harness/users';
 let anchor: RunningAnchor;
 beforeAll(async () => {
   // 0.05 MB is plenty for a tiny png and small enough to exceed in a test
-  anchor = await spawnAnchor({ name: 'users', s3: true, config: { files: { max_avatar_size: 0.05 } } });
+  anchor = await spawnAnchor({
+    name: 'users',
+    s3: true,
+    config: { files: { max_avatar_size: 0.05 } },
+  });
 });
 afterAll(() => anchor?.destroy());
 
 const png = (color: { r: number; g: number; b: number }, size = 16) =>
-  sharp({ create: { width: size, height: size, channels: 3, background: color } }).png().toBuffer();
+  sharp({ create: { width: size, height: size, channels: 3, background: color } })
+    .png()
+    .toBuffer();
 
-const upload = (u: Awaited<ReturnType<typeof signup>>, field: 'avatar' | 'banner', data: string | Uint8Array, type = 'image/png') => {
+const upload = (
+  u: Awaited<ReturnType<typeof signup>>,
+  field: 'avatar' | 'banner',
+  data: string | Uint8Array,
+  type = 'image/png'
+) => {
   const form = new FormData();
   form.set(field, new File([data], 'file', { type }));
   return u.fetch(`/user/${field}`, { method: 'POST', body: form });
@@ -28,10 +39,14 @@ const redirectTarget = async (path: string) => {
 describe('about', () => {
   test('defaults to null, can be set, read by anyone and cleared', async () => {
     const u = await signup(anchor.url);
-    const read = async () => (await (await fetch(`${anchor.url}/user/about/${u.user.id}`)).json()) as any;
+    const read = async () =>
+      (await (await fetch(`${anchor.url}/user/about/${u.user.id}`)).json()) as any;
     expect((await read()).about).toBeNull();
 
-    const res = await u.fetch('/user/about', { method: 'POST', body: JSON.stringify({ about: 'hello there' }) });
+    const res = await u.fetch('/user/about', {
+      method: 'POST',
+      body: JSON.stringify({ about: 'hello there' }),
+    });
     expect(res.status).toBe(200);
     expect(((await res.json()) as any).user.about).toBe('hello there');
     expect((await read()).about).toBe('hello there');
@@ -42,10 +57,13 @@ describe('about', () => {
 
   test('accepts 512 characters and rejects 513', async () => {
     const u = await signup(anchor.url);
-    const set = (about: string) => u.fetch('/user/about', { method: 'POST', body: JSON.stringify({ about }) });
+    const set = (about: string) =>
+      u.fetch('/user/about', { method: 'POST', body: JSON.stringify({ about }) });
     expect((await set('a'.repeat(512))).status).toBe(200);
     expect((await set('a'.repeat(513))).status).toBe(422);
-    expect(((await (await fetch(`${anchor.url}/user/about/${u.user.id}`)).json()) as any).about).toHaveLength(512);
+    expect(
+      ((await (await fetch(`${anchor.url}/user/about/${u.user.id}`)).json()) as any).about
+    ).toHaveLength(512);
   });
 
   test('unknown user is 404', async () => {
@@ -92,7 +110,9 @@ describe('avatar', () => {
   test('a second upload replaces the first', async () => {
     const u = await signup(anchor.url);
     await upload(u, 'avatar', await png({ r: 255, g: 0, b: 0 }));
-    const second = (await (await upload(u, 'avatar', await png({ r: 0, g: 0, b: 255 }, 32))).json()) as any;
+    const second = (await (
+      await upload(u, 'avatar', await png({ r: 0, g: 0, b: 255 }, 32))
+    ).json()) as any;
     expect(second.user.avatarColor).toMatch(/^#0000FF$/i);
     const { location } = await redirectTarget(`/user/avatar/${u.user.id}`);
     const meta = await sharp(Buffer.from(await (await fetch(location!)).arrayBuffer())).metadata();
@@ -113,7 +133,11 @@ describe('avatar', () => {
   test('non png/gif content types are 415', async () => {
     const u = await signup(anchor.url);
     expect((await upload(u, 'avatar', 'just text', 'text/plain')).status).toBe(415);
-    const jpeg = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#123456' } }).jpeg().toBuffer();
+    const jpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: '#123456' },
+    })
+      .jpeg()
+      .toBuffer();
     expect((await upload(u, 'avatar', jpeg, 'image/jpeg')).status).toBe(415);
     expect((await fetch(`${anchor.url}/user/avatar/${u.user.id}`)).status).toBe(404);
   });
@@ -143,7 +167,9 @@ describe('avatar', () => {
   test('uploading requires a session', async () => {
     const form = new FormData();
     form.set('avatar', new File([await png({ r: 1, g: 1, b: 1 })], 'a.png', { type: 'image/png' }));
-    expect((await fetch(`${anchor.url}/user/avatar`, { method: 'POST', body: form })).status).toBe(401);
+    expect((await fetch(`${anchor.url}/user/avatar`, { method: 'POST', body: form })).status).toBe(
+      401
+    );
   });
 });
 

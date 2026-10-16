@@ -2,7 +2,17 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { anchors, resetHarness, restart, signup, stackIsUp } from '../harness/federation';
 import { call, send } from '../harness/chat';
 import { connect } from '../harness/realtime';
-import { closePg, fedChannelId, friendList, idOf, listHas, makeFriends, pg, signerFor, userPayload } from '../harness/fedflows';
+import {
+  closePg,
+  fedChannelId,
+  friendList,
+  idOf,
+  listHas,
+  makeFriends,
+  pg,
+  signerFor,
+  userPayload,
+} from '../harness/fedflows';
 import { eventually } from '../harness/wait';
 import { nonce } from '../harness/chat';
 import type { TestUser } from '../harness/users';
@@ -15,7 +25,8 @@ beforeAll(async () => {
 afterAll(closePg);
 
 const hostA = anchors.a.homeserver;
-const dmsFrom = async (u: TestUser, hs = hostA) => ((await call(u, 'GET', `/dm/homeserver/${hs}`)).body.dms ?? []) as any[];
+const dmsFrom = async (u: TestUser, hs = hostA) =>
+  ((await call(u, 'GET', `/dm/homeserver/${hs}`)).body.dms ?? []) as any[];
 const hasDm = async (u: TestUser, id: string) => (await dmsFrom(u)).some((d) => d.id === id);
 
 /** friends a(A) and b(B), the DM opened from `from`, and the bridge on B up (probed through typing events) */
@@ -40,7 +51,12 @@ async function setup(from: 'host' | 'guest' = 'host') {
 }
 
 /** the DM bridge from B is established asynchronously; A typing is relayed over it once it is */
-async function bridgeUp(host: TestUser, hostId: string, rt: Awaited<ReturnType<typeof connect>>, shadowId: string) {
+async function bridgeUp(
+  host: TestUser,
+  hostId: string,
+  rt: Awaited<ReturnType<typeof connect>>,
+  shadowId: string
+) {
   await eventually(
     async () => {
       await call(host, 'POST', `/channel/${hostId}/typing`);
@@ -78,15 +94,26 @@ describe('opening', () => {
     const onA = await call(a, 'GET', '/dm');
     expect(onA.body.dms.map((d: any) => d.id)).toContain(hostId);
     // opening again is idempotent: same canonical channel
-    expect((await call(b, 'POST', '/dm', { userId: await idOf(b, a) })).body.id).toBe(opened.body.id);
+    expect((await call(b, 'POST', '/dm', { userId: await idOf(b, a) })).body.id).toBe(
+      opened.body.id
+    );
   });
 
   test('not friends: both sides refuse (403)', async () => {
     const [a, b] = [await signup('a'), await signup('b')];
-    await call(a, 'POST', '/friends/request', { username: b.user.username, homeserver: b.user.homeserver });
+    await call(a, 'POST', '/friends/request', {
+      username: b.user.username,
+      homeserver: b.user.homeserver,
+    });
     const target = await idOf(a, b);
     expect((await call(a, 'POST', '/dm', { userId: target })).status).toBe(403);
-    expect((await call(b, 'POST', '/dm', { userId: await eventually(() => idOf(b, a), { message: 'b sees request' }) })).status).toBe(403);
+    expect(
+      (
+        await call(b, 'POST', '/dm', {
+          userId: await eventually(() => idOf(b, a), { message: 'b sees request' }),
+        })
+      ).status
+    ).toBe(403);
   });
 });
 
@@ -97,10 +124,17 @@ describe('messages', () => {
     // b -> a through the shadow channel
     const sent = await send(b, shadowId, 'hello from b');
     expect(sent.status).toBe(200);
-    expect(sent.body.message).toMatchObject({ channelId: shadowId, content: 'hello from b', guildId: null });
+    expect(sent.body.message).toMatchObject({
+      channelId: shadowId,
+      content: 'hello from b',
+      guildId: null,
+    });
     const onA = await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`);
     expect(onA.body.messages.map((m: any) => m.content)).toEqual(['hello from b']);
-    expect(onA.body.messages[0].author).toMatchObject({ username: b.user.username, homeserver: anchors.b.homeserver });
+    expect(onA.body.messages[0].author).toMatchObject({
+      username: b.user.username,
+      homeserver: anchors.b.homeserver,
+    });
 
     // a -> b arrives on b's websocket with the mapped channel id
     const fromA = await send(a, hostId, 'hello from a');
@@ -111,7 +145,11 @@ describe('messages', () => {
     expect(evt.data.guildId).toBeNull();
 
     // listing from b goes to the host and keeps the shadow id
-    const onB = await call(b, 'GET', `/message/list?channelId=${encodeURIComponent(shadowId)}&cursor=0&amount=50`);
+    const onB = await call(
+      b,
+      'GET',
+      `/message/list?channelId=${encodeURIComponent(shadowId)}&cursor=0&amount=50`
+    );
     expect(onB.body.messages.map((m: any) => [m.content, m.channelId])).toEqual([
       ['hello from b', shadowId],
       ['hello from a', shadowId],
@@ -119,26 +157,60 @@ describe('messages', () => {
 
     // edit by b (own message) shows on A and arrives as message.updated
     const msgId = sent.body.message.id;
-    expect((await call(b, 'POST', '/message/edit', { channelId: shadowId, messageId: msgId, content: 'edited by b' })).status).toBe(200);
-    expect((await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body.messages[0]).toMatchObject({ content: 'edited by b', edited: true });
-    await rt.waitFor('message.updated', (e) => e.data.id === msgId && e.data.channelId === shadowId);
+    expect(
+      (
+        await call(b, 'POST', '/message/edit', {
+          channelId: shadowId,
+          messageId: msgId,
+          content: 'edited by b',
+        })
+      ).status
+    ).toBe(200);
+    expect(
+      (await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body
+        .messages[0]
+    ).toMatchObject({ content: 'edited by b', edited: true });
+    await rt.waitFor(
+      'message.updated',
+      (e) => e.data.id === msgId && e.data.channelId === shadowId
+    );
     // b cannot edit a's message
     const aMsg = fromA.body.message.id;
-    expect((await call(b, 'POST', '/message/edit', { channelId: shadowId, messageId: aMsg, content: 'nope' })).status).toBe(403);
+    expect(
+      (
+        await call(b, 'POST', '/message/edit', {
+          channelId: shadowId,
+          messageId: aMsg,
+          content: 'nope',
+        })
+      ).status
+    ).toBe(403);
 
     // delete by b, then by a, both reach the other side
-    expect((await call(b, 'POST', '/message/delete', { channelId: shadowId, messageId: msgId })).status).toBe(200);
-    await rt.waitFor('message.deleted', (e) => e.data.id === msgId && e.data.channelId === shadowId);
-    expect((await call(a, 'POST', '/message/delete', { channelId: hostId, messageId: aMsg })).status).toBe(200);
+    expect(
+      (await call(b, 'POST', '/message/delete', { channelId: shadowId, messageId: msgId })).status
+    ).toBe(200);
+    await rt.waitFor(
+      'message.deleted',
+      (e) => e.data.id === msgId && e.data.channelId === shadowId
+    );
+    expect(
+      (await call(a, 'POST', '/message/delete', { channelId: hostId, messageId: aMsg })).status
+    ).toBe(200);
     await rt.waitFor('message.deleted', (e) => e.data.id === aMsg && e.data.channelId === shadowId);
-    expect((await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body.messages).toEqual([]);
+    expect(
+      (await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body.messages
+    ).toEqual([]);
     rt.close();
   });
 
   test('opened from the non-host side works the same way', async () => {
     const { a, b, hostId, shadowId, rt } = await setup('guest');
     expect((await send(b, shadowId, 'from the guest')).status).toBe(200);
-    expect((await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body.messages[0]).toMatchObject({ content: 'from the guest' });
+    expect(
+      (await call(a, 'GET', `/message/list?channelId=${hostId}&cursor=0&amount=50`)).body
+        .messages[0]
+    ).toMatchObject({ content: 'from the guest' });
     await send(a, hostId, 'from the host');
     await rt.waitFor('message.created', (e) => e.data.content === 'from the host');
     rt.close();
@@ -146,14 +218,23 @@ describe('messages', () => {
 
   test('/dms/latest: B sees the latest message time and unread state of a hosted DM', async () => {
     const { a, b, hostId, shadowId, rt } = await setup('host');
-    expect((await dmsFrom(b)).find((d) => d.id === shadowId)).toMatchObject({ lastMessageAt: null, unread: false });
+    expect((await dmsFrom(b)).find((d) => d.id === shadowId)).toMatchObject({
+      lastMessageAt: null,
+      unread: false,
+    });
     await send(a, hostId, 'ping');
     await rt.waitFor('message.created');
-    const dm = await eventually(async () => (await dmsFrom(b)).find((d) => d.id === shadowId && d.lastMessageAt), { message: 'latest via /dms/latest' });
+    const dm = await eventually(
+      async () => (await dmsFrom(b)).find((d) => d.id === shadowId && d.lastMessageAt),
+      { message: 'latest via /dms/latest' }
+    );
     expect(dm.unread).toBe(true); // authored by a, not read by b
     // b's own message is never unread for b
     await send(b, shadowId, 'reply');
-    await eventually(async () => (await dmsFrom(b)).find((d) => d.id === shadowId)?.unread === false, { message: 'own message not unread' });
+    await eventually(
+      async () => (await dmsFrom(b)).find((d) => d.id === shadowId)?.unread === false,
+      { message: 'own message not unread' }
+    );
     rt.close();
   });
 });
@@ -164,7 +245,11 @@ describe('calls', () => {
     const rtA = await connect(a);
     rt.send({ type: 'call.ring', channelId: shadowId, ringing: true });
     const onA = await rtA.waitFor('call.ringing');
-    expect(onA.data).toMatchObject({ channelId: hostId, ringing: true, user: { username: b.user.username } });
+    expect(onA.data).toMatchObject({
+      channelId: hostId,
+      ringing: true,
+      user: { username: b.user.username },
+    });
     const echoed = await rt.waitFor('call.ringing', (e) => e.data.channelId === shadowId);
     expect(echoed.data.ringing).toBe(true);
     rtA.close();
@@ -177,20 +262,32 @@ describe('friendship changes and closing', () => {
     const { a, b, hostId, shadowId, rt } = await setup('host');
     await send(b, shadowId, 'before unfriend');
     expect((await call(a, 'DELETE', `/friends/${await idOf(a, b)}`)).status).toBe(200);
-    await eventually(async () => !listHas((await friendList(b)).accepted, a), { message: 'b sees unfriend' });
+    await eventually(async () => !listHas((await friendList(b)).accepted, a), {
+      message: 'b sees unfriend',
+    });
 
     // B itself refuses the write (no friendship there)
     expect((await send(b, shadowId, 'after unfriend')).status).toBe(403);
     // and so does the host, when B is bypassed and asks A directly with its real signature
     const fromB = await signerFor('b');
     const payload = userPayload(b.user);
-    const write = await fromB.send('a', 'POST', `/federation/channels/${hostId}/messages/send`, { user: payload, content: 'sneaky', nonce: nonce() });
+    const write = await fromB.send('a', 'POST', `/federation/channels/${hostId}/messages/send`, {
+      user: payload,
+      content: 'sneaky',
+      nonce: nonce(),
+    });
     expect(write.status).toBe(403);
     // reads still work, from B's API and on the wire
-    const list = await call(b, 'GET', `/message/list?channelId=${encodeURIComponent(shadowId)}&cursor=0&amount=50`);
+    const list = await call(
+      b,
+      'GET',
+      `/message/list?channelId=${encodeURIComponent(shadowId)}&cursor=0&amount=50`
+    );
     expect(list.status).toBe(200);
     expect(list.body.messages.map((m: any) => m.content)).toEqual(['before unfriend']);
-    const wire = await fromB.send('a', 'POST', `/federation/channels/${hostId}/messages`, { user: payload });
+    const wire = await fromB.send('a', 'POST', `/federation/channels/${hostId}/messages`, {
+      user: payload,
+    });
     expect(wire.status).toBe(200);
     expect(wire.json.messages).toHaveLength(1);
     rt.close();

@@ -12,7 +12,12 @@ afterAll(() => anchor?.destroy());
 
 const signupBody = (over: Record<string, unknown> = {}) => {
   const username = uniqueName();
-  return { username, email: `${username}@example.test`, password: 'correct-horse-battery', ...over };
+  return {
+    username,
+    email: `${username}@example.test`,
+    password: 'correct-horse-battery',
+    ...over,
+  };
 };
 
 describe('signup', () => {
@@ -43,7 +48,11 @@ describe('signup', () => {
     const sameEmail = await post(anchor.url, '/auth/signup', signupBody({ email: first.email }));
     expect(sameEmail.status).toBe(409);
     expect(((await sameEmail.json()) as any).error).toMatch(/email/i);
-    const sameName = await post(anchor.url, '/auth/signup', signupBody({ username: first.user.username }));
+    const sameName = await post(
+      anchor.url,
+      '/auth/signup',
+      signupBody({ username: first.user.username })
+    );
     expect(sameName.status).toBe(409);
     expect(((await sameName.json()) as any).error).toMatch(/username/i);
   });
@@ -61,11 +70,17 @@ describe('signup', () => {
 
   // gap: the schema uses `t.String({ type: 'email' })`, which is not a format check
   test.failing('rejects an invalid email with 422', async () => {
-    expect((await post(anchor.url, '/auth/signup', signupBody({ email: 'not-an-email' }))).status).toBe(422);
+    expect(
+      (await post(anchor.url, '/auth/signup', signupBody({ email: 'not-an-email' }))).status
+    ).toBe(422);
   });
 
   test('accepts the username and password length bounds', async () => {
-    for (const over of [{ username: 'a.' }, { username: uniqueName().padEnd(32, 'z') }, { password: '12345678' }]) {
+    for (const over of [
+      { username: 'a.' },
+      { username: uniqueName().padEnd(32, 'z') },
+      { password: '12345678' },
+    ]) {
       const body = signupBody(over);
       body.email = `${uniqueName()}@example.test`;
       expect((await post(anchor.url, '/auth/signup', body)).status).toBe(200);
@@ -76,7 +91,10 @@ describe('signup', () => {
 describe('login', () => {
   test('logs in with the password and returns a working session', async () => {
     const u = await signup(anchor.url);
-    const res = await post(anchor.url, '/auth/login', { username: u.user.username, password: u.password });
+    const res = await post(anchor.url, '/auth/login', {
+      username: u.user.username,
+      password: u.password,
+    });
     expect(res.status).toBe(200);
     expect(((await res.json()) as any).user.id).toBe(u.user.id);
     expect(await meStatus(anchor.url, parseSetCookie(res)!)).toBe(200);
@@ -84,8 +102,14 @@ describe('login', () => {
 
   test('wrong password and unknown user give the same status and body', async () => {
     const u = await signup(anchor.url);
-    const wrong = await post(anchor.url, '/auth/login', { username: u.user.username, password: 'not-the-password' });
-    const unknown = await post(anchor.url, '/auth/login', { username: uniqueName('ghost'), password: 'not-the-password' });
+    const wrong = await post(anchor.url, '/auth/login', {
+      username: u.user.username,
+      password: 'not-the-password',
+    });
+    const unknown = await post(anchor.url, '/auth/login', {
+      username: uniqueName('ghost'),
+      password: 'not-the-password',
+    });
     expect(wrong.status).toBe(401);
     expect(unknown.status).toBe(401);
     expect(await wrong.text()).toBe(await unknown.text());
@@ -144,7 +168,10 @@ describe('/me, logout and session tokens', () => {
 
   test('logout only ends the current session', async () => {
     const u = await signup(anchor.url);
-    const second = await post(anchor.url, '/auth/login', { username: u.user.username, password: u.password });
+    const second = await post(anchor.url, '/auth/login', {
+      username: u.user.username,
+      password: u.password,
+    });
     const secondCookie = parseSetCookie(second)!;
     await post(anchor.url, '/auth/logout', {}, withCookie(u.cookie));
     expect(await meStatus(anchor.url, u.cookie)).toBe(401);

@@ -24,7 +24,8 @@ const fmt = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`;
 let regressed = 0;
 const rows = current.results.map((now) => {
   const before = baselineByName.get(now.name);
-  if (!before) return `| ${now.name} | new | ${now.p95Ms.toFixed(2)} | | ${now.opsPerSecond.toFixed(0)} | | |`;
+  if (!before)
+    return `| ${now.name} | new | ${now.p95Ms.toFixed(2)} | | ${now.opsPerSecond.toFixed(0)} | | |`;
   const p95 = pct(before.p95Ms, now.p95Ms);
   const ops = pct(before.opsPerSecond, now.opsPerSecond);
   const bad = p95 > BENCH_MAX_REGRESSION;

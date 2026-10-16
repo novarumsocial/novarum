@@ -4,7 +4,8 @@ name: anchor-test
 services:
   postgres:
     image: postgres:18-alpine
-    command: ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
+    command:
+      ['postgres', '-c', 'fsync=off', '-c', 'synchronous_commit=off', '-c', 'max_connections=400']
     environment:
       POSTGRES_USER: novarum
       POSTGRES_PASSWORD: novarum

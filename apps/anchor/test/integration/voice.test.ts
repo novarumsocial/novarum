@@ -35,8 +35,17 @@ const claimsSchema = z.object({
 });
 
 /** what livekit does: POST the event body with a JWT whose sha256 claim is the body's base64 sha256 */
-async function webhook(anchor: RunningAnchor, event: object, signWith = secret, tamperBody = false) {
-  const body = JSON.stringify({ id: crypto.randomUUID(), createdAt: Math.floor(Date.now() / 1000), ...event });
+async function webhook(
+  anchor: RunningAnchor,
+  event: object,
+  signWith = secret,
+  tamperBody = false
+) {
+  const body = JSON.stringify({
+    id: crypto.randomUUID(),
+    createdAt: Math.floor(Date.now() / 1000),
+    ...event,
+  });
   const token = new AccessToken(key, signWith);
   token.sha256 = createHash('sha256').update(body).digest('base64');
   return fetch(`${anchor.url}/channel/livekit/webhook`, {
@@ -70,7 +79,9 @@ describe.skipIf(!enabled)('voice @livekit', () => {
 
       // signature and expiry are verified by livekit's own verifier; claims decoded from the payload
       await new TokenVerifier(key, secret).verify(body.token);
-      const claims = claimsSchema.parse(JSON.parse(Buffer.from(body.token.split('.')[1]!, 'base64url').toString()));
+      const claims = claimsSchema.parse(
+        JSON.parse(Buffer.from(body.token.split('.')[1]!, 'base64url').toString())
+      );
       expect(claims.sub).toBe(u.user.id);
       expect(claims.name).toBe('Vox Pop');
       expect(claims.video.room).toBe(`voice:${channelId}`);
@@ -82,8 +93,12 @@ describe.skipIf(!enabled)('voice @livekit', () => {
     test('a token signed with another secret fails verification', async () => {
       const u = await signup(anchor.url);
       const { channelId } = await voiceChannel(u);
-      const { token } = (await (await u.fetch(`/channel/${channelId}/call/token`)).json()) as { token: string };
-      await expect(new TokenVerifier(key, 'some-other-secret-0123456789abcdef').verify(token)).rejects.toThrow();
+      const { token } = (await (await u.fetch(`/channel/${channelId}/call/token`)).json()) as {
+        token: string;
+      };
+      await expect(
+        new TokenVerifier(key, 'some-other-secret-0123456789abcdef').verify(token)
+      ).rejects.toThrow();
     });
 
     test('a guild member can get a token', async () => {
@@ -128,9 +143,10 @@ describe.skipIf(!enabled)('voice @livekit', () => {
       const res = await b.fetch(`/channel/${dm.id}/call/token`);
       expect(res.status).toBe(200);
       const { token } = (await res.json()) as { token: string };
-      expect(claimsSchema.parse(JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString())).video.room).toBe(
-        `voice:${dm.id}`
-      );
+      expect(
+        claimsSchema.parse(JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString()))
+          .video.room
+      ).toBe(`voice:${dm.id}`);
       expect((await outsider.fetch(`/channel/${dm.id}/call/token`)).status).toBe(401);
     });
   });
@@ -146,7 +162,11 @@ describe.skipIf(!enabled)('voice @livekit', () => {
     test.failing('invalid signature -> 401', async () => {
       const u = await signup(anchor.url);
       const { channelId } = await voiceChannel(u);
-      const res = await webhook(anchor, joinedEvent(u, channelId), 'wrong-secret-0123456789abcdefghijkl');
+      const res = await webhook(
+        anchor,
+        joinedEvent(u, channelId),
+        'wrong-secret-0123456789abcdefghijkl'
+      );
       expect(res.status).toBe(401);
     });
 
@@ -157,13 +177,18 @@ describe.skipIf(!enabled)('voice @livekit', () => {
       rt.send({ type: 'subscribe.guild', guildId });
       await rt.waitFor('voice.states.snapshot', (e) => e.data.guildIds[0] === guildId);
 
-      const forged = await webhook(anchor, joinedEvent(u, channelId), 'wrong-secret-0123456789abcdefghijkl');
+      const forged = await webhook(
+        anchor,
+        joinedEvent(u, channelId),
+        'wrong-secret-0123456789abcdefghijkl'
+      );
       const tampered = await webhook(anchor, joinedEvent(u, channelId), secret, true);
       const unsigned = await fetch(`${anchor.url}/channel/livekit/webhook`, {
         method: 'POST',
         body: JSON.stringify(joinedEvent(u, channelId)),
       });
-      for (const res of [forged, tampered, unsigned]) expect(res.status).toBeGreaterThanOrEqual(400);
+      for (const res of [forged, tampered, unsigned])
+        expect(res.status).toBeGreaterThanOrEqual(400);
 
       await Bun.sleep(300);
       expect(rt.events.filter((e) => e.type === 'voice.state.changed')).toHaveLength(0);
@@ -231,12 +256,18 @@ describe.skipIf(!enabled)('voice @livekit', () => {
         room: { name: `voice:${other.channelId}` },
         participant: { identity: owner.user.id },
       });
-      expect((await webhook(anchor, { event: 'room_started', room: { name: 'x' } })).status).toBe(200);
+      expect((await webhook(anchor, { event: 'room_started', room: { name: 'x' } })).status).toBe(
+        200
+      );
       expect((await webhook(anchor, joinedEvent(owner, 'doesnotexist'))).status).toBe(200);
       await Bun.sleep(300);
-      expect(rt.events.filter((e) => e.type === 'voice.state.changed' && !e.data.connected)).toHaveLength(0);
+      expect(
+        rt.events.filter((e) => e.type === 'voice.state.changed' && !e.data.connected)
+      ).toHaveLength(0);
       const fresh = await connect(owner);
-      expect((await fresh.waitFor('voice.states.snapshot')).data.states.map((s: any) => s.channelId)).toEqual([channelId]);
+      expect(
+        (await fresh.waitFor('voice.states.snapshot')).data.states.map((s: any) => s.channelId)
+      ).toEqual([channelId]);
       rt.close();
       fresh.close();
     });
