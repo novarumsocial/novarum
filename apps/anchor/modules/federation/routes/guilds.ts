@@ -1,10 +1,14 @@
 import Elysia from 'elysia';
 import { z } from 'zod';
-import { db } from '../../../src/db';
+import { and, eq } from 'drizzle-orm';
+import { db, guildMembers } from '../../../src/db';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
+import { guildProfileSchema, memberUpdated } from '../../../utils/guildProfile';
 import { isMessageAfter } from '../../../utils/messageCursor';
+import { publishRealtime } from '../../../utils/publishRealtime';
+import { getFederatedGuildAccess } from '../access';
 import { federationAuth } from '../plugin';
-import { federationErrors } from '../schemas';
+import { federationErrors, okResponseSchema } from '../schemas';
 
 // for each channel: where the user stopped reading (null = never read anything)
 const unreadMentionsBodySchema = z.object({
@@ -69,6 +73,41 @@ export const guilds = new Elysia()
         200: z.object({
           channels: z.array(z.object({ id: z.string(), mention: z.number().int().nonnegative() })),
         }),
+        ...federationErrors,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  // a remote member changed how they look in one of our guilds (or their own profile, which
+  // comes along with every request)
+  .post(
+    '/guilds/:id/profile',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const profile = guildProfileSchema.safeParse(payload.profile);
+      if (!profile.success) return status(400, { error: 'Invalid server profile' });
+
+      const access = await getFederatedGuildAccess(params.id, remoteUser);
+      if (!access.ok) return status(access.status, { error: access.error });
+
+      await db
+        .update(guildMembers)
+        .set(profile.data)
+        .where(and(eq(guildMembers.guildId, params.id), eq(guildMembers.userId, access.user.id)));
+      if (server) {
+        publishRealtime(
+          server,
+          `guildEvents:${params.id}`,
+          memberUpdated(params.id, access.user, profile.data)
+        );
+      }
+
+      return { ok: true };
+    },
+    {
+      federatedUser: true,
+      response: {
+        200: okResponseSchema,
         ...federationErrors,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Plus } from '@lucide/svelte';
+  import { Plus, UserRoundPen } from '@lucide/svelte';
   import { flip } from 'svelte/animate';
   import { untrack } from 'svelte';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
 
   import type { Server } from '$lib/types/chat';
-  import { settings } from '$lib/settings.svelte';
+  import { serverProfileDialog, settings } from '$lib/settings.svelte';
 
   import Avatar from './avatar.svelte';
   import CreateServerDialog from './create-server-dialog.svelte';
@@ -159,6 +159,11 @@
             </button>
           </ContextMenu.Trigger>
           <ContextMenu.Content class="w-56">
+            <ContextMenu.Item onclick={() => (serverProfileDialog.guildId = server.id)}>
+              <UserRoundPen class="size-4" />
+              Edit Server Profile
+            </ContextMenu.Item>
+            <ContextMenu.Separator />
             <NotificationMenu targetId={server.id} noun="Server" />
           </ContextMenu.Content>
         </ContextMenu.Root>

@@ -56,6 +56,13 @@ type AddMessageInput = {
   }[];
 };
 
+type AuthorProfile = Partial<
+  Pick<
+    Author,
+    'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
+  >
+>;
+
 type ChannelMemberInput = PublicUser & {
   status: 'ONLINE' | 'OFFLINE';
 };
@@ -126,6 +133,35 @@ function authorFromInput({ homeserver, ...user }: PublicUser): Author {
     ...user,
     server: homeserver,
   };
+}
+
+function guildChannelIds(
+  state: { channelsByServer: Record<string, ChannelCategory[]> },
+  guildId: string
+) {
+  return (state.channelsByServer[guildId] ?? []).flatMap((category) =>
+    category.channels.map((channel) => channel.id)
+  );
+}
+
+function patchAuthors(
+  messagesByChannel: Record<string, Message[]>,
+  inChannel: (channelId: string) => boolean,
+  isUser: (author: Author) => boolean,
+  profile: AuthorProfile
+) {
+  return Object.fromEntries(
+    Object.entries(messagesByChannel).map(([channelId, messages]) => [
+      channelId,
+      inChannel(channelId)
+        ? messages.map((message) =>
+            isUser(message.author)
+              ? { ...message, author: { ...message.author, ...profile } }
+              : message
+          )
+        : messages,
+    ])
+  );
 }
 
 function channelTypeFor(type: string | undefined): Channel['type'] {
@@ -317,15 +353,8 @@ type ChatState = {
   removeMessage: (channelId: string, messageId: string) => void;
   updateMessage: (channelId: string, message: AddMessageInput) => void;
   updateMemberStatus: (userId: string, status: 'ONLINE' | 'OFFLINE') => void;
-  updateUserProfile: (
-    userId: string,
-    profile: Partial<
-      Pick<
-        Author,
-        'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
-      >
-    >
-  ) => void;
+  updateUserProfile: (userId: string, profile: AuthorProfile) => void;
+  updateMemberProfile: (guildId: string, user: PublicUser) => void;
   addOrUpdateMember: (guildId: string, member: ChannelMemberInput) => void;
   setVoiceStates: (guildIds: string[], states: VoicePresenceInput[], dmIds?: string[]) => void;
   updateVoiceState: (state: VoicePresenceInput & { connected: boolean }) => void;
@@ -789,22 +818,43 @@ export const useChat = create<ChatState>((set, get) => {
         ),
       }),
 
-    updateUserProfile: (userId, profile) =>
+    // a user's own profile only shows outside of guilds, in a guild their profile for it does
+    updateUserProfile(userId, profile) {
+      const guildChannels = new Set(
+        Object.keys(get().channelsByServer).flatMap((guildId) => guildChannelIds(get(), guildId))
+      );
       set({
-        members: get().members.map((member) =>
-          member.userId === userId ? { ...member, ...profile } : member
+        messagesByChannel: patchAuthors(
+          get().messagesByChannel,
+          (channelId) => !guildChannels.has(channelId),
+          (author) => author.userId === userId,
+          profile
         ),
-        messagesByChannel: Object.fromEntries(
-          Object.entries(get().messagesByChannel).map(([channelId, messages]) => [
-            channelId,
-            messages.map((message) =>
-              message.author.userId === userId
-                ? { ...message, author: { ...message.author, ...profile } }
-                : message
-            ),
-          ])
+      });
+    },
+
+    // matched by handle: in a remote guild the host knows the user under its own id
+    updateMemberProfile(guildId, user) {
+      const { displayName, avatarUrl, avatarColor, speakingRingColor, bannerUrl, about } = user;
+      const profile = { displayName, avatarUrl, avatarColor, speakingRingColor, bannerUrl, about };
+      const isUser = (author: Author) =>
+        author.username === user.username &&
+        author.server.toLowerCase() === user.homeserver.toLowerCase();
+      const channels = new Set(guildChannelIds(get(), guildId));
+
+      set({
+        members:
+          selectActiveServer(get()) === guildId
+            ? get().members.map((member) => (isUser(member) ? { ...member, ...profile } : member))
+            : get().members,
+        messagesByChannel: patchAuthors(
+          get().messagesByChannel,
+          (channelId) => channels.has(channelId),
+          isUser,
+          profile
         ),
-      }),
+      });
+    },
 
     addOrUpdateMember(guildId, member) {
       if (selectActiveServer(get()) !== guildId) return;

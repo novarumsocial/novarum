@@ -81,3 +81,6 @@ class SettingsStore {
 export const settings = new SettingsStore();
 
 export const settingsDialog = $state({ open: false });
+
+// the guild whose server profile is being edited
+export const serverProfileDialog = $state<{ guildId: string | null }>({ guildId: null });

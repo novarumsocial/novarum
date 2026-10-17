@@ -49,6 +49,13 @@ type AddMessageInput = {
   }[];
 };
 
+type AuthorProfile = Partial<
+  Pick<
+    Author,
+    'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
+  >
+>;
+
 type ChannelMemberInput = PublicUser & {
   status: 'ONLINE' | 'OFFLINE';
 };
@@ -424,26 +431,56 @@ class ChatState {
     );
   }
 
-  updateUserProfile(
-    userId: string,
-    profile: Partial<
-      Pick<
-        Author,
-        'displayName' | 'avatarUrl' | 'avatarColor' | 'speakingRingColor' | 'bannerUrl' | 'about'
-      >
-    >
-  ) {
-    this.members = this.members.map((member) =>
-      member.userId === userId ? { ...member, ...profile } : member
+  // a user's own profile only shows outside of guilds, in a guild their profile for it does
+  updateUserProfile(userId: string, profile: AuthorProfile) {
+    const guildChannels = new Set(
+      Object.keys(this.channelsByServer).flatMap((guildId) => this.guildChannelIds(guildId))
     );
+    this.patchAuthors(
+      (channelId) => !guildChannels.has(channelId),
+      (author) => author.userId === userId,
+      profile
+    );
+  }
+
+  // matched by handle: in a remote guild the host knows the user under its own id
+  updateMemberProfile(guildId: string, user: PublicUser) {
+    const { displayName, avatarUrl, avatarColor, speakingRingColor, bannerUrl, about } = user;
+    const profile = { displayName, avatarUrl, avatarColor, speakingRingColor, bannerUrl, about };
+    const isUser = (author: Author) =>
+      author.username === user.username &&
+      author.server.toLowerCase() === user.homeserver.toLowerCase();
+
+    if (this.activeServer === guildId) {
+      this.members = this.members.map((member) =>
+        isUser(member) ? { ...member, ...profile } : member
+      );
+    }
+    const channels = new Set(this.guildChannelIds(guildId));
+    this.patchAuthors((channelId) => channels.has(channelId), isUser, profile);
+  }
+
+  private guildChannelIds(guildId: string) {
+    return (this.channelsByServer[guildId] ?? []).flatMap((category) =>
+      category.channels.map((channel) => channel.id)
+    );
+  }
+
+  private patchAuthors(
+    inChannel: (channelId: string) => boolean,
+    isUser: (author: Author) => boolean,
+    profile: AuthorProfile
+  ) {
     this.messagesByChannel = Object.fromEntries(
       Object.entries(this.messagesByChannel).map(([channelId, messages]) => [
         channelId,
-        messages.map((message) =>
-          message.author.userId === userId
-            ? { ...message, author: { ...message.author, ...profile } }
-            : message
-        ),
+        inChannel(channelId)
+          ? messages.map((message) =>
+              isUser(message.author)
+                ? { ...message, author: { ...message.author, ...profile } }
+                : message
+            )
+          : messages,
       ])
     );
   }

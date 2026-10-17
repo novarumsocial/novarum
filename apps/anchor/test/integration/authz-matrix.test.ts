@@ -59,9 +59,9 @@ type Route = {
 };
 
 const json = (body: unknown) => JSON.stringify(body);
-const textFile = () => {
+const textFile = (field = 'avatar') => {
   const form = new FormData();
-  form.set('avatar', new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' }));
+  form.set(field, new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' }));
   return form;
 };
 
@@ -90,8 +90,36 @@ const guildRoutes: Route[] = [
     key: 'POST /guilds/{id}/avatar',
     method: 'POST',
     path: (fx) => `/guilds/${fx.guild.id}/avatar`,
-    body: textFile,
+    body: () => textFile(),
     expected: [401, 403, 403, 415],
+  },
+  // every member has a server profile of their own; nobody has a picture yet
+  {
+    key: 'GET /guilds/{id}/members/{userId}/{kind}',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/members/${fx.owner.user.id}/avatar`,
+    expected: [404, 404, 404, 404],
+  },
+  {
+    key: 'GET /guilds/{id}/profile',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/profile`,
+    expected: [401, 404, 200, 200],
+  },
+  {
+    key: 'PATCH /guilds/{id}/profile',
+    method: 'PATCH',
+    path: (fx) => `/guilds/${fx.guild.id}/profile`,
+    body: () => ({ displayName: 'x' }),
+    expected: [401, 404, 200, 200],
+  },
+  // members reach the 415 type check (jpeg), so they passed every permission check
+  {
+    key: 'POST /guilds/{id}/profile/{kind}',
+    method: 'POST',
+    path: (fx) => `/guilds/${fx.guild.id}/profile/avatar`,
+    body: () => textFile('picture'),
+    expected: [401, 404, 415, 415],
   },
   {
     key: 'GET /guilds/{id}/invites',

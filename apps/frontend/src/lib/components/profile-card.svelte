@@ -4,7 +4,7 @@
   import * as Popover from '$lib/components/ui/popover/index.js';
   import * as Drawer from '$lib/components/ui/drawer/index.js';
   import { device } from '$lib/device.svelte';
-  import { settings, settingsDialog } from '$lib/settings.svelte';
+  import { serverProfileDialog, settings, settingsDialog } from '$lib/settings.svelte';
   import { friends } from '$lib/friends.svelte';
   import { dms } from '$lib/dms.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -19,6 +19,7 @@
     UserRoundCheck,
     UserRoundCog,
     UserRoundMinus,
+    UserRoundPen,
     UserRoundPlus,
   } from '@lucide/svelte';
   import Avatar from './avatar.svelte';
@@ -115,6 +116,11 @@
   function editProfile() {
     open = false;
     settingsDialog.open = true;
+  }
+
+  function editServerProfile() {
+    open = false;
+    serverProfileDialog.guildId = chat.activeServer;
   }
 </script>
 
@@ -228,6 +234,12 @@
         <UserRoundCog class="size-4" />
         Edit profile
       </Button>
+      {#if chat.activeServer}
+        <Button variant="ghost" class="mt-1 w-full" onclick={editServerProfile}>
+          <UserRoundPen class="size-4" />
+          Edit server profile
+        </Button>
+      {/if}
     {:else if user.username && friendStatus === 'FRIEND' && !device.isComputer}
       <div class="mt-3 grid grid-cols-2 gap-2">
         <Button variant="secondary" class="w-full" onclick={() => void openDm()}>

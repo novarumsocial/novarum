@@ -11,6 +11,7 @@ import {
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { publishToChannel } from '../../../utils/publishRealtime';
 import { publicUser } from '../../../utils/publicUser';
+import { guildProfiles, withGuildProfile } from '../../../utils/guildProfile';
 import { dmRecipients, notifyInBackground } from '../../../utils/notify';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from '../../message/store';
 import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../../message/services';
@@ -315,10 +316,18 @@ export const messageRoutes = new Elysia()
       });
       const page = found.slice(0, limit.data);
       const lastMessage = page.at(-1);
+      const profiles = await guildProfiles(
+        access.channel.guildId,
+        page.map((message) => message.authorId)
+      );
 
       return {
         messages: page.map((message) =>
-          federatedMessageResponse(message, access.channel, message.author)
+          federatedMessageResponse(
+            message,
+            access.channel,
+            withGuildProfile(message.author, profiles.get(message.authorId))
+          )
         ),
         nextCursor:
           found.length > limit.data && lastMessage ? encodeMessageCursor(lastMessage) : null,

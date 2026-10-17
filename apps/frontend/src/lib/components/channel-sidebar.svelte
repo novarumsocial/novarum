@@ -19,13 +19,14 @@
     Trash2,
     CopyPlus,
     Link,
+    UserRoundPen,
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
   import type { Author, Channel, ChannelCategory, Server } from '$lib/types/chat';
   import type { Voice } from '$lib/voice.svelte';
-  import { settings } from '$lib/settings.svelte';
+  import { serverProfileDialog, settings } from '$lib/settings.svelte';
   import CreateChannelDialog from './create-channel-dialog.svelte';
   import EditChannelDialog from './edit-channel-dialog.svelte';
   import InviteDialog from './invite-dialog.svelte';
@@ -305,6 +306,12 @@
       </DropdownMenu.Group>
 
       <DropdownMenu.Separator />
+      <DropdownMenu.Item onclick={() => (serverProfileDialog.guildId = server.id)}>
+        Edit Server Profile
+        <DropdownMenu.Shortcut>
+          <UserRoundPen class="size-3" />
+        </DropdownMenu.Shortcut>
+      </DropdownMenu.Item>
       <DropdownMenu.Item>
         Notification Settings
         <DropdownMenu.Shortcut>
