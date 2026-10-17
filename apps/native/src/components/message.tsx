@@ -297,20 +297,18 @@ export const Message = memo(function Message({
   flash = false,
   onFlashEnd,
 }: MessageProps) {
-  const selfId = useSession((s) => s.user?.id);
   const selfHandle = useSession((s) => s.user?.handle.toLowerCase());
   const editing = useChat((s) => s.editingMessage && s.editingMessageId === message.id);
   const [menuMounted, setMenuMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const own = message.author.userId === selfId;
+  // user ids are per server, so a message from a federated guild or DM carries the remote one
+  const isMe = (author?: { username: string; server: string }) =>
+    !!author && `@${author.username}:${author.server}`.toLowerCase() === selfHandle;
+  const own = isMe(message.author);
   const authorName = message.author.displayName || message.author.username;
 
   const selfMentioned = useMemo(() => {
-    if (!selfHandle) return false;
-
-    const isMe = (author?: { username: string; server: string }) =>
-      author ? `@${author.username}:${author.server}`.toLowerCase() === selfHandle : false;
-    if (isMe(message.author)) return false;
+    if (!selfHandle || own) return false;
 
     const handles = [...(message.content.match(handlePattern) ?? []), ...message.pingedHandles];
     return isMe(repliedMessage?.author) || handles.some((h) => h.toLowerCase() === selfHandle);

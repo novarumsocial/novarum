@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Message } from '$lib/types/chat';
   import { chat } from '$lib/chat-state.svelte';
-  import { session } from '$lib/session.svelte';
+  import { isSelf, useSession } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
   import {
     Download,
@@ -76,7 +76,7 @@
       onclick: onReply,
       hideFromShift: true,
     },
-    ...(message.author.userId === session.user?.id
+    ...(isSelf(message.author)
       ? [
           {
             label: () => 'Edit Message',
@@ -110,7 +110,7 @@
       },
     },
     // TODO: separator here
-    ...(message.author.userId === session.user?.id
+    ...(isSelf(message.author)
       ? [
           {
             label: () => deleteText,
@@ -151,19 +151,15 @@
 
   const authorName = $derived(message.author.displayName || message.author.username);
   const selfMentioned = $derived.by(() => {
-    const handle = session.user?.handle.toLowerCase();
-    if (!handle) return false;
-
-    const isMe = (author: { username: string; server: string } | undefined) =>
-      author ? `@${author.username}:${author.server}`.toLowerCase() === handle : false;
-    if (isMe(message.author)) return false;
+    const handle = useSession().user?.handle.toLowerCase();
+    if (!handle || isSelf(message.author)) return false;
 
     const contentHandles =
       message.content.match(
         /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/g
       ) ?? [];
 
-    const replyingMe = isMe(repliedMessage?.author);
+    const replyingMe = isSelf(repliedMessage?.author);
 
     return (
       replyingMe || contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
@@ -394,7 +390,7 @@
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
                   ><Reply class="size-3" /></Button
                 >
-                {#if message.author.userId === session.user?.id}
+                {#if isSelf(message.author)}
                   <Button
                     variant="ghost"
                     size="icon-xs"

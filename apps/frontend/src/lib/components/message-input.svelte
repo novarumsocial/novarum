@@ -7,7 +7,7 @@
   import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
-  import { session } from '$lib/session.svelte';
+  import { isSelf } from '$lib/session.svelte';
   import { cn, formatBytes } from '$lib/utils';
 
   let content = $state('');
@@ -118,7 +118,7 @@
 
     if (e.key === 'ArrowUp' && !content && files.length === 0) {
       const lastOwn = chat.currentMessages.findLast(
-        (message) => message.author.userId === session.user?.id
+        (message) => isSelf(message.author)
       );
       if (lastOwn) {
         e.preventDefault();

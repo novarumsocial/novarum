@@ -283,3 +283,9 @@ export const session = new SessionState();
 export function useSession() {
   return session;
 }
+
+// user ids are per server, so a message from a federated guild or DM carries the remote one
+export function isSelf(author: { username: string; server: string } | undefined) {
+  const handle = session.user?.handle.toLowerCase();
+  return !!author && `@${author.username}:${author.server}`.toLowerCase() === handle;
+}

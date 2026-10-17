@@ -209,7 +209,7 @@ export function ChatArea({
 }) {
   const { height } = useWindowDimensions();
   const circleIcons = useSettings((s) => s.circleIcons);
-  const selfId = useSession((s) => s.user?.id);
+  const selfHandle = useSession((s) => s.user?.handle.toLowerCase());
   const typing = useChat((s) => s.typingByChannel[channel.id] ?? noTyping);
   const olderLoading = useChat((s) => s.loadingOlderByChannel[channel.id] ?? false);
   const callers = useChat((s) =>
@@ -322,8 +322,9 @@ export function ChatArea({
     if (!last || last.id === lastMessageId.current) return;
     const first = lastMessageId.current === null;
     lastMessageId.current = last.id;
-    if (!first && last.author.userId === selfId) scrollToLatest();
-  }, [messages, selfId]);
+    const handle = `@${last.author.username}:${last.author.server}`.toLowerCase();
+    if (!first && handle === selfHandle) scrollToLatest();
+  }, [messages, selfHandle]);
 
   // the shell may pass new functions on every render; rows get stable ones
   const handlers = useRef({ onDelete, onEdit, onSend });
