@@ -585,6 +585,12 @@ export const useVoice = create<VoiceStore>((set, get) => {
         play('cameraOff');
       }
 
+      // iOS reconfigures the audio session when the camera starts or stops, which silently kills the mic capture
+      const mic = micTrack(room);
+      if (Platform.OS === 'ios' && mic instanceof LocalAudioTrack && !mic.isMuted) {
+        await mic.restartTrack(microphoneCaptureOptions()).catch(() => null);
+      }
+
       // sets `selfCamera` from the actual track
       syncParticipant(room.localParticipant);
     },
