@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Footer from '../components/Footer.astro';
 import { LinkButton } from '@astrojs/starlight/components';
 import Logo from '../../public/favicon.svg';
 
@@ -128,50 +129,7 @@ const features = [
       </div>
     </main>
 
-    <footer class="bg-gray-900 [&_a]:text-accent-500 [&_a:hover]:text-accent-400">
-        <div class="mx-auto w-full max-w-7xl p-4 py-6 lg:py-8">
-            <div class="md:flex md:justify-between">
-              <div class="mb-6 md:mb-0">
-                  <a href="https://novarum.me/" class="flex items-center">
-                    <img src={'/favicon.svg'} class="h-7 me-3" alt="Novarum Logo" />
-                      <span class="text-heading self-center text-2xl font-semibold whitespace-nowrap">Novarum</span>
-                  </a>
-              </div>
-              <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3">
-                  <div>
-                      <h2 class="mb-6 text-sm font-semibold text-heading uppercase">Resources</h2>
-                      <ul class="text-body font-medium">
-                          <li class="mb-4">
-                              <a href="/docs">Documentation</a>
-                          </li>
-                          <li class="mb-4">
-                              <a href="/download">Download</a>
-                          </li>
-                          <li>
-                              <a href="/guides/deployment">Deploying an Anchor</a>
-                          </li>
-                      </ul>
-                  </div>
-                  <div>
-                      <h2 class="mb-6 text-sm font-semibold text-heading uppercase">On the net</h2>
-                      <ul class="text-body font-medium">
-                          <li class="mb-4">
-                              <a href="https://github.com/novarumsocial/novarum">Github</a>
-                          </li>
-                          <li>
-                              <a href="#">HCB (soon?)</a>
-                          </li>
-                      </ul>
-                  </div>
-              </div>
-          </div>
-          <hr class="my-6 border-default sm:mx-auto lg:my-8" />
-          <div class="sm:flex sm:items-center sm:justify-between">
-              <span class="text-sm text-body sm:text-center">© 2026 <a href="https://novarum.me/">Novarum</a>, under GNU AGPL v3.0 license. All Rights Reserved.
-              </span>
-          </div>
-        </div>
-    </footer>
+    <Footer />
     <!--<section
       class="flex min-h-screen items-center px-4 py-8 sm:px-8"
       aria-labelledby="features-title"

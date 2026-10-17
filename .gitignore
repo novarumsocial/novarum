@@ -43,3 +43,12 @@ apps/electron/.electron
 apps/mobile/android/keystore/
 
 worker/.wrangler
+
+# generated Capacitor / Android build output
+apps/mobile/node_modules
+apps/mobile/android/.gradle
+apps/mobile/android/build
+apps/mobile/android/app/build
+apps/mobile/android/local.properties
+apps/mobile/android/capacitor-cordova-android-plugins
+apps/mobile/android/app/src/main/assets

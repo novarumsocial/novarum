@@ -12,6 +12,7 @@ COPY apps/electron/package.json apps/electron/package.json
 COPY apps/frontend/package.json apps/frontend/package.json
 COPY apps/landing/package.json apps/landing/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
+COPY apps/native/package.json apps/native/package.json
 
 RUN bun install --frozen-lockfile --production --filter anchor
 

@@ -1,0 +1,220 @@
+name: Release native development build
+
+on:
+  workflow_dispatch:
+  # PR builds only upload the APK/IPA as workflow artifacts; they are not published as a release
+  pull_request:
+    paths:
+      - 'apps/native/**'
+      - 'apps/anchor/**'
+      - 'bun.lock'
+      - '.github/workflows/native-development-release.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/native/**'
+      - 'apps/anchor/**'
+      - 'bun.lock'
+      - '.github/workflows/native-development-release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # every build gets a higher build number, so it installs as an update over the previous one
+  BUILD_NUMBER: ${{ github.run_number }}
+  CI: 1
+
+jobs:
+  android:
+    name: Build APK
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # generates android/ from app.config.ts (it is not committed)
+      - name: Generate native project
+        run: bunx expo prebuild --platform android --clean --no-install
+        working-directory: apps/native
+
+      # the same keystore as the old Capacitor app, so the APK installs as an update over it
+      - name: Restore signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build APK
+        run: |
+          ./gradlew assembleRelease \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=2g" \
+            -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/release.jks" \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASS }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASS }}"
+          mv app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/novarum.apk"
+        working-directory: apps/native/android
+
+      - name: Upload APK
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: novarum-apk
+          path: ${{ runner.temp }}/novarum.apk
+          if-no-files-found: error
+
+  ios:
+    name: Build unsigned IPA
+    # signing needs an Apple Developer account; this IPA is for sideloading (AltStore, SideStore, ...),
+    # which signs it with your own Apple ID on install
+    runs-on: macos-26
+    outputs:
+      id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # generates ios/ from app.config.ts and runs pod install
+      - name: Generate native project
+        run: bunx expo prebuild --platform ios --clean
+        working-directory: apps/native
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -workspace Novarum.xcworkspace \
+            -scheme Novarum \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+        working-directory: apps/native/ios
+
+      - name: Package IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R build/Build/Products/Release-iphoneos/Novarum.app "$RUNNER_TEMP/ipa/Payload/"
+          cd "$RUNNER_TEMP/ipa" && zip -qry "$RUNNER_TEMP/novarum-unsigned.ipa" Payload
+        working-directory: apps/native/ios
+
+      - name: Upload IPA
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: novarum-ipa
+          path: ${{ runner.temp }}/novarum-unsigned.ipa
+          if-no-files-found: error
+
+  release:
+    name: Publish development release
+    needs: [android, ios]
+    # the APK is still published when only the iOS build failed
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.android.result == 'success' }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(jq -r .version apps/native/package.json)-dev.${BUILD_NUMBER}"
+          release_tag="native-v${version}"
+          notes="Development build for commit ${GITHUB_SHA}. The IPA is unsigned: install it with AltStore or SideStore."
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" release-assets/* --clobber
+          else
+            gh release create "$release_tag" release-assets/* \
+              --target "$GITHUB_SHA" \
+              --title "$release_tag" \
+              --notes "$notes" \
+              --prerelease
+          fi
+
+  comment:
+    name: Comment download links on PR
+    needs: [android, ios]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      # edits the bot's previous comment, so the PR thread only ever has one
+      - name: Create or update PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          ANDROID_ID: ${{ needs.android.outputs.id }}
+          IOS_RESULT: ${{ needs.ios.result }}
+          IOS_ID: ${{ needs.ios.outputs.id }}
+        run: |
+          link() { [ "$1" = success ] && echo "[Download](https://nightly.link/$GH_REPO/actions/artifacts/$2.zip)" || echo "Build $1 ([logs]($RUN_URL))"; }
+          gh pr comment "$PR" --edit-last --create-if-none --body "### Native development builds
+          | Platform | Build |
+          | --- | --- |
+          | Android APK | $(link "$ANDROID_RESULT" "$ANDROID_ID") |
+          | iOS IPA (unsigned, install with AltStore/SideStore) | $(link "$IOS_RESULT" "$IOS_ID") |
+
+          Commit \`${SHA::7}\` · [workflow run]($RUN_URL)"

@@ -242,6 +242,17 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT 1 FROM push_subscription`)).toHaveLength(0);
     },
   },
+  '20261013165332_thin_butterfly': {
+    check: async (url) => {
+      // existing attachments keep their rows and get nullable dimensions
+      expect(
+        await rows(
+          url,
+          `SELECT id FROM attachment WHERE id = 'a1' AND width IS NULL AND height IS NULL`
+        )
+      ).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

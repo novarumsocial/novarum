@@ -346,6 +346,10 @@ export const attachments = pgTable(
       mode: 'number',
     }).notNull(),
 
+    // read from the image header when a message claims it, so clients can size the preview up front
+    width: integer('width'),
+    height: integer('height'),
+
     status: text('status').notNull().default('PENDING'),
 
     uploaderId: text('uploaderId')

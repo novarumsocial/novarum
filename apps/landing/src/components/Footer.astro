@@ -1,0 +1,67 @@
+---
+const logo =
+  'M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z';
+const footerLink =
+  'text-gray-500 transition-colors duration-500 hover:text-accent-500 aria-[current=page]:text-gray-900 dark:text-gray-400 dark:aria-[current=page]:text-white';
+// the docs pages end in a slash
+const path = Astro.url.pathname.replace(/\/$/, '');
+const columns = [
+  [
+    { label: 'Documentation', href: '/docs' },
+    { label: 'Host an Anchor', href: '/guides/deployment' },
+    { label: 'Download', href: '/download' },
+  ],
+  [{ label: 'GitHub', href: 'https://github.com/novarumsocial/novarum' }],
+];
+const link = 'text-inherit underline! underline-offset-2 transition-colors duration-500 hover:text-accent-500';
+---
+
+<footer
+  class="relative mt-24 border-t border-gray-200 dark:border-[#272727] [&_:is(p,ul,li)]:m-0 [&_a]:no-underline [&_ul]:list-none [&_ul]:p-0"
+>
+  <!-- the logo is a sunrise, so it sits on the footer's top line like the sun on the horizon -->
+  <span class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2/3 bg-white px-4 dark:bg-gray-950">
+    <svg viewBox="0 0 24 24" class="size-8 text-accent-500" fill="currentColor" aria-hidden="true">
+      <path d={logo} />
+    </svg>
+  </span>
+
+  <div class="mx-auto flex w-full max-w-3xl flex-col gap-12 px-6 pt-16 pb-10">
+    <div class="flex flex-col justify-between gap-8 sm:flex-row">
+      <div class="flex flex-col gap-1 px-2">
+        <a href="/" class="w-max text-base font-semibold text-inherit">Novarum</a>
+        <p class="text-sm text-gray-500 dark:text-gray-400">A calm place to talk.</p>
+      </div>
+
+      <nav aria-label="Footer" class="grid grid-cols-2 gap-x-12 gap-y-2 px-2 text-sm">
+        {
+          columns.map((column, index) => (
+            <ul class="flex flex-col gap-2">
+              {column.map((item) => (
+                <li>
+                  <a
+                    class={footerLink}
+                    href={item.href}
+                    aria-current={path === item.href ? 'page' : undefined}
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+              {index === 1 && (
+                <li>
+                  <span class="text-gray-400 dark:text-gray-500">HCB, soon</span>
+                </li>
+              )}
+            </ul>
+          ))
+        }
+      </nav>
+    </div>
+
+    <p class="px-2 text-xs text-gray-500 dark:text-gray-400">
+      © 2026 Novarum. Free software under the{' '}
+      <a class={link} href="https://github.com/novarumsocial/novarum/blob/main/LICENSE">GNU AGPL v3.0</a>.
+    </p>
+  </div>
+</footer>
