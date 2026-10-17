@@ -1,7 +1,7 @@
 // The hub: the first screen of the chat stack (the web's left column). The guild rail picks a server, next to it
 // are that server's channels, or your DMs and friends for Home. Opening a channel pushes the channel screen.
 // Switching to a server shows its channel list with the channel you were last in there selected (swipe left to
-// open it), and a launch reopens the chat that was open when the app closed.
+// open it, or on Home the last DM), and a launch reopens the chat that was open when the app closed.
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
@@ -20,6 +20,7 @@ import {
   useChannelName,
   useChat,
 } from '@/lib/chat-state';
+import { dmPath, dms, type DmEntry } from '@/lib/dms';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import type { ChannelCategory } from '@/lib/types/chat';
@@ -71,9 +72,17 @@ export default function Hub() {
   const serverId = server?.id;
   const openChannel = useCallback((id: string) => goto(guildPath(serverId, id)), [serverId]);
 
-  // swipe left on the channel list to open the selected channel (the last one you were in, or the first)
+  // swipe left on the channel list to open the selected channel (the last one you were in, or the first), or on
+  // Home the last DM you were in (or the most recent one)
   const openSelected = () => {
-    if (!serverId) return;
+    if (!serverId) {
+      const list = dms().list;
+      const last = list.find((item) => item.id === lastGuildChannel('dms'));
+      const recent = (item: DmEntry) => new Date(item.lastMessageAt ?? item.joinedAt).getTime();
+      const dm = last ?? [...list].sort((a, b) => recent(b) - recent(a))[0];
+      if (dm) goto(dmPath(dm.id));
+      return;
+    }
     const text = categories
       .flatMap((category) => category.channels)
       .filter((item) => item.type !== 'VOICE');
@@ -82,7 +91,6 @@ export default function Hub() {
   };
   const swipe = Gesture.Pan()
     .runOnJS(true)
-    .enabled(!!server)
     .activeOffsetX(-15)
     .failOffsetX(15)
     .failOffsetY([-15, 15])

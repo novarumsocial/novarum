@@ -47,6 +47,9 @@ import { cn, formatBytes } from '@/lib/utils';
 const webOrigin = 'https://app.novarum.me';
 const SWIPE_THRESHOLD = 56;
 const SWIPE_MAX = 80;
+// your own messages swipe further, to edit them
+const EDIT_THRESHOLD = 120;
+const EDIT_MAX = 150;
 const bodyClass = 'text-[15px] leading-[22px] text-foreground/90';
 
 // the server doesn't send image sizes, so remember them once an image has loaded (keeps list rows from jumping)
@@ -352,15 +355,18 @@ export const Message = memo(function Message({
     setMenuOpen(true);
   };
 
-  // swipe left to reply. Right swipes are left alone so the stack's swipe back keeps working.
-  const latest = useRef({ message, onReply });
-  latest.current = { message, onReply };
+  // swipe left a bit to reply, or further on your own message to edit it. Right swipes are left alone so the
+  // stack's swipe back keeps working.
+  const latest = useRef({ message, onReply, own });
+  latest.current = { message, onReply, own };
   const reply = () => latest.current.onReply(latest.current.message);
   const translateX = useRef(new Animated.Value(0)).current;
   // the reply icon behind the row is an SVG, only worth mounting while a swipe is happening
   const [swiping, setSwiping] = useState(false);
+  const [swipeEdits, setSwipeEdits] = useState(false);
   const swipe = useMemo(() => {
-    let crossed = false;
+    // how far the swipe has gone: 0 nothing, 1 reply, 2 edit
+    let stage = 0;
     const settle = () =>
       Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start(() =>
         setSwiping(false)
@@ -370,18 +376,23 @@ export const Message = memo(function Message({
         dx < -10 && Math.abs(dx) > Math.abs(dy) * 2,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        crossed = false;
+        stage = 0;
         setSwiping(true);
+        setSwipeEdits(false);
       },
       onPanResponderMove: (_event, { dx }) => {
-        const x = Math.max(-SWIPE_MAX, Math.min(0, dx));
+        const x = Math.max(-(latest.current.own ? EDIT_MAX : SWIPE_MAX), Math.min(0, dx));
         translateX.setValue(x);
-        if (x <= -SWIPE_THRESHOLD === crossed) return;
-        crossed = !crossed;
-        if (crossed) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const next = x <= -EDIT_THRESHOLD ? 2 : x <= -SWIPE_THRESHOLD ? 1 : 0;
+        if (next === stage) return;
+        if (next > stage) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        stage = next;
+        setSwipeEdits(stage === 2);
       },
       onPanResponderRelease: () => {
-        if (crossed) latest.current.onReply(latest.current.message);
+        const { message, onReply } = latest.current;
+        if (stage === 2) useChat.setState({ editingMessage: true, editingMessageId: message.id });
+        else if (stage === 1) onReply(message);
         settle();
       },
       onPanResponderTerminate: settle,
@@ -401,7 +412,7 @@ export const Message = memo(function Message({
           className="absolute inset-y-0 right-4 justify-center"
           pointerEvents="none"
         >
-          <Icon as={Reply} size={20} className="text-muted-foreground" />
+          <Icon as={swipeEdits ? Pencil : Reply} size={20} className="text-muted-foreground" />
         </Animated.View>
       )}
 

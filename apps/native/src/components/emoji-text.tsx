@@ -1,12 +1,12 @@
 // Port of apps/frontend/src/lib/components/emoji-text.svelte
-// Unicode emoji become the server's emoji images, links open in the in-app browser and mentions are pills.
+// Unicode emoji become the server's emoji images, links open in the in-app browser (Novarum links in the app) and mentions are pills.
 import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Text } from '@/components/ui/text';
 import { ProfileSheet } from '@/components/profile-card';
 import { useChat } from '@/lib/chat-state';
+import { openLink } from '@/lib/navigation';
 import { useRealtime } from '@/lib/realtime';
 import { useSession } from '@/lib/session';
 import type { Author } from '@/lib/types/chat';
@@ -115,7 +115,7 @@ export function EmojiText({
               <Text
                 key={index}
                 className={cn(className, 'text-link underline')}
-                onPress={() => void WebBrowser.openBrowserAsync(part.text)}
+                onPress={() => openLink(part.text)}
               >
                 {part.text}
               </Text>

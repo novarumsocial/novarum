@@ -379,7 +379,7 @@ const hasMoreByChannel = new Map<string, boolean>();
 let resetCount = 0;
 
 // Native-only: where you were, kept across launches like a phone chat app does: the hub's server, the last text
-// channel of each guild (reopened when you tap the guild) and the chat open when the app closed (reopened on
+// channel of each guild (reopened when you tap the guild; `dms` for the last DM) and the chat open when the app closed (reopened on
 // launch by the hub). Kept per account, since a reload or the app closing also runs `reset`.
 const navKey = (name: string) => `nav:${session().user?.id ?? ''}:${name}`;
 // the last page of each channel, shown instantly next time while the fresh one loads (also per account)
@@ -608,8 +608,8 @@ export const useChat = create<ChatState>((set, get) => {
       // a voice channel is a call, not somewhere to land
       if (!channel || channel.type === 'VOICE') return;
       storage.set(navKey('last-chat'), channel.id);
-      if (route.kind === 'guild' && route.serverId)
-        storage.set(navKey(`channel:${route.serverId}`), channel.id);
+      const hub = route.kind === 'dms' ? 'dms' : route.serverId;
+      if (hub) storage.set(navKey(`channel:${hub}`), channel.id);
     },
 
     selectServer(id) {

@@ -7,7 +7,7 @@ import {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { Keyboard, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/lib/theme';
 
@@ -31,6 +31,8 @@ export function Sheet({
   useEffect(() => {
     if (open) {
       shown.current = true;
+      // the keyboard of whatever was being typed in would stay up over the sheet
+      Keyboard.dismiss();
       ref.current?.present();
     } else if (shown.current) ref.current?.dismiss();
   }, [open]);
