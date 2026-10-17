@@ -406,14 +406,14 @@ describe('signed attachment urls', () => {
     return fetch(`${anchor.url}${path}?${params}`);
   };
 
-  test('an image preview is generated as a scaled-down webp', async () => {
+  test('an image preview is generated as a webp, never enlarged past the source', async () => {
     const { att } = await attached();
     expect(local(att.previewUrl).path).toBe(`/attachment/${att.id}/preview`);
     const res = await previewOf(att);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/webp');
     const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
-    expect(meta).toMatchObject({ format: 'webp', width: 150 }); // 600px wide source, 1/4 scale
+    expect(meta).toMatchObject({ format: 'webp', width: 600 }); // 600px wide source fits inside 800x800, so it isn't resized
   });
 
   test('a cached preview is still the same image', async () => {
