@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { SettingsGroup } from '@/components/settings-group';
@@ -52,6 +52,7 @@ export default function Settings() {
   const [anchorVersion, setAnchorVersion] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version;
+  const gitCommit: string = (Constants.expoConfig?.extra?.gitCommitHash ?? 'unknown').slice(0, 7);
 
   useEffect(() => {
     void getAnchorInfo(anchor().homeServer)
@@ -114,9 +115,19 @@ export default function Settings() {
         </Pressable>
       </SettingsGroup>
 
-      <Text className="px-1 text-[11px] text-muted-foreground">
-        Novarum v{appVersion} · Anchor {anchorVersion ?? 'unknown'}
-      </Text>
+      <View className="gap-0.5 px-1">
+        <Text className="text-[11px] text-muted-foreground">
+          Novarum v{appVersion} · Anchor {anchorVersion ?? 'unknown'}
+        </Text>
+        <Text
+          className="self-start font-mono text-[11px] text-muted-foreground underline"
+          onPress={() =>
+            Linking.openURL(`https://github.com/novarumsocial/novarum/commit/${gitCommit}`)
+          }
+        >
+          {gitCommit}
+        </Text>
+      </View>
     </ScrollView>
   );
 }
