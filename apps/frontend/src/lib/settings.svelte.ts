@@ -35,7 +35,7 @@ const defaults: Settings = {
   roundedBorders: false,
   darkMode: true,
   noiseCancellation: true,
-  voiceEchoCancellation: false,
+  voiceEchoCancellation: true,
   voiceAutoGainControl: true,
   voiceInputDeviceId: 'default',
   voiceOutputDeviceId: 'default',
