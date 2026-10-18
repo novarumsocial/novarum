@@ -12,7 +12,7 @@ const settingsSchema = z.object({
   circleIcons: z.boolean().default(false),
   darkMode: z.boolean().default(true),
   noiseCancellation: z.boolean().default(true),
-  voiceEchoCancellation: z.boolean().default(false),
+  voiceEchoCancellation: z.boolean().default(true),
   voiceAutoGainControl: z.boolean().default(true),
   notificationVolume: z.number().default(0.5),
   timeFormat: z.enum(['auto', '12hr', '24hr']).default('auto'),
