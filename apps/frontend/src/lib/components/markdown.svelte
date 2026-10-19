@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
   import { parseInline, parseMarkdown, type Block, type Inline } from '$lib/markdown';
   import EmojiText from './emoji-text.svelte';
+  import { linkTarget } from '$lib/utils';
 
   // `inline` flattens everything to one line (reply previews); `trailing` goes at the end of the last paragraph ("(edited)")
   let {
@@ -43,7 +44,7 @@
       <a
         href={node.url}
         title={node.url}
-        target="_blank"
+        target={linkTarget(node.url)}
         rel="noreferrer"
         class="text-link underline underline-offset-2 transition-colors hover:text-link/80"
         >{@render spans(node.children)}</a
