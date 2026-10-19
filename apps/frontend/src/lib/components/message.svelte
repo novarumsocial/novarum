@@ -327,7 +327,7 @@
                   {repliedMessage.author.displayName || repliedMessage.author.username}
                 </span>
                 <span class="text-muted-foreground/40">·</span>
-                <span class="min-w-0 break-words text-muted-foreground">
+                <span class="min-w-0 truncate text-muted-foreground">
                   {#if repliedMessage.content}
                     <Markdown content={repliedMessage.content} inline />
                   {:else}
