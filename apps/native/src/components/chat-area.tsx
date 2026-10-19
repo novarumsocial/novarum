@@ -551,11 +551,9 @@ export function ChatArea({
               extraData={activeMessage}
               keyExtractor={(row) => row.key}
               renderItem={renderItem}
-              // keeps what you're reading still when a new message arrives, and follows it near the bottom
-              maintainVisibleContentPosition={{
-                minIndexForVisible: 0,
-                autoscrollToTopThreshold: 120,
-              }}
+              // keeps what you're reading still when a new message arrives. Off at the bottom: there iOS would shift
+              // the list up by the new row and then animate back down, instead of the row just appearing
+              maintainVisibleContentPosition={away ? { minIndexForVisible: 0 } : undefined}
               onEndReached={() => void chat().loadOlderMessages(channel.id)}
               onEndReachedThreshold={1.5}
               onScroll={onScroll}
