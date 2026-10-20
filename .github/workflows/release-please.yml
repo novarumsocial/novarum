@@ -13,5 +13,18 @@ permissions:
 jobs:
   release-please:
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - id: release
+        uses: googleapis/release-please-action@v4
+
+  # builds the native APK and unsigned IPA and attaches them to the release
+  native:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    uses: ./.github/workflows/native-development-release.yml
+    with:
+      release_tag: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
