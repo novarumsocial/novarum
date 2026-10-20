@@ -1,11 +1,10 @@
 // Port of apps/frontend/src/lib/components/dm-sidebar.svelte
-// Differences: swipe a row left (or long-press it) to close the conversation, pull down to refresh.
+// Differences: long-press a row for its actions drawer (close, notifications), pull down to refresh.
 // It is the hub's Home column: Friends and every DM open as their own screen.
 import * as Haptics from 'expo-haptics';
 import { ChevronRight, LoaderCircle, Phone, Plus, Users, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
-import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { NewDmDialog } from '@/components/new-dm-dialog';
@@ -59,65 +58,53 @@ export function DmSidebar() {
     const last = entry.lastMessageAt ? new Date(entry.lastMessageAt) : null;
 
     return (
-      // keyed so a recycled row never keeps the previous conversation's swipe open
-      <ReanimatedSwipeable
-        key={entry.id}
-        overshootRight={false}
-        renderRightActions={() => (
-          <View className="w-20 items-center justify-center bg-destructive">
-            <Icon as={X} size={18} className="text-destructive-foreground" />
-          </View>
-        )}
-        onSwipeableOpen={() => closeDm(entry)}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${name}${unread ? ', unread' : ''}`}
+        accessibilityHint="Long-press for more actions"
+        onPress={() => goto(dmPath(entry.id))}
+        onLongPress={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setMenuEntry(entry);
+          setMenu('actions');
+        }}
+        className="min-h-14 flex-row items-center gap-3 bg-sidebar px-3 active:bg-accent"
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${name}${unread ? ', unread' : ''}`}
-          accessibilityHint="Swipe left to close the conversation"
-          onPress={() => goto(dmPath(entry.id))}
-          onLongPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setMenuEntry(entry);
-            setMenu('actions');
-          }}
-          className="min-h-14 flex-row items-center gap-3 bg-sidebar px-3 active:bg-accent"
-        >
-          <View>
-            <Avatar
-              src={other?.avatarUrl}
-              name={name}
-              bgColor={other?.avatarColor}
-              className="size-10"
+        <View>
+          <Avatar
+            src={other?.avatarUrl}
+            name={name}
+            bgColor={other?.avatarColor}
+            className="size-10"
+          />
+          {other && friends().isOnline(other.userId) && (
+            <View
+              className={cn(
+                'absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500',
+                circleIcons && 'rounded-full'
+              )}
             />
-            {other && friends().isOnline(other.userId) && (
-              <View
-                className={cn(
-                  'absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500',
-                  circleIcons && 'rounded-full'
-                )}
-              />
-            )}
-          </View>
-          <Text
-            numberOfLines={1}
-            className={cn(
-              'flex-1 text-[15px] text-muted-foreground',
-              unread && 'font-semibold text-sidebar-foreground'
-            )}
-          >
-            {name}
-          </Text>
-          {last && (
-            <Text className={cn('text-xs', unread ? 'text-primary' : 'text-muted-foreground')}>
-              {formatDate(last) === 'Today' ? formatTime(last) : formatDate(last)}
-            </Text>
           )}
-          {voiceStates[entry.id]?.length ? (
-            <Icon as={Phone} size={14} className="text-green-500" accessibilityLabel="In a call" />
-          ) : null}
-          {unread && <View className="size-2 rounded-full bg-primary" />}
-        </Pressable>
-      </ReanimatedSwipeable>
+        </View>
+        <Text
+          numberOfLines={1}
+          className={cn(
+            'flex-1 text-[15px] text-muted-foreground',
+            unread && 'font-semibold text-sidebar-foreground'
+          )}
+        >
+          {name}
+        </Text>
+        {last && (
+          <Text className={cn('text-xs', unread ? 'text-primary' : 'text-muted-foreground')}>
+            {formatDate(last) === 'Today' ? formatTime(last) : formatDate(last)}
+          </Text>
+        )}
+        {voiceStates[entry.id]?.length ? (
+          <Icon as={Phone} size={14} className="text-green-500" accessibilityLabel="In a call" />
+        ) : null}
+        {unread && <View className="size-2 rounded-full bg-primary" />}
+      </Pressable>
     );
   };
 
