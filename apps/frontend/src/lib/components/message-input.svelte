@@ -287,6 +287,9 @@
   }
 
   function handlePaste(event: ClipboardEvent) {
+    const target = event.target as HTMLElement;
+    const otherField = target.closest?.('input, textarea, [contenteditable], [role="dialog"]');
+    if (target !== textarea && otherField) return;
     const items = Array.from(event.clipboardData?.items ?? []);
     const files = items
       .filter((item) => item.kind === 'file')
@@ -300,7 +303,7 @@
   }
 </script>
 
-<svelte:window onkeydown={windowKeyDown} />
+<svelte:window onkeydown={windowKeyDown} onpaste={handlePaste} />
 
 <div
   class="relative border-t border-border p-2 sm:p-4"
@@ -445,7 +448,6 @@
       bind:this={textarea}
       onkeydown={handleKeydown}
       onkeyup={handleKeyup}
-      onpaste={handlePaste}
       oninput={updateSearch}
       onclick={updateSearch}
       {placeholder}
