@@ -374,7 +374,7 @@
                       <Tooltip.Content>
                         <p>
                           {message.editedTime
-                            ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
+                            ? `${formatDate(new Date(message.editedTime)).toLowerCase()} at ${formatTime(new Date(message.editedTime))}`
                             : ''}
                         </p>
                       </Tooltip.Content>

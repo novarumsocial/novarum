@@ -4,16 +4,28 @@
   import EmojiText from './emoji-text.svelte';
   import { linkTarget } from '$lib/utils';
 
-  // `inline` flattens everything to one line (reply previews); `trailing` goes at the end of the last paragraph ("(edited)")
+  // `inline` flattens everything to one line (reply previews); `compact` shrinks and truncates headings (profile cards);
+  // `trailing` goes at the end of the last paragraph ("(edited)")
   let {
     content,
     links = false,
     inline = false,
+    compact = false,
     trailing,
-  }: { content: string; links?: boolean; inline?: boolean; trailing?: Snippet } = $props();
+  }: {
+    content: string;
+    links?: boolean;
+    inline?: boolean;
+    compact?: boolean;
+    trailing?: Snippet;
+  } = $props();
 
   const blocks = $derived(inline ? [] : parseMarkdown(content));
-  const headings = ['text-xl font-bold', 'text-lg font-bold', 'text-base font-semibold'];
+  const headings = $derived(
+    compact
+      ? ['truncate text-sm font-bold', 'truncate text-sm font-semibold', 'truncate font-semibold']
+      : ['text-xl font-bold', 'text-lg font-bold', 'text-base font-semibold']
+  );
 </script>
 
 {#snippet spans(nodes: Inline[])}
