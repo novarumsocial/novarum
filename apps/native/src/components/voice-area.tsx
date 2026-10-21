@@ -156,20 +156,19 @@ export function VoiceArea({
     (s) => s.participantAudio[spotlightScreenShare?.identity ?? '']?.screenVolume ?? 1
   );
 
-  // In a 1:1 DM call, tune into the other person's stream automatically, once per stream,
+  // Tune into other people's streams automatically, once per stream,
   // so stopping it sticks until they share again.
   const autoWatched = useRef(new Set<string>());
   useEffect(() => {
-    const dmOneOnOne = channel.type === 'DM' && voiceStates.size === 2;
     for (const [identity, state] of voiceStates) {
       if (identity === localIdentity) continue;
       if (!state.screenShare) autoWatched.current.delete(identity);
-      else if (dmOneOnOne && !autoWatched.current.has(identity)) {
+      else if (!autoWatched.current.has(identity)) {
         autoWatched.current.add(identity);
         voice().watchStream(identity);
       }
     }
-  }, [voiceStates, localIdentity, channel.type]);
+  }, [voiceStates, localIdentity]);
 
   // A newly started screen share takes over the stage, even if the user had chosen grid.
   const lastAutoKey = useRef<string | null>(null);
