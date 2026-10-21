@@ -17,6 +17,7 @@
     activeId,
     mentions,
     hasUnreadDms = false,
+    friendRequests = 0,
     onSelect,
     onCreateServer,
     onReorder,
@@ -25,6 +26,7 @@
     activeId: string | null;
     mentions: Record<string, number>;
     hasUnreadDms?: boolean;
+    friendRequests?: number;
     onSelect: (id?: string) => void;
     onCreateServer?: (server: Server) => void;
     onReorder?: (serverIds: string[]) => Promise<void>;
@@ -83,7 +85,11 @@
     class:ring-offset-1={activeId === null}
     class:ring-offset-background={activeId === null}
     class:rounded-full={settings.value.circleIcons}
-    aria-label={hasUnreadDms ? 'Home, unread direct messages' : 'Home'}
+    aria-label={friendRequests
+      ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
+      : hasUnreadDms
+        ? 'Home, unread direct messages'
+        : 'Home'}
   >
     <svg
       fill="currentColor"
@@ -96,7 +102,14 @@
       />
     </svg>
 
-    {#if hasUnreadDms}
+    {#if friendRequests > 0}
+      <span
+        class="absolute -right-1.5 -bottom-1 flex h-4.5 min-w-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
+        class:rounded-full={settings.value.circleIcons}
+      >
+        {friendRequests > 99 ? '99+' : friendRequests}
+      </span>
+    {:else if hasUnreadDms}
       <span
         class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
       ></span>
