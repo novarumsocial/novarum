@@ -11,6 +11,7 @@ import { dmRecipients, notifyInBackground } from '../../utils/notify';
 import { db } from '../../src/db';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from './store';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
+import { guildProfiles, guildUser, withGuildProfile } from '../../utils/guildProfile';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
 import sharp from 'sharp';
@@ -93,6 +94,10 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         offset: cursor,
       });
       messages.reverse();
+      const profiles = await guildProfiles(
+        channel.guildId,
+        messages.map((message) => message.authorId)
+      );
 
       return {
         messages: messages.map((message) => {
@@ -113,7 +118,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
               message.createdAt instanceof Date
                 ? message.createdAt.toISOString()
                 : message.createdAt,
-            author: publicUser(message.author),
+            author: publicUser(withGuildProfile(message.author, profiles.get(message.authorId))),
           };
         }),
       };
@@ -181,6 +186,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         return { message: mappedMessage };
       }
 
+      const author = await guildUser(channel.guildId, session.user);
       const priorMsg = await db.query.messages.findFirst({
         where: {
           authorId: session.userId,
@@ -216,7 +222,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
               priorMsg.createdAt instanceof Date
                 ? priorMsg.createdAt.toISOString()
                 : priorMsg.createdAt,
-            author: publicUser(session.user),
+            author: publicUser(author),
           },
         };
       }
@@ -260,7 +266,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         attachments: responseAttachments,
         createdAt:
           message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
-        author: publicUser(session.user),
+        author: publicUser(author),
       };
 
       if (server) {
@@ -270,7 +276,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         });
       }
       notifyInBackground(
-        { ...message, author: session.user },
+        { ...message, author },
         channel,
         channel.guildId ? pingRecipients : dmRecipients(channel.id)
       );
@@ -361,6 +367,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
       const alreadyPinged = await pingedUserIds(existing.id);
       const updated = await editMessage(existing.id, content, pingRecipients);
+      const author = await guildUser(channel.guildId, session.user);
 
       const responseMessage = {
         id: updated.id,
@@ -377,7 +384,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         ),
         createdAt:
           updated.createdAt instanceof Date ? updated.createdAt.toISOString() : updated.createdAt,
-        author: publicUser(session.user),
+        author: publicUser(author),
       };
 
       if (server) {
@@ -388,7 +395,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       }
       // anyone already pinged by the original message was already notified
       notifyInBackground(
-        { ...updated, author: session.user },
+        { ...updated, author },
         channel,
         pingRecipients.filter((recipient) => !alreadyPinged.has(recipient.userId))
       );

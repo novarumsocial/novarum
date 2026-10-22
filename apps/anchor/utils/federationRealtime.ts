@@ -107,6 +107,10 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('member.updated'),
+    data: z.object({ guildId: z.string(), user: publicUserSchema }),
+  }),
+  z.object({
     type: z.literal('voice.states.snapshot'),
     data: z.object({
       guildIds: z.array(z.string()),
@@ -520,6 +524,8 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
         },
       };
     case 'member.joined':
+      return { ...event, data: { ...event.data, guildId: guild(event.data.guildId) } };
+    case 'member.updated':
       return { ...event, data: { ...event.data, guildId: guild(event.data.guildId) } };
     case 'voice.states.snapshot':
       return {

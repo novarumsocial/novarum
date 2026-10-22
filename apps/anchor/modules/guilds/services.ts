@@ -1,6 +1,6 @@
 import Elysia, { t } from 'elysia';
 import { randomString } from '../../utils/randomString';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
 import { publishRealtime } from '../../utils/publishRealtime';
 import {
   makeFederatedChannelId,
@@ -32,6 +32,13 @@ import {
   guildResponseSchema as guildSchema,
 } from '../../src/db/zod';
 import { processImage } from '../../utils/optimizeWebp';
+import { publicUser, publicUserSchema } from '../../utils/publicUser';
+import {
+  type GuildProfile,
+  guildProfileSchema,
+  shareGuildProfile,
+  withGuildProfile,
+} from '../../utils/guildProfile';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const successResponseSchema = z.object({ success: z.boolean() });
@@ -59,6 +66,18 @@ const unreadMentionsResponseSchema = z.object({
   ),
 });
 type PingMessage = { id: string; channelId: string; createdAt: Date | string };
+const guildProfilePatchSchema = z.object({
+  displayName: z.string().max(64).nullable().optional(),
+  about: z.string().max(512).nullable().optional(),
+  // pictures are uploaded on their own, here they can only be removed
+  avatarUrl: z.null().optional(),
+  bannerUrl: z.null().optional(),
+});
+const guildProfileResponseSchema = z.object({
+  profile: guildProfileSchema,
+  user: publicUserSchema,
+});
+const profilePictureKind = t.UnionEnum(['avatar', 'banner']);
 
 export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
   .get(
@@ -89,6 +108,30 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
       }),
     }
   )
+  .get(
+    '/:id/members/:userId/:kind',
+    async ({ params, status }) => {
+      const member = await findMember(params.id, params.userId);
+      if (!member?.[`${params.kind}Url` as const])
+        return status(404, { error: 'Picture not found' });
+
+      const url = publicPresign(guildProfileKey(params.id, params.userId, params.kind), {
+        method: 'GET',
+        expiresIn: 5 * 60,
+        type: 'image/webp',
+        contentDisposition: 'inline',
+      });
+
+      return noStoreRedirect(url);
+    },
+    {
+      params: t.Object({ id: t.String(), userId: t.String(), kind: profilePictureKind }),
+      response: {
+        302: t.Void(),
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
   .resolve(async ({ cookie, status }) => {
     const token = cookie[sessionCookieName]?.value as string | undefined;
     const session = await validateSessionToken(token);
@@ -97,6 +140,93 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
     }
     return { session };
   })
+  // the user's own profile for a guild, without their own profile filled in
+  .get(
+    '/:id/profile',
+    async ({ params, session, status }) => {
+      const member = await findMember(params.id, session.userId);
+      if (!member) return status(404, { error: 'Guild not found' });
+
+      return { profile: guildProfileSchema.parse(member) };
+    },
+    {
+      response: {
+        200: z.object({ profile: guildProfileSchema }),
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .patch(
+    '/:id/profile',
+    async ({ params, body, session, server, status }) => {
+      const member = await findMember(params.id, session.userId);
+      if (!member) return status(404, { error: 'Guild not found' });
+
+      const saved = await saveGuildProfile(server, session, member, body);
+      if (!saved.ok) return status(saved.status, saved.error);
+      return saved.data;
+    },
+    {
+      body: guildProfilePatchSchema,
+      response: {
+        200: guildProfileResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/:id/profile/:kind',
+    async ({ params, body, session, server, status }) => {
+      const member = await findMember(params.id, session.userId);
+      if (!member) return status(404, { error: 'Guild not found' });
+      if (body.picture.type !== 'image/png' && body.picture.type !== 'image/gif') {
+        return status(415, { error: 'Picture must be a PNG or GIF image' });
+      }
+      if (body.picture.size > maxAvatarSize) {
+        return status(413, { error: 'Picture is too large' });
+      }
+
+      const image = await processImage(await body.picture.arrayBuffer());
+      await storage.write(guildProfileKey(params.id, session.userId, params.kind), image.data, {
+        type: 'image/webp',
+      });
+
+      // stays on our homeserver even for a remote guild; its host just gets the url
+      const url = new URL(
+        `/guilds/${encodeURIComponent(params.id)}/members/${encodeURIComponent(session.userId)}/${params.kind}?v=${Date.now()}${image.animated ? '&animated=1' : ''}`,
+        getConfig().server.base_url
+      ).toString();
+      const saved = await saveGuildProfile(
+        server,
+        session,
+        member,
+        params.kind === 'avatar' ? { avatarUrl: url } : { bannerUrl: url }
+      );
+      if (!saved.ok) return status(saved.status, saved.error);
+      return saved.data;
+    },
+    {
+      params: t.Object({ id: t.String(), kind: profilePictureKind }),
+      body: t.Object({
+        picture: t.File({ maxSize: maxAvatarSize }),
+      }),
+      response: {
+        200: guildProfileResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        413: genericResponseErrorSchema,
+        415: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
   .post(
     '/:id/avatar',
     async ({ params, body, session, status }) => {
@@ -551,6 +681,37 @@ function randomAlphanumericString(length: number): string {
   }
 
   return result;
+}
+
+function findMember(guildId: string, userId: string) {
+  return db.query.guildMembers.findFirst({ where: { guildId, userId } });
+}
+
+// fed: guild ids are full of characters that don't belong in a storage key
+function guildProfileKey(guildId: string, userId: string, kind: string) {
+  return `guild-profiles/${Buffer.from(guildId).toString('base64url')}/${userId}/${kind}.webp`;
+}
+
+// a remote guild's host has to take the profile before we keep our copy of it
+async function saveGuildProfile(
+  server: Parameters<typeof shareGuildProfile>[0],
+  session: SessionWithUser,
+  member: typeof guildMembers.$inferSelect,
+  patch: Partial<GuildProfile>
+) {
+  const profile = guildProfileSchema.parse({ ...member, ...patch });
+  const shared = await shareGuildProfile(server, session.user, member.guildId, profile);
+  if (!shared.ok) return shared;
+
+  await db
+    .update(guildMembers)
+    .set(profile)
+    .where(and(eq(guildMembers.guildId, member.guildId), eq(guildMembers.userId, member.userId)));
+
+  return {
+    ok: true as const,
+    data: { profile, user: publicUser(withGuildProfile(session.user, profile)) },
+  };
 }
 
 function serializeInvite(invite: typeof guildInvites.$inferSelect) {

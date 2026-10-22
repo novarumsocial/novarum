@@ -194,6 +194,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     data: z.object({}),
   }),
   z.object({
+    type: z.literal('member.updated'),
+    data: z.object({ guildId: z.string(), user: publicUserSchema }),
+  }),
+  z.object({
     type: z.literal('user.updated'),
     data: z.object({
       user: publicUserSchema,
@@ -447,6 +451,9 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     }
     if (event.type === 'user.updated') {
       chat().updateUserProfile(event.data.user.userId, event.data.user);
+    }
+    if (event.type === 'member.updated') {
+      chat().updateMemberProfile(event.data.guildId, event.data.user);
     }
     if (event.type === 'dm.created') {
       dms().upsert(event.data);

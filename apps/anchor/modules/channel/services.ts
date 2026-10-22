@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { parseJson } from '../../utils/parseJson';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { publicUser } from '../../utils/publicUser';
+import { guildUser, withGuildProfile } from '../../utils/guildProfile';
 import { channelReadStates, channels, db } from '../../src/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -336,7 +337,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       });
 
       const users = members.map((member) => ({
-        ...publicUser(member.user),
+        ...publicUser(withGuildProfile(member.user, member)),
         status: member.user.status as 'ONLINE' | 'OFFLINE',
         role: member.role as 'OWNER' | 'ADMIN' | 'MEMBER',
         joinedAt: member.joinedAt.toISOString(),
@@ -393,9 +394,10 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         return status(401, { error: 'Unauthorized' });
       }
 
+      const user = await guildUser(channel.guildId, session.user);
       const token = new AccessToken(voiceConfig.livekit_key, voiceConfig.livekit_secret, {
         identity: session.userId,
-        name: session.user.displayName || session.user.username,
+        name: user.displayName || user.username,
         ttl: '5m',
         metadata: JSON.stringify({
           channelId: channel.id,
@@ -462,13 +464,14 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       }
 
       if (server) {
+        const { displayName } = await guildUser(channel.guildId, session.user);
         await publishToChannel(server, channel, {
           type: 'channel.typing',
           data: {
             channelId: channel.id,
             userId: session.userId,
             username: session.user.username,
-            displayName: session.user.displayName,
+            displayName,
             homeserver: session.user.homeserver,
             time: new Date().toISOString(),
           },

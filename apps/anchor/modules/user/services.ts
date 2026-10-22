@@ -12,6 +12,7 @@ import { publicUser } from '../../utils/publicUser';
 import { publishRealtime } from '../../utils/publishRealtime';
 import type { RealtimeEvent } from '../../src';
 import { processImage } from '../../utils/optimizeWebp';
+import { guildProfileSchema, shareGuildProfile } from '../../utils/guildProfile';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const userPayloadResponseSchema = z.object({ user: userResponseSchema });
@@ -85,21 +86,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         .returning();
       if (!user) return status(404, { error: 'User not found' });
 
-      if (server) {
-        const memberships = await db.query.guildMembers.findMany({
-          where: { userId: session.userId },
-          columns: { guildId: true },
-        });
-        const event: RealtimeEvent = {
-          type: 'user.updated',
-          data: { user: publicUser(user) },
-        };
-
-        publishRealtime(server, `userEvents:${session.userId}`, event);
-        for (const memb of memberships) {
-          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
-        }
-      }
+      await publishUserUpdate(server, user);
 
       return { user: userResponse(user) };
     },
@@ -134,21 +121,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
 
       if (!user) return status(404, { error: 'User not found' });
 
-      if (server) {
-        const memberships = await db.query.guildMembers.findMany({
-          where: { userId: session.userId },
-          columns: { guildId: true },
-        });
-        const event: RealtimeEvent = {
-          type: 'user.updated',
-          data: { user: publicUser(user) },
-        };
-
-        publishRealtime(server, `userEvents:${session.userId}`, event);
-        for (const memb of memberships) {
-          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
-        }
-      }
+      await publishUserUpdate(server, user);
 
       return {
         avatarColor: user.avatarColor!,
@@ -230,21 +203,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
 
-      if (server) {
-        const memberships = await db.query.guildMembers.findMany({
-          where: { userId: session.userId },
-          columns: { guildId: true },
-        });
-        const event: RealtimeEvent = {
-          type: 'user.updated',
-          data: { user: publicUser(user) },
-        };
-
-        publishRealtime(server, `userEvents:${session.userId}`, event);
-        for (const memb of memberships) {
-          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
-        }
-      }
+      await publishUserUpdate(server, user);
 
       return { user: userResponse(user) };
     },
@@ -288,21 +247,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       const user = await db.query.users.findFirst({ where: { id: session.userId } });
       if (!user) return status(404, { error: 'User not found' });
 
-      if (server) {
-        const memberships = await db.query.guildMembers.findMany({
-          where: { userId: session.userId },
-          columns: { guildId: true },
-        });
-        const event: RealtimeEvent = {
-          type: 'user.updated',
-          data: { user: publicUser(user) },
-        };
-
-        publishRealtime(server, `userEvents:${session.userId}`, event);
-        for (const memb of memberships) {
-          publishRealtime(server, `guildEvents:${memb.guildId}`, event);
-        }
-      }
+      await publishUserUpdate(server, user);
 
       return { user: userResponse(user) };
     },
@@ -315,3 +260,19 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
       },
     }
   );
+
+// everyone who can see the user gets their new profile, and each of their guilds also gets it
+// with the user's profile for that guild on top
+async function publishUserUpdate(
+  server: Parameters<typeof publishRealtime>[0] | null,
+  user: typeof users.$inferSelect
+) {
+  const memberships = await db.query.guildMembers.findMany({ where: { userId: user.id } });
+  const event: RealtimeEvent = { type: 'user.updated', data: { user: publicUser(user) } };
+
+  if (server) publishRealtime(server, `userEvents:${user.id}`, event);
+  for (const member of memberships) {
+    if (server) publishRealtime(server, `guildEvents:${member.guildId}`, event);
+    void shareGuildProfile(server, user, member.guildId, guildProfileSchema.parse(member));
+  }
+}

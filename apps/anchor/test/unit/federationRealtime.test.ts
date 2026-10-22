@@ -51,6 +51,7 @@ const fixtures: Record<string, unknown> = {
   'message.deleted': { id: 'm1', channelId: 'c1', guildId: 'g1' },
   'user.status.changed': { userId: 'u1', status: 'ONLINE' },
   'member.joined': { guildId: 'g1', user: { ...user, status: 'ONLINE' } },
+  'member.updated': { guildId: 'g1', user: { ...user, displayName: 'In G1' } },
   'voice.states.snapshot': {
     guildIds: ['g1'],
     states: [{ guildId: 'g1', channelId: 'c1', userId: 'u1', name: null }],
@@ -183,6 +184,12 @@ describe('mapFederatedRealtimeEvent', () => {
 
   test('member.joined', () => {
     guildOnce(map('member.joined').data.guildId, 'g1');
+  });
+
+  test('member.updated', () => {
+    const { data } = map('member.updated');
+    guildOnce(data.guildId, 'g1');
+    expect(data.user.displayName).toBe('In G1');
   });
 
   test('voice.states.snapshot', () => {

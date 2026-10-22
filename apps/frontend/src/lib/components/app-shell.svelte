@@ -22,6 +22,7 @@
   import FriendsHome from './friends-home.svelte';
   import DmSidebar from './dm-sidebar.svelte';
   import CallRinging from './call-ringing.svelte';
+  import ServerProfileDialog from './server-profile-dialog.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -375,4 +376,5 @@
       startCall(id);
     }}
   />
+  <ServerProfileDialog />
 {/if}

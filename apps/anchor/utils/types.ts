@@ -65,6 +65,14 @@ export type RealtimeEvent =
       };
     }
   | {
+      // the user with their profile for this guild on top
+      type: 'member.updated';
+      data: {
+        guildId: string;
+        user: PublicUser;
+      };
+    }
+  | {
       type: 'voice.states.snapshot';
       data: {
         guildIds: string[];
