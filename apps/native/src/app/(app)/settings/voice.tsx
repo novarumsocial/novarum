@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSettings } from '@/lib/settings';
+import { MicModes } from '../../../../modules/mic-modes';
 import { useVoice, voice, type AudioOutput, type CameraFacing } from '@/lib/voice';
+import { ConnectionState } from 'livekit-client';
 
 const outputLabels: Record<AudioOutput, string> = {
   speaker: 'Speaker',
@@ -52,6 +54,7 @@ export default function VoiceSettings() {
   const audioOutputs = useVoice((s) => s.audioOutputs);
   const cameraFacing = useVoice((s) => s.cameraFacing);
   const testing = useVoice((s) => s.audioLoopbackTesting);
+  const inCall = useVoice((s) => s.connectionState === ConnectionState.Connected);
   const testTrack = useVoice((s) => s.audioLoopbackTrack);
   const [deviceError, setDeviceError] = useState<string | null>(null);
 
@@ -124,6 +127,23 @@ export default function VoiceSettings() {
             onValueChange={(value) => void voice().setNoiseCancellation(value)}
           />
         </SettingsRow>
+        {MicModes ? (
+          <SettingsRow
+            title="Voice Isolation"
+            description="Apple's mic mode that filters out everything but your voice. Available while you're in a call or testing your mic."
+            stacked
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={!inCall && !testing}
+              onPress={() => MicModes?.showPicker()}
+            >
+              <Text>Choose mic mode</Text>
+            </Button>
+          </SettingsRow>
+        ) : null}
       </SettingsGroup>
 
       <SettingsGroup
