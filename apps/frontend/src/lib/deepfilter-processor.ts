@@ -17,6 +17,7 @@ export class DeepFilterProcessor implements TrackProcessor<
   private source?: MediaStreamAudioSourceNode;
 
   async init({ track }: AudioProcessorOptions) {
+    await core.initialize();
     // the model only runs at 48kHz, so it can't share livekit's context
     const context = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     this.context = context;
@@ -24,7 +25,6 @@ export class DeepFilterProcessor implements TrackProcessor<
     void context.resume().catch(() => undefined);
     document.addEventListener('pointerdown', () => void context.resume(), { once: true });
 
-    await core.initialize();
     const node = await core.createAudioWorkletNode(context);
     const destination = context.createMediaStreamDestination();
     this.source = context.createMediaStreamSource(new MediaStream([track]));

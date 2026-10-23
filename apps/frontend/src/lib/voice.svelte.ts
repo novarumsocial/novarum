@@ -326,7 +326,7 @@ export class Voice {
         const audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
         this.audioLoopbackContext = audioContext;
         track.setAudioContext(audioContext);
-        await track.setProcessor(noiseProcessor());
+        await this.setNoiseProcessor(track);
       }
 
       if (!this.audioLoopbackTesting || this.room !== room) {
@@ -561,8 +561,20 @@ export class Voice {
     await this.removeNoiseCancellation();
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
-    await track.setProcessor(noiseProcessor());
-    this.noiseProcessorTrack = track;
+    if (await this.setNoiseProcessor(track)) this.noiseProcessorTrack = track;
+  }
+
+  // a processor that can't start (e.g. no WebAssembly) turns noise suppression off, so the toggle never lies
+  private async setNoiseProcessor(track: LocalAudioTrack) {
+    try {
+      await track.setProcessor(noiseProcessor());
+      return true;
+    } catch (error) {
+      console.error('could not enable noise suppression', error);
+      settings.value.noiseCancellation = false;
+      this.noiseCancellationEnabled = false;
+      return false;
+    }
   }
 
   async setNoiseCancellation(enabled: boolean) {
