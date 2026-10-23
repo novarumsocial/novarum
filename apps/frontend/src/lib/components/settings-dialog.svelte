@@ -31,7 +31,12 @@
   import AvatarCropDialog from './avatar-crop-dialog.svelte';
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
-  import { settings, type TimeFormat } from '$lib/settings.svelte';
+  import {
+    noiseModelLabels,
+    settings,
+    type NoiseSuppressionModel,
+    type TimeFormat,
+  } from '$lib/settings.svelte';
   import { VENMIC_DEVICE_LABEL, type Voice } from '$lib/voice.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import {
@@ -1350,6 +1355,27 @@
                   checked={settings.value.noiseCancellation}
                   onCheckedChange={(enabled) => voice.setNoiseCancellation(enabled)}
                 />
+              </SettingsRow>
+              <SettingsRow
+                title="Noise suppression model"
+                description="DeepFilterNet removes more noise; RNNoise is lighter on your CPU."
+                id="noise-model"
+              >
+                <Select.Root
+                  type="single"
+                  value={settings.value.noiseSuppressionModel}
+                  onValueChange={(model) =>
+                    voice.setNoiseSuppressionModel(model as NoiseSuppressionModel)}
+                >
+                  <Select.Trigger id="noise-model" class="w-40">
+                    {noiseModelLabels[settings.value.noiseSuppressionModel]}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each Object.entries(noiseModelLabels) as [value, label]}
+                      <Select.Item {value}>{label}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </SettingsRow>
             </SettingsGroup>
 

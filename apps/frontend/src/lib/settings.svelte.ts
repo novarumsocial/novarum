@@ -1,6 +1,12 @@
 import { getNotificationPermission, notificationsSupported } from './notifications';
 
 export type TimeFormat = 'auto' | '12hr' | '24hr';
+export type NoiseSuppressionModel = 'deepfilternet' | 'rnnoise';
+
+export const noiseModelLabels: Record<NoiseSuppressionModel, string> = {
+  deepfilternet: 'DeepFilterNet 3',
+  rnnoise: 'RNNoise',
+};
 
 type Settings = {
   pushNotifications: boolean;
@@ -13,6 +19,7 @@ type Settings = {
   roundedBorders: boolean;
   darkMode: boolean;
   noiseCancellation: boolean;
+  noiseSuppressionModel: NoiseSuppressionModel;
   voiceEchoCancellation: boolean;
   voiceAutoGainControl: boolean;
   voiceInputDeviceId: string;
@@ -35,6 +42,7 @@ const defaults: Settings = {
   roundedBorders: false,
   darkMode: true,
   noiseCancellation: true,
+  noiseSuppressionModel: 'deepfilternet',
   voiceEchoCancellation: true,
   voiceAutoGainControl: true,
   voiceInputDeviceId: 'default',

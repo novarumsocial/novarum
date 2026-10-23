@@ -27,10 +27,15 @@ import ScreenOff from './sounds/screen-off.opus?url';
 
 // guille: no freedesktop? :(
 
-import { settings } from './settings.svelte';
+import { settings, type NoiseSuppressionModel } from './settings.svelte';
 import { RnnoiseProcessor } from './rnnoise-processor';
+import { DeepFilterProcessor } from './deepfilter-processor';
 
 const livekitConnectionTimeoutMs = 15_000;
+const noiseProcessor = () =>
+  settings.value.noiseSuppressionModel === 'rnnoise'
+    ? new RnnoiseProcessor()
+    : new DeepFilterProcessor();
 const microphoneCaptureOptions = () => ({
   echoCancellation: settings.value.voiceEchoCancellation,
   autoGainControl: settings.value.voiceAutoGainControl,
@@ -321,7 +326,7 @@ export class Voice {
         const audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
         this.audioLoopbackContext = audioContext;
         track.setAudioContext(audioContext);
-        await track.setProcessor(new RnnoiseProcessor());
+        await track.setProcessor(noiseProcessor());
       }
 
       if (!this.audioLoopbackTesting || this.room !== room) {
@@ -536,7 +541,12 @@ export class Voice {
       return;
     }
 
-    if (enabled && this.noiseCancellationEnabled) await this.ensureNoiseCancellation(room);
+    // the first deepfilternet load downloads the model, so don't hold up joining on it
+    if (enabled && this.noiseCancellationEnabled) {
+      this.ensureNoiseCancellation(room).catch((error) =>
+        console.error('could not enable noise suppression', error)
+      );
+    }
   }
 
   private async ensureNoiseCancellation(room: Room) {
@@ -551,7 +561,7 @@ export class Voice {
     await this.removeNoiseCancellation();
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
-    await track.setProcessor(new RnnoiseProcessor());
+    await track.setProcessor(noiseProcessor());
     this.noiseProcessorTrack = track;
   }
 
@@ -578,6 +588,18 @@ export class Voice {
       settings.value.noiseCancellation = previous;
       this.noiseCancellationEnabled = previous;
     }
+  }
+
+  async setNoiseSuppressionModel(model: NoiseSuppressionModel) {
+    settings.value.noiseSuppressionModel = model;
+    const room = this.room;
+    if (!room || !this.noiseCancellationEnabled || this.selfMuted || this.selfDeafened) return;
+
+    this.noiseCancellationOperation = this.noiseCancellationOperation
+      .catch(() => undefined)
+      .then(() => this.removeNoiseCancellation())
+      .then(() => this.ensureNoiseCancellation(room));
+    await this.noiseCancellationOperation;
   }
 
   async setEchoCancellation(enabled: boolean) {

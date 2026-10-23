@@ -77,6 +77,7 @@
         "@sapphi-red/web-noise-suppressor": "^0.3.5",
         "@videojs/html": "10.0.0-beta.26",
         "anchor": "workspace:*",
+        "deepfilternet3-noise-filter": "1.3.0",
         "elysia": "^1.4.29",
         "livekit-client": "^2.20.0",
         "qrcode": "^1.5.4",
@@ -1634,6 +1635,8 @@
     "decompress-response": ["decompress-response@6.0.0", "", { "dependencies": { "mimic-response": "^3.1.0" } }, "sha512-aW35yZM6Bb/4oJlZncMH2LCoZtJXTRxES17vE3hoRiowU2kWHaJKFkSBDnDR+cm9J+9QhXmREyIfv0pji9ejCQ=="],
 
     "deep-extend": ["deep-extend@0.6.0", "", {}, "sha512-LOHxIOaPYdHlJRtCQfDIVZtfw/ufM8+rVj649RIHzcm/vGwQRXFt6OPqIFWsm2XEMrNIEtWR64sY1LEKD2vAOA=="],
+
+    "deepfilternet3-noise-filter": ["deepfilternet3-noise-filter@1.3.0", "", { "peerDependencies": { "livekit-client": "^2.0.0" } }, "sha512-yYFUlPuvPguqcd/R6/OSsr0noGqlqOE50JkCWYHogk+PjLj9qrNgwTt5zKraVkKnw0l4+eXJagkz2SUWtUl4sQ=="],
 
     "deepmerge": ["deepmerge@4.3.1", "", {}, "sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A=="],
 
