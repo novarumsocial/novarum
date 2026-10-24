@@ -70,15 +70,13 @@ async function setup() {
     ]
   );
   await db.insert(guilds).values({ id: guildId, name: 'Benchmark', ownerId: userId });
-  await db
-    .insert(guildMembers)
-    .values(
-      Array.from({ length: 10 }, (_, i) => ({
-        guildId,
-        userId: `${prefix}-user-${i}`,
-        position: 0,
-      }))
-    );
+  await db.insert(guildMembers).values(
+    Array.from({ length: 10 }, (_, i) => ({
+      guildId,
+      userId: `${prefix}-user-${i}`,
+      position: 0,
+    }))
+  );
   await db.insert(channels).values({ id: channelId, guildId, name: 'benchmark', position: 0 });
 
   // distinct timestamps so ordering is stable, spread over the last day
@@ -103,16 +101,14 @@ async function setup() {
     .insert(guildMembers)
     .values(guildIds.map((id, i) => ({ guildId: id, userId: `${prefix}-user-1`, position: i })));
   const guildChannelIds = guildIds.map((_, i) => `${prefix}-member-channel-${i}`);
-  await db
-    .insert(channels)
-    .values(
-      guildIds.map((id, i) => ({
-        id: guildChannelIds[i]!,
-        guildId: id,
-        name: 'general',
-        position: 0,
-      }))
-    );
+  await db.insert(channels).values(
+    guildIds.map((id, i) => ({
+      id: guildChannelIds[i]!,
+      guildId: id,
+      name: 'general',
+      position: 0,
+    }))
+  );
   const guildMessages = guildChannelIds.map((id, i) => ({
     id: `${prefix}-member-message-${i}`,
     channelId: id,

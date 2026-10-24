@@ -47,7 +47,14 @@ type Row =
   | { kind: 'category'; category: ChannelCategory }
   | { kind: 'channel'; channel: Channel; category: ChannelCategory };
 type Menu =
-  'guild' | 'guildNotify' | 'channel' | 'channelNotify' | 'invite' | 'create' | 'edit' | 'settings';
+  | 'guild'
+  | 'guildNotify'
+  | 'channel'
+  | 'channelNotify'
+  | 'invite'
+  | 'create'
+  | 'edit'
+  | 'settings';
 
 // memo: see GuildSidebar
 export const ChannelSidebar = memo(function ChannelSidebar({

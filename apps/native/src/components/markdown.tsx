@@ -165,7 +165,9 @@ export function Markdown({
   return (
     <>
       {inline ? (
-        <Text numberOfLines={1} className={className}>{spans(parseInline(content.replace(/\s+/g, ' ')))}</Text>
+        <Text numberOfLines={1} className={className}>
+          {spans(parseInline(content.replace(/\s+/g, ' ')))}
+        </Text>
       ) : (
         <View>
           {blocks.length ? render(blocks, true) : <Text className={className}>{children}</Text>}

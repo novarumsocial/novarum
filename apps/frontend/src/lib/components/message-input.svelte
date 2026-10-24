@@ -116,9 +116,7 @@
     }
 
     if (e.key === 'ArrowUp' && !content && files.length === 0) {
-      const lastOwn = chat.currentMessages.findLast(
-        (message) => isSelf(message.author)
-      );
+      const lastOwn = chat.currentMessages.findLast((message) => isSelf(message.author));
       if (lastOwn) {
         e.preventDefault();
         chat.editingMessage = true;
@@ -384,11 +382,7 @@
           title={file.name}
         >
           {#if previews[index]}
-            <img
-              src={previews[index]}
-              alt={file.name}
-              class="size-full object-cover"
-            />
+            <img src={previews[index]} alt={file.name} class="size-full object-cover" />
           {:else}
             <div class="flex size-full flex-col items-center justify-center gap-1.5 px-2 pb-4">
               <FileText class="size-5 text-primary" />
