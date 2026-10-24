@@ -742,12 +742,12 @@ export class Voice {
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         this.syncParticipant(participant, channelId);
-        joinSound.play();
+        if (settings.value.othersCallSounds) joinSound.play();
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.voiceStates.delete(participant.identity);
         this.watchedStreams.delete(participant.identity);
-        leaveSound.play();
+        if (settings.value.othersCallSounds) leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) this.playRemoteSound(publication.source, false);
@@ -792,6 +792,7 @@ export class Voice {
 
   // on = the track turned on (unmuted / published); video sources only react to publish changes too
   private playRemoteSound(source: Track.Source, on: boolean, published = false) {
+    if (!settings.value.othersCallSounds) return;
     if (source === Track.Source.Microphone && !published) (on ? unmuteSound : muteSound).play();
     if (source === Track.Source.Camera) (on ? cameraSound : cameraOffSound).play();
     if (source === Track.Source.ScreenShare) (on ? screenSound : screenOffSound).play();

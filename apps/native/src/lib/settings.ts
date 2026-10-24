@@ -14,6 +14,7 @@ const settingsSchema = z.object({
   noiseCancellation: z.boolean().default(true),
   voiceEchoCancellation: z.boolean().default(true),
   voiceAutoGainControl: z.boolean().default(true),
+  othersCallSounds: z.boolean().default(true),
   notificationVolume: z.number().default(0.5),
   timeFormat: z.enum(['auto', '12hr', '24hr']).default('auto'),
   language: z.string().default('en'),

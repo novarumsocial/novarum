@@ -50,6 +50,8 @@ export default function VoiceSettings() {
   const echo = useSettings((s) => s.voiceEchoCancellation);
   const gain = useSettings((s) => s.voiceAutoGainControl);
   const noise = useSettings((s) => s.noiseCancellation);
+  const othersCallSounds = useSettings((s) => s.othersCallSounds);
+  const update = useSettings((s) => s.update);
   const audioOutput = useVoice((s) => s.audioOutput);
   const audioOutputs = useVoice((s) => s.audioOutputs);
   const cameraFacing = useVoice((s) => s.cameraFacing);
@@ -144,6 +146,18 @@ export default function VoiceSettings() {
             </Button>
           </SettingsRow>
         ) : null}
+      </SettingsGroup>
+
+      <SettingsGroup title="Sound effects">
+        <SettingsRow
+          title="Others' sound effects"
+          description="Play a sound when others join, leave, mute, or turn on their camera or screen."
+        >
+          <Switch
+            value={othersCallSounds}
+            onValueChange={(value) => update({ othersCallSounds: value })}
+          />
+        </SettingsRow>
       </SettingsGroup>
 
       <SettingsGroup

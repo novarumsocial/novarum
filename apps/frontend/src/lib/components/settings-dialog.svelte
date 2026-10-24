@@ -1392,6 +1392,16 @@
                 />
               </SettingsRow>
             </SettingsGroup>
+
+            <SettingsGroup title="Sound effects">
+              <SettingsRow
+                title="Others' sound effects"
+                description="Play a sound when others join, leave, mute, or turn on their camera or screen."
+                id="others-call-sounds"
+              >
+                <Switch id="others-call-sounds" bind:checked={settings.value.othersCallSounds} />
+              </SettingsRow>
+            </SettingsGroup>
           </Tabs.Content>
 
           <Tabs.Content value="langt" class="space-y-6 outline-none">

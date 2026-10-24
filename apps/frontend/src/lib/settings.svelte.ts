@@ -26,6 +26,7 @@ type Settings = {
   voiceOutputDeviceId: string;
   videoInputDeviceId: string;
   screenShareSystemAudio: boolean;
+  othersCallSounds: boolean;
   notificationVolume?: number;
   timeFormat: TimeFormat;
   language: string;
@@ -49,6 +50,7 @@ const defaults: Settings = {
   voiceOutputDeviceId: 'default',
   videoInputDeviceId: 'default',
   screenShareSystemAudio: true,
+  othersCallSounds: true,
   notificationVolume: 0.5,
   timeFormat: 'auto',
   language: 'en',
