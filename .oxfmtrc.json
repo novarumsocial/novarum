@@ -8,5 +8,5 @@
   "semi": true,
   "sortPackageJson": false,
   "svelte": {},
-  "ignorePatterns": []
+  "ignorePatterns": ["apps/native/src/lib/canvas-editor.generated.ts"]
 }
