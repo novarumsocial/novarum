@@ -16,7 +16,7 @@ import {
 import { notificationSettings } from './notification-settings.svelte';
 import { friends } from './friends.svelte';
 import { dms, dmPath } from './dms.svelte';
-import { canvases } from './canvas.svelte';
+import { openCanvases, type CanvasMessage } from './canvas.svelte';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -179,14 +179,16 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
-    type: z.literal('channel.canvas.updated'),
-    data: z.object({
-      channelId: z.string(),
-      content: z.string(),
-      version: z.number(),
-      updatedAt: isoDateSchema.nullable(),
-      updatedBy: publicUserSchema.nullable(),
-    }),
+    type: z.literal('canvas.sync'),
+    data: z.object({ channelId: z.string(), state: z.string(), writable: z.boolean() }),
+  }),
+  z.object({
+    type: z.literal('canvas.update'),
+    data: z.object({ channelId: z.string(), update: z.string() }),
+  }),
+  z.object({
+    type: z.literal('canvas.awareness'),
+    data: z.object({ channelId: z.string(), update: z.string(), hello: z.boolean().optional() }),
   }),
   z.object({
     type: z.literal('guild.channels.reordered'),
@@ -326,6 +328,8 @@ class RealtimeState {
       this.sendClientState();
 
       for (const guild of chat.servers) this.subscribeGuild(guild.id);
+      // a fresh sync also sends back anything typed while we were disconnected
+      for (const canvas of openCanvases.values()) canvas.join();
       if (this.voiceChannelId) socket.send({ type: 'voice.join', channelId: this.voiceChannelId });
 
       if (this.shouldRecover) {
@@ -496,8 +500,12 @@ class RealtimeState {
           event.data.displayName ?? event.data.username
         );
       }
-      if (event.type === 'channel.canvas.updated') {
-        canvases.apply(event.data);
+      if (
+        event.type === 'canvas.sync' ||
+        event.type === 'canvas.update' ||
+        event.type === 'canvas.awareness'
+      ) {
+        openCanvases.get(event.data.channelId)?.handle(event);
       }
       if (event.type === 'guild.channels.reordered') {
         chat.reorderChannels(event.data.guildId, event.data.channelIds);
@@ -581,6 +589,10 @@ class RealtimeState {
     if (!this.socket || !this.connected) return;
 
     this.socket.send({ type: 'voice.join', channelId });
+  }
+
+  sendCanvas(message: CanvasMessage) {
+    if (this.socket && this.connected) this.socket.send(message);
   }
 
   ringCall(channelId: string, ringing = true) {

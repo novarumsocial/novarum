@@ -57,6 +57,7 @@
     "react-email": "^6.9.1",
     "sharp": "^0.35.3",
     "web-push": "^3.6.7",
+    "yjs": "^13.6.33",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -17,6 +17,12 @@ import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { bridgedVoicePresenceFor } from '../../utils/federationRealtime';
 import { clearOnlineUsers, getOnlineUsers } from '../../utils/clearOnlineUsers';
 import { canAccessChannel } from '../../utils/channelAccess';
+import {
+  applyCanvasUpdate,
+  canvasTopic,
+  findCanvasChannel,
+  loadCanvasState,
+} from '../../utils/canvas';
 import { db, users } from '../../src/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -103,6 +109,25 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     t.Object({
       type: t.Literal('emoji.search'),
       query: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('canvas.join'),
+      channelId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('canvas.leave'),
+      channelId: t.String(),
+    }),
+    t.Object({
+      type: t.Literal('canvas.update'),
+      channelId: t.String(),
+      update: t.String({ maxLength: 1_000_000 }),
+    }),
+    t.Object({
+      type: t.Literal('canvas.awareness'),
+      channelId: t.String(),
+      update: t.String({ maxLength: 10_000 }),
+      hello: t.Optional(t.Boolean()),
     }),
     t.Object({
       type: t.Literal('emoji.query'),
@@ -284,6 +309,41 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
           data: { unicodes, emojis },
         })
       );
+      return;
+    }
+
+    if (message.type === 'canvas.join') {
+      const channel = await findCanvasChannel(message.channelId);
+      if (!channel || !(await canAccessChannel(channel, session.userId))) return;
+
+      ws.subscribe(canvasTopic(channel.id));
+      const state = Buffer.from(await loadCanvasState(channel.id)).toString('base64');
+      const writable = await canAccessChannel(channel, session.userId, true);
+      ws.send(
+        JSON.stringify({ type: 'canvas.sync', data: { channelId: channel.id, state, writable } })
+      );
+      return;
+    }
+
+    if (message.type === 'canvas.leave') {
+      ws.unsubscribe(canvasTopic(message.channelId));
+      return;
+    }
+
+    // only sockets that joined the canvas can talk to it
+    if (message.type === 'canvas.awareness' || message.type === 'canvas.update') {
+      const topic = canvasTopic(message.channelId);
+      if (!ws.isSubscribed(topic)) return;
+
+      if (message.type === 'canvas.update') {
+        const channel = await findCanvasChannel(message.channelId);
+        if (!channel || !(await canAccessChannel(channel, session.userId, true))) return;
+        const update = Buffer.from(message.update, 'base64');
+        if (!(await applyCanvasUpdate(channel.id, update, session.userId))) return;
+      }
+
+      const { type, ...data } = message;
+      ws.publish(topic, JSON.stringify({ type, data }));
       return;
     }
 

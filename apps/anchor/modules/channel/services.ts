@@ -18,12 +18,10 @@ import { z } from 'zod';
 import { parseJson } from '../../utils/parseJson';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { publicUser } from '../../utils/publicUser';
-import { channelCanvases, channelReadStates, channels, db } from '../../src/db';
+import { channelReadStates, channels, db } from '../../src/db';
 import { and, eq, sql } from 'drizzle-orm';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import {
-  canvasResponseSchema,
-  canvasUpdateSchema,
   channelCreateSchema,
   channelResponseSchema,
   channelUsersResponseSchema,
@@ -39,20 +37,6 @@ const livekitMetadataSchema = z.object({ channelId: z.string().optional() });
 const callParticipantsResponseSchema = z.object({
   participants: z.array(z.object({ identity: z.string(), name: z.string(), metadata: z.string() })),
 });
-
-async function readCanvas(channelId: string) {
-  const canvas = await db.query.channelCanvases.findFirst({
-    where: { channelId },
-    with: { updatedBy: true },
-  });
-  return {
-    channelId,
-    content: canvas?.content ?? '',
-    version: canvas?.version ?? 0,
-    updatedAt: canvas?.updatedAt.toISOString() ?? null,
-    updatedBy: canvas?.updatedBy ? publicUser(canvas.updatedBy) : null,
-  };
-}
 
 // TODO: probably refactor the repeated code and put it in the .resolve()
 export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
@@ -440,87 +424,6 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
-      },
-    }
-  )
-  .get(
-    '/:id/canvas',
-    async ({ params, session, status }) => {
-      if (!session) return status(401, { error: 'Unauthorized' });
-      if (parseFederatedChannelId(params.id)) {
-        return status(400, { error: 'Canvases are not available on federated channels' });
-      }
-
-      const channel = await db.query.channels.findFirst({ where: { id: params.id } });
-      if (!channel || channel.type === 'VOICE') {
-        return status(404, { error: 'Channel not found' });
-      }
-      if (!(await canAccessChannel(channel, session.userId))) {
-        return status(403, { error: 'Forbidden' });
-      }
-
-      return readCanvas(channel.id);
-    },
-    {
-      response: {
-        200: canvasResponseSchema,
-        400: genericResponseErrorSchema,
-        401: genericResponseErrorSchema,
-        403: genericResponseErrorSchema,
-        404: genericResponseErrorSchema,
-      },
-    }
-  )
-  .put(
-    '/:id/canvas',
-    async ({ params, body, session, server, status }) => {
-      if (!session) return status(401, { error: 'Unauthorized' });
-      if (parseFederatedChannelId(params.id)) {
-        return status(400, { error: 'Canvases are not available on federated channels' });
-      }
-
-      const channel = await db.query.channels.findFirst({ where: { id: params.id } });
-      if (!channel || channel.type === 'VOICE') {
-        return status(404, { error: 'Channel not found' });
-      }
-      if (!(await canAccessChannel(channel, session.userId, true))) {
-        return status(403, { error: 'Forbidden' });
-      }
-
-      const values = {
-        content: body.content,
-        version: body.version + 1,
-        updatedById: session.userId,
-        updatedAt: new Date(),
-      };
-      // only lands if nobody saved since the version the editor started from
-      const [saved] = await db
-        .insert(channelCanvases)
-        .values({ channelId: channel.id, ...values })
-        .onConflictDoUpdate({
-          target: channelCanvases.channelId,
-          set: values,
-          setWhere: eq(channelCanvases.version, body.version),
-        })
-        .returning();
-
-      const canvas = await readCanvas(channel.id);
-      if (!saved) return status(409, canvas);
-
-      if (server) {
-        await publishToChannel(server, channel, { type: 'channel.canvas.updated', data: canvas });
-      }
-      return canvas;
-    },
-    {
-      body: canvasUpdateSchema,
-      response: {
-        200: canvasResponseSchema,
-        400: genericResponseErrorSchema,
-        401: genericResponseErrorSchema,
-        403: genericResponseErrorSchema,
-        404: genericResponseErrorSchema,
-        409: canvasResponseSchema,
       },
     }
   )

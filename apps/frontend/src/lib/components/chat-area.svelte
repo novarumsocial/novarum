@@ -24,7 +24,6 @@
   import { session } from '$lib/session.svelte';
   import { Progress } from '$lib/components/ui/progress/index.js';
   import CanvasPanel from './canvas-panel.svelte';
-  import { canvases } from '$lib/canvas.svelte';
 
   // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
   type Pending = {
@@ -72,6 +71,8 @@
 
   let callHeight = $state(320);
   let canvasOpen = $state(false);
+  // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
+  const canvasSupported = $derived(channel.type !== 'VOICE' && !channel.id.startsWith('fed:'));
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
   const ringing = $derived(!!call && dms.outgoingCall === channel.id);
 
@@ -314,7 +315,7 @@
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
     <div class="flex-1"></div>
-    {#if canvases.supports(channel)}
+    {#if canvasSupported}
       <Button
         variant={canvasOpen ? 'secondary' : 'ghost'}
         size="icon-lg"
@@ -541,8 +542,10 @@
         onTyping={() => chat.onTyping()}
       />
     </div>
-    {#if canvasOpen && canvases.supports(channel)}
-      <CanvasPanel channelId={channel.id} onClose={() => (canvasOpen = false)} />
+    {#if canvasOpen && canvasSupported}
+      {#key channel.id}
+        <CanvasPanel channelId={channel.id} onClose={() => (canvasOpen = false)} />
+      {/key}
     {/if}
   </div>
 </div>

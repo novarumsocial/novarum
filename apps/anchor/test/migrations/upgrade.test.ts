@@ -253,17 +253,17 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
-  '20261026095803_channel_canvas': {
+  '20261026103024_channel_canvas': {
     check: async (url) => {
       // existing channels start without a canvas, and can get one
       expect(await rows(url, `SELECT 1 FROM channel_canvas`)).toHaveLength(0);
       await rows(
         url,
-        `INSERT INTO channel_canvas ("channelId", "updatedById") VALUES ('c1', 'u1')`
+        `INSERT INTO channel_canvas ("channelId", "state", "updatedById") VALUES ('c1', '\\x0000', 'u1')`
       );
-      expect(
-        await rows(url, `SELECT 1 FROM channel_canvas WHERE "channelId" = 'c1' AND version = 0`)
-      ).toHaveLength(1);
+      expect(await rows(url, `SELECT 1 FROM channel_canvas WHERE "channelId" = 'c1'`)).toHaveLength(
+        1
+      );
     },
   },
 };
