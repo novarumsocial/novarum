@@ -1,23 +1,35 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "aac64375-212f-4056-b8f5-57ac3645ed66",
-  "prevIds": ["0eb1decd-54bf-4ade-9e79-283865f8405e"],
+  "id": "deee60e2-f688-4789-bd8e-b28f1068ff3c",
+  "prevIds": [
+    "0eb1decd-54bf-4ade-9e79-283865f8405e"
+  ],
   "ddl": [
     {
-      "values": ["TOTP", "EMAIL"],
+      "values": [
+        "TOTP",
+        "EMAIL"
+      ],
       "name": "mfa_method",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": ["ALL", "MENTIONS", "NONE"],
+      "values": [
+        "ALL",
+        "MENTIONS",
+        "NONE"
+      ],
       "name": "notification_level",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": ["WEBPUSH", "UNIFIEDPUSH"],
+      "values": [
+        "WEBPUSH",
+        "UNIFIEDPUSH"
+      ],
       "name": "push_kind",
       "entityType": "enums",
       "schema": "public"
@@ -318,27 +330,14 @@
       "table": "channel_canvas"
     },
     {
-      "type": "text",
+      "type": "bytea",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
-      "default": "''",
+      "default": null,
       "generated": null,
       "identity": null,
-      "name": "content",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "channel_canvas"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "0",
-      "generated": null,
-      "identity": null,
-      "name": "version",
+      "name": "state",
       "entityType": "columns",
       "schema": "public",
       "table": "channel_canvas"
@@ -2324,10 +2323,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["uploaderId"],
+      "columns": [
+        "uploaderId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "attachment_uploaderId_user_id_fkey",
@@ -2337,10 +2340,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "schemaTo": "public",
       "tableTo": "channel",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "attachment_channelId_channel_id_fkey",
@@ -2350,10 +2357,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["messageId"],
+      "columns": [
+        "messageId"
+      ],
       "schemaTo": "public",
       "tableTo": "message",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "attachment_messageId_message_id_fkey",
@@ -2363,10 +2374,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "schemaTo": "public",
       "tableTo": "channel",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_canvas_channelId_channel_id_fkey",
@@ -2376,10 +2391,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["updatedById"],
+      "columns": [
+        "updatedById"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "name": "channel_canvas_updatedById_user_id_fkey",
@@ -2389,10 +2408,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "schemaTo": "public",
       "tableTo": "channel",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_member_channelId_channel_id_fkey",
@@ -2402,10 +2425,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_member_userId_user_id_fkey",
@@ -2415,10 +2442,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_read_state_userId_user_id_fkey",
@@ -2428,10 +2459,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "schemaTo": "public",
       "tableTo": "channel",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_read_state_channelId_channel_id_fkey",
@@ -2441,10 +2476,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["guildId"],
+      "columns": [
+        "guildId"
+      ],
       "schemaTo": "public",
       "tableTo": "guild",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "channel_guildId_guild_id_fkey",
@@ -2454,10 +2493,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userOneId"],
+      "columns": [
+        "userOneId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "friend_relationship_userOneId_user_id_fkey",
@@ -2467,10 +2510,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userTwoId"],
+      "columns": [
+        "userTwoId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "friend_relationship_userTwoId_user_id_fkey",
@@ -2480,10 +2527,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["requestedById"],
+      "columns": [
+        "requestedById"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "friend_relationship_requestedById_user_id_fkey",
@@ -2493,10 +2544,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["guildId"],
+      "columns": [
+        "guildId"
+      ],
       "schemaTo": "public",
       "tableTo": "guild",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "guild_invite_guildId_guild_id_fkey",
@@ -2506,10 +2561,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["creatorId"],
+      "columns": [
+        "creatorId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "guild_invite_creatorId_user_id_fkey",
@@ -2519,10 +2578,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["guildId"],
+      "columns": [
+        "guildId"
+      ],
       "schemaTo": "public",
       "tableTo": "guild",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "guild_member_guildId_guild_id_fkey",
@@ -2532,10 +2595,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "guild_member_userId_user_id_fkey",
@@ -2545,10 +2612,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["ownerId"],
+      "columns": [
+        "ownerId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "guild_ownerId_user_id_fkey",
@@ -2558,10 +2629,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "local_credential_userId_user_id_fkey",
@@ -2571,10 +2646,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["messageId"],
+      "columns": [
+        "messageId"
+      ],
       "schemaTo": "public",
       "tableTo": "message",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_ping_messageId_message_id_fkey",
@@ -2584,10 +2663,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_ping_userId_user_id_fkey",
@@ -2597,10 +2680,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "schemaTo": "public",
       "tableTo": "channel",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_channelId_channel_id_fkey",
@@ -2610,10 +2697,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["authorId"],
+      "columns": [
+        "authorId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "message_authorId_user_id_fkey",
@@ -2623,10 +2714,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["replyTo"],
+      "columns": [
+        "replyTo"
+      ],
       "schemaTo": "public",
       "tableTo": "message",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "name": "message_replyTo_message_id_fkey",
@@ -2636,10 +2731,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "notification_preference_userId_user_id_fkey",
@@ -2649,10 +2748,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "notification_setting_userId_user_id_fkey",
@@ -2662,10 +2765,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "push_subscription_userId_user_id_fkey",
@@ -2675,10 +2782,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["sessionId"],
+      "columns": [
+        "sessionId"
+      ],
       "schemaTo": "public",
       "tableTo": "session",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "push_subscription_sessionId_session_id_fkey",
@@ -2688,10 +2799,14 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "schemaTo": "public",
       "tableTo": "user",
-      "columnsTo": ["id"],
+      "columnsTo": [
+        "id"
+      ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "session_userId_user_id_fkey",
@@ -2700,7 +2815,10 @@
       "table": "session"
     },
     {
-      "columns": ["channelId", "userId"],
+      "columns": [
+        "channelId",
+        "userId"
+      ],
       "nameExplicit": true,
       "name": "channel_member_pkey",
       "entityType": "pks",
@@ -2708,7 +2826,10 @@
       "table": "channel_member"
     },
     {
-      "columns": ["userId", "channelId"],
+      "columns": [
+        "userId",
+        "channelId"
+      ],
       "nameExplicit": true,
       "name": "channel_read_state_pkey",
       "entityType": "pks",
@@ -2716,7 +2837,10 @@
       "table": "channel_read_state"
     },
     {
-      "columns": ["userOneId", "userTwoId"],
+      "columns": [
+        "userOneId",
+        "userTwoId"
+      ],
       "nameExplicit": true,
       "name": "friend_relationship_pkey",
       "entityType": "pks",
@@ -2724,7 +2848,10 @@
       "table": "friend_relationship"
     },
     {
-      "columns": ["guildId", "userId"],
+      "columns": [
+        "guildId",
+        "userId"
+      ],
       "nameExplicit": true,
       "name": "guild_member_pkey",
       "entityType": "pks",
@@ -2732,7 +2859,10 @@
       "table": "guild_member"
     },
     {
-      "columns": ["messageId", "userId"],
+      "columns": [
+        "messageId",
+        "userId"
+      ],
       "nameExplicit": true,
       "name": "message_ping_pkey",
       "entityType": "pks",
@@ -2740,7 +2870,10 @@
       "table": "message_ping"
     },
     {
-      "columns": ["userId", "targetId"],
+      "columns": [
+        "userId",
+        "targetId"
+      ],
       "nameExplicit": true,
       "name": "notification_setting_pkey",
       "entityType": "pks",
@@ -2748,7 +2881,9 @@
       "table": "notification_setting"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "attachment_pkey",
       "schema": "public",
@@ -2756,7 +2891,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["channelId"],
+      "columns": [
+        "channelId"
+      ],
       "nameExplicit": false,
       "name": "channel_canvas_pkey",
       "schema": "public",
@@ -2764,7 +2901,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "channel_pkey",
       "schema": "public",
@@ -2772,7 +2911,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "email_otps_pkey",
       "schema": "public",
@@ -2780,7 +2921,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "emojis_pkey",
       "schema": "public",
@@ -2788,7 +2931,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "federation_nonce_pkey",
       "schema": "public",
@@ -2796,7 +2941,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "guild_invite_pkey",
       "schema": "public",
@@ -2804,7 +2951,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "guild_pkey",
       "schema": "public",
@@ -2812,7 +2961,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "homeserver_keys_pkey",
       "schema": "public",
@@ -2820,7 +2971,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "nameExplicit": false,
       "name": "local_credential_pkey",
       "schema": "public",
@@ -2828,7 +2981,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "message_pkey",
       "schema": "public",
@@ -2836,7 +2991,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["userId"],
+      "columns": [
+        "userId"
+      ],
       "nameExplicit": false,
       "name": "notification_preference_pkey",
       "schema": "public",
@@ -2844,7 +3001,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "push_subscription_pkey",
       "schema": "public",
@@ -2852,7 +3011,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "session_pkey",
       "schema": "public",
@@ -2860,7 +3021,9 @@
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
+      "columns": [
+        "id"
+      ],
       "nameExplicit": false,
       "name": "user_pkey",
       "schema": "public",
@@ -2869,7 +3032,10 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["guildId", "name"],
+      "columns": [
+        "guildId",
+        "name"
+      ],
       "nullsNotDistinct": false,
       "name": "channel_guildId_name_unique",
       "entityType": "uniques",
@@ -2878,7 +3044,10 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["homeserver", "nonce"],
+      "columns": [
+        "homeserver",
+        "nonce"
+      ],
       "nullsNotDistinct": false,
       "name": "federation_nonce_homeserver_nonce_unique",
       "entityType": "uniques",
@@ -2887,7 +3056,10 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["authorId", "nonce"],
+      "columns": [
+        "authorId",
+        "nonce"
+      ],
       "nullsNotDistinct": false,
       "name": "message_authorId_nonce_unique",
       "entityType": "uniques",
@@ -2896,7 +3068,9 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["endpoint"],
+      "columns": [
+        "endpoint"
+      ],
       "nullsNotDistinct": false,
       "name": "push_subscription_endpoint_unique",
       "entityType": "uniques",
@@ -2905,7 +3079,10 @@
     },
     {
       "nameExplicit": true,
-      "columns": ["username", "homeserverName"],
+      "columns": [
+        "username",
+        "homeserverName"
+      ],
       "nullsNotDistinct": false,
       "name": "user_username_homeserver_unique",
       "entityType": "uniques",
@@ -2914,7 +3091,9 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["objectKey"],
+      "columns": [
+        "objectKey"
+      ],
       "nullsNotDistinct": false,
       "name": "attachment_objectKey_key",
       "schema": "public",
@@ -2923,7 +3102,9 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["dmKey"],
+      "columns": [
+        "dmKey"
+      ],
       "nullsNotDistinct": false,
       "name": "channel_dmKey_key",
       "schema": "public",
@@ -2932,7 +3113,9 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["unicode"],
+      "columns": [
+        "unicode"
+      ],
       "nullsNotDistinct": false,
       "name": "emojis_unicode_key",
       "schema": "public",
@@ -2941,7 +3124,9 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["code"],
+      "columns": [
+        "code"
+      ],
       "nullsNotDistinct": false,
       "name": "guild_invite_code_key",
       "schema": "public",
@@ -2950,7 +3135,9 @@
     },
     {
       "nameExplicit": false,
-      "columns": ["email"],
+      "columns": [
+        "email"
+      ],
       "nullsNotDistinct": false,
       "name": "local_credential_email_key",
       "schema": "public",

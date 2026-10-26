@@ -1,7 +1,6 @@
 CREATE TABLE "channel_canvas" (
 	"channelId" text PRIMARY KEY,
-	"content" text DEFAULT '' NOT NULL,
-	"version" integer DEFAULT 0 NOT NULL,
+	"state" bytea NOT NULL,
 	"updatedById" text,
 	"updatedAt" timestamp(3) with time zone DEFAULT now() NOT NULL
 );
