@@ -55,6 +55,21 @@ export const channelResponseSchema = createSelectSchema(channels, {
   position: true,
 });
 
+// version 0 means nobody has written the canvas yet.
+export const canvasResponseSchema = z.object({
+  channelId: z.string(),
+  content: z.string(),
+  version: z.number().int(),
+  updatedAt: isoDateSchema.nullable(),
+  updatedBy: publicUserSchema.nullable(),
+});
+
+export const canvasUpdateSchema = z.object({
+  content: z.string().max(100_000),
+  // the version this edit was based on
+  version: z.number().int().min(0),
+});
+
 export const attachmentResponseSchema = createSelectSchema(attachments, { size: z.number() })
   .pick({
     id: true,

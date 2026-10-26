@@ -16,6 +16,7 @@ import {
 import { notificationSettings } from './notification-settings.svelte';
 import { friends } from './friends.svelte';
 import { dms, dmPath } from './dms.svelte';
+import { canvases } from './canvas.svelte';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -175,6 +176,16 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       displayName: z.string().nullable(),
       homeserver: z.string(),
       time: isoDateSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('channel.canvas.updated'),
+    data: z.object({
+      channelId: z.string(),
+      content: z.string(),
+      version: z.number(),
+      updatedAt: isoDateSchema.nullable(),
+      updatedBy: publicUserSchema.nullable(),
     }),
   }),
   z.object({
@@ -484,6 +495,9 @@ class RealtimeState {
           event.data.homeserver,
           event.data.displayName ?? event.data.username
         );
+      }
+      if (event.type === 'channel.canvas.updated') {
+        canvases.apply(event.data);
       }
       if (event.type === 'guild.channels.reordered') {
         chat.reorderChannels(event.data.guildId, event.data.channelIds);

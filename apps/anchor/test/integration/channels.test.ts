@@ -307,3 +307,77 @@ describe('typing', () => {
     expect((await call(stranger, 'POST', '/channel/nope/typing')).status).toBe(404);
   });
 });
+
+describe('canvas', () => {
+  test('starts empty, saves bump the version and reach other members live', async () => {
+    const { owner, member, channel } = await world();
+    expect((await call(member, 'GET', `/channel/${channel.id}/canvas`)).body).toEqual({
+      channelId: channel.id,
+      content: '',
+      version: 0,
+      updatedAt: null,
+      updatedBy: null,
+    });
+
+    const ws = await openRealtime(anchor.url, owner.cookie);
+    try {
+      await Bun.sleep(200); // memberships are subscribed right after open
+      const first = await call(member, 'PUT', `/channel/${channel.id}/canvas`, {
+        content: '# notes',
+        version: 0,
+      });
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({
+        content: '# notes',
+        version: 1,
+        updatedBy: { userId: member.user.id },
+      });
+      const event = await ws.waitFor('channel.canvas.updated');
+      expect(event.data).toMatchObject({ channelId: channel.id, content: '# notes', version: 1 });
+    } finally {
+      ws.close();
+    }
+
+    const second = await call(owner, 'PUT', `/channel/${channel.id}/canvas`, {
+      content: '# notes\n- more',
+      version: 1,
+    });
+    expect(second.body).toMatchObject({ version: 2, updatedBy: { userId: owner.user.id } });
+  });
+
+  test('a save based on an old version is refused with 409 and the current canvas', async () => {
+    const { owner, member, channel } = await world();
+    await call(owner, 'PUT', `/channel/${channel.id}/canvas`, { content: 'a', version: 0 });
+    await call(owner, 'PUT', `/channel/${channel.id}/canvas`, { content: 'b', version: 1 });
+
+    const stale = await call(member, 'PUT', `/channel/${channel.id}/canvas`, {
+      content: 'mine',
+      version: 1,
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body).toMatchObject({ content: 'b', version: 2 });
+    // and a stale first write can't clobber an existing canvas either
+    const staleFirst = await call(member, 'PUT', `/channel/${channel.id}/canvas`, {
+      content: 'mine',
+      version: 0,
+    });
+    expect(staleFirst.status).toBe(409);
+    expect((await call(owner, 'GET', `/channel/${channel.id}/canvas`)).body.content).toBe('b');
+  });
+
+  test('non-members get 403, voice and unknown channels 404', async () => {
+    const { owner, stranger, guild, channel } = await world();
+    expect((await call(stranger, 'GET', `/channel/${channel.id}/canvas`)).status).toBe(403);
+    expect(
+      (await call(stranger, 'PUT', `/channel/${channel.id}/canvas`, { content: 'x', version: 0 }))
+        .status
+    ).toBe(403);
+    const voice = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'talk',
+      type: 'VOICE',
+    });
+    expect((await call(owner, 'GET', `/channel/${voice.body.id}/canvas`)).status).toBe(404);
+    expect((await call(owner, 'GET', '/channel/nope/canvas')).status).toBe(404);
+  });
+});

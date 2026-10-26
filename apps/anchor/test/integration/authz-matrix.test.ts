@@ -153,6 +153,22 @@ const guildRoutes: Route[] = [
     expected: [401, 401, 200, 200],
   },
   {
+    key: 'GET /channel/{id}/canvas',
+    method: 'GET',
+    path: (fx) => `/channel/${fx.channel.id}/canvas`,
+    expected: [401, 403, 200, 200],
+  },
+  {
+    key: 'PUT /channel/{id}/canvas',
+    method: 'PUT',
+    path: (fx) => `/channel/${fx.channel.id}/canvas`,
+    body: async (fx) => ({
+      content: 'x',
+      version: (await call(fx.owner, 'GET', `/channel/${fx.channel.id}/canvas`)).body.version,
+    }),
+    expected: [401, 403, 200, 200],
+  },
+  {
     key: 'GET /channel/{id}/call/token',
     method: 'GET',
     path: (fx) => `/channel/${fx.voice.id}/call/token`,
@@ -303,6 +319,21 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
         body: { messageId: fx.message.id, createdAt: fx.message.createdAt },
       }),
       expected: [401, 403, 200, 200],
+    },
+    {
+      name: 'GET /channel/{id}/canvas',
+      request: (fx) => ({ method: 'GET', path: `/channel/${fx.dmId}/canvas` }),
+      expected: [401, 403, 200, 200],
+    },
+    {
+      // writing to a DM needs the friendship, like sending messages does
+      name: 'PUT /channel/{id}/canvas',
+      request: (fx) => ({
+        method: 'PUT',
+        path: `/channel/${fx.dmId}/canvas`,
+        body: { content: 'x', version: 0 },
+      }),
+      expected: [401, 403, 200, 403],
     },
     {
       name: 'GET /channel/{id}/users',

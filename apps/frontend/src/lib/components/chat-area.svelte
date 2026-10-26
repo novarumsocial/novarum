@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { BellRing, Hash, Menu, Phone, RotateCw, Users, Volume2, X } from '@lucide/svelte';
+  import {
+    BellRing,
+    Hash,
+    Menu,
+    NotebookPen,
+    Phone,
+    RotateCw,
+    Users,
+    Volume2,
+    X,
+  } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { tick, type Snippet } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -13,6 +23,8 @@
   import { formatDate } from '$lib/formatDate';
   import { session } from '$lib/session.svelte';
   import { Progress } from '$lib/components/ui/progress/index.js';
+  import CanvasPanel from './canvas-panel.svelte';
+  import { canvases } from '$lib/canvas.svelte';
 
   // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
   type Pending = {
@@ -59,6 +71,7 @@
   } = $props();
 
   let callHeight = $state(320);
+  let canvasOpen = $state(false);
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
   const ringing = $derived(!!call && dms.outgoingCall === channel.id);
 
@@ -300,26 +313,26 @@
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
+    <div class="flex-1"></div>
+    {#if canvases.supports(channel)}
+      <Button
+        variant={canvasOpen ? 'secondary' : 'ghost'}
+        size="icon-lg"
+        onclick={() => (canvasOpen = !canvasOpen)}
+        aria-label={canvasOpen ? 'Close canvas' : 'Open canvas'}
+        aria-pressed={canvasOpen}
+        title="Canvas"
+      >
+        <NotebookPen class="size-5" />
+      </Button>
+    {/if}
     {#if channel.type === 'DM'}
       {#if !call}
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          class="ml-auto"
-          onclick={onCall}
-          aria-label="Start call"
-        >
+        <Button variant="ghost" size="icon-lg" onclick={onCall} aria-label="Start call">
           <Phone class="size-5" />
         </Button>
       {:else if callers.length <= 1 && !ringing}
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          class="ml-auto"
-          onclick={onRing}
-          aria-label="Ring"
-          title="Ring"
-        >
+        <Button variant="ghost" size="icon-lg" onclick={onRing} aria-label="Ring" title="Ring">
           <BellRing class="size-5" />
         </Button>
       {/if}
@@ -327,7 +340,7 @@
       <Button
         variant="ghost"
         size="icon-lg"
-        class="ml-auto lg:hidden"
+        class="lg:hidden"
         onclick={onOpenMembers}
         aria-label="Open members"
       >
@@ -387,140 +400,149 @@
     </div>
   {/if}
 
-  <div class={call && callExpanded ? 'hidden' : 'contents'}>
-    <div
-      bind:this={scrollContainer}
-      class="min-h-0 min-w-0 flex-1 overflow-y-auto"
-      onscroll={onScroll}
-    >
-      {#if olderLoading}
-        <div class="space-y-5 px-3 pt-4 sm:px-4">
-          {@render skeletonRows(2)}
-        </div>
-      {/if}
-      <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
-        {#if loading}
-          <div class="space-y-5">
-            {@render skeletonRows(5)}
-          </div>
-        {:else if messages.length === 0 && channelPending.length === 0}
-          <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
-            {#if channel.type === 'DM'}
-              <Avatar
-                src={channel.avatarUrl}
-                name={channel.name}
-                class="size-14 text-lg"
-                bgColor={channel.avatarColor}
-              />
-            {/if}
-            <div class="border border-dashed border-border p-4">
-              <p class="text-sm font-medium text-foreground">
-                {channel.type === 'DM'
-                  ? `This is the beginning of your conversation with ${channel.name}.`
-                  : 'No messages yet'}
-              </p>
-              {#if channel.type !== 'DM'}
-                <p class="mt-1 text-sm text-muted-foreground">
-                  Start the conversation in #{channel.name}.
-                </p>
-              {/if}
-            </div>
-          </div>
-        {:else}
-          <div>
-            {#each messages as msg, i}
-              {@const prev = messages[i - 1]}
-              {@const firstUnread = i === firstUnreadIndex}
-              {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
-              {@const grouped =
-                !firstUnread &&
-                prev !== undefined &&
-                prev.author.username === msg.author.username &&
-                prev.author.server === msg.author.server &&
-                msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
-              {@const dayDivider =
-                (i > 0 &&
-                  msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
-                i === 0}
-              {#if dayDivider}
-                <div
-                  class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
-                  role="separator"
-                  aria-label={msg.timestamp.toLocaleDateString()}
-                >
-                  <span class="h-px flex-1 bg-muted-foreground/20"></span>
-                  <span>{formatDate(msg.timestamp)}</span>
-                </div>
-              {/if}
-              {#if firstUnread}
-                <div
-                  id={`unread-${channel.id}`}
-                  class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
-                  role="separator"
-                  aria-label="New messages"
-                >
-                  <span class="h-px flex-1 bg-destructive"></span>
-                  <span>New</span>
-                </div>
-              {/if}
-              <MessageComponent
-                message={msg}
-                {repliedMessage}
-                {grouped}
-                {onDelete}
-                {onEdit}
-                onReply={() => (replyingTo = msg)}
-                {onProfileCall}
-              />
-            {/each}
-            {#each channelPending as item (item.id)}
-              {@render pendingMessage(item)}
-            {/each}
+  <div class={call && callExpanded ? 'hidden' : 'relative flex min-h-0 flex-1'}>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <div
+        bind:this={scrollContainer}
+        class="min-h-0 min-w-0 flex-1 overflow-y-auto"
+        onscroll={onScroll}
+      >
+        {#if olderLoading}
+          <div class="space-y-5 px-3 pt-4 sm:px-4">
+            {@render skeletonRows(2)}
           </div>
         {/if}
+        <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
+          {#if loading}
+            <div class="space-y-5">
+              {@render skeletonRows(5)}
+            </div>
+          {:else if messages.length === 0 && channelPending.length === 0}
+            <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
+              {#if channel.type === 'DM'}
+                <Avatar
+                  src={channel.avatarUrl}
+                  name={channel.name}
+                  class="size-14 text-lg"
+                  bgColor={channel.avatarColor}
+                />
+              {/if}
+              <div class="border border-dashed border-border p-4">
+                <p class="text-sm font-medium text-foreground">
+                  {channel.type === 'DM'
+                    ? `This is the beginning of your conversation with ${channel.name}.`
+                    : 'No messages yet'}
+                </p>
+                {#if channel.type !== 'DM'}
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    Start the conversation in #{channel.name}.
+                  </p>
+                {/if}
+              </div>
+            </div>
+          {:else}
+            <div>
+              {#each messages as msg, i}
+                {@const prev = messages[i - 1]}
+                {@const firstUnread = i === firstUnreadIndex}
+                {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
+                {@const grouped =
+                  !firstUnread &&
+                  prev !== undefined &&
+                  prev.author.username === msg.author.username &&
+                  prev.author.server === msg.author.server &&
+                  msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
+                {@const dayDivider =
+                  (i > 0 &&
+                    msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
+                  i === 0}
+                {#if dayDivider}
+                  <div
+                    class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
+                    role="separator"
+                    aria-label={msg.timestamp.toLocaleDateString()}
+                  >
+                    <span class="h-px flex-1 bg-muted-foreground/20"></span>
+                    <span>{formatDate(msg.timestamp)}</span>
+                  </div>
+                {/if}
+                {#if firstUnread}
+                  <div
+                    id={`unread-${channel.id}`}
+                    class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
+                    role="separator"
+                    aria-label="New messages"
+                  >
+                    <span class="h-px flex-1 bg-destructive"></span>
+                    <span>New</span>
+                  </div>
+                {/if}
+                <MessageComponent
+                  message={msg}
+                  {repliedMessage}
+                  {grouped}
+                  {onDelete}
+                  {onEdit}
+                  onReply={() => (replyingTo = msg)}
+                  {onProfileCall}
+                />
+              {/each}
+              {#each channelPending as item (item.id)}
+                {@render pendingMessage(item)}
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
-    </div>
 
-    {#if typingText}
-      <div
-        class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
-        aria-live="polite"
-      >
-        <span class="flex items-center gap-0.5 mr-2.5">
-          <span
-            class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
-          ></span>
-          <span
-            class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
-          ></span>
-          <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
-        </span>
-        {typingText ?? ''}
-      </div>
-    {/if}
-
-    {#if replyingTo}
-      <div class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4">
-        <span class="min-w-0 flex-1 truncate text-muted-foreground">
-          Replying to <span class="font-medium text-foreground"
-            >{replyingTo.author.displayName || replyingTo.author.username}</span
-          >
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Cancel reply"
-          onclick={() => (replyingTo = null)}
+      {#if typingText}
+        <div
+          class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
+          aria-live="polite"
         >
-          <X class="size-3.5" />
-        </Button>
-      </div>
-    {/if}
+          <span class="flex items-center gap-0.5 mr-2.5">
+            <span
+              class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
+            ></span>
+            <span
+              class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
+            ></span>
+            <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
+          </span>
+          {typingText ?? ''}
+        </div>
+      {/if}
 
-    <MessageInput
-      placeholder={channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`}
-      onSend={sendMessage}
-      onTyping={() => chat.onTyping()}
-    />
+      {#if replyingTo}
+        <div
+          class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4"
+        >
+          <span class="min-w-0 flex-1 truncate text-muted-foreground">
+            Replying to <span class="font-medium text-foreground"
+              >{replyingTo.author.displayName || replyingTo.author.username}</span
+            >
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Cancel reply"
+            onclick={() => (replyingTo = null)}
+          >
+            <X class="size-3.5" />
+          </Button>
+        </div>
+      {/if}
+
+      <MessageInput
+        placeholder={channel.type === 'DM'
+          ? `Message @${channel.name}`
+          : `Message #${channel.name}`}
+        onSend={sendMessage}
+        onTyping={() => chat.onTyping()}
+      />
+    </div>
+    {#if canvasOpen && canvases.supports(channel)}
+      <CanvasPanel channelId={channel.id} onClose={() => (canvasOpen = false)} />
+    {/if}
   </div>
 </div>

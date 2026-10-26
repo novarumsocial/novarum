@@ -1,4 +1,6 @@
 import type { PublicUser } from './publicUser';
+import type { z } from 'zod';
+import type { canvasResponseSchema } from '../src/db/zod';
 
 export type RealtimeEvent =
   | {
@@ -97,6 +99,10 @@ export type RealtimeEvent =
         homeserver: string;
         time: string;
       };
+    }
+  | {
+      type: 'channel.canvas.updated';
+      data: z.infer<typeof canvasResponseSchema>;
     }
   | {
       type: 'guild.channels.reordered';

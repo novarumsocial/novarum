@@ -235,6 +235,20 @@ export const channelMembers = pgTable(
   ]
 );
 
+// one shared markdown document per channel, like slack's canvases.
+// version goes up on every save, so two people editing at once can't overwrite each other.
+export const channelCanvases = pgTable('channel_canvas', {
+  channelId: text('channelId')
+    .primaryKey()
+    .references(() => channels.id, { onDelete: 'cascade' }),
+
+  content: text('content').notNull().default(''),
+  version: integer('version').notNull().default(0),
+
+  updatedById: text('updatedById').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: date('updatedAt').notNull().defaultNow(),
+});
+
 export const messages = pgTable(
   'message',
   {
