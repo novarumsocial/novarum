@@ -1,0 +1,149 @@
+/* Port of the <style> block in apps/frontend/src/lib/components/canvas-panel.svelte. The colors come from the app's
+   theme (src/components/canvas-panel.tsx sends them in as variables). */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  /* the app's IBM Plex files aren't reachable from the page; the phone's own UI font is the closest match */
+  font-family: -apple-system, Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+#editor {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ProseMirror {
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem 3rem;
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+.ProseMirror > * {
+  margin: 0;
+}
+.ProseMirror > * + * {
+  margin-top: 0.6em;
+}
+.ProseMirror p {
+  margin: 0;
+}
+h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.ProseMirror h1:not(:first-child),
+.ProseMirror h2:not(:first-child) {
+  margin-top: 1.1em;
+}
+ul,
+ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+ul:not([data-type='taskList']) {
+  list-style: disc;
+}
+ol {
+  list-style: decimal;
+}
+li::marker {
+  color: var(--muted-foreground);
+}
+ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.1rem;
+}
+ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+ul[data-type='taskList'] li > label {
+  flex-shrink: 0;
+  margin-top: 0.2em;
+}
+ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+ul[data-type='taskList'] input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--primary);
+}
+li[data-checked='true'] > div {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+blockquote {
+  margin: 0;
+  border-left: 3px solid var(--muted-foreground);
+  padding-left: 0.75rem;
+  color: var(--muted-foreground);
+}
+code {
+  background: var(--muted);
+  padding: 0.1em 0.3em;
+  font-size: 0.85em;
+  font-family: ui-monospace, Menlo, monospace;
+}
+pre {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  overflow-x: auto;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.85em;
+}
+pre code {
+  background: none;
+  padding: 0;
+}
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+/* other people's cursors and names */
+.collaboration-carets__caret {
+  position: relative;
+  margin: 0 -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+  color: #fff;
+  user-select: none;
+}

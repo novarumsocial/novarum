@@ -4,7 +4,17 @@
 // in place while you're at the bottom.
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { BellRing, ChevronDown, Hash, Phone, Reply, RotateCw, Users, X } from 'lucide-react-native';
+import {
+  BellRing,
+  ChevronDown,
+  Hash,
+  NotebookPen,
+  Phone,
+  Reply,
+  RotateCw,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
@@ -26,6 +36,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Avatar } from '@/components/avatar';
+import { CanvasPanel } from '@/components/canvas-panel';
 import { Message } from '@/components/message';
 import { MessageInput } from '@/components/message-input';
 import { ScreenHeader } from '@/components/screen-header';
@@ -226,6 +237,10 @@ export function ChatArea({
   } | null>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const closeCanvas = useCallback(() => setCanvasOpen(false), []);
+  // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
+  const canvasSupported = channel.type !== 'VOICE' && !channel.id.startsWith('fed:');
 
   // the call panel's height, dragged with its bottom handle
   const callHeight = useSharedValue(320);
@@ -410,28 +425,46 @@ export function ChatArea({
     <View className="min-h-0 min-w-0 flex-1 bg-background">
       <ScreenHeader
         actions={
-          channel.type === 'DM' ? (
-            !call ? (
-              <Button variant="ghost" size="icon" accessibilityLabel="Start call" onPress={onCall}>
-                <Icon as={Phone} size={20} />
-              </Button>
-            ) : callers.length <= 1 && !ringing ? (
-              <Button variant="ghost" size="icon" accessibilityLabel="Ring" onPress={onRing}>
-                <Icon as={BellRing} size={20} />
-              </Button>
-            ) : null
-          ) : (
-            onOpenMembers && (
+          <>
+            {canvasSupported && (
               <Button
-                variant="ghost"
+                variant={canvasOpen ? 'secondary' : 'ghost'}
                 size="icon"
-                accessibilityLabel="Open members"
-                onPress={onOpenMembers}
+                accessibilityLabel={canvasOpen ? 'Close canvas' : 'Open canvas'}
+                accessibilityState={{ selected: canvasOpen }}
+                onPress={() => setCanvasOpen((open) => !open)}
               >
-                <Icon as={Users} size={20} />
+                <Icon as={NotebookPen} size={20} />
               </Button>
-            )
-          )
+            )}
+            {channel.type === 'DM' ? (
+              !call ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  accessibilityLabel="Start call"
+                  onPress={onCall}
+                >
+                  <Icon as={Phone} size={20} />
+                </Button>
+              ) : callers.length <= 1 && !ringing ? (
+                <Button variant="ghost" size="icon" accessibilityLabel="Ring" onPress={onRing}>
+                  <Icon as={BellRing} size={20} />
+                </Button>
+              ) : null
+            ) : (
+              onOpenMembers && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  accessibilityLabel="Open members"
+                  onPress={onOpenMembers}
+                >
+                  <Icon as={Users} size={20} />
+                </Button>
+              )
+            )}
+          </>
         }
       >
         {channel.type === 'DM' ? (
@@ -508,9 +541,17 @@ export function ChatArea({
         </Animated.View>
       )}
 
+      {canvasOpen && canvasSupported && !(call && callExpanded) && (
+        <CanvasPanel key={channel.id} channelId={channel.id} onClose={closeCanvas} />
+      )}
+
       <KeyboardAvoidingView
         behavior="padding"
-        style={call && callExpanded ? { display: 'none' } : { flex: 1, minHeight: 0 }}
+        style={
+          (call && callExpanded) || (canvasOpen && canvasSupported)
+            ? { display: 'none' }
+            : { flex: 1, minHeight: 0 }
+        }
       >
         <View className="min-h-0 flex-1">
           {loading ? (
