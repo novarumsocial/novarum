@@ -104,6 +104,9 @@ export const relations = defineRelations(schema, (r) => ({
       optional: false,
     }),
   },
+  channelCanvases: {
+    updatedBy: r.one.users({ from: r.channelCanvases.updatedById, to: r.users.id }),
+  },
   messages: {
     channel: r.one.channels({
       from: r.messages.channelId,
