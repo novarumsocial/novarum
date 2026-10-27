@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BellRing, Hash, Menu, Phone, Users, Volume2, X } from '@lucide/svelte';
+  import { BellRing, Hash, Menu, Phone, RotateCw, Users, Volume2, X } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { tick, type Snippet } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -11,6 +11,18 @@
   import MessageInput from './message-input.svelte';
   import Avatar from './avatar.svelte';
   import { formatDate } from '$lib/formatDate';
+  import { session } from '$lib/session.svelte';
+  import { Progress } from '$lib/components/ui/progress/index.js';
+
+  // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
+  type Pending = {
+    id: string;
+    channelId: string;
+    content: string | null;
+    files: File[];
+    replyTo: string | null;
+    failed: boolean;
+  };
 
   let {
     channel,
@@ -129,10 +141,39 @@
     });
   });
 
-  async function sendMessage(content: string | null, files: File[]) {
-    await onSend?.(content, files, replyingTo?.id ?? null);
+  let pending = $state<Pending[]>([]);
+  const channelPending = $derived(pending.filter((item) => item.channelId === channel.id));
+  const uploadProgress = $derived.by(() => {
+    const values = Object.values(chat.uploadProgress);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  });
+
+  // sends in the background: the composer clears right away and the message waits in the list as "sending"
+  async function send(item: Pending) {
+    pending = pending.map((p) => (p.id === item.id ? { ...p, failed: false } : p));
+    try {
+      await onSend?.(item.content, item.files, item.replyTo);
+      pending = pending.filter((p) => p.id !== item.id);
+    } catch {
+      pending = pending.map((p) => (p.id === item.id ? { ...p, failed: true } : p));
+    }
+  }
+
+  function sendMessage(content: string | null, files: File[]) {
+    const item: Pending = {
+      id: crypto.randomUUID(),
+      channelId: channel.id,
+      content,
+      files,
+      replyTo: replyingTo?.id ?? null,
+      failed: false,
+    };
+    pending = [...pending, item];
     unreadBoundary = null;
     replyingTo = null;
+    void send(item);
+    // a new pending message scrolls into view, like your own sent messages do
+    void tick().then(() => scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight }));
   }
 
   function onScroll() {
@@ -179,6 +220,56 @@
       </div>
     </div>
   {/each}
+{/snippet}
+
+{#snippet pendingMessage(item: Pending)}
+  {@const name = session.user?.displayName || session.user?.username || 'You'}
+  <div class="mt-4 flex gap-3 py-0.5">
+    <Avatar
+      src={session.user?.avatarUrl}
+      {name}
+      class="mt-0.5 size-9 text-xs"
+      bgColor={session.user?.avatarColor}
+    />
+    <div class="min-w-0 flex-1">
+      <span class="text-sm font-semibold text-foreground">{name}</span>
+      <div class:opacity-60={!item.failed}>
+        {#if item.content}
+          <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+            {item.content}
+          </div>
+        {/if}
+        {#if item.files.length > 0}
+          <p class="text-xs text-muted-foreground">
+            {item.files.length} attachment{item.files.length === 1 ? '' : 's'}
+          </p>
+          {#if !item.failed && uploadProgress !== null}
+            <Progress value={uploadProgress} max={1} class="mt-1 h-0.5 max-w-xs" />
+          {/if}
+        {/if}
+      </div>
+      {#if item.failed}
+        <div class="flex items-center gap-1 text-xs text-destructive">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 hover:underline"
+            onclick={() => send(item)}
+          >
+            <RotateCw class="size-3.5" />
+            Failed to send. Click to retry
+          </button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Discard message"
+            onclick={() => (pending = pending.filter((p) => p.id !== item.id))}
+          >
+            <X class="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      {/if}
+    </div>
+  </div>
 {/snippet}
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
@@ -312,7 +403,7 @@
           <div class="space-y-5">
             {@render skeletonRows(5)}
           </div>
-        {:else if messages.length === 0}
+        {:else if messages.length === 0 && channelPending.length === 0}
           <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
             {#if channel.type === 'DM'}
               <Avatar
@@ -381,6 +472,9 @@
                 onReply={() => (replyingTo = msg)}
                 {onProfileCall}
               />
+            {/each}
+            {#each channelPending as item (item.id)}
+              {@render pendingMessage(item)}
             {/each}
           </div>
         {/if}

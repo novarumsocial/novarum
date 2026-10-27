@@ -3,7 +3,7 @@
   import { realtime } from '$lib/realtime.svelte';
   import { useSession } from '$lib/session.svelte';
   import type { Author } from '$lib/types/chat';
-  import { isUrl, urlPattern } from '$lib/utils';
+  import { isUrl, linkTarget, urlPattern } from '$lib/utils';
   import ProfileCard from './profile-card.svelte';
 
   let { content, links = false }: { content: string; links?: boolean } = $props();
@@ -71,7 +71,7 @@
   {#if part.url}
     <a
       href={part.text}
-      target="_blank"
+      target={linkTarget(part.text)}
       rel="noreferrer"
       class="text-link underline underline-offset-2 transition-colors hover:text-link/80"
       >{part.text}</a

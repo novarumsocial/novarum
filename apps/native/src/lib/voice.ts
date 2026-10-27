@@ -4,7 +4,6 @@
 // system audio in screen shares and iOS screen share (needs a broadcast extension), and the loopback playback
 // of the mic test (RN has no audio element).
 import { registerGlobals, AudioSession } from '@livekit/react-native';
-import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import {
   ConnectionState,
@@ -24,6 +23,7 @@ import { anchor } from './anchor';
 import { chat } from './chat-state';
 import { realtime } from './realtime';
 import { settings } from './settings';
+import { playSound, setInCall } from './sounds';
 
 // must run once before `Room` is used
 registerGlobals();
@@ -50,14 +50,8 @@ const sources = {
   screen: require('../../assets/sounds/screen.opus'),
   screenOff: require('../../assets/sounds/screen-off.opus'),
 };
-const players = new Map<keyof typeof sources, ReturnType<typeof createAudioPlayer>>();
-
-function play(name: keyof typeof sources) {
-  const player = players.get(name) ?? createAudioPlayer(sources[name]);
-  players.set(name, player);
-  void player.seekTo(0);
-  player.play();
-}
+const play = (name: keyof typeof sources, keepAudioSessionActive?: boolean) =>
+  playSound(sources[name], 1, keepAudioSessionActive);
 
 export interface VoiceState {
   userId: string;
@@ -133,6 +127,8 @@ const clampVolume = (volume: number) => Math.max(0, Math.min(3, volume));
 
 export const useVoice = create<VoiceStore>((set, get) => {
   let connectionAttempt = 0;
+  // the leave sound of a channel switch must not end the audio session the next call is starting
+  let switchingChannel = false;
   let captureSettingsOperation: Promise<void> = Promise.resolve();
   // start / stop calls run one after another so a quick leave + join can't end with the session stopped
   let audioSessionOperation: Promise<void> = Promise.resolve();
@@ -253,6 +249,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
   // on = the track turned on (unmuted / published); video sources only react to publish changes too
   const playRemoteSound = (source: Track.Source, on: boolean, published = false) => {
+    if (!settings().othersCallSounds) return;
     if (source === Track.Source.Microphone && !published) play(on ? 'unmute' : 'mute');
     if (source === Track.Source.Camera) play(on ? 'camera' : 'cameraOff');
     if (source === Track.Source.ScreenShare) play(on ? 'screen' : 'screenOff');
@@ -275,7 +272,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         syncParticipant(participant);
-        play('join');
+        if (settings().othersCallSounds) play('join');
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         set((s) => {
@@ -285,7 +282,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
           watchedStreams.delete(participant.identity);
           return { voiceStates, watchedStreams };
         });
-        play('leave');
+        if (settings().othersCallSounds) play('leave');
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) playRemoteSound(publication.source, false);
@@ -396,12 +393,17 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
       if (get().room) {
         if (get().channelId === channelId) return;
-        await get().leave();
+        switchingChannel = true;
+        try {
+          await get().leave();
+        } finally {
+          switchingChannel = false;
+        }
       }
 
-      play('join');
       const attempt = ++connectionAttempt;
       set({ channelId, connectionState: ConnectionState.Connecting });
+      play('join');
 
       const { data, error } = await anchor().client.channel({ id: channelId }).call.token.get();
       if (connectionAttempt !== attempt) return;
@@ -505,7 +507,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
       await room.disconnect().catch(() => null);
       await stopAudioSession();
       if (channelId) realtime().leaveVoice();
-      play('leave');
+      play('leave', switchingChannel);
     },
 
     async setMuted(muted) {
@@ -585,12 +587,6 @@ export const useVoice = create<VoiceStore>((set, get) => {
         play('cameraOff');
       }
 
-      // iOS reconfigures the audio session when the camera starts or stops, which silently kills the mic capture
-      const mic = micTrack(room);
-      if (Platform.OS === 'ios' && mic instanceof LocalAudioTrack && !mic.isMuted) {
-        await mic.restartTrack(microphoneCaptureOptions()).catch(() => null);
-      }
-
       // sets `selfCamera` from the actual track
       syncParticipant(room.localParticipant);
     },
@@ -661,6 +657,8 @@ export const useVoice = create<VoiceStore>((set, get) => {
     },
   };
 });
+
+useVoice.subscribe((s) => setInCall(s.channelId !== null));
 
 // Same name as on the web, for code that runs outside React: `voice().join(channelId)`
 export const voice = useVoice.getState;

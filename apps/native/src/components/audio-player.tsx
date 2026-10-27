@@ -8,6 +8,7 @@ import { Linking, Pressable, View } from 'react-native';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import type { Attachment } from '@/lib/types/chat';
+import { useVoice } from '@/lib/voice';
 
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
@@ -93,7 +94,9 @@ function Controls({
 
 // plays as soon as it loads (the tap that mounted it was the "play")
 function LoadedPlayer({ attachment }: { attachment: Attachment }) {
-  const player = useAudioPlayer(attachment.url);
+  // see lib/sounds.ts: during a call, pausing or finishing must not end the audio session
+  const inCall = useVoice((s) => s.channelId !== null);
+  const player = useAudioPlayer(attachment.url, { keepAudioSessionActive: inCall });
   const status = useAudioPlayerStatus(player);
 
   useEffect(() => {

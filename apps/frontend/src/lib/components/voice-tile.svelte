@@ -128,7 +128,7 @@
     <!-- speaking ring, drawn inside so it never changes the tile's box -->
     {#if tile.state.speaking && !isScreen}
       <div
-        class="pointer-events-none absolute inset-0"
+        class="pointer-events-none absolute inset-0 rounded-none"
         style:box-shadow="inset 0 0 0 2px {ringColor}"
       ></div>
     {/if}

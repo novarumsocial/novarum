@@ -17,8 +17,9 @@ export const RING_TIMEOUT = 30_000;
 const isFromHomeserver = (dm: DmEntry, homeserver: string) =>
   dm.id.startsWith(`fed:channel:${encodeURIComponent(homeserver)}:`);
 
-export function dmPath(channelId: string) {
-  return `/guilds/dms/${encodeURIComponent(channelId)}`;
+export function dmPath(channelId: string, messageId?: string) {
+  const path = `/guilds/dms/${encodeURIComponent(channelId)}`;
+  return messageId ? `${path}/${encodeURIComponent(messageId)}` : path;
 }
 
 class DmsState {

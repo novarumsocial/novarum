@@ -3,9 +3,13 @@ import '@/lib/polyfills';
 import '../../global.css';
 import {
   IBMPlexSans_400Regular,
+  IBMPlexSans_400Regular_Italic,
   IBMPlexSans_500Medium,
+  IBMPlexSans_500Medium_Italic,
   IBMPlexSans_600SemiBold,
+  IBMPlexSans_600SemiBold_Italic,
   IBMPlexSans_700Bold,
+  IBMPlexSans_700Bold_Italic,
   useFonts,
 } from '@expo-google-fonts/ibm-plex-sans';
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
@@ -31,9 +35,13 @@ export default function RootLayout() {
   const colors = useThemeColors();
   const [fontsLoaded] = useFonts({
     IBMPlexSans_400Regular,
+    IBMPlexSans_400Regular_Italic,
     IBMPlexSans_500Medium,
+    IBMPlexSans_500Medium_Italic,
     IBMPlexSans_600SemiBold,
+    IBMPlexSans_600SemiBold_Italic,
     IBMPlexSans_700Bold,
+    IBMPlexSans_700Bold_Italic,
     IBMPlexMono_400Regular,
   });
 

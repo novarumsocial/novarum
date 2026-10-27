@@ -2,6 +2,12 @@ name: Release desktop development build
 
 on:
   workflow_dispatch:
+  # called by release-please.yml to attach the desktop builds to a versioned release
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
   push:
     branches:
       - main
@@ -14,7 +20,8 @@ permissions:
   contents: read
 
 env:
-  DESKTOP_VERSION: 0.1.1-dev.${{ github.run_number }}
+  # releases upload to the existing v<version> release instead of creating a prerelease
+  DESKTOP_VERSION: ${{ inputs.version || format('0.1.1-dev.{0}', github.run_number) }}
 
 jobs:
   build-linux-windows:
@@ -51,6 +58,7 @@ jobs:
             apps/electron/dist/*.exe
             apps/electron/dist/*.blockmap
             apps/electron/dist/dev*.yml
+            apps/electron/dist/latest*.yml
           if-no-files-found: error
 
   build-macos:
@@ -80,6 +88,7 @@ jobs:
             apps/electron/dist/*.zip
             apps/electron/dist/*.blockmap
             apps/electron/dist/dev*.yml
+            apps/electron/dist/latest*.yml
           if-no-files-found: error
 
   release:

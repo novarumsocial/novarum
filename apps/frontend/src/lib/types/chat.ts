@@ -66,7 +66,7 @@ export interface VoiceUser {
 
 export type ChatRoute =
   | { kind: 'home' }
-  | { kind: 'dms'; channelId: string | null }
+  | { kind: 'dms'; channelId: string | null; messageId: string | null }
   | {
       kind: 'guild';
       serverId: string | null;

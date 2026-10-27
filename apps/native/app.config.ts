@@ -1,11 +1,25 @@
 import type { ExpoConfig } from 'expo/config';
+import { execFileSync } from 'node:child_process';
+
+const gitCommitHash =
+  process.env.GITHUB_SHA ??
+  (() => {
+    try {
+      return execFileSync('git', ['rev-parse', 'HEAD'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+    } catch {
+      return 'unknown';
+    }
+  })();
 
 // Same app id as the Capacitor app (apps/mobile) so the native app installs as an update over it
 const config: ExpoConfig = {
   name: 'Novarum',
   slug: 'novarum',
   scheme: 'novarum',
-  version: '0.1.0',
+  version: '0.1.0', // x-release-please-version
   orientation: 'default',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
@@ -80,6 +94,7 @@ const config: ExpoConfig = {
   updates: { enabled: Boolean(process.env.EAS_UPDATE_URL), url: process.env.EAS_UPDATE_URL },
   runtimeVersion: { policy: 'appVersion' }, // set `updates.url` after `eas init` to turn on OTA updates
   experiments: { typedRoutes: true },
+  extra: { gitCommitHash },
 };
 
 export default config;

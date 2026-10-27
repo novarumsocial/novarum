@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "5cb57bd0b60b7506e519b27d31d35699e6784f97",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "novarum",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "revert", "section": "Reverts" }
+      ],
+      "extra-files": [
+        { "type": "json", "path": "apps/anchor/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/electron/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/frontend/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/landing/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/mobile/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/native/package.json", "jsonpath": "$.version" },
+        { "type": "generic", "path": "apps/native/app.config.ts" }
+      ]
+    }
+  }
+}

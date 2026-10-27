@@ -179,7 +179,7 @@ function currentRoute(): ChatRoute {
   const [first, second, third] = (page.params.path ?? '').split('/').filter(Boolean);
 
   if (!first) return { kind: 'home' };
-  if (first === 'dms') return { kind: 'dms', channelId: second ?? null };
+  if (first === 'dms') return { kind: 'dms', channelId: second ?? null, messageId: third ?? null };
 
   return {
     kind: 'guild',
@@ -209,7 +209,7 @@ class ChatState {
   activeChannel = $derived(
     this.route.kind === 'guild' || this.route.kind === 'dms' ? this.route.channelId : null
   );
-  activeMessage = $derived(this.route.kind === 'guild' ? this.route.messageId : null);
+  activeMessage = $derived(this.route.kind === 'home' ? null : this.route.messageId);
 
   editingMessage = $state<boolean>(false);
   editingMessageId = $state<string | null>(null);
@@ -264,7 +264,7 @@ class ChatState {
   }
 
   messagePath(id: string) {
-    if (this.route.kind === 'dms' && this.activeChannel) return dmPath(this.activeChannel);
+    if (this.route.kind === 'dms' && this.activeChannel) return dmPath(this.activeChannel, id);
     return guildPath(this.activeServer ?? undefined, this.activeChannel ?? undefined, id);
   }
 

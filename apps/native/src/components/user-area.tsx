@@ -64,7 +64,16 @@ export const UserArea = memo(function UserArea({
   useEffect(() => {
     setLatency(null);
     if (!connected || !room) return;
-    const update = () => setLatency(room.engine.client.rtt || null);
+    // Media-path RTT from the active ICE pair; the signal client's rtt runs over the
+    // WebSocket and includes proxy/TLS/event-loop delay.
+    const update = async () => {
+      const pc = room.engine.pcManager;
+      const stats = await (pc?.subscriber ?? pc?.publisher)?.getStats();
+      stats?.forEach((s) => {
+        if (s.type === 'candidate-pair' && s.nominated && s.currentRoundTripTime != null)
+          setLatency(Math.round(s.currentRoundTripTime * 1000));
+      });
+    };
     update();
     const timer = setInterval(update, 2000);
     return () => clearInterval(timer);

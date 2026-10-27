@@ -1,5 +1,4 @@
 // Port of apps/frontend/src/lib/notifications.ts
-import { createAudioPlayer } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { AppState, Platform } from 'react-native';
@@ -7,6 +6,7 @@ import { create } from 'zustand';
 import { effectiveLevel, levelAllows, type NotificationEntries } from 'anchor/notification-level';
 import { chatPathSchema, hasPushSubscription } from './push';
 import { settings } from './settings';
+import { playSound } from './sounds';
 
 // the app shows its own in-app banner (components/in-app-banner.tsx) while it is open,
 // so the OS never shows a notification for the foreground
@@ -128,15 +128,10 @@ export function messageNotificationTitle(
   return names ? `${name} (#${names.channel ?? 'channel'} · ${names.guild ?? 'server'})` : name;
 }
 
-let player: ReturnType<typeof createAudioPlayer> | undefined;
-
 export function notificationSound() {
   // notification sound by universfield in pixabay
   // https://pixabay.com/users/universfield-28281460/
-  player ??= createAudioPlayer(require('../../assets/sounds/notification.opus'));
-  player.volume = settings().notificationVolume;
-  void player.seekTo(0);
-  player.play();
+  playSound(require('../../assets/sounds/notification.opus'), settings().notificationVolume);
 }
 
 export type NotificationOptions = {

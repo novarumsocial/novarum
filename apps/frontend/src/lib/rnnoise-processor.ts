@@ -27,7 +27,10 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
       loadedContexts.set(context, worklet);
     }
 
-    await Promise.all([context.resume(), worklet]);
+    // resume() stays pending while autoplay is blocked (Firefox/LibreWolf), so don't wait on it;
+    // livekit resumes the shared context on the next click or room.startAudio()
+    void context.resume().catch(() => undefined);
+    await worklet;
     this.source = context.createMediaStreamSource(new MediaStream([track]));
     this.node = new RnnoiseWorkletNode(context, {
       maxChannels: 1,
@@ -36,12 +39,12 @@ export class RnnoiseProcessor implements TrackProcessor<Track.Kind.Audio, AudioP
         simdUrl: rnnoiseSimdWasmUrl,
       })),
     });
-    this.mono = new GainNode(audioContext, {
+    this.mono = new GainNode(context, {
       channelCount: 1,
       channelCountMode: 'explicit',
       channelInterpretation: 'discrete',
     });
-    this.destination = audioContext.createMediaStreamDestination();
+    this.destination = context.createMediaStreamDestination();
     this.source.connect(this.node).connect(this.mono).connect(this.destination);
     this.processedTrack = this.destination.stream.getAudioTracks()[0];
   }

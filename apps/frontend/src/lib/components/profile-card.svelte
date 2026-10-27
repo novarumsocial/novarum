@@ -25,6 +25,7 @@
   import Avatar from './avatar.svelte';
   import AnimatedImage from './animated-image.svelte';
   import AttachmentViewer from './attachment-viewer.svelte';
+  import Markdown from './markdown.svelte';
 
   let {
     user,
@@ -260,9 +261,9 @@
           </span>
           <Separator class="flex-1" />
         </div>
-        <p class="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/80">
-          {user.about}
-        </p>
+        <div class="line-clamp-6 text-xs leading-relaxed text-foreground/80">
+          <Markdown content={user.about.trim()} links compact />
+        </div>
       </div>
     {/if}
     {#if user.username && !isSelf && friendStatus === 'FRIEND' && device.isComputer}
