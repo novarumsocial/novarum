@@ -29,7 +29,7 @@ import ScreenOff from './sounds/screen-off.opus?url';
 
 import { settings, type NoiseSuppressionModel } from './settings.svelte';
 import { RnnoiseProcessor } from './rnnoise-processor';
-import { DeepFilterProcessor } from './deepfilter-processor';
+import { DeepFilterProcessor, setDeepFilterLevel } from './deepfilter-processor';
 
 const livekitConnectionTimeoutMs = 15_000;
 const noiseProcessor = () =>
@@ -131,6 +131,7 @@ export class Voice {
       leaveSound.play();
     }
 
+    await this.setAudioLoopbackTesting(false);
     joinSound.play();
     const connectionAttempt = ++this.connectionAttempt;
     this.channelId = channelId;
@@ -308,13 +309,8 @@ export class Voice {
 
   private async startAudioLoopback() {
     const room = this.room;
-    if (!room) {
-      this.audioLoopbackTesting = false;
-      return;
-    }
-
     this.audioLoopbackDeafenedBefore = this.selfDeafened;
-    if (!this.selfDeafened) await this.setDeafened(true);
+    if (room && !this.selfDeafened) await this.setDeafened(true);
 
     try {
       await this.removeNoiseCancellation();
@@ -553,8 +549,7 @@ export class Voice {
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
     const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-      | LocalAudioTrack
-      | undefined;
+      LocalAudioTrack | undefined;
     if (!(track instanceof LocalAudioTrack)) return;
     if (this.noiseProcessorTrack === track) return;
 
@@ -612,6 +607,11 @@ export class Voice {
       .then(() => this.removeNoiseCancellation())
       .then(() => this.ensureNoiseCancellation(room));
     await this.noiseCancellationOperation;
+  }
+
+  setNoiseSuppressionLevel(level: number) {
+    settings.value.noiseSuppressionLevel = level;
+    setDeepFilterLevel(level);
   }
 
   async setEchoCancellation(enabled: boolean) {
@@ -687,8 +687,7 @@ export class Voice {
       .catch(() => undefined)
       .then(async () => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-          | LocalAudioTrack
-          | undefined;
+          LocalAudioTrack | undefined;
         if (this.room !== room || !(track instanceof LocalAudioTrack)) return;
 
         await this.removeNoiseCancellation();

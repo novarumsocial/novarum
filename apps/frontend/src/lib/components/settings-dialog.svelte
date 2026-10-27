@@ -57,6 +57,7 @@
   import { cn } from '$lib/utils';
   import SettingsGroup from './settings-group.svelte';
   import SettingsRow from './settings-row.svelte';
+  import MicTest from './mic-test.svelte';
 
   let { open = $bindable(false), voice }: { open: boolean; voice: Voice } = $props();
 
@@ -1353,6 +1354,7 @@
                 <Switch
                   id="noise"
                   checked={settings.value.noiseCancellation}
+                  disabled={voice.audioLoopbackTesting}
                   onCheckedChange={(enabled) => voice.setNoiseCancellation(enabled)}
                 />
               </SettingsRow>
@@ -1367,7 +1369,11 @@
                   onValueChange={(model) =>
                     voice.setNoiseSuppressionModel(model as NoiseSuppressionModel)}
                 >
-                  <Select.Trigger id="noise-model" class="w-40">
+                  <Select.Trigger
+                    id="noise-model"
+                    class="w-40"
+                    disabled={voice.audioLoopbackTesting}
+                  >
                     {noiseModelLabels[settings.value.noiseSuppressionModel]}
                   </Select.Trigger>
                   <Select.Content>
@@ -1376,6 +1382,31 @@
                     {/each}
                   </Select.Content>
                 </Select.Root>
+              </SettingsRow>
+              {#if settings.value.noiseSuppressionModel === 'deepfilternet'}
+                <SettingsRow
+                  title="Noise suppression strength"
+                  description="Higher removes more noise but can make your voice sound muffled."
+                  stacked
+                  id="noise-level"
+                >
+                  <Slider
+                    type="single"
+                    min={0}
+                    max={60}
+                    step={1}
+                    value={settings.value.noiseSuppressionLevel}
+                    onValueChange={(level) => voice.setNoiseSuppressionLevel(level)}
+                  />
+                </SettingsRow>
+              {/if}
+              <SettingsRow
+                title="Mic test"
+                description="Hear yourself with your current settings."
+                stacked
+                id="mic-test"
+              >
+                <MicTest {voice} />
               </SettingsRow>
             </SettingsGroup>
 

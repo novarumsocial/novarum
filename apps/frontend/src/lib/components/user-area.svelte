@@ -16,7 +16,7 @@
     Plus,
   } from '@lucide/svelte';
   import SettingsDialog from './settings-dialog.svelte';
-  import MicLevelMeter from './mic-level-meter.svelte';
+  import MicTest from './mic-test.svelte';
   import type { Voice } from '$lib/voice.svelte';
   import { cn } from '$lib/utils';
   import Avatar from './avatar.svelte';
@@ -24,7 +24,6 @@
   import * as Select from '$lib/components/ui/select/index.js';
   import Switch from './ui/switch/switch.svelte';
   import Label from './ui/label/label.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
   import {
     noiseModelLabels,
     settings,
@@ -52,8 +51,6 @@
   const otherAccounts = $derived(
     session.accounts.filter((account) => account.homeServer !== anchor.homeServer)
   );
-  let loopbackPending = $state(false);
-  let loopbackError = $state<string | null>(null);
   let latency = $state<number | null>(null);
 
   const tiers = [
@@ -86,19 +83,6 @@
     const timer = setInterval(update, 2000);
     return () => clearInterval(timer);
   });
-
-  async function toggleAudioLoopback() {
-    loopbackPending = true;
-    loopbackError = null;
-
-    try {
-      await voice.setAudioLoopbackTesting(!voice.audioLoopbackTesting);
-    } catch (error) {
-      loopbackError = error instanceof Error ? error.message : 'Unknown playback error';
-    } finally {
-      loopbackPending = false;
-    }
-  }
 </script>
 
 <div class="w-74 shrink-0 border-t border-border bg-sidebar-accent/30">
@@ -208,33 +192,7 @@
                   </span>
                 {/if}
               </div>
-              <div class="mt-2 flex items-center gap-2">
-                <Button
-                  class="flex-1"
-                  size="sm"
-                  variant={voice.audioLoopbackTesting ? 'secondary' : 'outline'}
-                  disabled={loopbackPending}
-                  aria-pressed={voice.audioLoopbackTesting}
-                  onclick={toggleAudioLoopback}
-                >
-                  <Headphones data-icon="inline-start" />
-                  {loopbackPending
-                    ? voice.audioLoopbackTesting
-                      ? 'Starting...'
-                      : 'Stopping...'
-                    : voice.audioLoopbackTesting
-                      ? 'Stop test'
-                      : 'Start test'}
-                </Button>
-                <MicLevelMeter stream={voice.audioLoopbackStream} />
-              </div>
-              {#if loopbackError}
-                <p
-                  class="mt-2 border border-destructive/20 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive"
-                >
-                  {loopbackError}
-                </p>
-              {/if}
+              <div class="mt-2"><MicTest {voice} /></div>
             </div>
           </Popover.Content>
         </Popover.Root>

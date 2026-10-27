@@ -20,6 +20,7 @@ type Settings = {
   darkMode: boolean;
   noiseCancellation: boolean;
   noiseSuppressionModel: NoiseSuppressionModel;
+  noiseSuppressionLevel: number;
   voiceEchoCancellation: boolean;
   voiceAutoGainControl: boolean;
   voiceInputDeviceId: string;
@@ -44,6 +45,7 @@ const defaults: Settings = {
   darkMode: true,
   noiseCancellation: true,
   noiseSuppressionModel: 'deepfilternet',
+  noiseSuppressionLevel: 30,
   voiceEchoCancellation: true,
   voiceAutoGainControl: true,
   voiceInputDeviceId: 'default',

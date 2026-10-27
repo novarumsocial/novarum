@@ -1,11 +1,11 @@
 import { DeepFilterNet3Core } from 'deepfilternet3-noise-filter';
 import { Track, type AudioProcessorOptions, type TrackProcessor } from 'livekit-client';
+import { settings } from './settings.svelte';
 
 // shared so the ~24MB of wasm + model is only downloaded and compiled once
-const core = new DeepFilterNet3Core({
-  noiseReductionLevel: 80,
-  assetConfig: { cdnUrl: 'https://dfn3.srizan.dev' },
-});
+const core = new DeepFilterNet3Core({ assetConfig: { cdnUrl: 'https://dfn3.srizan.dev' } });
+
+export const setDeepFilterLevel = (level: number) => core.setSuppressionLevel(level);
 
 export class DeepFilterProcessor implements TrackProcessor<
   Track.Kind.Audio,
@@ -26,6 +26,7 @@ export class DeepFilterProcessor implements TrackProcessor<
     document.addEventListener('pointerdown', () => void context.resume(), { once: true });
 
     const node = await core.createAudioWorkletNode(context);
+    setDeepFilterLevel(settings.value.noiseSuppressionLevel);
     const destination = context.createMediaStreamDestination();
     this.source = context.createMediaStreamSource(new MediaStream([track]));
     this.source.connect(node).connect(destination);
