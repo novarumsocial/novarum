@@ -21,10 +21,16 @@
   import { cn } from '$lib/utils';
   import Avatar from './avatar.svelte';
   import * as Popover from '$lib/components/ui/popover/index.js';
+  import * as Select from '$lib/components/ui/select/index.js';
   import Switch from './ui/switch/switch.svelte';
   import Label from './ui/label/label.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { settings, settingsDialog } from '$lib/settings.svelte';
+  import {
+    noiseModelLabels,
+    settings,
+    settingsDialog,
+    type NoiseSuppressionModel,
+  } from '$lib/settings.svelte';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { session, type SessionUser } from '$lib/session.svelte';
   import { anchor } from '$lib/anchor.svelte';
@@ -161,6 +167,32 @@
                 onCheckedChange={(e) => voice.setNoiseCancellation(e)}
               />
             </div>
+
+            {#if voice.noiseCancellationEnabled}
+              <div class="flex items-center justify-between gap-4 px-3.5 pb-3">
+                <Label for="noise-model-select" class="text-xs font-medium">Model</Label>
+                <Select.Root
+                  type="single"
+                  value={settings.value.noiseSuppressionModel}
+                  onValueChange={(model) =>
+                    voice.setNoiseSuppressionModel(model as NoiseSuppressionModel)}
+                >
+                  <Select.Trigger
+                    id="noise-model-select"
+                    size="sm"
+                    class="w-36"
+                    disabled={voice.audioLoopbackTesting}
+                  >
+                    {noiseModelLabels[settings.value.noiseSuppressionModel]}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each Object.entries(noiseModelLabels) as [value, label]}
+                      <Select.Item {value}>{label}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </div>
+            {/if}
 
             <div class="border-t border-border bg-muted/20 px-3.5 py-3">
               <div class="flex items-center justify-between gap-3">

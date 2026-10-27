@@ -21,7 +21,7 @@
   import AudioPlayer from './audio-player.svelte';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
-  import EmojiText from './emoji-text.svelte';
+  import Markdown from './markdown.svelte';
   import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
   import type { LucideProps } from '@lucide/svelte';
   import type { Component } from 'svelte';
@@ -327,9 +327,9 @@
                   {repliedMessage.author.displayName || repliedMessage.author.username}
                 </span>
                 <span class="text-muted-foreground/40">·</span>
-                <span class="min-w-0 break-words text-muted-foreground">
+                <span class="min-w-0 truncate text-muted-foreground">
                   {#if repliedMessage.content}
-                    <EmojiText content={repliedMessage.content} />
+                    <Markdown content={repliedMessage.content} inline />
                   {:else}
                     {repliedMessage.attachments.length} attachment{repliedMessage.attachments
                       .length === 1
@@ -363,24 +363,25 @@
               </div>
             </div>
           {:else if message.content?.trim() || message.edited}
-            <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
-              {#if message.content?.trim()}
-                <EmojiText content={message.content} links />
-              {/if}
-              {#if message.edited}
-                <Tooltip.Root>
-                  <Tooltip.Trigger>
-                    <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content>
-                    <p>
-                      {message.editedTime
-                        ? `${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
-                        : ''}
-                    </p>
-                  </Tooltip.Content>
-                </Tooltip.Root>
-              {/if}
+            <div class="text-sm leading-relaxed text-foreground/90">
+              <Markdown content={message.content?.trim() ? message.content : ''} links>
+                {#snippet trailing()}
+                  {#if message.edited}
+                    <Tooltip.Root>
+                      <Tooltip.Trigger>
+                        <span class="ml-1 text-[11px] text-muted-foreground/60">(edited)</span>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>
+                        <p>
+                          {message.editedTime
+                            ? `${formatDate(new Date(message.editedTime)).toLowerCase()} at ${formatTime(new Date(message.editedTime))}`
+                            : ''}
+                        </p>
+                      </Tooltip.Content>
+                    </Tooltip.Root>
+                  {/if}
+                {/snippet}
+              </Markdown>
             </div>
           {/if}
 

@@ -21,3 +21,7 @@ export type WithoutChild<T> = T extends { child?: any } ? Omit<T, 'child'> : T;
 export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, 'children'> : T;
 export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
+
+// links to this app (e.g. app.novarum.me) navigate in place instead of opening a new tab
+export const linkTarget = (url: string) =>
+  url === location.origin || url.startsWith(`${location.origin}/`) ? undefined : '_blank';

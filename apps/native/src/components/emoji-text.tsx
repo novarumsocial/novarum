@@ -1,10 +1,9 @@
-// Port of apps/frontend/src/lib/components/emoji-text.svelte
+// Port of apps/frontend/src/lib/components/emoji-text.svelte, rendered inside markdown.tsx
 // Unicode emoji become the server's emoji images, links open in the in-app browser (Novarum links in the app) and mentions are pills.
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Text } from '@/components/ui/text';
-import { ProfileSheet } from '@/components/profile-card';
 import { useChat } from '@/lib/chat-state';
 import { openLink } from '@/lib/navigation';
 import { useRealtime } from '@/lib/realtime';
@@ -79,21 +78,20 @@ function mentionUser(mention: string): Author {
   );
 }
 
-// Renders a <Text>. Pass `className` for the text style: <Text> always sets a size, so nothing is inherited.
-export function EmojiText({
+// The nested <Text> pieces of one text run, for a parent <Text> (markdown.tsx). Pass the parent's `className`:
+// <Text> always sets a size, so nothing is inherited.
+export function EmojiSpans({
   content,
   links = false,
   className,
-  children,
+  onMention,
 }: {
   content: string;
   links?: boolean;
   className?: string;
-  // appended after the text, inside the same <Text> (message.tsx puts "(edited)" here)
-  children?: ReactNode;
+  onMention: (user: Author) => void;
 }) {
   const self = useSession((s) => s.user);
-  const [profile, setProfile] = useState<Author | null>(null);
   const parts = useMemo(() => parse(content, links), [content, links]);
   const unicodes = useMemo(
     () => parts.flatMap((part) => (part.unicode ? [part.unicode] : [])),
@@ -106,57 +104,49 @@ export function EmojiText({
     if (unicodes.length) useRealtime.getState().queryEmojis(unicodes);
   }, [unicodes]);
 
-  return (
-    <>
-      <Text className={className}>
-        {parts.map((part, index) => {
-          if (part.url) {
-            return (
-              <Text
-                key={index}
-                className={cn(className, 'text-link underline')}
-                onPress={() => openLink(part.text)}
-              >
-                {part.text}
-              </Text>
-            );
-          }
+  return parts.map((part, index) => {
+    if (part.url) {
+      return (
+        <Text
+          key={index}
+          className={cn(className, 'text-link underline')}
+          onPress={() => openLink(part.text)}
+        >
+          {part.text}
+        </Text>
+      );
+    }
 
-          if (part.mention) {
-            const isSelf = part.text === `@${self?.username}:${self?.homeserver}`;
-            return (
-              <Text
-                key={index}
-                className={cn(
-                  className,
-                  'font-medium text-link',
-                  isSelf ? 'bg-link/25' : 'bg-link/10'
-                )}
-                onPress={links ? () => setProfile(mentionUser(part.text)) : undefined}
-              >
-                {part.text}
-              </Text>
-            );
-          }
+    if (part.mention) {
+      const isSelf = part.text === `@${self?.username}:${self?.homeserver}`;
+      return (
+        <Text
+          key={index}
+          className={cn(className, 'font-medium text-link', isSelf ? 'bg-link/25' : 'bg-link/10')}
+          onPress={links ? () => onMention(mentionUser(part.text)) : undefined}
+        >
+          {part.text}
+        </Text>
+      );
+    }
 
-          const url = part.unicode && urls[unicodes.indexOf(part.unicode)];
-          if (url) {
-            return (
-              <Image
-                key={index}
-                source={{ uri: url }}
-                accessibilityLabel={part.text}
-                contentFit="contain"
-                style={{ width: 20, height: 20 }}
-              />
-            );
-          }
+    const url = part.unicode && urls[unicodes.indexOf(part.unicode)];
+    if (url) {
+      return (
+        <Image
+          key={index}
+          source={{ uri: url }}
+          accessibilityLabel={part.text}
+          contentFit="contain"
+          style={{ width: 20, height: 20 }}
+        />
+      );
+    }
 
-          return part.text;
-        })}
-        {children}
+    return (
+      <Text key={index} className={className}>
+        {part.text}
       </Text>
-      {profile && <ProfileSheet user={profile} open onClose={() => setProfile(null)} />}
-    </>
-  );
+    );
+  });
 }

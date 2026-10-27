@@ -2,6 +2,12 @@ name: Release native development build
 
 on:
   workflow_dispatch:
+  # called by release-please.yml to attach the APK/IPA to a versioned release
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: true
   # PR builds only upload the APK/IPA as workflow artifacts; they are not published as a release
   pull_request:
     paths:
@@ -174,7 +180,13 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+            exit 0
+          fi
+
           version="$(jq -r .version apps/native/package.json)-dev.${BUILD_NUMBER}"
           release_tag="native-v${version}"
           notes="Development build for commit ${GITHUB_SHA}. The IPA is unsigned: install it with AltStore or SideStore."

@@ -252,6 +252,7 @@
           activeId={chat.activeServer}
           mentions={guildMentions}
           {hasUnreadDms}
+          friendRequests={friends.incoming.length}
           onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}
           onReorder={async (guilds) => await chat.reorderGuilds(guilds)}

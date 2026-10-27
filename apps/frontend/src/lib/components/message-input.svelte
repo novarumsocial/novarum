@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Progress } from '$lib/components/ui/progress/index.js';
   import { realtime } from '$lib/realtime.svelte';
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -8,7 +7,7 @@
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
   import { isSelf } from '$lib/session.svelte';
-  import { cn, formatBytes } from '$lib/utils';
+  import { formatBytes } from '$lib/utils';
 
   let content = $state('');
   let files = $state<File[]>([]);
@@ -117,9 +116,7 @@
     }
 
     if (e.key === 'ArrowUp' && !content && files.length === 0) {
-      const lastOwn = chat.currentMessages.findLast(
-        (message) => isSelf(message.author)
-      );
+      const lastOwn = chat.currentMessages.findLast((message) => isSelf(message.author));
       if (lastOwn) {
         e.preventDefault();
         chat.editingMessage = true;
@@ -288,6 +285,9 @@
   }
 
   function handlePaste(event: ClipboardEvent) {
+    const target = event.target as HTMLElement;
+    const otherField = target.closest?.('input, textarea, [contenteditable], [role="dialog"]');
+    if (target !== textarea && otherField) return;
     const items = Array.from(event.clipboardData?.items ?? []);
     const files = items
       .filter((item) => item.kind === 'file')
@@ -301,7 +301,7 @@
   }
 </script>
 
-<svelte:window onkeydown={windowKeyDown} />
+<svelte:window onkeydown={windowKeyDown} onpaste={handlePaste} />
 
 <div
   class="relative border-t border-border p-2 sm:p-4"
@@ -377,20 +377,12 @@
   {#if files.length > 0}
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
       {#each files as file, index (`${file.name}:${file.size}:${file.lastModified}`)}
-        {@const progress = chat.uploadProgress[index]}
         <div
           class="group relative size-24 shrink-0 overflow-hidden rounded-none border border-border bg-muted/30"
           title={file.name}
         >
           {#if previews[index]}
-            <img
-              src={previews[index]}
-              alt={file.name}
-              class={cn(
-                'size-full object-cover transition-opacity',
-                progress !== undefined && 'opacity-60'
-              )}
-            />
+            <img src={previews[index]} alt={file.name} class="size-full object-cover" />
           {:else}
             <div class="flex size-full flex-col items-center justify-center gap-1.5 px-2 pb-4">
               <FileText class="size-5 text-primary" />
@@ -412,14 +404,6 @@
           >
             <X class="size-3" />
           </Button>
-          {#if progress !== undefined}
-            <Progress
-              value={progress}
-              max={1}
-              class="absolute inset-x-0 bottom-0 h-0.5 bg-transparent"
-              aria-hidden="true"
-            />
-          {/if}
         </div>
       {/each}
     </div>
@@ -458,7 +442,6 @@
       bind:this={textarea}
       onkeydown={handleKeydown}
       onkeyup={handleKeyup}
-      onpaste={handlePaste}
       oninput={updateSearch}
       onclick={updateSearch}
       {placeholder}

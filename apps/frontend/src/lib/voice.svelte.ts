@@ -27,10 +27,15 @@ import ScreenOff from './sounds/screen-off.opus?url';
 
 // guille: no freedesktop? :(
 
-import { settings } from './settings.svelte';
+import { settings, type NoiseSuppressionModel } from './settings.svelte';
 import { RnnoiseProcessor } from './rnnoise-processor';
+import { DeepFilterProcessor } from './deepfilter-processor';
 
 const livekitConnectionTimeoutMs = 15_000;
+const noiseProcessor = () =>
+  settings.value.noiseSuppressionModel === 'rnnoise'
+    ? new RnnoiseProcessor()
+    : new DeepFilterProcessor();
 const microphoneCaptureOptions = () => ({
   echoCancellation: settings.value.voiceEchoCancellation,
   autoGainControl: settings.value.voiceAutoGainControl,
@@ -321,7 +326,7 @@ export class Voice {
         const audioContext = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
         this.audioLoopbackContext = audioContext;
         track.setAudioContext(audioContext);
-        await track.setProcessor(new RnnoiseProcessor());
+        await this.setNoiseProcessor(track);
       }
 
       if (!this.audioLoopbackTesting || this.room !== room) {
@@ -536,7 +541,12 @@ export class Voice {
       return;
     }
 
-    if (enabled && this.noiseCancellationEnabled) await this.ensureNoiseCancellation(room);
+    // the first deepfilternet load downloads the model, so don't hold up joining on it
+    if (enabled && this.noiseCancellationEnabled) {
+      this.ensureNoiseCancellation(room).catch((error) =>
+        console.error('could not enable noise suppression', error)
+      );
+    }
   }
 
   private async ensureNoiseCancellation(room: Room) {
@@ -551,8 +561,20 @@ export class Voice {
     await this.removeNoiseCancellation();
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
-    await track.setProcessor(new RnnoiseProcessor());
-    this.noiseProcessorTrack = track;
+    if (await this.setNoiseProcessor(track)) this.noiseProcessorTrack = track;
+  }
+
+  // a processor that can't start (e.g. no WebAssembly) turns noise suppression off, so the toggle never lies
+  private async setNoiseProcessor(track: LocalAudioTrack) {
+    try {
+      await track.setProcessor(noiseProcessor());
+      return true;
+    } catch (error) {
+      console.error('could not enable noise suppression', error);
+      settings.value.noiseCancellation = false;
+      this.noiseCancellationEnabled = false;
+      return false;
+    }
   }
 
   async setNoiseCancellation(enabled: boolean) {
@@ -578,6 +600,18 @@ export class Voice {
       settings.value.noiseCancellation = previous;
       this.noiseCancellationEnabled = previous;
     }
+  }
+
+  async setNoiseSuppressionModel(model: NoiseSuppressionModel) {
+    settings.value.noiseSuppressionModel = model;
+    const room = this.room;
+    if (!room || !this.noiseCancellationEnabled || this.selfMuted || this.selfDeafened) return;
+
+    this.noiseCancellationOperation = this.noiseCancellationOperation
+      .catch(() => undefined)
+      .then(() => this.removeNoiseCancellation())
+      .then(() => this.ensureNoiseCancellation(room));
+    await this.noiseCancellationOperation;
   }
 
   async setEchoCancellation(enabled: boolean) {
@@ -708,12 +742,12 @@ export class Voice {
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         this.syncParticipant(participant, channelId);
-        joinSound.play();
+        if (settings.value.othersCallSounds) joinSound.play();
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         this.voiceStates.delete(participant.identity);
         this.watchedStreams.delete(participant.identity);
-        leaveSound.play();
+        if (settings.value.othersCallSounds) leaveSound.play();
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) this.playRemoteSound(publication.source, false);
@@ -758,6 +792,7 @@ export class Voice {
 
   // on = the track turned on (unmuted / published); video sources only react to publish changes too
   private playRemoteSound(source: Track.Source, on: boolean, published = false) {
+    if (!settings.value.othersCallSounds) return;
     if (source === Track.Source.Microphone && !published) (on ? unmuteSound : muteSound).play();
     if (source === Track.Source.Camera) (on ? cameraSound : cameraOffSound).play();
     if (source === Track.Source.ScreenShare) (on ? screenSound : screenOffSound).play();

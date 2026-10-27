@@ -249,6 +249,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
   // on = the track turned on (unmuted / published); video sources only react to publish changes too
   const playRemoteSound = (source: Track.Source, on: boolean, published = false) => {
+    if (!settings().othersCallSounds) return;
     if (source === Track.Source.Microphone && !published) play(on ? 'unmute' : 'mute');
     if (source === Track.Source.Camera) play(on ? 'camera' : 'cameraOff');
     if (source === Track.Source.ScreenShare) play(on ? 'screen' : 'screenOff');
@@ -271,7 +272,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
       })
       .on(RoomEvent.ParticipantConnected, (participant) => {
         syncParticipant(participant);
-        play('join');
+        if (settings().othersCallSounds) play('join');
       })
       .on(RoomEvent.ParticipantDisconnected, (participant) => {
         set((s) => {
@@ -281,7 +282,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
           watchedStreams.delete(participant.identity);
           return { voiceStates, watchedStreams };
         });
-        play('leave');
+        if (settings().othersCallSounds) play('leave');
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) playRemoteSound(publication.source, false);

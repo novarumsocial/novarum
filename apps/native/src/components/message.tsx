@@ -27,7 +27,8 @@ import Reanimated, {
 import { Avatar } from '@/components/avatar';
 import { AudioPlayer } from '@/components/audio-player';
 import { openAttachmentViewer } from '@/components/attachment-viewer';
-import { EmojiText, handlePattern } from '@/components/emoji-text';
+import { handlePattern } from '@/components/emoji-text';
+import { Markdown } from '@/components/markdown';
 import { ProfileCard } from '@/components/profile-card';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -482,8 +483,9 @@ export const Message = memo(function Message({
                     <Text className="text-[11px] leading-4 text-muted-foreground/40">·</Text>
                     <View className="min-w-0 shrink">
                       {repliedMessage.content ? (
-                        <EmojiText
+                        <Markdown
                           content={repliedMessage.content}
+                          inline
                           className="text-[11px] leading-4 text-muted-foreground"
                         />
                       ) : (
@@ -505,7 +507,11 @@ export const Message = memo(function Message({
             {editing ? (
               <EditBox message={message} onEdit={onEdit} />
             ) : message.content?.trim() || message.edited ? (
-              <EmojiText content={message.content ?? ''} links className={bodyClass}>
+              <Markdown
+                content={message.content?.trim() ? message.content : ''}
+                links
+                className={bodyClass}
+              >
                 {message.edited && (
                   <Text className="text-[11px] text-muted-foreground/60">
                     {' '}
@@ -516,7 +522,7 @@ export const Message = memo(function Message({
                     )
                   </Text>
                 )}
-              </EmojiText>
+              </Markdown>
             ) : null}
 
             {videos.map((attachment) => (

@@ -1,5 +1,5 @@
 # build context is the repo root: docker build -f apps/anchor/Dockerfile .
-ARG BUN_VERSION=1.4.2
+ARG BUN_VERSION=1.4.4
 
 FROM oven/bun:${BUN_VERSION}-slim
 
