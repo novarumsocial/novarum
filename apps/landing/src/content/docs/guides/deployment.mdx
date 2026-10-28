@@ -4,6 +4,7 @@ description: Deploy your own Novarum infrastructure!
 ---
 
 import { Tabs, TabItem, Code } from '@astrojs/starlight/components';
+import NewsletterForm from '../../../components/NewsletterForm.astro';
 
 # Hosting an Anchor instance
 
@@ -233,6 +234,12 @@ We recommend running everything though a reverse proxy, such as Caddy, but the d
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
 
+## Anchor hoster mailing list
+
+You may want to subscribe to the Anchor hoster mailing list to get notified of any breaking changes or important updates. It won't be spammy, we promise!
+
+<NewsletterForm />
+
 ## Handling different hosts
 
 Anchor sometimes needs to be hosted on a different host than what the homeserver URL is.  
@@ -346,7 +353,3 @@ The following docker image is based on the Caddy hosting guide below, but packag
 ---
 
 Great job! Gilfoyle would be proud.
-
-```
-
-```

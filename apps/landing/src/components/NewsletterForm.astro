@@ -1,0 +1,157 @@
+---
+const action = 'https://app.loops.so/api/newsletter-form/cmvshw9kz00hl0j1qalzf3g9v';
+---
+
+<div class="newsletter not-content" data-state="idle">
+  <form class="newsletter-form" action={action} method="POST">
+    <input
+      class="newsletter-input"
+      type="email"
+      name="email"
+      placeholder="you@example.com"
+      aria-label="Email address"
+      required
+    />
+    <button class="newsletter-button" type="submit">
+      <span class="label-idle">Subscribe</span>
+      <span class="label-loading">Subscribing…</span>
+    </button>
+  </form>
+
+  <p class="newsletter-message newsletter-success">
+    Subscribed. We'll email you about breaking changes and important updates.
+  </p>
+  <p class="newsletter-message newsletter-error" role="alert"></p>
+
+  <button class="newsletter-back" type="button">Back</button>
+</div>
+
+<script>
+  const defaultError = 'Subscribing failed. Check your email address and try again.';
+  const rateLimitError = 'Too many signups from this browser. Try again in a minute.';
+
+  document.querySelectorAll<HTMLElement>('.newsletter').forEach((container) => {
+    const form = container.querySelector<HTMLFormElement>('.newsletter-form')!;
+    const input = container.querySelector<HTMLInputElement>('.newsletter-input')!;
+    const error = container.querySelector<HTMLElement>('.newsletter-error')!;
+
+    const setState = (state: string, message = defaultError) => {
+      container.dataset.state = state;
+      error.textContent = message;
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const now = Date.now();
+      const previous = Number(localStorage.getItem('loops-form-timestamp'));
+      if (previous && previous + 60_000 > now) return setState('error', rateLimitError);
+      localStorage.setItem('loops-form-timestamp', String(now));
+
+      setState('loading');
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: new URLSearchParams({ userGroup: '', mailingLists: '', email: input.value }),
+        });
+        if (res.ok) {
+          form.reset();
+          return setState('success');
+        }
+        const data = await res.json().catch(() => ({}));
+        setState('error', data.message || res.statusText || defaultError);
+      } catch (err) {
+        // Loops sits behind Cloudflare, which rejects rapid signups with a CORS failure
+        if (err instanceof Error && err.message === 'Failed to fetch') {
+          return setState('error', rateLimitError);
+        }
+        localStorage.removeItem('loops-form-timestamp');
+        setState('error', err instanceof Error ? err.message : defaultError);
+      }
+    });
+
+    container
+      .querySelector('.newsletter-back')!
+      .addEventListener('click', () => setState('idle'));
+  });
+</script>
+
+<style>
+  .newsletter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-block: 1rem;
+  }
+
+  .newsletter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .newsletter-input {
+    width: 16rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999rem;
+    background: transparent;
+    color: var(--sl-color-white);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+  }
+
+  .newsletter-input:focus-visible {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 1px;
+  }
+
+  .newsletter-button {
+    padding: 0.5rem 1.125rem;
+    border: none;
+    border-radius: 999rem;
+    background: var(--color-accent-600);
+    color: var(--color-accent-50);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    cursor: pointer;
+  }
+
+  .newsletter-message {
+    margin: 0;
+    font-size: var(--sl-text-sm);
+  }
+
+  .newsletter-error {
+    color: var(--sl-color-red-high);
+  }
+
+  .newsletter-back {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--sl-color-gray-3);
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    cursor: pointer;
+  }
+
+  .label-loading,
+  .newsletter-success,
+  .newsletter-error,
+  .newsletter-back,
+  [data-state='success'] .newsletter-form,
+  [data-state='error'] .newsletter-form,
+  [data-state='loading'] .label-idle {
+    display: none;
+  }
+
+  [data-state='loading'] .label-loading,
+  [data-state='success'] .newsletter-success,
+  [data-state='error'] .newsletter-error,
+  [data-state='success'] .newsletter-back,
+  [data-state='error'] .newsletter-back {
+    display: block;
+  }
+</style>
