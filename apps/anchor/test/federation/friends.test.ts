@@ -407,6 +407,56 @@ describe('versions, command ids and authority rules', () => {
       expect(res.status).toBe(403);
       expect((await friendList(b)).accepted).toHaveLength(0);
     });
+
+    test('a remote cannot force acceptance by reusing the pending command id', async () => {
+      const b = await signup('b');
+      const fromA = await signerFor('a');
+      const now = new Date().toISOString();
+      const remote = userPayload({ username: uniqueName('ra'), homeserver: anchors.a.homeserver });
+      const snapshot = {
+        commandId: 'reuse',
+        remoteUser: remote,
+        localUsername: b.user.username,
+        requestedBy: { username: remote.username, homeserver: remote.homeserver },
+        createdAt: now,
+        updatedAt: now,
+      };
+      const pending = await fromA.send('b', 'POST', '/federation/friends/sync', {
+        ...snapshot,
+        status: 'PENDING',
+        version: 1,
+        acceptedAt: null,
+      });
+      expect(pending.status).toBe(200);
+      const accepted = await fromA.send('b', 'POST', '/federation/friends/sync', {
+        ...snapshot,
+        status: 'ACCEPTED',
+        version: 2,
+        acceptedAt: now,
+      });
+      expect(accepted.status).toBe(403);
+      expect((await friendList(b)).accepted).toHaveLength(0);
+    });
+
+    test('a remote cannot claim the local user sent a request it never sent', async () => {
+      const b = await signup('b');
+      const fromA = await signerFor('a');
+      const now = new Date().toISOString();
+      const remote = userPayload({ username: uniqueName('ra'), homeserver: anchors.a.homeserver });
+      const res = await fromA.send('b', 'POST', '/federation/friends/sync', {
+        commandId: 'forged',
+        remoteUser: remote,
+        localUsername: b.user.username,
+        requestedBy: { username: b.user.username, homeserver: b.user.homeserver },
+        status: 'PENDING',
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        acceptedAt: null,
+      });
+      expect(res.status).toBe(403);
+      expect(await relationOn('b', b.user.username, remote.username)).toBeUndefined();
+    });
   });
 });
 
