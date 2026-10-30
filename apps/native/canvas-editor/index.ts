@@ -14,6 +14,8 @@ import { fromBase64, toBase64 } from 'lib0/buffer';
 
 export type CanvasUser = { id: string; name: string; avatarUrl: string | null };
 export type CanvasPeer = CanvasUser & { color: string };
+// `avatarColor` is null when the user kept the default profile color
+export type CanvasSelf = CanvasUser & { avatarColor: string | null };
 export type CanvasTool =
   | 'bold'
   | 'italic'
@@ -29,7 +31,7 @@ export type CanvasTool =
 
 // what the app sends in
 export type CanvasInbound =
-  | { type: 'init'; user: CanvasUser; colors: Record<string, string> }
+  | { type: 'init'; user: CanvasSelf; colors: Record<string, string> }
   | { type: 'colors'; colors: Record<string, string> }
   | { type: 'sync'; state: string; writable: boolean }
   | { type: 'update'; update: string }
@@ -57,8 +59,8 @@ declare global {
   }
 }
 
-// same palette and pick as the web, so a person has the same caret color on every device
-const caretColors = [
+// everyone's default profile color is the same, so those users get a random caret color
+const fallbackCaretColors = [
   '#e5484d',
   '#f76b15',
   '#ffc53d',
@@ -68,8 +70,8 @@ const caretColors = [
   '#6e56cf',
   '#d6409f',
 ];
-const caretColor = (id: string) =>
-  caretColors[[...id].reduce((sum, c) => sum + c.charCodeAt(0), 0) % caretColors.length];
+const randomCaretColor = () =>
+  fallbackCaretColors[Math.floor(Math.random() * fallbackCaretColors.length)];
 
 const post = (message: CanvasOutbound) =>
   window.ReactNativeWebView.postMessage(JSON.stringify(message));
@@ -170,7 +172,12 @@ window.canvasReceive = (message) => {
         Collaboration.configure({ document: doc }),
         CollaborationCaret.configure({
           provider: { awareness },
-          user: { ...message.user, color: caretColor(message.user.id) },
+          user: {
+            id: message.user.id,
+            name: message.user.name,
+            avatarUrl: message.user.avatarUrl,
+            color: message.user.avatarColor ?? randomCaretColor(),
+          },
         }),
       ],
       onTransaction: reportState,

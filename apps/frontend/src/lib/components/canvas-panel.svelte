@@ -25,11 +25,11 @@
   import Avatar from './avatar.svelte';
   import { CanvasSession } from '$lib/canvas.svelte';
   import { realtime } from '$lib/realtime.svelte';
-  import { session } from '$lib/session.svelte';
+  import { session, type SessionUser } from '$lib/session.svelte';
   import { cn } from '$lib/utils';
+  import { DEFAULT_AVATAR_COLOR } from '$lib/defaultColors';
 
-  // everyone's profile colors default to the same one, so carets get their own, picked from the user id
-  const caretColors = [
+  const fallbackCaretColors = [
     '#e5484d',
     '#f76b15',
     '#ffc53d',
@@ -52,7 +52,7 @@
   let peers = $state<Peer[]>([]);
 
   onMount(() => {
-    const user = session.user;
+    const user = session.user as SessionUser | undefined;
     const current = new CanvasSession(channelId, (message) => realtime.sendCanvas(message));
     canvas = current;
     editor = new Editor({
@@ -71,10 +71,9 @@
             id: user?.id,
             name: user?.displayName || user?.username || 'Someone',
             color:
-              caretColors[
-                [...(user?.id ?? '')].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
-                  caretColors.length
-              ],
+              user?.avatarColor === DEFAULT_AVATAR_COLOR
+                ? fallbackCaretColors[Math.floor(Math.random() * fallbackCaretColors.length)]
+                : user?.avatarColor,
             avatarUrl: user?.avatarUrl,
           },
         }),
@@ -83,7 +82,6 @@
     });
 
     const updatePeers = () => {
-      // one face per person, however many tabs they have the canvas open in
       const others = [...current.awareness.getStates().values()]
         .map((state) => state.user as Peer | undefined)
         .filter((peer) => peer && peer.id !== user?.id) as Peer[];
