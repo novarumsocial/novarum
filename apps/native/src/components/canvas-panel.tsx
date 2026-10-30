@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { openCanvases, type CanvasEvent } from '@/lib/canvas';
+import { DEFAULT_AVATAR_COLOR } from '@/lib/default-colors';
 import { canvasEditorHtml } from '@/lib/canvas-editor.generated';
 import { realtime } from '@/lib/realtime';
 import { useSession } from '@/lib/session';
@@ -185,6 +186,7 @@ export function CanvasPanel({ channelId, onClose }: { channelId: string; onClose
           id: self?.id ?? '',
           name: self?.displayName || self?.username || 'Someone',
           avatarUrl: self?.avatarUrl ?? null,
+          avatarColor: self?.avatarColor === DEFAULT_AVATAR_COLOR ? null : (self?.avatarColor ?? null),
         },
         colors: latest.current.colors,
       });

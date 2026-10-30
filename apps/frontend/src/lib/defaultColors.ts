@@ -1,0 +1,2 @@
+export const DEFAULT_AVATAR_COLOR = "005f78"
+export const DEFAULT_SPEKAING_RING_COLOR = "00d492"
