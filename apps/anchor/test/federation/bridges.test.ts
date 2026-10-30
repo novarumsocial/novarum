@@ -31,7 +31,13 @@ const hostA = anchors.a.homeserver;
 
 describe('events from a host guild reach the member server, with mapped ids', () => {
   test('message, channel, member and typing events use fed: ids exactly once', async () => {
-    const { owner, guild, channel, shadowGuild, shadowChannel, rt, invite } = await joinedRoom();
+    const { owner, member, guild, channel, shadowGuild, shadowChannel, rt, invite } =
+      await joinedRoom();
+    // B keeps its own copy of the host's channels, which is what /guilds/list returns after a reload
+    const listedChannels = async () =>
+      (await call(member, 'GET', '/guilds/list')).body.guilds
+        .find((g: any) => g.id === shadowGuild)
+        .channels.map((c: any) => c.id);
 
     const msg = (await send(owner, channel.id, 'through the bridge')).body.message;
     const created = await rt.waitFor('message.created', (e) => e.data.id === msg.id);
@@ -72,6 +78,7 @@ describe('events from a host guild reach the member server, with mapped ids', ()
       id: fedChannelId(hostA, newChannel.id),
       guildId: shadowGuild,
     });
+    expect(await listedChannels()).toEqual([fedChannelId(hostA, newChannel.id), shadowChannel]);
     const reorder = await call(owner, 'PATCH', '/channel/order', {
       guildId: guild.id,
       channelIds: [channel.id, newChannel.id],
@@ -82,6 +89,7 @@ describe('events from a host guild reach the member server, with mapped ids', ()
       guildId: shadowGuild,
       channelIds: [shadowChannel, fedChannelId(hostA, newChannel.id)],
     });
+    expect(await listedChannels()).toEqual(reordered.data.channelIds);
 
     const other = await signup('c');
     await call(other, 'POST', '/invite/accept', { code: invite, homeserver: hostA });

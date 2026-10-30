@@ -2,8 +2,8 @@ import type { Server } from 'elysia/universal';
 import { z } from 'zod';
 import { discoverRemoteAnchor, signFederationRequest } from './discovery';
 import { getConfig } from './config';
-import { db, channelMembers } from '../src/db';
-import { eq } from 'drizzle-orm';
+import { db, channelMembers, channels } from '../src/db';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   makeFederatedChannelId,
   makeFederatedGuildId,
@@ -191,7 +191,29 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
     kind: 'guild',
     homeserver: federatedGuild.homeserver,
     remoteId: federatedGuild.id,
-    handler: (event) => publishRealtime(server, `guildEvents:${guildId}`, event),
+    handler: async (event) => {
+      // our copy of the guild's channels is what GET /guilds returns, so keep it in step
+      if (event.type === 'channel.created') {
+        await db.transaction(async (tx) => {
+          await tx
+            .update(channels)
+            .set({ position: sql`${channels.position} + 1` })
+            .where(eq(channels.guildId, guildId));
+          await tx.insert(channels).values(event.data).onConflictDoNothing();
+        });
+      }
+      if (event.type === 'guild.channels.reordered') {
+        await db.transaction(async (tx) => {
+          for (const [position, channelId] of event.data.channelIds.entries()) {
+            await tx
+              .update(channels)
+              .set({ position })
+              .where(and(eq(channels.guildId, guildId), eq(channels.id, channelId)));
+          }
+        });
+      }
+      publishRealtime(server, `guildEvents:${guildId}`, event);
+    },
   });
 }
 
