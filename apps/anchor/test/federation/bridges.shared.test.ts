@@ -85,8 +85,8 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
     expect(await otherPath.waitClosed()).toMatchObject({ code: 1008, reason: 'Invalid signature' });
   });
 
-  test('subscribing: a guild with a member gets a presence snapshot, everything else is refused', async () => {
-    const { guild } = await room();
+  test('subscribing: a guild with a member gets a presence and channel snapshot, everything else is refused', async () => {
+    const { guild, channel } = await room();
     const notMember = await signup('a');
     const other = (await createGuild(notMember, 'private')).guild;
 
@@ -97,7 +97,7 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
       guilds: [guild.id, other.id, 'does-not-exist'],
       dms: ['no-such-dm'],
     });
-    await eventually(() => socket.events.length >= 4, { message: 'one answer per id' });
+    await eventually(() => socket.events.length >= 5, { message: 'an answer for every id' });
 
     const frames = socket.events as any[];
     const about = (kind: string, id: string) =>
@@ -108,6 +108,20 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
         kind: 'guild',
         id: guild.id,
         event: { type: 'voice.states.snapshot', data: { guildIds: [guild.id], states: [] } },
+      },
+      {
+        type: 'event',
+        kind: 'guild',
+        id: guild.id,
+        event: {
+          type: 'guild.channels.snapshot',
+          data: {
+            guildId: guild.id,
+            channels: [
+              { id: channel.id, guildId: guild.id, name: 'general', position: 0, type: 'TEXT' },
+            ],
+          },
+        },
       },
     ]);
     expect(about('guild', other.id)).toEqual([{ type: 'refused', kind: 'guild', id: other.id }]);
@@ -181,7 +195,7 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
     const { guild } = await room();
     const socket = await openBridge('a', 'shared', '', signer);
     socket.send({ type: 'subscribe', guilds: [guild.id] });
-    await socket.waitFor('event');
+    await eventually(() => socket.events.length >= 2, { message: 'both snapshots' });
     for (const junk of [
       'not even json',
       { type: 'subscribe', guilds: 'x' },
@@ -192,7 +206,8 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
       socket.send(junk);
     socket.send({ type: 'subscribe', guilds: [guild.id] });
     await Bun.sleep(1000);
-    expect((socket.events as any[]).filter((f) => f.id === guild.id)).toHaveLength(1);
+    // the presence and channel snapshots, once
+    expect((socket.events as any[]).filter((f) => f.id === guild.id)).toHaveLength(2);
     expect(socket.closed).toBeNull();
     socket.close();
   });

@@ -61,8 +61,19 @@ const dmSource: Source = {
   voiceSnapshot: (channelId) => ({ guildIds: [], states: voicePresenceForChannels([channelId]) }),
 };
 
-const voiceSnapshotEvent = (source: Source, id: string) =>
-  JSON.stringify({ type: 'voice.states.snapshot', data: source.voiceSnapshot(id) });
+// what a new follower missed: who is in a call, and for a guild its channels (created or reordered while it wasn't listening)
+async function snapshotEvents(source: Source, id: string) {
+  const events: object[] = [{ type: 'voice.states.snapshot', data: source.voiceSnapshot(id) }];
+  if (source.kind === 'guild') {
+    const channels = await db.query.channels.findMany({
+      where: { guildId: id },
+      orderBy: { position: 'asc' },
+      columns: { id: true, guildId: true, name: true, position: true, type: true },
+    });
+    events.push({ type: 'guild.channels.snapshot', data: { guildId: id, channels } });
+  }
+  return events.map((event) => JSON.stringify(event));
+}
 
 type Socket = {
   id: string;
@@ -102,7 +113,7 @@ function singleSocket(source: Source) {
       if (!followable.has(id)) return ws.close(policyViolation, 'Forbidden');
 
       ws.subscribe(source.topic(id));
-      ws.send(voiceSnapshotEvent(source, id));
+      for (const event of await snapshotEvents(source, id)) ws.send(event);
     },
     message() {
       // server-to-server realtime is publish-only for now.
@@ -156,7 +167,9 @@ const sharedSocket = {
           continue;
         }
         ws.subscribe(topic);
-        ws.send(sharedEventFrame(source.kind, id, voiceSnapshotEvent(source, id)));
+        for (const event of await snapshotEvents(source, id)) {
+          ws.send(sharedEventFrame(source.kind, id, event));
+        }
       }
     }
   },

@@ -152,6 +152,13 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
       channelIds: z.array(z.string()),
     }),
   }),
+  z.object({
+    type: z.literal('guild.channels.snapshot'),
+    data: z.object({
+      guildId: z.string(),
+      channels: z.array(channelResponseSchema),
+    }),
+  }),
 ]) satisfies z.ZodType<RealtimeEvent>;
 
 // what the host sends over a shared socket
@@ -201,6 +208,45 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
             .where(eq(channels.guildId, guildId));
           await tx.insert(channels).values(event.data).onConflictDoNothing();
         });
+      }
+      // sent when we (re)connect: brings our copy up to date with whatever we missed, and tells
+      // our clients through the events they already know
+      if (event.type === 'guild.channels.snapshot') {
+        const known = await db.query.channels.findMany({
+          where: { guildId },
+          orderBy: { position: 'asc' },
+        });
+        const channelIds = event.data.channels.map((channel) => channel.id);
+        // nothing missed (the usual case): don't bother our clients
+        const unchanged =
+          known.length === channelIds.length &&
+          event.data.channels.every(
+            ({ id, name, type }, i) =>
+              known[i]?.id === id && known[i]?.name === name && known[i]?.type === type
+          );
+        if (unchanged) return;
+
+        await db.transaction(async (tx) => {
+          for (const [position, { id, name, type }] of event.data.channels.entries()) {
+            await tx
+              .insert(channels)
+              .values({ id, guildId, name, position, type })
+              .onConflictDoUpdate({ target: channels.id, set: { name, position, type } });
+          }
+        });
+        const knownIds = new Set(known.map((channel) => channel.id));
+        for (const [position, channel] of event.data.channels.entries()) {
+          if (knownIds.has(channel.id)) continue;
+          publishRealtime(server, `guildEvents:${guildId}`, {
+            type: 'channel.created',
+            data: { ...channel, guildId, position },
+          });
+        }
+        publishRealtime(server, `guildEvents:${guildId}`, {
+          type: 'guild.channels.reordered',
+          data: { guildId, channelIds },
+        });
+        return;
       }
       if (event.type === 'guild.channels.reordered') {
         await db.transaction(async (tx) => {
@@ -568,6 +614,18 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
       return { ...event, data: { ...event.data, channelId: channel(event.data.channelId) } };
     case 'channel.typing':
       return { ...event, data: { ...event.data, channelId: channel(event.data.channelId) } };
+    case 'guild.channels.snapshot':
+      return {
+        ...event,
+        data: {
+          guildId: guild(event.data.guildId),
+          channels: event.data.channels.map((c) => ({
+            ...c,
+            id: channel(c.id),
+            guildId: guild(c.guildId),
+          })),
+        },
+      };
     case 'guild.channels.reordered':
       return {
         ...event,

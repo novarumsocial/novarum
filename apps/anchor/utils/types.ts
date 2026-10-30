@@ -106,6 +106,20 @@ export type RealtimeEvent =
       };
     }
   | {
+      // only between homeservers: sent to a guild's new follower, never to clients
+      type: 'guild.channels.snapshot';
+      data: {
+        guildId: string;
+        channels: {
+          id: string;
+          name: string;
+          position: number;
+          type: 'TEXT' | 'VOICE';
+          guildId: string;
+        }[];
+      };
+    }
+  | {
       type: 'friends.changed';
       data: Record<string, never>;
     }

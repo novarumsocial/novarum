@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { resetHarness, restart, stackIsUp } from '../harness/federation';
+import { anchors, resetHarness, restart, stackIsUp, start, stop } from '../harness/federation';
 import { call, send } from '../harness/chat';
 import { connect } from '../harness/realtime';
-import { closePg, joinedRoom } from '../harness/fedflows';
+import { closePg, fedChannelId, joinedRoom } from '../harness/fedflows';
 import { eventually } from '../harness/wait';
 
 // TESTING_PLAN §5.3 flow 5: bridges across restarts of the host (A) and of the member server (B).
@@ -56,5 +56,43 @@ test('B restarts: the guild bridge is only re-created once a B client calls GET 
     },
     { timeout: 15_000, interval: 300, message: 'bridge re-created by /guilds/list' }
   );
+  rt2.close();
+});
+
+test('channels created and reordered while B was down show up once its bridge reconnects', async () => {
+  const { owner, guild, channel, member, shadowGuild, shadowChannel, rt } = await joinedRoom();
+  rt.close();
+  await stop('b');
+  const missed = (
+    await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'missed',
+      type: 'TEXT',
+    })
+  ).body;
+  await call(owner, 'PATCH', '/channel/order', {
+    guildId: guild.id,
+    channelIds: [channel.id, missed.id],
+  });
+  await start('b');
+
+  const rt2 = await connect(member);
+  const expected = [shadowChannel, fedChannelId(anchors.a.homeserver, missed.id)];
+  // the first /guilds/list starts the bridge; the host's snapshot then fixes B's copy
+  await eventually(
+    async () => {
+      const list = await call(member, 'GET', '/guilds/list');
+      const ids = list.body.guilds
+        .find((g: any) => g.id === shadowGuild)
+        .channels.map((c: any) => c.id);
+      return JSON.stringify(ids) === JSON.stringify(expected);
+    },
+    { timeout: 15_000, interval: 300, message: 'B caught up with the channels it missed' }
+  );
+  // and clients already connected are told through the events they know
+  const created = await rt2.waitFor('channel.created', (e) => e.data.name === 'missed');
+  expect(created.data).toMatchObject({ id: expected[1], guildId: shadowGuild });
+  const reordered = await rt2.waitFor('guild.channels.reordered');
+  expect(reordered.data).toEqual({ guildId: shadowGuild, channelIds: expected });
   rt2.close();
 });
