@@ -274,7 +274,12 @@
   }
 
   function windowKeyDown(event: KeyboardEvent) {
+    // typing into another field (like the canvas editor) stays there
+    const otherField = (event.target as HTMLElement).closest?.(
+      'input, textarea, [contenteditable]'
+    );
     if (
+      !otherField &&
       textarea !== document.activeElement &&
       !event.ctrlKey &&
       !event.metaKey &&

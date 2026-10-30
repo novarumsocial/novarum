@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { signup } from '../harness/users';
-import { befriend } from '../harness/friends';
+import { befriend, unfriend } from '../harness/friends';
+import * as Y from 'yjs';
 import { openRealtime } from '../harness/ws';
 import { call, createGuild, join, list, send } from '../harness/chat';
 
@@ -305,5 +306,120 @@ describe('typing', () => {
     const { stranger, channel } = await world();
     expect((await call(stranger, 'POST', `/channel/${channel.id}/typing`)).status).toBe(401);
     expect((await call(stranger, 'POST', '/channel/nope/typing')).status).toBe(404);
+  });
+});
+
+describe('canvas', () => {
+  const encode = (doc: Y.Doc) => Buffer.from(Y.encodeStateAsUpdate(doc)).toString('base64');
+  const textOf = (state: string) => {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, Buffer.from(state, 'base64'));
+    return doc.getText('t').toString();
+  };
+  async function openCanvas(user: { cookie: string }, channelId: string) {
+    const ws = await openRealtime(anchor.url, user.cookie);
+    ws.send({ type: 'canvas.join', channelId });
+    const sync = await ws.waitFor('canvas.sync');
+    return { ws, sync: sync.data };
+  }
+
+  test('everyone in the canvas gets edits live, and a later visitor gets them merged', async () => {
+    const { owner, member, channel } = await world();
+    const a = await openCanvas(owner, channel.id);
+    const b = await openCanvas(member, channel.id);
+    try {
+      expect(a.sync).toMatchObject({ channelId: channel.id, writable: true });
+      expect(textOf(a.sync.state)).toBe('');
+
+      // both type at once, from the same starting point
+      const docA = new Y.Doc();
+      docA.getText('t').insert(0, 'hello');
+      const docB = new Y.Doc();
+      docB.getText('t').insert(0, 'world');
+      a.ws.send({ type: 'canvas.update', channelId: channel.id, update: encode(docA) });
+      b.ws.send({ type: 'canvas.update', channelId: channel.id, update: encode(docB) });
+
+      const fromA = await b.ws.waitFor('canvas.update');
+      expect(textOf(fromA.data.update)).toBe('hello');
+      await a.ws.waitFor('canvas.update');
+
+      const later = await openCanvas(member, channel.id);
+      later.ws.close();
+      const merged = textOf(later.sync.state);
+      expect(merged).toHaveLength(10);
+      expect(merged).toContain('hello');
+      expect(merged).toContain('world');
+    } finally {
+      a.ws.close();
+      b.ws.close();
+    }
+  });
+
+  test('presence is relayed only to the other sockets in the canvas', async () => {
+    const { owner, member, channel } = await world();
+    const a = await openCanvas(owner, channel.id);
+    const b = await openCanvas(member, channel.id);
+    const outside = await openRealtime(anchor.url, member.cookie);
+    try {
+      a.ws.send({ type: 'canvas.awareness', channelId: channel.id, update: 'AQ==', hello: true });
+      const event = await b.ws.waitFor('canvas.awareness');
+      expect(event.data).toEqual({ channelId: channel.id, update: 'AQ==', hello: true });
+      await Bun.sleep(200);
+      expect(outside.events.some((e) => e.type.startsWith('canvas.'))).toBe(false);
+    } finally {
+      a.ws.close();
+      b.ws.close();
+      outside.close();
+    }
+  });
+
+  test('strangers, voice channels and sockets that never joined get nothing in and nothing out', async () => {
+    const { owner, stranger, guild, channel } = await world();
+    const voice = await call(owner, 'POST', '/channel/create', {
+      guildId: guild.id,
+      name: 'talk',
+      type: 'VOICE',
+    });
+    const ws = await openRealtime(anchor.url, stranger.cookie);
+    const ownerWs = await openRealtime(anchor.url, owner.cookie);
+    try {
+      ws.send({ type: 'canvas.join', channelId: channel.id });
+      ownerWs.send({ type: 'canvas.join', channelId: voice.body.id });
+      const doc = new Y.Doc();
+      doc.getText('t').insert(0, 'sneaky');
+      // the owner can write, but never joined this canvas
+      ownerWs.send({ type: 'canvas.update', channelId: channel.id, update: encode(doc) });
+      ws.send({ type: 'canvas.update', channelId: channel.id, update: encode(doc) });
+      await Bun.sleep(300);
+      expect([...ws.events, ...ownerWs.events].some((e) => e.type === 'canvas.sync')).toBe(false);
+
+      const check = await openCanvas(owner, channel.id);
+      check.ws.close();
+      expect(textOf(check.sync.state)).toBe('');
+    } finally {
+      ws.close();
+      ownerWs.close();
+    }
+  });
+
+  test('a DM participant who is no longer a friend can read the canvas but not edit it', async () => {
+    const [a, b] = await Promise.all([signup(anchor.url), signup(anchor.url)]);
+    await befriend(a, b);
+    const dmId = (await call(a, 'POST', '/dm', { userId: b.user.id })).body.id;
+    await unfriend(a, b);
+
+    const canvas = await openCanvas(a, dmId);
+    try {
+      expect(canvas.sync.writable).toBe(false);
+      const doc = new Y.Doc();
+      doc.getText('t').insert(0, 'nope');
+      canvas.ws.send({ type: 'canvas.update', channelId: dmId, update: encode(doc) });
+      await Bun.sleep(300);
+    } finally {
+      canvas.ws.close();
+    }
+    const check = await openCanvas(b, dmId);
+    check.ws.close();
+    expect(textOf(check.sync.state)).toBe('');
   });
 });

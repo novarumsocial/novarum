@@ -98,6 +98,20 @@ export type RealtimeEvent =
         time: string;
       };
     }
+  // canvas events only go to sockets that opened that canvas (`canvas.join`); updates are base64 Yjs updates
+  | {
+      type: 'canvas.sync';
+      data: { channelId: string; state: string; writable: boolean };
+    }
+  | {
+      type: 'canvas.update';
+      data: { channelId: string; update: string };
+    }
+  | {
+      // `hello` asks everyone already there to send their own presence back
+      type: 'canvas.awareness';
+      data: { channelId: string; update: string; hello?: boolean };
+    }
   | {
       type: 'guild.channels.reordered';
       data: {

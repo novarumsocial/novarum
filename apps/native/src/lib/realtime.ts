@@ -19,6 +19,7 @@ import {
 import { notificationSettings } from './notification-settings';
 import { friends } from './friends';
 import { dms, dmPath } from './dms';
+import { openCanvases, type CanvasMessage } from './canvas';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -183,6 +184,18 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('canvas.sync'),
+    data: z.object({ channelId: z.string(), state: z.string(), writable: z.boolean() }),
+  }),
+  z.object({
+    type: z.literal('canvas.update'),
+    data: z.object({ channelId: z.string(), update: z.string() }),
+  }),
+  z.object({
+    type: z.literal('canvas.awareness'),
+    data: z.object({ channelId: z.string(), update: z.string(), hello: z.boolean().optional() }),
+  }),
+  z.object({
     type: z.literal('guild.channels.reordered'),
     data: z.object({
       guildId: z.string(),
@@ -252,6 +265,7 @@ type RealtimeStore = {
   joinVoice: (channelId: string) => void;
   ringCall: (channelId: string, ringing?: boolean) => void;
   leaveVoice: () => void;
+  sendCanvas: (message: CanvasMessage) => void;
 };
 
 export const useRealtime = create<RealtimeStore>((set, get) => {
@@ -439,6 +453,13 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
         event.data.displayName ?? event.data.username
       );
     }
+    if (
+      event.type === 'canvas.sync' ||
+      event.type === 'canvas.update' ||
+      event.type === 'canvas.awareness'
+    ) {
+      openCanvases.get(event.data.channelId)?.handle(event);
+    }
     if (event.type === 'guild.channels.reordered') {
       chat().reorderChannels(event.data.guildId, event.data.channelIds);
     }
@@ -475,6 +496,8 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
       sendClientState();
 
       for (const guild of chat().servers) get().subscribeGuild(guild.id);
+      // a fresh sync also sends back anything typed while we were disconnected
+      for (const canvas of openCanvases.values()) canvas.join();
       if (voiceChannelId) current.send({ type: 'voice.join', channelId: voiceChannelId });
 
       if (shouldRecover) {
@@ -611,6 +634,10 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
       if (!socket || !get().connected) return;
 
       socket.send({ type: 'voice.leave' });
+    },
+
+    sendCanvas(message) {
+      if (socket && get().connected) socket.send(message);
     },
   };
 });
