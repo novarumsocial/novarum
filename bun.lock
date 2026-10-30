@@ -15,7 +15,7 @@
     },
     "apps/anchor": {
       "name": "anchor",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@elysia/openapi": "^1.4.15",
         "@elysia/server-timing": "^1.4.1",
@@ -26,7 +26,6 @@
         "dotenv": "^17.4.2",
         "drizzle-orm": "^1.0.0-rc.4",
         "elysia": "^1.4.29",
-        "elysia-ip": "^1.1.1",
         "elysia-rate-limit": "^4.6.2",
         "fast-average-color-node": "^3.2.0",
         "livekit-server-sdk": "^2.15.5",
@@ -54,7 +53,7 @@
     },
     "apps/electron": {
       "name": "desktop",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "electron-updater": "^6.8.9",
       },
@@ -69,7 +68,7 @@
     },
     "apps/frontend": {
       "name": "frontend",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@capacitor/core": "^8.5.0",
         "@capgo/capacitor-updater": "^8.51.3",
@@ -116,7 +115,7 @@
     },
     "apps/landing": {
       "name": "landing",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@astrojs/starlight": "^0.41.3",
         "@astrojs/starlight-tailwind": "^5.0.0",
@@ -129,7 +128,7 @@
     },
     "apps/mobile": {
       "name": "mobile",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@capacitor/android": "^8.5.0",
         "@capacitor/core": "^8.5.0",
@@ -142,7 +141,7 @@
     },
     "apps/native": {
       "name": "native",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@elysia/eden": "^1.4.10",
         "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
@@ -1743,8 +1742,6 @@
     "elementtree": ["elementtree@0.1.7", "", { "dependencies": { "sax": "1.1.4" } }, "sha512-wkgGT6kugeQk/P6VZ/f4T+4HB41BVgNBq5CDIZVbQ02nvTVqAiVTbskxxu3eA/X96lMlfYOwnLQpN2v5E1zDEg=="],
 
     "elysia": ["elysia@1.4.30", "", { "dependencies": { "cookie": "^1.1.1", "exact-mirror": "^0.2.7", "fast-decode-uri-component": "^1.0.1", "memoirist": "^0.4.0" }, "peerDependencies": { "@sinclair/typebox": ">= 0.34.0 < 1", "@types/bun": ">= 1.2.0", "file-type": ">= 20.0.0", "openapi-types": ">= 12.0.0", "typescript": ">= 5.0.0" }, "optionalPeers": ["@types/bun", "typescript"] }, "sha512-S2qqV0CbM4faB1hQQ5IYoeYnAUinjHlzRduxaBc4OoNqh0GjOc8k6tt3hv5ozWcG6Svr6hugw6JL4zNke4jwfA=="],
-
-    "elysia-ip": ["elysia-ip@1.1.1", "", { "peerDependencies": { "elysia": ">= 1.0.9" } }, "sha512-9mUMRCH58+BOzTeDvaZe729ozfLFTk2oFIrEcmAC+BpRnXUud5FPCBTS/j0GAGmBkuK1JuGsuofS0P7qJT5sDA=="],
 
     "elysia-rate-limit": ["elysia-rate-limit@4.6.2", "", { "dependencies": { "@alloc/quick-lru": "5.2.0", "debug": "4.3.4" }, "peerDependencies": { "elysia": ">= 1.0.0" } }, "sha512-3axf0dl9PECqg+Duo+qfiI/RWyYnl63osuVgaI4DnXJjLs7PxNzJINfnKIV1Tyg0mqONO1jzdAjwDrJ3HEmuug=="],
 

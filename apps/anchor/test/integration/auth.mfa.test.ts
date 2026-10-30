@@ -226,3 +226,17 @@ describe('email MFA', () => {
     expect(res.status).toBe(401);
   });
 });
+
+test('a challenge locks after 5 wrong codes, even for the right one', async () => {
+  const u = await signup(anchor.url);
+  const secret = await enableTotp(u);
+  const c = await challenge(u);
+  const right = totpNow(secret);
+  const wrong = right === '123456' ? '654321' : '123456';
+  for (let i = 0; i < 5; i++) expect((await mfaLogin(c.challenge, 'TOTP', wrong)).status).toBe(401);
+  const res = await mfaLogin(c.challenge, 'TOTP', right);
+  expect(res.status).toBe(401);
+  expect(await res.json()).toEqual({
+    error: 'This verification request has expired. Sign in again.',
+  });
+});

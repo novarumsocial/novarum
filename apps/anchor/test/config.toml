@@ -7,6 +7,8 @@ database_url = "postgresql://novarum:novarum@127.0.0.1:15432/anchor_test"
 homeserver = "localhost"
 base_url = "http://localhost:5049"
 listen_port = 5049
+# tests pick their client IP with X-Forwarded-For
+trusted_proxies = ["0.0.0.0/0", "::/0"]
 
 [federation]
 key_dir = "./test/.keys"

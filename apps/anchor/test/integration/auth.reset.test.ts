@@ -74,12 +74,40 @@ describe('password reset', () => {
     expect((await login(u.user.username, u.password)).status).toBe(200);
   });
 
-  // gap: reset-password never deletes the email_otps row, so the code works again until it expires
-  test.failing('the OTP is single use', async () => {
+  test('the OTP is single use', async () => {
     const u = await signup(anchor.url);
     const code = await requestCode(u.email);
     expect((await reset(u.email, code, 'first-new-password')).status).toBe(200);
     expect((await reset(u.email, code, 'second-new-password')).status).toBe(400);
+  });
+
+  test('a successful reset invalidates every other outstanding code', async () => {
+    const u = await signup(anchor.url);
+    const first = await requestCode(u.email);
+    const second = await requestCode(u.email);
+    expect((await reset(u.email, second)).status).toBe(200);
+    expect((await reset(u.email, first, 'another-new-password')).status).toBe(400);
+  });
+
+  test('codes lock after 5 wrong guesses, even the right one', async () => {
+    const u = await signup(anchor.url);
+    const code = await requestCode(u.email);
+    const wrong = code === '123456' ? '654321' : '123456';
+    for (let i = 0; i < 5; i++) expect((await reset(u.email, wrong)).status).toBe(400);
+    expect((await reset(u.email, code)).status).toBe(400);
+    expect((await login(u.user.username, u.password)).status).toBe(200);
+  });
+
+  test('at most 3 codes are active per email', async () => {
+    const u = await signup(anchor.url);
+    for (let i = 0; i < 3; i++) await requestCode(u.email);
+    const since = Date.now() - 1000;
+    expect((await request(u.email)).status).toBe(200);
+    await Bun.sleep(500);
+    const recent = (await messagesFor(u.email)).filter(
+      (m) => new Date(m.Created).getTime() >= since
+    );
+    expect(recent).toHaveLength(0);
   });
 
   // gap: reset-password only updates the hash; sessions created before the reset stay valid

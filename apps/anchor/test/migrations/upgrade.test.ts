@@ -264,6 +264,14 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
+  '20261030210929_even_charles_xavier': {
+    check: async (url) => {
+      // existing OTPs keep working and start with no failed attempts
+      const otps = await rows<{ attempts: number }>(url, `SELECT attempts FROM email_otps`);
+      expect(otps.length).toBeGreaterThan(0);
+      expect(otps.every((otp) => otp.attempts === 0)).toBe(true);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

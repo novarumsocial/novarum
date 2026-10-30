@@ -513,6 +513,7 @@ export const emailOtps = pgTable('email_otps', {
   email: text('email').notNull(),
   otp: text('otp').notNull(),
   intent: text('intent').notNull(),
+  attempts: integer('attempts').notNull().default(0),
 
   createdAt: date('createdAt').notNull().defaultNow(),
   expiresAt: date('expiresAt').notNull(),

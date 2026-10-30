@@ -27,11 +27,16 @@ import {
   verifyTOTPWithGracePeriod,
 } from '../../utils/otp';
 import { mfaMethodSchema } from '../../src/db/zod';
+import { clientIp } from '../../utils/clientIp';
+
+const maxOtpAttempts = 5;
+const maxActiveResetCodes = 3;
 
 const authRateLimit = (path: string, max: number, duration: number) =>
   rateLimit({
     scoping: 'scoped',
-    max,
+    // a function seeds each limiter randomly, otherwise Elysia dedupes the ones with equal max/duration
+    max: () => max,
     duration,
     countFailedRequest: true,
     skip: (request) =>
@@ -40,7 +45,7 @@ const authRateLimit = (path: string, max: number, duration: number) =>
       status: 429,
       headers: { 'Content-Type': 'application/json' },
     }),
-    generator: (_req, _serv, { ip }) => ip,
+    generator: clientIp,
   });
 
 export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend({
@@ -273,6 +278,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
           id: body.challenge,
           intent: 'MFA_LOGIN',
           expiresAt: { gte: new Date() },
+          attempts: { lt: maxOtpAttempts },
         },
       });
       if (!pendingChallenge) {
@@ -300,6 +306,10 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
               )
             );
       if (!validCode) {
+        await db
+          .update(emailOtps)
+          .set({ attempts: sql`${emailOtps.attempts} + 1` })
+          .where(eq(emailOtps.id, body.challenge));
         return status(401, { error: 'Invalid verification code' });
       }
 
@@ -426,9 +436,20 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
           intent: 'PASSWORD_RESET',
           otp: hashedCode,
           expiresAt: { gte: new Date() },
+          attempts: { lt: maxOtpAttempts },
         },
       });
+      const resetCodes = and(eq(emailOtps.email, email), eq(emailOtps.intent, 'PASSWORD_RESET'));
       if (!otp) {
+        await db
+          .update(emailOtps)
+          .set({ attempts: sql`${emailOtps.attempts} + 1` })
+          .where(resetCodes);
+        return status(400, { error: 'Invalid or expired verification code' });
+      }
+
+      const consumed = await db.delete(emailOtps).where(resetCodes).returning({ id: emailOtps.id });
+      if (!consumed.some(({ id }) => id === otp.id)) {
         return status(400, { error: 'Invalid or expired verification code' });
       }
 
@@ -476,7 +497,15 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         where: { email },
       });
 
-      if (userCredential) {
+      const activeCodes = await db.$count(
+        emailOtps,
+        and(
+          eq(emailOtps.email, email),
+          eq(emailOtps.intent, 'PASSWORD_RESET'),
+          gt(emailOtps.expiresAt, new Date())
+        )
+      );
+      if (userCredential && activeCodes < maxActiveResetCodes) {
         const otp = randomInt(100000, 1000000);
         const hashedOtp = hashOtp(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
