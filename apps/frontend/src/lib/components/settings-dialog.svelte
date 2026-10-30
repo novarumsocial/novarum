@@ -67,8 +67,8 @@
   let about = $state('');
   let avatarInput: HTMLInputElement;
   let bannerInput: HTMLInputElement;
-  let selectedAvatarColor = $state(session.user?.avatarColor ?? '#005f78');
-  let savedAvatarColor = $state(session.user?.avatarColor ?? '#005f78');
+  let selectedAvatarColor = $state(session.user?.avatarColor ?? '#2E14BE');
+  let savedAvatarColor = $state(session.user?.avatarColor ?? '#2E14BE');
   let avatarColorOpen = $state(false);
   let speakingRingOpen = $state(false);
   let avatarColorLoading = $state(false);
