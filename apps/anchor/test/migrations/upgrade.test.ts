@@ -253,6 +253,19 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
+  '20261017201738_guild_profiles': {
+    check: async (url) => {
+      // existing members start without a guild profile, so they keep looking like themselves
+      expect(
+        await rows(
+          url,
+          `SELECT 1 FROM guild_member WHERE "displayName" IS NOT NULL OR "avatarUrl" IS NOT NULL
+             OR "bannerUrl" IS NOT NULL OR about IS NOT NULL`
+        )
+      ).toHaveLength(0);
+      expect(await rows(url, `SELECT 1 FROM guild_member`)).toHaveLength(7);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

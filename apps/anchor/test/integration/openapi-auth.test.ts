@@ -19,6 +19,8 @@ const publicRoutes: Record<string, string> = {
   'POST /auth/reset-password': 'authorised by the mailed OTP',
   'POST /auth/password-reset/request': 'unauthenticated by nature (the user forgot the password)',
   'GET /guilds/avatar/{id}': 'avatars are public images (redirect to a presigned URL)',
+  'GET /guilds/{id}/members/{userId}/{kind}':
+    'server profile pictures are public images (redirect to a presigned URL)',
   'GET /user/avatar/{userId}': 'avatars are public images (redirect to a presigned URL)',
   'GET /user/banner/{userId}': 'banners are public images (redirect to a presigned URL)',
   'GET /user/about/{userId}': 'profile text is public (also fetched by remote homeservers/clients)',

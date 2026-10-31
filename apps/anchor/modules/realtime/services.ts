@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { getConfig } from '../../utils/config';
 import type { VoicePresence } from '../../utils/types';
 import { publicUser } from '../../utils/publicUser';
+import { guildUser } from '../../utils/guildProfile';
 
 const activeRealtimeConnections = new Map<string, number>();
 // whether each open socket's window is focused. a socket that is connected but backgrounded
@@ -222,11 +223,12 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (previous && previous.channelId !== channel.id)
         await publishVoiceState(ws, previous, false);
 
+      const user = await guildUser(channel.guildId, session.user);
       const state = {
         guildId: channel.guildId,
         channelId: channel.id,
         userId: session.userId,
-        name: session.user.displayName || session.user.username,
+        name: user.displayName || user.username,
       };
       setVoicePresence(state);
       voiceSocketByUser.set(session.userId, ws.id);

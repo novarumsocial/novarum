@@ -103,7 +103,7 @@
             class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
           >
             <Cog class="size-3.5" />
-            Server Profile
+            Overview
           </Tabs.Trigger>
 
           <Tabs.Trigger

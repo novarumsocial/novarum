@@ -6,6 +6,7 @@ import { db } from '../../../src/db';
 import { getConfig } from '../../../utils/config';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { publicUser } from '../../../utils/publicUser';
+import { withGuildProfile } from '../../../utils/guildProfile';
 import { publishToChannel } from '../../../utils/publishRealtime';
 import { removeVoicePresence, setVoicePresence } from '../../../utils/services/livekit';
 import { getFederatedChannelAccess, isCallChannel } from '../access';
@@ -36,7 +37,7 @@ export const channels = new Elysia()
 
       return {
         users: members.map((member) => ({
-          ...publicUser(member.user),
+          ...publicUser(withGuildProfile(member.user, member)),
           status: member.user.status as 'ONLINE' | 'OFFLINE',
           role: member.role as 'OWNER' | 'ADMIN' | 'MEMBER',
           joinedAt: member.joinedAt.toISOString(),

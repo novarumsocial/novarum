@@ -3,6 +3,7 @@ import { db, users } from '../../src/db';
 import { canAccessChannel } from '../../utils/channelAccess';
 import type { FederationUserPayload } from '../../utils/federationPayload';
 import { userProfile } from '../../utils/publicUser';
+import { guildUser } from '../../utils/guildProfile';
 
 const forbidden = { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
@@ -46,7 +47,8 @@ export async function getFederatedChannelAccess(
   const freshUser = await refreshProfile(user, remoteUser);
   if (!(await canAccessChannel(channel, user.id, write))) return forbidden;
 
-  return { ok: true as const, channel, user: freshUser };
+  // in a guild channel, they show up with their profile for that guild
+  return { ok: true as const, channel, user: await guildUser(channel.guildId, freshUser) };
 }
 
 /** A remote user acting inside one of our guilds; they have to be a member of it. */
@@ -63,7 +65,7 @@ export async function getFederatedGuildAccess(guildId: string, remoteUser: Feder
   });
   if (!membership) return forbidden;
 
-  return { ok: true as const, guild, user };
+  return { ok: true as const, guild, user: await refreshProfile(user, remoteUser) };
 }
 
 /** Voice and ringing only make sense in voice channels and DMs. */

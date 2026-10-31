@@ -156,6 +156,13 @@ export const guildMembers = pgTable(
     position: integer('position').notNull(),
 
     joinedAt: date('joinedAt').notNull().defaultNow(),
+
+    // the member's profile for this guild, null falls back to their own profile.
+    // for a remote guild this is our copy of what its host has.
+    displayName: text('displayName'),
+    avatarUrl: text('avatarUrl'),
+    bannerUrl: text('bannerUrl'),
+    about: text('about'),
   },
   (table) => [
     primaryKey({
