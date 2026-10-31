@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.1](https://github.com/novarumsocial/novarum/compare/v0.2.0...v0.2.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **federation:** keep federated guild channels in sync with the host ([59e46a1](https://github.com/novarumsocial/novarum/commit/59e46a17a39cf7cd874a4c5e3f1f0981d05e7b8e))
+* **federation:** send a guild's channels when a member server subscribes ([a6d242b](https://github.com/novarumsocial/novarum/commit/a6d242b2ff21e78d0ece2f92b02174a991b057c3))
+* **voice:** add deepfilternet3 voice suppression strength ([2391b8d](https://github.com/novarumsocial/novarum/commit/2391b8d85308e827ce3ed9aabb57b46a484554ed))
+* **voice:** random mutes on certain users ([6344c55](https://github.com/novarumsocial/novarum/commit/6344c552622d109aa4d3a1bedb0eb813225456a5))
+
 ## [0.2.0](https://github.com/novarumsocial/novarum/compare/v0.1.0...v0.2.0) (2026-10-27)
 
 

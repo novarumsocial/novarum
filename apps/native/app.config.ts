@@ -19,7 +19,7 @@ const config: ExpoConfig = {
   name: 'Novarum',
   slug: 'novarum',
   scheme: 'novarum',
-  version: '0.2.0', // x-release-please-version
+  version: '0.2.1', // x-release-please-version
   orientation: 'default',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
