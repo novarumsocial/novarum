@@ -549,7 +549,8 @@ export class Voice {
     if (this.room !== room || !this.noiseCancellationEnabled) return;
 
     const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-      LocalAudioTrack | undefined;
+      | LocalAudioTrack
+      | undefined;
     if (!(track instanceof LocalAudioTrack)) return;
     if (this.noiseProcessorTrack === track) return;
 
@@ -687,7 +688,8 @@ export class Voice {
       .catch(() => undefined)
       .then(async () => {
         const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as
-          LocalAudioTrack | undefined;
+          | LocalAudioTrack
+          | undefined;
         if (this.room !== room || !(track instanceof LocalAudioTrack)) return;
 
         await this.removeNoiseCancellation();
@@ -750,6 +752,17 @@ export class Voice {
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) this.playRemoteSound(publication.source, false);
+        // livekit mutes the mic on its own when the device drops out (sleep, unplug, bluetooth),
+        // so turn it back on, or show the user as muted if that fails
+        else if (
+          publication.source === Track.Source.Microphone &&
+          !this.selfMuted &&
+          !this.selfDeafened
+        ) {
+          void this.syncLocalMicrophone(room).then(() => {
+            if (this.room === room) this.syncParticipant(participant, channelId);
+          });
+        }
         this.syncParticipant(participant, channelId);
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {

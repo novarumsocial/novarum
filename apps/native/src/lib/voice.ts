@@ -286,6 +286,15 @@ export const useVoice = create<VoiceStore>((set, get) => {
       })
       .on(RoomEvent.TrackMuted, (publication, participant) => {
         if (!participant.isLocal) playRemoteSound(publication.source, false);
+        // livekit mutes the mic on its own when the device drops out (sleep, unplug, bluetooth),
+        // so turn it back on, or show the user as muted if that fails
+        else if (
+          publication.source === Track.Source.Microphone &&
+          !get().selfMuted &&
+          !get().selfDeafened
+        ) {
+          void syncLocalMicrophone(room).then(() => syncParticipant(participant));
+        }
         syncParticipant(participant);
       })
       .on(RoomEvent.TrackUnmuted, (publication, participant) => {
