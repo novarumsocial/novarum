@@ -1,5 +1,8 @@
 import sharp from 'sharp';
 
+// every output is at most an avatar, banner or 800x800 preview, so bigger inputs are only decode bombs
+export const maxInputPixels = 4096 * 4096;
+
 // thank god ai exists for this :sobpray:
 export function isAnimatedGif(imageBuffer: ArrayBuffer): boolean {
   const bytes = new Uint8Array(imageBuffer);
@@ -45,11 +48,16 @@ export async function processImage(
   quality = 45
 ): Promise<{ data: Buffer; animated: boolean }> {
   if (isAnimatedGif(imageBuffer)) {
-    const data = await sharp(Buffer.from(imageBuffer), { animated: true })
+    const data = await sharp(Buffer.from(imageBuffer), {
+      animated: true,
+      limitInputPixels: maxInputPixels,
+    })
       .webp({ quality })
       .toBuffer();
     return { data, animated: true };
   }
-  const data = await sharp(Buffer.from(imageBuffer)).webp({ quality }).toBuffer();
+  const data = await sharp(Buffer.from(imageBuffer), { limitInputPixels: maxInputPixels })
+    .webp({ quality })
+    .toBuffer();
   return { data, animated: false };
 }

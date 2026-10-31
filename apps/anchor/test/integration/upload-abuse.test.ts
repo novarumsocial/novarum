@@ -232,13 +232,12 @@ describe('malformed media in the preview path never takes the process down', () 
   for (const [name, contentType, make] of cases) {
     test(`${name}: gets an answer (no hang or crash) and the server keeps serving`, async () => {
       const { res } = await previewOf(await make(), contentType);
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404]).toContain(res.status);
       await alive();
     });
   }
 
-  // gap: sharp / node-av errors are not caught in /attachment/:id/preview, so malformed media is a 500 instead of a 404
-  test.failing('malformed media gets a 4xx preview answer, not a 500', async () => {
+  test('malformed media gets a 4xx preview answer, not a 500', async () => {
     for (const [, contentType, make] of cases.slice(0, 10))
       expect((await previewOf(await make(), contentType)).res.status).toBeLessThan(500);
   });
@@ -251,7 +250,21 @@ describe('malformed media in the preview path never takes the process down', () 
     bomb.writeUInt32BE(60000, 16); // IHDR width
     bomb.writeUInt32BE(60000, 20); // IHDR height
     const { res } = await previewOf(bomb, 'image/png');
-    expect([404, 500]).toContain(res.status);
+    expect(res.status).toBe(404);
+    await alive();
+  });
+
+  test('a real image just over 4096x4096 pixels (within sharp defaults) gets no preview', async () => {
+    const big = await sharp({
+      create: { width: 4097, height: 4096, channels: 3, background: '#000' },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    const { res, att } = await previewOf(big, 'image/png');
+    expect(res.status).toBe(404);
+    // the failure is remembered, so asking again does not decode it again
+    const url = new URL(att.previewUrl);
+    expect((await fetch(`${anchor.url}${url.pathname}${url.search}`)).status).toBe(404);
     await alive();
   });
 

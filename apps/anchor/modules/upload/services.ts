@@ -24,9 +24,68 @@ import sharp from 'sharp';
 import { sniffAudioVideo } from '../../utils/sniffAudioVideo';
 import { Demuxer, Decoder, Scaler } from 'node-av/api';
 import { getConfig } from '../../utils/config';
-import { AV_AFD_4_3 } from 'node-av';
+import { maxInputPixels } from '../../utils/optimizeWebp';
 
 const attachmentQuery = t.Object({ exp: t.Numeric(), sig: t.String() });
+
+// each decode can take a few hundred MB, so only a couple run at once and the rest wait their turn
+const maxConcurrentPreviews = 2;
+const maxQueuedPreviews = 200;
+let previewsInFlight = 0;
+const previewQueue: (() => void)[] = [];
+
+async function acquirePreviewSlot() {
+  if (previewsInFlight < maxConcurrentPreviews) {
+    previewsInFlight++;
+    return true;
+  }
+  if (previewQueue.length >= maxQueuedPreviews) return false;
+  await new Promise<void>((resolve) => previewQueue.push(resolve));
+  return true;
+}
+
+// hands the slot straight to the next waiting request
+function releasePreviewSlot() {
+  const next = previewQueue.shift();
+  if (next) next();
+  else previewsInFlight--;
+}
+// attachments are immutable, so a file that failed once will always fail
+const failedPreviews = new Set<string>();
+
+async function renderPreview(file: ArrayBuffer) {
+  const type = sniffAudioVideo(file);
+  if (type === 'image') {
+    const data = await sharp(file, { limitInputPixels: maxInputPixels })
+      .rotate()
+      .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 85 })
+      .toBuffer();
+    return { data, type: 'image/webp' };
+  }
+  if (type !== 'video') return null;
+
+  await using input = await Demuxer.open(Buffer.from(file));
+  const video = input.video();
+  if (!video || video.codecpar.width * video.codecpar.height > maxInputPixels) return null;
+
+  using decoder = await Decoder.create(video);
+  using scaler = new Scaler();
+  for await (const frame of decoder.frames(input.packets(video.index))) {
+    if (!frame) continue;
+    const scale = Math.min(1, 320 / frame.width, 240 / frame.height);
+    // the scaler can only really do jpeg so we're going with that for a bit
+    const data = await scaler.toJpeg(frame, {
+      resize: {
+        width: Math.round(frame.width * scale),
+        height: Math.round(frame.height * scale),
+      },
+      quality: 75,
+    });
+    return { data, type: 'image/jpeg' };
+  }
+  return null;
+}
 
 async function requireUploadAccess(channelId: string, contentType: string, token: unknown) {
   const session = await validateSessionToken(typeof token === 'string' ? token : undefined);
@@ -76,7 +135,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
   )
   .get(
     '/attachment/:id/preview',
-    async ({ params, query, status }) => {
+    async ({ params, query, set, status }) => {
       const saveStorage = getConfig().misc.save_attachment_thumbnails;
       const attachment = await db.query.attachments.findFirst({
         where: { id: params.id, status: 'ATTACHED' },
@@ -84,71 +143,48 @@ export const upload = new Elysia({ tags: ['Upload'] })
       if (!attachment || !isValidAttachmentSignature(attachment.id, query.exp, query.sig)) {
         return status(404, { error: 'Attachment not found' });
       }
+      if (failedPreviews.has(attachment.id)) return status(404, { error: 'No preview available' });
 
-      const exists =
-        saveStorage && (await storage.exists(`attachment-previews/${attachment.objectKey}`));
-      if (exists) {
-        const file = storage.file(`attachment-previews/${attachment.objectKey}`);
-        return new Response(Buffer.from(await file.arrayBuffer()), {
-          headers: {
-            'content-type': file.type,
-          },
+      // an empty object marks a file that has no preview
+      const key = `attachment-previews/${attachment.objectKey}`;
+      const cached = saveStorage
+        ? await storage
+            .file(key)
+            .stat()
+            .catch(() => null)
+        : null;
+      if (cached) {
+        if (!cached.size) return status(404, { error: 'No preview available' });
+        return new Response(await storage.file(key).arrayBuffer(), {
+          headers: { 'content-type': cached.type },
         });
       }
 
-      const url = publicPresign(attachment.objectKey, {
-        method: 'GET',
-        expiresIn: 5 * 60,
-        contentDisposition: `inline; filename="${safeAttachmentFilename(attachment.filename)}"`,
-      });
-      const file = await (await fetch(url)).arrayBuffer();
-      const type = sniffAudioVideo(file);
-
-      let thumbnail: Buffer | undefined;
-      if (type === 'image') {
-        const img = sharp(file);
-        thumbnail = await img
-          .rotate()
-          .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 85 })
-          .toBuffer();
-      } else if (type === 'video') {
-        await using input = await Demuxer.open(Buffer.from(file));
-
-        const video = input.video();
-        if (!video) throw new Error('no video stream found');
-
-        using decoder = await Decoder.create(video);
-        using scaler = new Scaler();
-
-        for await (const frame of decoder.frames(input.packets(video.index))) {
-          if (!frame) continue;
-          const scale = Math.min(1, 320 / frame.width, 240 / frame.height);
-
-          // the scaler can only really do jpeg so we're going with that for a bit
-          thumbnail = await scaler.toJpeg(frame, {
-            resize: {
-              width: Math.round(frame.width * scale),
-              height: Math.round(frame.height * scale),
-            },
-            quality: 75,
-          });
-          break;
+      if (!(await acquirePreviewSlot())) {
+        set.headers['retry-after'] = '5';
+        return status(503, { error: 'Preview busy, try again later' });
+      }
+      const preview = await (async () => {
+        try {
+          const url = publicPresign(attachment.objectKey, { method: 'GET', expiresIn: 5 * 60 });
+          return await renderPreview(await (await fetch(url)).arrayBuffer());
+        } catch {
+          return null;
+        } finally {
+          releasePreviewSlot();
         }
+      })();
+
+      if (!preview) {
+        if (failedPreviews.size >= 10_000) failedPreviews.clear();
+        failedPreviews.add(attachment.id);
+        if (saveStorage)
+          await storage.write(key, new Uint8Array(), { type: 'application/x-no-preview' });
+        return status(404, { error: 'No preview available' });
       }
 
-      if (saveStorage && thumbnail) {
-        await storage.write(`attachment-previews/${attachment.objectKey}`, thumbnail, {
-          type: type === 'video' ? 'image/jpeg' : 'image/webp',
-        });
-      }
-
-      if (!thumbnail) return status(404, { error: 'No preview available' });
-      return new Response(thumbnail, {
-        headers: {
-          'content-type': type === 'video' ? 'image/jpeg' : 'image/webp',
-        },
-      });
+      if (saveStorage) await storage.write(key, preview.data, { type: preview.type });
+      return new Response(preview.data, { headers: { 'content-type': preview.type } });
     },
     { query: attachmentQuery }
   )
