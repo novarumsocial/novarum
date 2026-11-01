@@ -142,6 +142,8 @@ async function sendPush(subscription: typeof pushSubscriptions.$inferSelect, mes
 // the host of a guild or DM works out who to notify and sends one call per homeserver. If a
 // homeserver is down the push is lost on purpose: /federation/unread-mentions brings the
 // badges back on the next load, and there is no retry queue.
+const maxPushHandles = 1000;
+
 export async function notifyMessage(
   message: { id: string; content: string | null; author: { id: string } & PushPayload['author'] },
   channel: { id: string; guildId: string | null },
@@ -163,17 +165,25 @@ export async function notifyMessage(
   };
 
   await Promise.all(
-    [...byHomeserver].map(([recipientHomeserver, group]) =>
-      recipientHomeserver === localHomeserver
-        ? notifyLocal(
+    [...byHomeserver].flatMap<Promise<unknown>>(([recipientHomeserver, group]) => {
+      if (recipientHomeserver === localHomeserver) {
+        return [
+          notifyLocal(
             group.map((recipient) => recipient.userId),
             body
-          )
-        : postSignedFederationJson(recipientHomeserver, '/federation/push', {
-            ...body,
-            handles: group.map((recipient) => recipient.handle),
-          }).catch(() => null)
-    )
+          ),
+        ];
+      }
+      // a homeserver takes up to 1000 handles per push, which an @everyone can go over
+      return Array.from({ length: Math.ceil(group.length / maxPushHandles) }, (_, i) =>
+        postSignedFederationJson(recipientHomeserver, '/federation/push', {
+          ...body,
+          handles: group
+            .slice(i * maxPushHandles, (i + 1) * maxPushHandles)
+            .map((recipient) => recipient.handle),
+        }).catch(() => null)
+      );
+    })
   );
 }
 

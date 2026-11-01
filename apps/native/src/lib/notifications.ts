@@ -7,6 +7,7 @@ import { effectiveLevel, levelAllows, type NotificationEntries } from 'anchor/no
 import { chatPathSchema, hasPushSubscription } from './push';
 import { settings } from './settings';
 import { playSound } from './sounds';
+import { mentionsEveryone } from './utils';
 
 // the app shows its own in-app banner (components/in-app-banner.tsx) while it is open,
 // so the OS never shows a notification for the foreground
@@ -93,6 +94,7 @@ export function setBadgeCount(count: number) {
 type NotifyMessage = {
   channelId: string;
   guildId: string | null;
+  content: string | null;
   pingedHandles: string[];
   author: { userId: string };
 };
@@ -115,6 +117,7 @@ export function shouldNotify(
   const isDm = message.guildId === null;
   const mentioned =
     isDm ||
+    mentionsEveryone(message.content) ||
     message.pingedHandles.some((handle) => handle.toLowerCase() === user.handle.toLowerCase());
 
   return levelAllows(effectiveLevel(entries, message), mentioned);

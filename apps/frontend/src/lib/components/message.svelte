@@ -16,7 +16,7 @@
   } from '@lucide/svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
-  import { cn, formatBytes } from '$lib/utils';
+  import { cn, formatBytes, mentionsEveryone } from '$lib/utils';
   import VideoPlayer from './video-player.svelte';
   import AudioPlayer from './audio-player.svelte';
   import Avatar from './avatar.svelte';
@@ -162,7 +162,9 @@
     const replyingMe = isSelf(repliedMessage?.author);
 
     return (
-      replyingMe || contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
+      replyingMe ||
+      (chat.route.kind === 'guild' && mentionsEveryone(message.content)) ||
+      contentHandles.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
     );
   });
   const viewableAttachments = $derived(

@@ -5,6 +5,7 @@ import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } fro
 import { useSession } from './session.svelte';
 import type { PublicUser } from 'anchor/public-user';
 import { dms, dmPath } from './dms.svelte';
+import { mentionsEveryone } from './utils';
 
 function initialsFor(name: string) {
   const initials = name
@@ -39,6 +40,7 @@ type AddMessageInput = {
   editedTime?: string;
   replyTo?: string | null;
   pingedHandles?: string[];
+  guildId?: string | null;
   author: PublicUser;
   attachments?: {
     id: string;
@@ -398,9 +400,11 @@ class ChatState {
 
     if (this.activeChannel !== message.channelId) {
       const handle = useSession().user?.handle.toLowerCase();
-      const pinged = handle
-        ? message.pingedHandles?.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
-        : false;
+      const pinged =
+        (!!message.guildId && mentionsEveryone(message.content)) ||
+        (handle
+          ? message.pingedHandles?.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
+          : false);
       this.setChannelUnread(message.channelId, true);
       if (pinged) this.incrementChannelMention(message.channelId);
     } else {

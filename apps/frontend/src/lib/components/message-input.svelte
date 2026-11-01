@@ -29,13 +29,22 @@
   const mentionResults = $derived.by(() => {
     if (mentionStart === null) return [];
     const query = mentionQuery.toLowerCase();
-    return chat.members
+    const everyone =
+      chat.route.kind === 'guild' && 'everyone'.startsWith(query)
+        ? [{ id: 'everyone', name: 'Everyone', handle: 'everyone' }]
+        : [];
+    const members = chat.members
       .filter((member) =>
         [member.username, member.displayName ?? '', memberHandle(member)].some((value) =>
           value.toLowerCase().includes(query)
         )
       )
-      .slice(0, 8);
+      .map((member) => ({
+        id: member.userId,
+        name: member.displayName || member.username,
+        handle: memberHandle(member),
+      }));
+    return [...everyone, ...members].slice(0, 8);
   });
   const previews = $derived(
     files.map((file) => (file.type.startsWith('image/') ? URL.createObjectURL(file) : null))
@@ -87,7 +96,7 @@
 
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        insertMention(mentionResults[selectedMention]!);
+        insertMention(mentionResults[selectedMention]!.handle);
         return;
       }
     }
@@ -188,11 +197,11 @@
     });
   });
 
-  function insertMention(member: Author) {
+  function insertMention(handle: string) {
     if (mentionStart === null) return;
 
     const cursor = textarea.selectionStart;
-    const mention = `@${memberHandle(member)}`;
+    const mention = `@${handle}`;
     const nextCursor = mentionStart + mention.length + 1;
     content = `${content.slice(0, mentionStart)}${mention} ${content.slice(cursor)}`;
     closeMentionSearch();
@@ -353,7 +362,7 @@
       class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
     >
       {#if mentionResults.length}
-        {#each mentionResults as member, index (member.userId)}
+        {#each mentionResults as result, index (result.id)}
           <button
             id={`mention-result-${index}`}
             type="button"
@@ -362,10 +371,10 @@
             class={`flex w-full min-w-0 items-center gap-2 px-2 py-1.5 text-left text-xs transition-colors ${selectedMention === index ? 'bg-primary text-primary-foreground' : 'text-popover-foreground hover:bg-muted'}`}
             onmousedown={(event) => event.preventDefault()}
             onmouseenter={() => (selectedMention = index)}
-            onclick={() => insertMention(member)}
+            onclick={() => insertMention(result.handle)}
           >
-            <span class="truncate font-medium">{member.displayName || member.username}</span>
-            <span class="ml-auto truncate opacity-70">@{memberHandle(member)}</span>
+            <span class="truncate font-medium">{result.name}</span>
+            <span class="ml-auto truncate opacity-70">@{result.handle}</span>
           </button>
         {/each}
       {:else}

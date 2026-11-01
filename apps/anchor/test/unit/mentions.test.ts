@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mentionHandles } from '../../utils/mentions';
+import { mentionHandles, mentionsEveryone } from '../../utils/mentions';
 
 const handles = (s: string | null) => [...mentionHandles(s)];
 
@@ -36,4 +36,23 @@ describe('mentionHandles', () => {
     expect(handles(null)).toEqual([]);
     expect(handles('')).toEqual([]);
   });
+});
+
+describe('mentionsEveryone', () => {
+  test.each(['@everyone', 'hey @everyone!', '@everyone.', '(@everyone)', 'a\n@everyone b'])(
+    '%p matches',
+    (content) => expect(mentionsEveryone(content)).toBe(true)
+  );
+  test.each([
+    null,
+    '',
+    'everyone',
+    '@everyones',
+    '@Everyone',
+    'mail@everyone',
+    'x.@everyone',
+    '@everyone:a.test',
+    '@everyone.example.com',
+    'https://x.test/@everyone',
+  ])('%p does not match', (content) => expect(mentionsEveryone(content)).toBe(false));
 });

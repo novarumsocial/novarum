@@ -5,7 +5,7 @@ import { parseFederatedChannelId } from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
-import { mentionHandles } from '../../utils/mentions';
+import { mentionHandles, mentionsEveryone } from '../../utils/mentions';
 import { canAccessChannel, canSendInChannel } from '../../utils/channelAccess';
 import { dmRecipients, notifyInBackground } from '../../utils/notify';
 import { db } from '../../src/db';
@@ -261,7 +261,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         nonce: message.nonce,
         replyTo: message.replyTo ?? null,
         edited: messageEdited(message),
-        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+        pingedHandles: pingedHandles(pingRecipients),
         attachments: responseAttachments,
         createdAt:
           message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
@@ -376,7 +376,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         replyTo: updated.replyTo ?? null,
         edited: true,
         editedTime: updated.updatedAt.toISOString(),
-        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+        pingedHandles: pingedHandles(pingRecipients),
         attachments: existing.attachments.map((attachment) =>
           attachmentPayload(attachment as Parameters<typeof attachmentPayload>[0])
         ),
@@ -587,7 +587,8 @@ export async function getPingRecipients(
   if (!guildId) return [];
 
   const mentionedHandles = mentionHandles(content);
-  if (!mentionedHandles.size && !replyAuthorId) return [];
+  const everyone = mentionsEveryone(content);
+  if (!mentionedHandles.size && !replyAuthorId && !everyone) return [];
 
   const members = await db.query.guildMembers.findMany({
     where: { guildId },
@@ -595,9 +596,13 @@ export async function getPingRecipients(
   });
   return members.flatMap((member) => {
     const handle = `@${member.user.username}:${member.user.homeserver}`;
-    return member.userId !== authorId &&
-      (member.userId === replyAuthorId || mentionedHandles.has(handle.toLowerCase()))
-      ? [{ userId: member.userId, homeserver: member.user.homeserver, handle }]
+    const named = member.userId === replyAuthorId || mentionedHandles.has(handle.toLowerCase());
+    return member.userId !== authorId && (named || everyone)
+      ? [{ userId: member.userId, homeserver: member.user.homeserver, handle, named }]
       : [];
   });
 }
+
+// clients spot @everyone in the content themselves, so a big guild's handles aren't sent each time
+export const pingedHandles = (recipients: { handle: string; named: boolean }[]) =>
+  recipients.flatMap((recipient) => (recipient.named ? [recipient.handle] : []));

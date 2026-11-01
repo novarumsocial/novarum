@@ -9,12 +9,15 @@ import { openLink } from '@/lib/navigation';
 import { useRealtime } from '@/lib/realtime';
 import { useSession } from '@/lib/session';
 import type { Author } from '@/lib/types/chat';
-import { cn, isUrl, urlPattern } from '@/lib/utils';
+import { cn, everyonePattern, isUrl, urlPattern } from '@/lib/utils';
 
 const handleSource = '@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?';
 export const handlePattern = new RegExp(`(?<![a-zA-Z0-9._])${handleSource}`, 'g');
-const mentionPattern = new RegExp(`((?<![a-zA-Z0-9._])${handleSource})`, 'g');
-const mentionOnly = new RegExp(`^${handleSource}$`);
+const mentionPattern = new RegExp(
+  `((?<![a-zA-Z0-9._])${handleSource}|${everyonePattern.source})`,
+  'g'
+);
+const mentionOnly = new RegExp(`^(${handleSource}|@everyone)$`);
 // Hermes has no Intl.Segmenter, so emoji sequences (flags, keycaps, skin tones, ZWJ) are matched by range
 const pictograph =
   '[\\u{1F000}-\\u{1FAFF}\\u{231A}-\\u{23FF}\\u{2600}-\\u{27BF}\\u{2B00}-\\u{2BFF}]';
@@ -118,12 +121,13 @@ export function EmojiSpans({
     }
 
     if (part.mention) {
-      const isSelf = part.text === `@${self?.username}:${self?.homeserver}`;
+      const everyone = part.text === '@everyone';
+      const isSelf = everyone || part.text === `@${self?.username}:${self?.homeserver}`;
       return (
         <Text
           key={index}
           className={cn(className, 'font-medium text-link', isSelf ? 'bg-link/25' : 'bg-link/10')}
-          onPress={links ? () => onMention(mentionUser(part.text)) : undefined}
+          onPress={links && !everyone ? () => onMention(mentionUser(part.text)) : undefined}
         >
           {part.text}
         </Text>

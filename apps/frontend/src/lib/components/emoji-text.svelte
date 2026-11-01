@@ -3,7 +3,7 @@
   import { realtime } from '$lib/realtime.svelte';
   import { useSession } from '$lib/session.svelte';
   import type { Author } from '$lib/types/chat';
-  import { isUrl, linkTarget, urlPattern } from '$lib/utils';
+  import { everyonePattern, isUrl, linkTarget, urlPattern } from '$lib/utils';
   import ProfileCard from './profile-card.svelte';
 
   let { content, links = false }: { content: string; links?: boolean } = $props();
@@ -12,14 +12,15 @@
   type Part = { text: string; url?: boolean; mention?: boolean; unicode?: string };
 
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-  const mentionPattern =
-    /((?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?)/g;
+  const handlePattern =
+    /(?<![a-zA-Z0-9._])@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?/;
+  const mentionPattern = new RegExp(`(${handlePattern.source}|${everyonePattern.source})`, 'g');
   const parts = $derived(
     content.split(urlPattern).flatMap<Part>((text) => {
       if (links && isUrl(text)) return [{ text, url: true }];
 
       return text.split(mentionPattern).flatMap<Part>((part) =>
-        /^@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(part)
+        /^@([a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?|everyone)$/.test(part)
           ? [{ text: part, mention: true }]
           : [...segmenter.segment(part)].map(({ segment }) => ({
               text: segment,
@@ -38,7 +39,8 @@
   });
 
   function mentionClass(text: string) {
-    const self = text === `@${session.user!.username}:${session.user!.homeserver}`;
+    const self =
+      text === '@everyone' || text === `@${session.user!.username}:${session.user!.homeserver}`;
     return `${self ? 'bg-link/25' : 'bg-link/12'} rounded-[3px] px-0.5 font-medium text-link transition-colors hover:bg-link/30`;
   }
 
@@ -77,7 +79,7 @@
       >{part.text}</a
     >
   {:else if part.mention}
-    {#if links}
+    {#if links && part.text !== '@everyone'}
       <ProfileCard user={mentionUser(part.text)}>
         <span class={mentionClass(part.text)}>{part.text}</span>
       </ProfileCard>

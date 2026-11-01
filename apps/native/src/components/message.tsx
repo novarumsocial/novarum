@@ -42,7 +42,7 @@ import { formatDate, formatTime } from '@/lib/format-date';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import type { Attachment, Message as ChatMessage } from '@/lib/types/chat';
-import { cn, formatBytes } from '@/lib/utils';
+import { cn, formatBytes, mentionsEveryone } from '@/lib/utils';
 
 // where shared message links point (the same host the app opens as a deep link)
 const webOrigin = 'https://app.novarum.me';
@@ -308,12 +308,14 @@ export const Message = memo(function Message({
   const own = isMe(message.author);
   const authorName = message.author.displayName || message.author.username;
 
+  const inGuild = useChat((s) => s.route.kind === 'guild');
   const selfMentioned = useMemo(() => {
     if (!selfHandle || own) return false;
+    if (inGuild && mentionsEveryone(message.content)) return true;
 
     const handles = [...(message.content.match(handlePattern) ?? []), ...message.pingedHandles];
     return isMe(repliedMessage?.author) || handles.some((h) => h.toLowerCase() === selfHandle);
-  }, [message, repliedMessage, selfHandle]);
+  }, [message, repliedMessage, selfHandle, inGuild]);
 
   const viewable = useMemo(
     () => message.attachments.filter((a) => isImage(a) || isVideo(a) || isAudio(a) || isPdf(a)),

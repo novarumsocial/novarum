@@ -9,6 +9,7 @@ import { dms, dmPath, useDms, type DmEntry } from './dms';
 import { goHome, goto } from './navigation';
 import { session } from './session';
 import { storage } from './storage';
+import { mentionsEveryone } from './utils';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
 
 function initialsFor(name: string) {
@@ -44,6 +45,7 @@ type AddMessageInput = {
   editedTime?: string;
   replyTo?: string | null;
   pingedHandles?: string[];
+  guildId?: string | null;
   author: PublicUser;
   attachments?: {
     id: string;
@@ -763,9 +765,11 @@ export const useChat = create<ChatState>((set, get) => {
 
       if (selectActiveChannel(get()) !== message.channelId) {
         const handle = session().user?.handle.toLowerCase();
-        const pinged = handle
-          ? message.pingedHandles?.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
-          : false;
+        const pinged =
+          (!!message.guildId && mentionsEveryone(message.content)) ||
+          (handle
+            ? message.pingedHandles?.some((pingedHandle) => pingedHandle.toLowerCase() === handle)
+            : false);
         setChannelUnread(message.channelId, true);
         if (pinged) incrementChannelMention(message.channelId);
       } else {

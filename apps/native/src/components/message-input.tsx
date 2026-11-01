@@ -97,6 +97,7 @@ export function MessageInput({
   const keyboardVisible = useKeyboardState((s) => s.isVisible);
   const maxFileSize = useAnchor((s) => s.maxFileSize) * 1024 * 1024;
   const members = useChat((s) => s.members);
+  const inGuild = useChat((s) => s.route.kind === 'guild');
   const uploadProgress = useChat((s) => s.uploadProgress);
   const emojiQuery = useRealtime((s) => s.emojiQuery);
   const emojiResults = useRealtime((s) => s.emojiResults);
@@ -108,14 +109,24 @@ export function MessageInput({
   const mentionResults = useMemo(() => {
     if (search?.kind !== 'mention') return [];
     const query = search.query.toLowerCase();
-    return members
+    const everyone =
+      inGuild && 'everyone'.startsWith(query)
+        ? [{ id: 'everyone', name: 'Everyone', handle: 'everyone', member: null }]
+        : [];
+    const matches = members
       .filter((member) =>
         [member.username, member.displayName ?? '', memberHandle(member)].some((value) =>
           value.toLowerCase().includes(query)
         )
       )
-      .slice(0, 8);
-  }, [members, search]);
+      .map((member) => ({
+        id: member.userId,
+        name: member.displayName || member.username,
+        handle: memberHandle(member),
+        member,
+      }));
+    return [...everyone, ...matches].slice(0, 8);
+  }, [members, search, inGuild]);
   const emojiMatches =
     search?.kind === 'emoji' && emojiQuery.trim() === search.query.trim() ? emojiResults : [];
 
@@ -215,7 +226,7 @@ export function MessageInput({
     setSelection({ start: nextCursor, end: nextCursor });
   }
 
-  const insertMention = (member: Author) => replaceSearch(`@${memberHandle(member)}`);
+  const insertMention = (handle: string) => replaceSearch(`@${handle}`);
   const insertEmoji = (emoji: EmojiResult) =>
     replaceSearch(
       String.fromCodePoint(...emoji.unicode.split('-').map((part) => parseInt(part, 16)))
@@ -235,23 +246,23 @@ export function MessageInput({
           showsHorizontalScrollIndicator={false}
           className="mb-2 max-h-11 border border-border bg-popover"
         >
-          {mentionResults.map((member) => (
+          {mentionResults.map((result) => (
             <Pressable
               accessibilityRole="button"
-              key={member.userId}
-              onPress={() => insertMention(member)}
+              key={result.id}
+              onPress={() => insertMention(result.handle)}
               className="h-11 flex-row items-center gap-2 px-3 active:bg-accent"
             >
-              <Avatar
-                src={member.avatarUrl}
-                name={member.displayName || member.username}
-                bgColor={member.avatarColor}
-                className="size-6"
-              />
-              <Text className="text-xs font-medium">{member.displayName || member.username}</Text>
-              <Text className="font-mono text-[10px] text-muted-foreground">
-                @{memberHandle(member)}
-              </Text>
+              {result.member && (
+                <Avatar
+                  src={result.member.avatarUrl}
+                  name={result.name}
+                  bgColor={result.member.avatarColor}
+                  className="size-6"
+                />
+              )}
+              <Text className="text-xs font-medium">{result.name}</Text>
+              <Text className="font-mono text-[10px] text-muted-foreground">@{result.handle}</Text>
             </Pressable>
           ))}
           {emojiMatches.map((emoji) => (

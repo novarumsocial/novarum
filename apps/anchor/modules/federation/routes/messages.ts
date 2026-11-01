@@ -13,7 +13,12 @@ import { publishToChannel } from '../../../utils/publishRealtime';
 import { publicUser } from '../../../utils/publicUser';
 import { dmRecipients, notifyInBackground } from '../../../utils/notify';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from '../../message/store';
-import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../../message/services';
+import {
+  getPingRecipients,
+  messageEdited,
+  pingedHandles,
+  verifyPendingAttachments,
+} from '../../message/services';
 import { createPendingAttachment } from '../../upload/services';
 import { getFederatedChannelAccess } from '../access';
 import { canSendInChannel } from '../../../utils/channelAccess';
@@ -161,7 +166,7 @@ export const messageRoutes = new Elysia()
       const message = {
         ...created,
         attachments: attachments.value,
-        pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+        pingedHandles: pingedHandles(pingRecipients),
       };
 
       const response = federatedMessageResponse(message, access.channel, access.user);
@@ -227,7 +232,7 @@ export const messageRoutes = new Elysia()
         {
           ...updated,
           attachments: existing.attachments,
-          pingedHandles: pingRecipients.map((recipient) => recipient.handle),
+          pingedHandles: pingedHandles(pingRecipients),
         },
         access.channel,
         access.user

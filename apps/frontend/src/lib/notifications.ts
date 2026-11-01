@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { Howl } from 'howler';
 import NotificationSound from './sounds/notification.opus?url';
 import { settings } from './settings.svelte';
+import { mentionsEveryone } from './utils';
 import { effectiveLevel, levelAllows, type NotificationEntries } from 'anchor/notification-level';
 
 export function notificationsSupported(): boolean {
@@ -51,6 +52,7 @@ export async function sendNotification(notification: NotificationOptions): Promi
 type NotifyMessage = {
   channelId: string;
   guildId: string | null;
+  content: string | null;
   pingedHandles: string[];
   author: { userId: string };
 };
@@ -73,6 +75,7 @@ export function shouldNotify(
   const isDm = message.guildId === null;
   const mentioned =
     isDm ||
+    mentionsEveryone(message.content) ||
     message.pingedHandles.some((handle) => handle.toLowerCase() === user.handle.toLowerCase());
 
   return levelAllows(effectiveLevel(entries, message), mentioned);

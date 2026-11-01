@@ -446,6 +446,62 @@ describe('pings and unread mentions', () => {
     expect(await mentionCount(member)).toBe(0);
   });
 
+  test('@everyone pings every other member without listing their handles', async () => {
+    const { owner, member, guild, channel } = await primed();
+    const third = await signup(anchor.url);
+    await join(owner, guild.id, third);
+    await Promise.all([mentionCount(owner), mentionCount(third)]);
+
+    const sent = (await send(member, channel.id, 'hey @everyone')).body.message;
+    expect(sent.pingedHandles).toEqual([]);
+    expect((await pingRows(sent.id)).map((r: any) => r.userId).sort()).toEqual(
+      [owner.user.id, third.user.id].sort()
+    );
+    expect(await mentionCount(owner)).toBe(1);
+    expect(await mentionCount(third)).toBe(1);
+    expect(await mentionCount(member)).toBe(0);
+  });
+
+  test('@everyone together with a handle pings each member once and lists only the handle', async () => {
+    const { owner, member, channel } = await primed();
+    const sent = (await send(owner, channel.id, `@everyone ${handle(member)}`)).body.message;
+    expect(sent.pingedHandles).toEqual([handle(member)]);
+    expect((await pingRows(sent.id)).map((r: any) => r.userId)).toEqual([member.user.id]);
+  });
+
+  test('look-alikes of @everyone do not ping', async () => {
+    const { owner, channel } = await primed();
+    for (const content of [
+      '@everyones',
+      'mail@everyone',
+      '@everyone:localhost',
+      'https://example.test/@everyone',
+    ]) {
+      expect(await pingRows((await send(owner, channel.id, content)).body.message.id)).toHaveLength(
+        0
+      );
+    }
+  });
+
+  test('editing a message to add @everyone pings the members not pinged yet', async () => {
+    const { owner, member, channel } = await primed();
+    const msg = (await send(owner, channel.id, 'soon')).body.message;
+    await call(owner, 'POST', '/message/edit', {
+      channelId: channel.id,
+      messageId: msg.id,
+      content: 'now @everyone',
+    });
+    expect((await pingRows(msg.id)).map((r: any) => r.userId)).toEqual([member.user.id]);
+  });
+
+  test('@everyone in a DM pings nobody', async () => {
+    const { owner, member } = await world();
+    await befriend(owner, member);
+    const dm = (await call(owner, 'POST', '/dm', { userId: member.user.id })).body;
+    const sent = (await send(owner, dm.id, '@everyone')).body.message;
+    expect(await pingRows(sent.id)).toHaveLength(0);
+  });
+
   test('handles match case-insensitively and are deduplicated', async () => {
     const { owner, member, channel } = await primed();
     const h = handle(member);
