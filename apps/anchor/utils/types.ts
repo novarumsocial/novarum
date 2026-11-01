@@ -9,24 +9,12 @@ export type RealtimeEvent =
         ownerId: string;
         avatarUrl: string | null;
         description: string | null;
-        channels: {
-          id: string;
-          name: string;
-          position: number;
-          type: 'TEXT' | 'VOICE';
-          guildId: string;
-        }[];
+        channels: GuildChannel[];
       };
     }
   | {
-      type: 'channel.created';
-      data: {
-        id: string;
-        name: string;
-        position: number;
-        type: 'TEXT' | 'VOICE';
-        guildId: string;
-      };
+      type: 'channel.created' | 'channel.updated';
+      data: GuildChannel;
     }
   | {
       type: 'message.created';
@@ -110,13 +98,7 @@ export type RealtimeEvent =
       type: 'guild.channels.snapshot';
       data: {
         guildId: string;
-        channels: {
-          id: string;
-          name: string;
-          position: number;
-          type: 'TEXT' | 'VOICE';
-          guildId: string;
-        }[];
+        channels: GuildChannel[];
       };
     }
   | {
@@ -129,6 +111,15 @@ export type RealtimeEvent =
         user: PublicUser;
       };
     };
+
+export type GuildChannel = {
+  id: string;
+  name: string;
+  position: number;
+  type: 'TEXT' | 'VOICE';
+  guildId: string;
+  ownerOnly: boolean;
+};
 
 export type AttachmentPayload = {
   id: string;

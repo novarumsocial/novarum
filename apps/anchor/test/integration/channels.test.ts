@@ -176,6 +176,82 @@ describe('order', () => {
   });
 });
 
+describe('owner-only', () => {
+  const ownerOnly = (user: Parameters<typeof call>[0], channelId: string, value = true) =>
+    call(user, 'PATCH', `/channel/${channelId}`, { ownerOnly: value });
+
+  test('channels start open, and the owner can mark one owner-only and back', async () => {
+    const { owner, member, guild, channel } = await world();
+    expect((await channelsOf(member, guild.id))[0].ownerOnly).toBe(false);
+
+    const res = await ownerOnly(owner, channel.id);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: channel.id, guildId: guild.id, ownerOnly: true });
+    expect((await channelsOf(member, guild.id))[0].ownerOnly).toBe(true);
+
+    expect((await ownerOnly(owner, channel.id, false)).body.ownerOnly).toBe(false);
+    expect((await send(member, channel.id, 'open again')).status).toBe(200);
+  });
+
+  test('only the owner can send in an owner-only channel; reading still works', async () => {
+    const { owner, member, stranger, channel } = await world();
+    await ownerOnly(owner, channel.id);
+
+    const refused = await send(member, channel.id, 'hi');
+    expect(refused.status).toBe(403);
+    expect((await send(stranger, channel.id, 'hi')).status).toBe(403);
+    expect((await send(owner, channel.id, 'announcement')).status).toBe(200);
+
+    const messages = (await list(member, channel.id)).body.messages;
+    expect(messages.map((m: any) => m.content)).toEqual(['announcement']);
+  });
+
+  test('a retried nonce from before the switch does not let a member post', async () => {
+    const { owner, member, channel } = await world();
+    const first = await send(member, channel.id, 'before');
+    await ownerOnly(owner, channel.id);
+    const retry = await call(member, 'POST', '/message/send', {
+      channelId: channel.id,
+      content: 'before',
+      nonce: first.body.message.nonce,
+    });
+    expect(retry.status).toBe(403);
+  });
+
+  test('members and non-members get 403, unknown channel 404, federated 400, DMs 404', async () => {
+    const { owner, member, stranger, channel } = await world();
+    expect((await ownerOnly(member, channel.id)).status).toBe(403);
+    expect((await ownerOnly(stranger, channel.id)).status).toBe(403);
+    expect((await ownerOnly(owner, 'nope')).status).toBe(404);
+    expect((await ownerOnly(owner, 'fed:channel:remote.example:c1')).status).toBe(400);
+
+    await befriend(owner, member);
+    const dm = (await call(owner, 'POST', '/dm', { userId: member.user.id })).body;
+    expect((await ownerOnly(owner, dm.id)).status).toBe(404);
+    expect((await channelsOf(owner, (await createGuild(owner)).guild.id))[0].ownerOnly).toBe(false);
+  });
+
+  test('the body must be a boolean ownerOnly', async () => {
+    const { owner, channel } = await world();
+    for (const body of [{}, { ownerOnly: 'yes' }, { ownerOnly: null }, { ownerOnly: 1 }]) {
+      expect((await call(owner, 'PATCH', `/channel/${channel.id}`, body)).status).toBe(422);
+    }
+  });
+
+  test('members get channel.updated through the realtime guild events', async () => {
+    const { owner, member, guild, channel } = await world();
+    const ws = await openRealtime(anchor.url, member.cookie);
+    try {
+      await Bun.sleep(200);
+      await ownerOnly(owner, channel.id);
+      const event = await ws.waitFor('channel.updated', (e) => e.data?.id === channel.id);
+      expect(event.data).toMatchObject({ guildId: guild.id, ownerOnly: true });
+    } finally {
+      ws.close();
+    }
+  });
+});
+
 describe('users', () => {
   test('members see the whole roster with roles', async () => {
     const { owner, member, guild, channel } = await world();

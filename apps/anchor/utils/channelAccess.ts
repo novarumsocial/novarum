@@ -25,3 +25,13 @@ export async function canAccessChannel(channel: AccessibleChannel, userId: strin
   );
   return friendships.every((friendship) => friendship?.status === 'ACCEPTED');
 }
+
+// owner-only guild channels take messages from the guild owner alone
+export async function canSendInChannel(
+  channel: { guildId: string | null; ownerOnly: boolean },
+  userId: string
+) {
+  if (!channel.guildId || !channel.ownerOnly) return true;
+  const guild = await db.query.guilds.findFirst({ where: { id: channel.guildId } });
+  return guild?.ownerId === userId;
+}

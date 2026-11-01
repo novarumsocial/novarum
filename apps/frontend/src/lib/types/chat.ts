@@ -25,6 +25,7 @@ export interface Channel {
   lastReadMessageId: string | null;
   mention: number;
   type: 'TEXT' | 'VOICE' | 'DM';
+  ownerOnly?: boolean;
   avatarUrl?: string | null;
   avatarColor?: string | null;
 }

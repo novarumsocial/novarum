@@ -210,6 +210,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
                 position: channel.position,
                 type: channel.type as 'TEXT' | 'VOICE',
                 guildId: guild.id,
+                ownerOnly: channel.ownerOnly,
               },
             ],
           },
@@ -369,6 +370,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
                 name: channel.name,
                 position: channel.position,
                 type: channel.type as 'TEXT' | 'VOICE',
+                ownerOnly: channel.ownerOnly,
                 lastReadMessageId: readState?.lastReadMessageId ?? latestMessage?.id ?? null,
                 unread: Boolean(
                   latestMessage &&

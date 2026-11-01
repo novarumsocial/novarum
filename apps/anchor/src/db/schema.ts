@@ -181,6 +181,8 @@ export const channels = pgTable(
     // TEXT, VOICE, DM, GROUP_DM
     type: text('type').notNull().default('TEXT'),
     position: integer('position').notNull().default(0),
+    // only the guild owner can send messages
+    ownerOnly: boolean('ownerOnly').notNull().default(false),
 
     // sorted "userIdA:userIdB" for a 1:1 DM, so opening a DM is idempotent.
     // null for guild channels and group DMs.

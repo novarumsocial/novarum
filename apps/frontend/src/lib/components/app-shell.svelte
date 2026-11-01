@@ -272,6 +272,8 @@
             onReorderChannels={(channelIds) => chat.reorderChannels(currentServer.id, channelIds)}
             onSaveChannelOrder={async (channelIds) =>
               await chat.saveChannelOrder(currentServer.id, channelIds)}
+            onSetOwnerOnly={(channelId, ownerOnly) =>
+              void chat.setOwnerOnly(currentServer.id, channelId, ownerOnly)}
             canReorder={currentServer.canManageChannels}
             {voice}
             members={chat.members}

@@ -68,7 +68,7 @@ async function snapshotEvents(source: Source, id: string) {
     const channels = await db.query.channels.findMany({
       where: { guildId: id },
       orderBy: { position: 'asc' },
-      columns: { id: true, guildId: true, name: true, position: true, type: true },
+      columns: { id: true, guildId: true, name: true, position: true, type: true, ownerOnly: true },
     });
     events.push({ type: 'guild.channels.snapshot', data: { guildId: id, channels } });
   }

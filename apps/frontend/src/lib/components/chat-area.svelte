@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { BellRing, Hash, Menu, Phone, RotateCw, Users, Volume2, X } from '@lucide/svelte';
+  import {
+    BellRing,
+    Hash,
+    Megaphone,
+    Menu,
+    Phone,
+    RotateCw,
+    Users,
+    Volume2,
+    X,
+  } from '@lucide/svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { tick, type Snippet } from 'svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -517,10 +527,21 @@
       </div>
     {/if}
 
-    <MessageInput
-      placeholder={channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`}
-      onSend={sendMessage}
-      onTyping={() => chat.onTyping()}
-    />
+    {#if chat.canSendInCurrentChannel}
+      <MessageInput
+        placeholder={channel.type === 'DM'
+          ? `Message @${channel.name}`
+          : `Message #${channel.name}`}
+        onSend={sendMessage}
+        onTyping={() => chat.onTyping()}
+      />
+    {:else}
+      <div
+        class="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-border px-3 text-sm text-muted-foreground"
+      >
+        <Megaphone class="size-4" />
+        Only the server owner can send messages in this channel.
+      </div>
+    {/if}
   </div>
 </div>

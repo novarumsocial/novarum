@@ -16,6 +16,7 @@ import { createMessage, deleteMessage, editMessage, pingedUserIds } from '../../
 import { getPingRecipients, messageEdited, verifyPendingAttachments } from '../../message/services';
 import { createPendingAttachment } from '../../upload/services';
 import { getFederatedChannelAccess } from '../access';
+import { canSendInChannel } from '../../../utils/channelAccess';
 import { federationAuth } from '../plugin';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
 
@@ -109,6 +110,9 @@ export const messageRoutes = new Elysia()
 
       const access = await getFederatedChannelAccess(params.id, remoteUser, true);
       if (!access.ok) return status(access.status, { error: access.error });
+      if (!(await canSendInChannel(access.channel, access.user.id))) {
+        return status(403, { error: 'Only the guild owner can send messages in this channel' });
+      }
 
       const replyTarget = replyTo
         ? await db.query.messages.findFirst({ where: { id: replyTo, channelId: params.id } })

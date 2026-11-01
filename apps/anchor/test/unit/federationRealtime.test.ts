@@ -46,6 +46,7 @@ const fixtures: Record<string, unknown> = {
     channels: [channel, { ...channel, id: 'c2', position: 1 }],
   },
   'channel.created': channel,
+  'channel.updated': { ...channel, ownerOnly: true },
   'message.created': message,
   'message.updated': { ...message, edited: true },
   'message.deleted': { id: 'm1', channelId: 'c1', guildId: 'g1' },
@@ -72,6 +73,10 @@ const fixtures: Record<string, unknown> = {
     time: '2026-01-01T00:00:00.000Z',
   },
   'guild.channels.reordered': { guildId: 'g1', channelIds: ['c1', 'c2'] },
+  'guild.channels.snapshot': {
+    guildId: 'g1',
+    channels: [channel, { ...channel, id: 'c2', position: 1, ownerOnly: true }],
+  },
 };
 const parse = (type: string, data: unknown = fixtures[type]) =>
   parseRealtimeEvent(JSON.stringify({ type, data }));
@@ -104,6 +109,11 @@ describe('realtimeEventSchema', () => {
     const { replyTo: _r, pingedHandles: _p, ...old } = message;
     const event = parse('message.created', old);
     expect(event).toMatchObject({ data: { replyTo: null, pingedHandles: [] } });
+  });
+
+  test('channels from older peers (no ownerOnly) are not owner-only', () => {
+    expect(parse('channel.created')).toMatchObject({ data: { ownerOnly: false } });
+    expect(parse('channel.updated')).toMatchObject({ data: { ownerOnly: true } });
   });
 });
 
@@ -152,8 +162,8 @@ describe('mapFederatedRealtimeEvent', () => {
     for (const c of data.channels) guildOnce(c.guildId, 'g1');
   });
 
-  test('channel.created', () => {
-    const { data } = map('channel.created');
+  test.each(['channel.created', 'channel.updated'])('%s', (type) => {
+    const { data } = map(type);
     channelOnce(data.id, 'c1');
     guildOnce(data.guildId, 'g1');
   });

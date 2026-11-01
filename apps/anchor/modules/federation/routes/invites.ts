@@ -121,6 +121,7 @@ export const invites = new Elysia()
           name: channel.name,
           position: channel.position,
           type: channel.type as 'TEXT' | 'VOICE',
+          ownerOnly: channel.ownerOnly,
         })),
       };
     },

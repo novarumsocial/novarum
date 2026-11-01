@@ -253,6 +253,17 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
+  '20261101140313_steady_pestilence': {
+    check: async (url) => {
+      // every existing channel, guild or DM, stays open to everyone
+      expect(await rows(url, `SELECT id FROM channel WHERE "ownerOnly" IS NOT FALSE`)).toHaveLength(
+        0
+      );
+      expect(
+        await rows(url, `SELECT id FROM channel WHERE id = 'fed:channel:remote.example:c9'`)
+      ).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

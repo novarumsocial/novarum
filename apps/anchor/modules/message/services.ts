@@ -6,7 +6,7 @@ import { callRemote, federationChannelPath, passThrough } from '../../utils/fede
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles } from '../../utils/mentions';
-import { canAccessChannel } from '../../utils/channelAccess';
+import { canAccessChannel, canSendInChannel } from '../../utils/channelAccess';
 import { dmRecipients, notifyInBackground } from '../../utils/notify';
 import { db } from '../../src/db';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from './store';
@@ -179,6 +179,11 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         }
 
         return { message: mappedMessage };
+      }
+
+      // a federated channel's host checks this itself: our copy of its guild has no real owner
+      if (!(await canSendInChannel(channel, session.userId))) {
+        return status(403, { error: 'Only the guild owner can send messages in this channel' });
       }
 
       const priorMsg = await db.query.messages.findFirst({

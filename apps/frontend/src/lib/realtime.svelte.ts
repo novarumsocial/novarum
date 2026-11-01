@@ -56,6 +56,7 @@ const channelSchema = z.object({
   position: z.number(),
   type: channelTypeSchema,
   guildId: z.string(),
+  ownerOnly: z.boolean().default(false),
 });
 
 // eden revives ISO date strings in ws payloads into Date objects, so every date field
@@ -99,6 +100,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('channel.created'),
+    data: channelSchema,
+  }),
+  z.object({
+    type: z.literal('channel.updated'),
     data: channelSchema,
   }),
   z.object({
@@ -371,6 +376,9 @@ class RealtimeState {
       }
       if (event.type === 'channel.created') {
         chat.addChannel(event.data);
+      }
+      if (event.type === 'channel.updated') {
+        chat.setChannelOwnerOnly(event.data.guildId, event.data.id, event.data.ownerOnly);
       }
       if (event.type === 'message.created') {
         const user = useSession().user;

@@ -254,6 +254,7 @@ async function guildChannels(guildId: string) {
     name: channel.name,
     position: channel.position,
     type: channel.type as 'TEXT' | 'VOICE',
+    ownerOnly: channel.ownerOnly,
   }));
 }
 
@@ -273,6 +274,7 @@ type RemoteInviteAccept = {
     name: string;
     position: number;
     type: 'TEXT' | 'VOICE';
+    ownerOnly: boolean;
   }>;
 };
 
@@ -319,6 +321,7 @@ async function persistFederatedInviteSnapshot(session: Session, homeserver: stri
       name: channel.name,
       position: channel.position,
       type: channel.type,
+      ownerOnly: channel.ownerOnly,
     };
     await db
       .insert(dbChannels)
@@ -397,6 +400,8 @@ function parseRemoteInviteAccept(
       name: channelName,
       position,
       type,
+      // older homeservers don't send it
+      ownerOnly: property(channel, 'ownerOnly') === true,
     });
   }
 

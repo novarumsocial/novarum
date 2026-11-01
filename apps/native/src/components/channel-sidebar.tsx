@@ -13,6 +13,7 @@ import {
   HeadphoneOff,
   IdCardLanyard,
   Link,
+  Megaphone,
   MicOff,
   Pencil,
   Plus,
@@ -406,6 +407,16 @@ export const ChannelSidebar = memo(function ChannelSidebar({
               disabled={position < 0 || position >= siblings.length - 1}
               onPress={() => move(1)}
             />
+            {channel?.type === 'TEXT' && (
+              <SheetItem
+                icon={Megaphone}
+                label={channel.ownerOnly ? 'Let Everyone Send' : 'Only Owner Can Send'}
+                onPress={() => {
+                  void chat().setOwnerOnly(server.id, channel.id, !channel.ownerOnly);
+                  setMenu(null);
+                }}
+              />
+            )}
           </>
         )}
         <SheetItem

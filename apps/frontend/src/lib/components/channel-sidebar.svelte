@@ -19,6 +19,7 @@
     Trash2,
     CopyPlus,
     Link,
+    Megaphone,
   } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import { flip } from 'svelte/animate';
@@ -46,6 +47,7 @@
     onCreateChannel,
     onReorderChannels,
     onSaveChannelOrder,
+    onSetOwnerOnly,
     canReorder = false,
     voice,
     members = [],
@@ -58,6 +60,7 @@
     onCreateChannel?: (channel: Channel) => Promise<Channel | void>;
     onReorderChannels: (channelIds: string[]) => void;
     onSaveChannelOrder: (channelIds: string[]) => Promise<void>;
+    onSetOwnerOnly?: (channelId: string, ownerOnly: boolean) => void;
     canReorder?: boolean;
     voice?: Voice | null;
     members?: Author[];
@@ -461,6 +464,15 @@
                   </ContextMenu.Item>
 
                   {#if server.canManageChannels}
+                    {#if ch.type === 'TEXT'}
+                      <ContextMenu.CheckboxItem
+                        checked={ch.ownerOnly ?? false}
+                        onCheckedChange={(checked) => onSetOwnerOnly?.(ch.id, checked)}
+                      >
+                        <Megaphone class="size-4" />
+                        Only Owner Can Send
+                      </ContextMenu.CheckboxItem>
+                    {/if}
                     <ContextMenu.Item>
                       <CopyPlus class="size-4" />
                       Duplicate Channel

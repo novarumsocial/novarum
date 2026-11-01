@@ -75,6 +75,10 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
     data: channelResponseSchema,
   }),
   z.object({
+    type: z.literal('channel.updated'),
+    data: channelResponseSchema,
+  }),
+  z.object({
     type: z.literal('message.created'),
     data: messageEventDataSchema,
   }),
@@ -209,6 +213,12 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
           await tx.insert(channels).values(event.data).onConflictDoNothing();
         });
       }
+      if (event.type === 'channel.updated') {
+        await db
+          .update(channels)
+          .set({ ownerOnly: event.data.ownerOnly })
+          .where(and(eq(channels.guildId, guildId), eq(channels.id, event.data.id)));
+      }
       // sent when we (re)connect: brings our copy up to date with whatever we missed, and tells
       // our clients through the events they already know
       if (event.type === 'guild.channels.snapshot') {
@@ -221,24 +231,31 @@ export async function ensureFederatedGuildRealtimeBridge(server: Server, guildId
         const unchanged =
           known.length === channelIds.length &&
           event.data.channels.every(
-            ({ id, name, type }, i) =>
-              known[i]?.id === id && known[i]?.name === name && known[i]?.type === type
+            ({ id, name, type, ownerOnly }, i) =>
+              known[i]?.id === id &&
+              known[i]?.name === name &&
+              known[i]?.type === type &&
+              known[i]?.ownerOnly === ownerOnly
           );
         if (unchanged) return;
 
         await db.transaction(async (tx) => {
-          for (const [position, { id, name, type }] of event.data.channels.entries()) {
+          for (const [position, { id, name, type, ownerOnly }] of event.data.channels.entries()) {
             await tx
               .insert(channels)
-              .values({ id, guildId, name, position, type })
-              .onConflictDoUpdate({ target: channels.id, set: { name, position, type } });
+              .values({ id, guildId, name, position, type, ownerOnly })
+              .onConflictDoUpdate({
+                target: channels.id,
+                set: { name, position, type, ownerOnly },
+              });
           }
         });
-        const knownIds = new Set(known.map((channel) => channel.id));
+        const knownById = new Map(known.map((channel) => [channel.id, channel]));
         for (const [position, channel] of event.data.channels.entries()) {
-          if (knownIds.has(channel.id)) continue;
+          const old = knownById.get(channel.id);
+          if (old && old.ownerOnly === channel.ownerOnly) continue;
           publishRealtime(server, `guildEvents:${guildId}`, {
-            type: 'channel.created',
+            type: old ? 'channel.updated' : 'channel.created',
             data: { ...channel, guildId, position },
           });
         }
@@ -564,6 +581,7 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
         },
       };
     case 'channel.created':
+    case 'channel.updated':
       return {
         ...event,
         data: { ...event.data, id: channel(event.data.id), guildId: guild(event.data.guildId) },

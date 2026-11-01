@@ -32,6 +32,7 @@ type AddChannelInput = {
   unread?: boolean;
   lastReadMessageId?: string | null;
   mention?: number;
+  ownerOnly?: boolean;
 };
 
 type AddMessageInput = {
@@ -257,6 +258,10 @@ export const selectCurrentChannel = (state: ChatStateData): Channel | null => {
   return null;
 };
 
+// owner-only channels only take messages from the guild owner, the one who can manage channels
+export const selectCanSendInCurrentChannel = (state: ChatStateData) =>
+  !selectCurrentChannel(state)?.ownerOnly || !!selectCurrentServer(state)?.canManageChannels;
+
 export const selectCurrentMessages = (state: ChatStateData) => {
   const channel = selectCurrentChannel(state);
   return channel ? (state.messagesByChannel[channel.id] ?? noMessages) : noMessages;
@@ -368,6 +373,8 @@ type ChatState = {
   reorderGuilds: (guilds: string[]) => Promise<void>;
   reorderChannels: (guildId: string, channelIds: string[]) => void;
   saveChannelOrder: (guildId: string, channelIds: string[]) => Promise<void>;
+  setChannelOwnerOnly: (guildId: string, channelId: string, ownerOnly: boolean) => void;
+  setOwnerOnly: (guildId: string, channelId: string, ownerOnly: boolean) => Promise<void>;
   // native-only: the web reloads the page when the account changes
   reset: () => void;
 };
@@ -688,6 +695,9 @@ export const useChat = create<ChatState>((set, get) => {
           channel.lastReadMessageId,
           channel.mention
         );
+        if (channel.ownerOnly !== undefined) {
+          get().setChannelOwnerOnly(channel.guildId, channel.id, channel.ownerOnly);
+        }
         return existingChannel;
       }
 
@@ -699,6 +709,7 @@ export const useChat = create<ChatState>((set, get) => {
         lastReadMessageId: channel.lastReadMessageId ?? null,
         mention: channel.mention ?? 0,
         type: channelTypeFor(channel.type),
+        ownerOnly: channel.ownerOnly ?? false,
       };
 
       const textCategoryIndex = categories.findIndex((category) => category.id === 'text');
@@ -1145,6 +1156,25 @@ export const useChat = create<ChatState>((set, get) => {
 
     async saveChannelOrder(guildId, channelIds) {
       await anchor().client.channel.order.patch({ guildId, channelIds });
+    },
+
+    setChannelOwnerOnly(guildId, channelId, ownerOnly) {
+      get().setGuildCategories(
+        guildId,
+        (get().channelsByServer[guildId] ?? []).map((category) => ({
+          ...category,
+          channels: category.channels.map((channel) =>
+            channel.id === channelId ? { ...channel, ownerOnly } : channel
+          ),
+        }))
+      );
+    },
+
+    async setOwnerOnly(guildId, channelId, ownerOnly) {
+      const result = await anchor().client.channel({ id: channelId }).patch({ ownerOnly });
+      if (result.error || !result.data) return;
+
+      get().setChannelOwnerOnly(guildId, channelId, result.data.ownerOnly);
     },
 
     reset() {

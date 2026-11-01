@@ -47,13 +47,18 @@ export const channelResponseSchema = createSelectSchema(channels, {
   type: channelTypeSchema,
   guildId: z.string(),
   position: z.number(),
+  // older homeservers don't send it
+  ownerOnly: z.boolean().default(false),
 }).pick({
   id: true,
   guildId: true,
   name: true,
   type: true,
   position: true,
+  ownerOnly: true,
 });
+
+export const channelUpdateSchema = z.object({ ownerOnly: z.boolean() });
 
 export const attachmentResponseSchema = createSelectSchema(attachments, { size: z.number() })
   .pick({

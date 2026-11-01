@@ -133,6 +133,14 @@ const guildRoutes: Route[] = [
     body: async (fx) => ({ guildId: fx.guild.id, channelIds: await fx.channelIds() }),
     expected: [401, 403, 403, 200],
   },
+  // ownerOnly: false keeps the channel open for the other cells
+  {
+    key: 'PATCH /channel/{id}',
+    method: 'PATCH',
+    path: (fx) => `/channel/${fx.channel.id}`,
+    body: () => ({ ownerOnly: false }),
+    expected: [401, 403, 403, 200],
+  },
   {
     key: 'GET /channel/{id}/users',
     method: 'GET',

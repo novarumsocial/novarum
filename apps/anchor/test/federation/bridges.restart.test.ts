@@ -74,6 +74,7 @@ test('channels created and reordered while B was down show up once its bridge re
     guildId: guild.id,
     channelIds: [channel.id, missed.id],
   });
+  await call(owner, 'PATCH', `/channel/${channel.id}`, { ownerOnly: true });
   await start('b');
 
   const rt2 = await connect(member);
@@ -94,5 +95,11 @@ test('channels created and reordered while B was down show up once its bridge re
   expect(created.data).toMatchObject({ id: expected[1], guildId: shadowGuild });
   const reordered = await rt2.waitFor('guild.channels.reordered');
   expect(reordered.data).toEqual({ guildId: shadowGuild, channelIds: expected });
+  const updated = await rt2.waitFor('channel.updated', (e) => e.data.id === shadowChannel);
+  expect(updated.data.ownerOnly).toBe(true);
+  const list = await call(member, 'GET', '/guilds/list');
+  expect(
+    list.body.guilds.find((g: any) => g.id === shadowGuild).channels.map((c: any) => c.ownerOnly)
+  ).toEqual([true, false]);
   rt2.close();
 });

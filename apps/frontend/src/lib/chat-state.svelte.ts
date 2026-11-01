@@ -27,6 +27,7 @@ type AddChannelInput = {
   unread?: boolean;
   lastReadMessageId?: string | null;
   mention?: number;
+  ownerOnly?: boolean;
 };
 
 type AddMessageInput = {
@@ -231,6 +232,11 @@ class ChatState {
     return null;
   }
 
+  // owner-only channels only take messages from the guild owner, the one who can manage channels
+  get canSendInCurrentChannel() {
+    return !this.currentChannel?.ownerOnly || !!this.currentServer?.canManageChannels;
+  }
+
   get currentMessages() {
     return this.currentChannel ? (this.messagesByChannel[this.currentChannel.id] ?? []) : [];
   }
@@ -336,6 +342,9 @@ class ChatState {
         channel.lastReadMessageId,
         channel.mention
       );
+      if (channel.ownerOnly !== undefined) {
+        this.setChannelOwnerOnly(channel.guildId, channel.id, channel.ownerOnly);
+      }
       return existingChannel;
     }
 
@@ -347,6 +356,7 @@ class ChatState {
       lastReadMessageId: channel.lastReadMessageId ?? null,
       mention: channel.mention ?? 0,
       type: channelTypeFor(channel.type),
+      ownerOnly: channel.ownerOnly ?? false,
     };
 
     const textCategoryIndex = categories.findIndex((category) => category.id === 'text');
@@ -970,6 +980,25 @@ class ChatState {
         ),
       }))
     );
+  }
+
+  setChannelOwnerOnly(guildId: string, channelId: string, ownerOnly: boolean) {
+    this.setGuildCategories(
+      guildId,
+      (this.channelsByServer[guildId] ?? []).map((category) => ({
+        ...category,
+        channels: category.channels.map((channel) =>
+          channel.id === channelId ? { ...channel, ownerOnly } : channel
+        ),
+      }))
+    );
+  }
+
+  async setOwnerOnly(guildId: string, channelId: string, ownerOnly: boolean) {
+    const result = await anchor.client.channel({ id: channelId }).patch({ ownerOnly });
+    if (result.error || !result.data) return;
+
+    this.setChannelOwnerOnly(guildId, channelId, result.data.ownerOnly);
   }
 
   async saveChannelOrder(guildId: string, channelIds: string[]) {

@@ -4,7 +4,17 @@
 // in place while you're at the bottom.
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { BellRing, ChevronDown, Hash, Phone, Reply, RotateCw, Users, X } from 'lucide-react-native';
+import {
+  BellRing,
+  ChevronDown,
+  Hash,
+  Megaphone,
+  Phone,
+  Reply,
+  RotateCw,
+  Users,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
@@ -33,7 +43,13 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
-import { chat, useChat, type PickedFile, type TypingInput } from '@/lib/chat-state';
+import {
+  chat,
+  selectCanSendInCurrentChannel,
+  useChat,
+  type PickedFile,
+  type TypingInput,
+} from '@/lib/chat-state';
 import { useDms } from '@/lib/dms';
 import { formatDate } from '@/lib/format-date';
 import { useSession } from '@/lib/session';
@@ -211,6 +227,7 @@ export function ChatArea({
   const circleIcons = useSettings((s) => s.circleIcons);
   const selfHandle = useSession((s) => s.user?.handle.toLowerCase());
   const typing = useChat((s) => s.typingByChannel[channel.id] ?? noTyping);
+  const canSend = useChat(selectCanSendInCurrentChannel);
   const olderLoading = useChat((s) => s.loadingOlderByChannel[channel.id] ?? false);
   const callers = useChat((s) =>
     channel.type === 'DM' ? (s.voiceStates[channel.id] ?? noCallers) : noCallers
@@ -644,14 +661,23 @@ export function ChatArea({
           </View>
         )}
 
-        <MessageInput
-          placeholder={
-            channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`
-          }
-          onSend={sendMessage}
-          onTyping={() => void chat().onTyping()}
-          focusOn={replyingTo?.id ?? null}
-        />
+        {canSend ? (
+          <MessageInput
+            placeholder={
+              channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`
+            }
+            onSend={sendMessage}
+            onTyping={() => void chat().onTyping()}
+            focusOn={replyingTo?.id ?? null}
+          />
+        ) : (
+          <View className="min-h-12 flex-row items-center justify-center gap-2 border-t border-border px-3">
+            <Icon as={Megaphone} size={16} className="text-muted-foreground" />
+            <Text className="text-sm text-muted-foreground">
+              Only the server owner can send messages in this channel.
+            </Text>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </View>
   );

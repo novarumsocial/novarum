@@ -24,6 +24,7 @@ import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import {
   channelCreateSchema,
   channelResponseSchema,
+  channelUpdateSchema,
   channelUsersResponseSchema,
 } from '../../src/db/zod';
 
@@ -186,6 +187,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         position: channel.position,
         type,
         guildId: channel.guildId!,
+        ownerOnly: channel.ownerOnly,
       };
 
       if (server) {
@@ -206,6 +208,57 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         500: genericResponseErrorSchema,
+      },
+    }
+  )
+  .patch(
+    '/:id',
+    async ({ params, body, session, server, status }) => {
+      if (!session) return status(401, { error: 'Unauthorized' });
+      if (parseFederatedChannelId(params.id)) {
+        return status(400, { error: 'Cannot edit channels on a federated guild' });
+      }
+
+      const channel = await db.query.channels.findFirst({
+        where: { id: params.id },
+        with: { guild: true },
+      });
+      if (!channel?.guild) return status(404, { error: 'Channel not found' });
+      if (channel.guild.ownerId !== session.userId) {
+        return status(403, { error: 'Unauthorized' });
+      }
+
+      const [updated] = await db
+        .update(channels)
+        .set({ ownerOnly: body.ownerOnly })
+        .where(eq(channels.id, channel.id))
+        .returning();
+      const updatedChannel = {
+        id: updated!.id,
+        name: updated!.name,
+        position: updated!.position,
+        type: updated!.type as 'TEXT' | 'VOICE',
+        guildId: channel.guild.id,
+        ownerOnly: updated!.ownerOnly,
+      };
+
+      if (server) {
+        publishRealtime(server, `guildEvents:${channel.guild.id}`, {
+          type: 'channel.updated',
+          data: updatedChannel,
+        });
+      }
+
+      return updatedChannel;
+    },
+    {
+      body: channelUpdateSchema,
+      response: {
+        200: channelResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
       },
     }
   )

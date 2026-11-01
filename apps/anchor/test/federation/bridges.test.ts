@@ -106,6 +106,27 @@ describe('events from a host guild reach the member server, with mapped ids', ()
     rt.close();
   });
 
+  test('owner-only reaches the member server, whose users then cannot send there', async () => {
+    const { owner, member, channel, shadowGuild, shadowChannel, rt } = await joinedRoom();
+    expect((await call(owner, 'PATCH', `/channel/${channel.id}`, { ownerOnly: true })).status).toBe(
+      200
+    );
+    const updated = await rt.waitFor('channel.updated', (e) => e.data.id === shadowChannel);
+    expect(updated.data).toMatchObject({ guildId: shadowGuild, ownerOnly: true });
+    const listed = (await call(member, 'GET', '/guilds/list')).body.guilds
+      .find((g: any) => g.id === shadowGuild)
+      .channels.find((c: any) => c.id === shadowChannel);
+    expect(listed.ownerOnly).toBe(true);
+
+    expect((await send(member, shadowChannel, 'nope')).status).toBe(403);
+    // B can't flip it on the host's behalf
+    expect(
+      (await call(member, 'PATCH', `/channel/${shadowChannel}`, { ownerOnly: false })).status
+    ).toBe(400);
+    expect((await send(owner, channel.id, 'still open to the owner')).status).toBe(200);
+    rt.close();
+  });
+
   test('voice presence on the host is relayed with mapped ids', async () => {
     const { owner, guild, shadowGuild, rt } = await joinedRoom();
     const vc = (
