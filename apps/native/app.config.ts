@@ -39,7 +39,7 @@ const config: ExpoConfig = {
     package: 'me.novarum.mobile',
     // CI passes its run number, so every build installs as an update (the Capacitor app was 1)
     versionCode: Number(process.env.BUILD_NUMBER ?? 1),
-    adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#0c090c' },
+    adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#050711' },
     permissions: [
       'RECORD_AUDIO',
       'CAMERA',
@@ -65,7 +65,7 @@ const config: ExpoConfig = {
     'expo-router',
     [
       'expo-splash-screen',
-      { image: './assets/icon.png', imageWidth: 160, backgroundColor: '#0c090c' },
+      { image: './assets/icon.png', imageWidth: 160, backgroundColor: '#050711' },
     ],
     'expo-font',
     'expo-image-picker',
