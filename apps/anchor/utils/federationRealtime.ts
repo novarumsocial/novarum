@@ -15,6 +15,7 @@ import { subscribeMessages, type SharedKind } from './federationSharedSocket';
 import type { RealtimeEvent, VoicePresence } from './types';
 import { publishRealtime, publishToChannel } from './publishRealtime';
 import { publicUserSchema } from './publicUser';
+import { localUserIds, vetLocalIdentity } from './federatedLocalUser';
 import {
   attachmentResponseSchema,
   channelResponseSchema,
@@ -188,6 +189,8 @@ type Bridge = {
   remoteId: string;
   // publishes an event to our own clients
   handler: (event: RealtimeEvent) => void | Promise<void>;
+  // events are vetted one at a time so they reach our clients in order
+  queue?: Promise<void>;
 };
 
 // every bridge that is running or waiting to reconnect, by our id for it
@@ -354,11 +357,60 @@ async function openSignedSocket(remote: { baseUrl: string }, path: string) {
   return new WebSocket(url);
 }
 
-// An event from the host: map its ids to ours, remember who is in a call and publish it.
+// An event from the host: map its ids to ours, check who it claims to be from, remember who is in
+// a call and publish it.
 function receive(bridge: Bridge, event: RealtimeEvent) {
-  const mapped = mapFederatedRealtimeEvent(event, bridge.homeserver);
-  trackBridgedVoicePresence(bridge.id, mapped);
-  publish(bridge, mapped);
+  bridge.queue = (bridge.queue ?? Promise.resolve())
+    .then(async () => {
+      const vetted = await vetBridgedEvent(
+        bridge,
+        mapFederatedRealtimeEvent(event, bridge.homeserver)
+      );
+      if (!vetted) return;
+      trackBridgedVoicePresence(bridge.id, vetted);
+      publish(bridge, vetted);
+    })
+    .catch((error) => console.warn(`Failed to vet bridged event for ${bridge.id}:`, error));
+}
+
+export async function vetBridgedEvent(
+  bridge: Pick<Bridge, 'id' | 'kind'>,
+  event: RealtimeEvent
+): Promise<RealtimeEvent | null> {
+  const scope =
+    bridge.kind === 'guild'
+      ? { guildId: bridge.id, channelId: '' }
+      : { guildId: null, channelId: bridge.id };
+
+  switch (event.type) {
+    case 'message.created':
+    case 'message.updated': {
+      const author = await vetLocalIdentity(scope, event.data.author);
+      return author && { ...event, data: { ...event.data, author } };
+    }
+    case 'member.joined': {
+      const user = await vetLocalIdentity(scope, event.data.user);
+      return user && { ...event, data: { ...event.data, user } };
+    }
+    case 'call.ringing': {
+      const user = await vetLocalIdentity(scope, event.data.user);
+      return user && { ...event, data: { ...event.data, user } };
+    }
+    case 'channel.typing': {
+      const user = await vetLocalIdentity(scope, event.data);
+      return user && { ...event, data: { ...event.data, displayName: user.displayName } };
+    }
+    case 'user.status.changed':
+    case 'voice.state.changed':
+      return (await localUserIds([event.data.userId])).size ? null : event;
+    case 'voice.states.snapshot': {
+      const forged = await localUserIds(event.data.states.map((state) => state.userId));
+      const states = event.data.states.filter((state) => !forged.has(state.userId));
+      return { ...event, data: { ...event.data, states } };
+    }
+    default:
+      return event;
+  }
 }
 
 // a failing handler must not break the bridge
