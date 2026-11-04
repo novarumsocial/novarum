@@ -1,7 +1,8 @@
 import Elysia from 'elysia';
 import { z } from 'zod';
 import { dmLatestResponseSchema, dmOpenResponseSchema } from '../../../src/db/zod';
-import { db } from '../../../src/db';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { channelMembers, channels, db } from '../../../src/db';
 import { getConfig } from '../../../utils/config';
 import { makeFederatedChannelId } from '../../../utils/federationIds';
 import { federationUserSchema, upsertFederatedUser } from '../../../utils/federationPayload';
@@ -73,7 +74,7 @@ export const dms = new Elysia()
     async ({ payload, origin, server, status }) => {
       // a body that isn't an object has no fields, so every field below counts as missing
       const fields = z.record(z.string(), z.unknown()).catch({}).parse(payload);
-      const channelId = z.string().safeParse(fields.channelId);
+      const channelId = z.string().min(1).max(64).safeParse(fields.channelId);
       if (!channelId.success) return status(400, { error: 'Invalid channel ID' });
       const participants = z.array(federationUserSchema).safeParse(fields.participants);
       if (!participants.success) return status(400, { error: 'Invalid participants' });
@@ -107,6 +108,29 @@ export const dms = new Elysia()
 
       // the ids are rebuilt from the sender's homeserver, so it can only create DMs it hosts
       const shadowId = makeFederatedChannelId(origin.homeserver, channelId.data);
+      const [existing] = await db
+        .select({ id: channelMembers.channelId })
+        .from(channelMembers)
+        .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+        .where(
+          and(
+            eq(channelMembers.userId, others[0]!.id),
+            isNull(channels.guildId),
+            eq(channels.type, 'DM'),
+            inArray(
+              channelMembers.channelId,
+              db
+                .select({ id: channelMembers.channelId })
+                .from(channelMembers)
+                .where(eq(channelMembers.userId, localUser.id))
+            )
+          )
+        )
+        .limit(1);
+      // two users have one DM, so a host can't keep opening new ones (and bridges) for them
+      if (existing && existing.id !== shadowId) {
+        return status(409, { error: 'These users already have a DM' });
+      }
       const membership = await upsertDmShadow(shadowId, localUser.id, [
         localUser.id,
         ...others.map((user) => user.id),
@@ -129,6 +153,7 @@ export const dms = new Elysia()
         ...federationErrors,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
+        409: genericResponseErrorSchema,
       },
     }
   )
