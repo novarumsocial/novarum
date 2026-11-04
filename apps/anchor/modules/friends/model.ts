@@ -209,18 +209,20 @@ export async function applyFriendSnapshot(
     const existing = await db.query.friendRelationships.findFirst({
       where: { userOneId, userTwoId },
     });
+    const localCommand =
+      !!snapshot.commandId &&
+      (existing?.acceptCommandId === snapshot.commandId ||
+        localAcceptanceCommandId === snapshot.commandId);
+    const localRequestStands =
+      (existing?.status === 'PENDING' || existing?.status === 'ACCEPTED') &&
+      existing.requestedById === localUser.id;
+    const claimsLocalRequest = requestedById === localUser.id;
     if (
-      snapshot.status === 'ACCEPTED' &&
-      !(
-        snapshot.commandId &&
-        (existing?.acceptCommandId === snapshot.commandId ||
-          localAcceptanceCommandId === snapshot.commandId)
-      ) &&
-      (!existing ||
-        existing.status === 'NONE' ||
-        (existing.status === 'PENDING' &&
-          existing.requestedById === remoteUser.id &&
-          existing.lastCommandId !== snapshot.commandId))
+      snapshot.status !== 'NONE' &&
+      !localCommand &&
+      (claimsLocalRequest
+        ? !localRequestStands
+        : snapshot.status === 'ACCEPTED' && existing?.status !== 'ACCEPTED')
     ) {
       return {
         ok: false as const,

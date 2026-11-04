@@ -143,7 +143,7 @@ export async function hashSecret(secret: string): Promise<Buffer> {
   return Buffer.from(secretHashBuffer);
 }
 
-function parseSessionToken(token: string): SessionTokenParts | null {
+export function parseSessionToken(token: string): SessionTokenParts | null {
   const [sessionId, sessionSecret, ...extraParts] = token.split('.');
   if (!sessionId || !sessionSecret || extraParts.length > 0) {
     return null;

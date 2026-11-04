@@ -66,7 +66,7 @@ export const user = new Elysia({ prefix: '/user', tags: ['User'] })
         type: 'image/webp',
       });
 
-      const color = await getAverageColor(Buffer.from(avatarArrayBuffer));
+      const color = await getAverageColor(image.data);
 
       const version = Date.now();
       const avatarUrl = new URL(

@@ -16,6 +16,8 @@ import { z } from 'zod';
 import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
+export const maxMessageLength = 4000;
+
 const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
   pingedHandles: z.array(z.string()).optional(),
@@ -121,8 +123,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
     {
       query: t.Object({
         channelId: t.String(),
-        cursor: t.Number(),
-        amount: t.Number({ min: 20, max: 100, default: 50 }),
+        cursor: t.Integer({ minimum: 0 }),
+        amount: t.Integer({ minimum: 20, maximum: 100, default: 50 }),
       }),
       response: {
         200: messageListResponseSchema,
@@ -285,7 +287,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
     {
       body: t.Object({
         channelId: t.String(),
-        content: t.Nullable(t.String()),
+        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
         nonce: t.String(),
         replyTo: t.Optional(t.String()),
         attachmentIds: t.Optional(
@@ -404,7 +406,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       body: t.Object({
         channelId: t.String(),
         messageId: t.String(),
-        content: t.Nullable(t.String()),
+        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
       }),
       response: {
         200: messageResponseSchema,
@@ -554,24 +556,37 @@ export async function verifyPendingAttachments(
     });
     if (!attachment) return { ok: false as const, error: 'Invalid attachment' };
 
+    // the uploader can PUT to the pending key until its URL expires, so the message gets a copy
+    // under a key they never had a URL for, stored with the type they declared
+    const claimed = { ...attachment, objectKey: `${attachment.objectKey}/claimed` };
     try {
-      const metadata = await storage.file(attachment.objectKey).stat();
-      if (metadata.size !== attachment.size) {
-        await storage
-          .file(attachment.objectKey)
-          .delete()
-          .catch(() => {});
-        return { ok: false as const, error: `${attachment.filename} has an invalid size` };
-      }
-    } catch (e) {
-      console.log('meow', e);
+      await storage.write(claimed.objectKey, storage.file(attachment.objectKey), {
+        type: attachment.contentType,
+      });
+    } catch {
       return {
         ok: false as const,
         error: `${attachment.filename} has not finished uploading`,
       };
     }
+    const { size } = await storage.file(claimed.objectKey).stat();
+    if (size !== attachment.size) {
+      await Promise.all(
+        [attachment.objectKey, claimed.objectKey].map((key) =>
+          storage
+            .file(key)
+            .delete()
+            .catch(() => {})
+        )
+      );
+      return { ok: false as const, error: `${attachment.filename} has an invalid size` };
+    }
 
-    attachments.push({ ...attachment, ...(await imageSize(attachment)) });
+    attachments.push({
+      ...claimed,
+      pendingObjectKey: attachment.objectKey,
+      ...(await imageSize(claimed)),
+    });
   }
 
   return { ok: true as const, value: attachments };

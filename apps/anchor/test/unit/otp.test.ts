@@ -5,6 +5,7 @@ import {
   encodeBase32,
   generateHOTP,
   generateTOTP,
+  matchTOTPCounter,
   verifyHOTP,
   verifyTOTP,
   verifyTOTPWithGracePeriod,
@@ -82,6 +83,16 @@ describe('verifyTOTPWithGracePeriod', () => {
 
   test('negative grace throws', () => {
     expect(() => verifyTOTPWithGracePeriod(key, 30, 6, '123456', -1)).toThrow();
+  });
+
+  test('matchTOTPCounter returns the step a code belongs to, so it can be marked used', () => {
+    const now = 1_700_000_010;
+    const step = Math.floor(now / 30);
+    const [far, prev, cur] = [codeAt(now - 90), codeAt(now - 30), codeAt(now)];
+    at(now);
+    expect(matchTOTPCounter(key, 30, 6, prev, 30)).toBe(step - 1);
+    expect(matchTOTPCounter(key, 30, 6, cur, 30)).toBe(step);
+    expect(matchTOTPCounter(key, 30, 6, far, 30)).toBeNull();
   });
 });
 

@@ -37,7 +37,7 @@ import { SheetItem } from '@/components/ui/sheet-item';
 import { Textarea } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { VideoPlayer } from '@/components/video-player';
-import { chat, useChat } from '@/lib/chat-state';
+import { chat, maxMessageLength, useChat } from '@/lib/chat-state';
 import { formatDate, formatTime } from '@/lib/format-date';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
@@ -198,6 +198,7 @@ function EditBox({
         autoFocus
         value={value}
         onChangeText={setValue}
+        maxLength={maxMessageLength}
         className="min-h-20"
         accessibilityLabel="Edit message"
       />

@@ -70,6 +70,41 @@ describe('what a hostile host can make us show', () => {
   });
 });
 
+describe('a hostile host speaking for our own users', () => {
+  test('a push claiming a local user who is not a member is dropped', async () => {
+    const outsider = await signup('b');
+    const before = received();
+    const author = {
+      username: outsider.user.username,
+      displayName: 'Outsider',
+      homeserver: anchors.b.homeserver,
+      avatarUrl: null,
+    };
+    expect(
+      (await sendSigned(await signed(1, 'b', path, push({ author, messageId: 'outsider' })))).status
+    ).toBe(200);
+    await sink.settle();
+    expect(received()).toBe(before);
+  });
+
+  test("a local member's profile comes from our database, never from the host", async () => {
+    const before = received();
+    const author = {
+      username: member.user.username,
+      displayName: 'Not Their Name',
+      homeserver: anchors.b.homeserver,
+      avatarUrl: 'https://tracker.example/pixel.png',
+    };
+    expect(
+      (await sendSigned(await signed(1, 'b', path, push({ author, messageId: 'local' })))).status
+    ).toBe(200);
+    await eventually(() => received() === before + 1, { message: 'push delivered' });
+    const last = sink.for(device.label).at(-1);
+    expect(JSON.stringify(last)).not.toContain('tracker.example');
+    expect(JSON.stringify(last)).not.toContain('Not Their Name');
+  });
+});
+
 describe('forged and mismatched senders', () => {
   test('claiming to be another homeserver while signing with the evil key is 401, and nothing is pushed', async () => {
     const before = received();

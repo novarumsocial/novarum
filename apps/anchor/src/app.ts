@@ -15,13 +15,16 @@ import { dm } from '../modules/dm/services';
 import { friends } from '../modules/friends/services.ts';
 import { notifications } from '../modules/notifications/services';
 import openapi from '@elysia/openapi';
-import { ip } from 'elysia-ip';
 import { serverTiming } from '@elysia/server-timing';
 
 export const createApp = () =>
-  new Elysia()
+  new Elysia({
+    serve: {
+      // 1 MiB
+      maxRequestBodySize: 1024 * 1024,
+    },
+  })
     .use(cors({ credentials: true, origin: getConfig().files.s3_cors_origins }))
-    .use(ip({ headersFirst: true }))
     .use(serverTiming({ enabled: getConfig().server.server_timing }))
     .use(
       openapi({

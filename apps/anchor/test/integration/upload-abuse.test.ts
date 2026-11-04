@@ -98,34 +98,37 @@ describe('declared vs uploaded', () => {
     expect((await send([p.attachmentId])).status).toBe(400);
   });
 
-  // gap: Content-Type is not part of the presigned signature, so the uploader picks the type storage serves the object with
-  test.failing(
-    'a PUT with a different Content-Type than presigned is refused by storage',
-    async () => {
-      const { put } = await upload(
-        '<html>hi</html>',
-        { contentType: 'text/plain' },
-        { 'content-type': 'text/html' }
-      );
-      expect(put.status).toBeGreaterThanOrEqual(400);
-    }
-  );
+  const download = async (att: { url: string }) => {
+    const url = new URL(att.url);
+    const redirect = await fetch(`${anchor.url}${url.pathname}${url.search}`, {
+      redirect: 'manual',
+    });
+    return fetch(redirect.headers.get('location')!);
+  };
 
-  test('...and the claimed attachment is still reported (and downloaded through the redirect) with a type', async () => {
+  test('a PUT with another Content-Type is still served with the declared one once claimed', async () => {
     const { p, put } = await upload(
       '<html>hi</html>',
       { contentType: 'text/plain' },
       { 'content-type': 'text/html' }
     );
-    expect(put.status).toBe(200); // pins the gap above
+    expect(put.status).toBe(200); // storage itself doesn't bind the type
     const att = ((await (await send([p.attachmentId])).json()) as any).message.attachments[0];
-    expect(att.contentType).toBe('text/plain'); // the DB keeps the declared type
-    const url = new URL(att.url);
-    const redirect = await fetch(`${anchor.url}${url.pathname}${url.search}`, {
-      redirect: 'manual',
+    expect(att.contentType).toBe('text/plain');
+    expect((await download(att)).headers.get('content-type')).toStartWith('text/plain');
+  });
+
+  test('re-using the presigned URL after the message is sent does not change the attachment', async () => {
+    const { p } = await upload('12345', { contentType: 'text/plain' });
+    const att = ((await (await send([p.attachmentId])).json()) as any).message.attachments[0];
+    await fetch(p.uploadUrl, {
+      method: 'PUT',
+      headers: { 'content-type': 'text/html' },
+      body: '<script>alert(1)</script>',
     });
-    const stored = await fetch(redirect.headers.get('location')!);
-    expect(stored.headers.get('content-type')).toBe('text/html'); // storage serves what the uploader sent
+    const stored = await download(att);
+    expect(stored.headers.get('content-type')).toStartWith('text/plain');
+    expect(await stored.text()).toBe('12345');
   });
 
   test('re-using the presigned URL overwrites the object; the claim checks the final size', async () => {
@@ -232,13 +235,12 @@ describe('malformed media in the preview path never takes the process down', () 
   for (const [name, contentType, make] of cases) {
     test(`${name}: gets an answer (no hang or crash) and the server keeps serving`, async () => {
       const { res } = await previewOf(await make(), contentType);
-      expect([200, 404, 500]).toContain(res.status);
+      expect([200, 404]).toContain(res.status);
       await alive();
     });
   }
 
-  // gap: sharp / node-av errors are not caught in /attachment/:id/preview, so malformed media is a 500 instead of a 404
-  test.failing('malformed media gets a 4xx preview answer, not a 500', async () => {
+  test('malformed media gets a 4xx preview answer, not a 500', async () => {
     for (const [, contentType, make] of cases.slice(0, 10))
       expect((await previewOf(await make(), contentType)).res.status).toBeLessThan(500);
   });
@@ -251,7 +253,21 @@ describe('malformed media in the preview path never takes the process down', () 
     bomb.writeUInt32BE(60000, 16); // IHDR width
     bomb.writeUInt32BE(60000, 20); // IHDR height
     const { res } = await previewOf(bomb, 'image/png');
-    expect([404, 500]).toContain(res.status);
+    expect(res.status).toBe(404);
+    await alive();
+  });
+
+  test('a real image just over 4096x4096 pixels (within sharp defaults) gets no preview', async () => {
+    const big = await sharp({
+      create: { width: 4097, height: 4096, channels: 3, background: '#000' },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    const { res, att } = await previewOf(big, 'image/png');
+    expect(res.status).toBe(404);
+    // the failure is remembered, so asking again does not decode it again
+    const url = new URL(att.previewUrl);
+    expect((await fetch(`${anchor.url}${url.pathname}${url.search}`)).status).toBe(404);
     await alive();
   });
 

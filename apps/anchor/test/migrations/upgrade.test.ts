@@ -264,6 +264,25 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
+  '20261104222159_marvelous_edwin_jarvis': {
+    check: async (url) => {
+      // existing OTPs keep working and start with no failed attempts
+      const otps = await rows<{ attempts: number }>(url, `SELECT attempts FROM email_otps`);
+      expect(otps.length).toBeGreaterThan(0);
+      expect(otps.every((otp) => otp.attempts === 0)).toBe(true);
+    },
+  },
+  '20261104222200_short_lenny_balinger': {
+    check: async (url) => {
+      // existing TOTP secrets survive and no code counts as used yet
+      expect(
+        await rows(url, `SELECT 1 FROM local_credential WHERE "totpSecret" IS NOT NULL`)
+      ).toHaveLength(1);
+      expect(
+        await rows(url, `SELECT 1 FROM local_credential WHERE "totpLastCounter" IS NOT NULL`)
+      ).toHaveLength(0);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

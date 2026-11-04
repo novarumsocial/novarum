@@ -30,6 +30,8 @@ import type { LucideIcon } from 'lucide-react-native';
 
 type MfaOption = 'EMAIL' | 'TOTP';
 
+const missingMfaPassword = 'Enter your current password to change two-step verification.';
+
 const totpCodeSchema = z
   .string()
   .regex(/^\d{6}$/, 'Enter the 6-digit code from your authenticator app.');
@@ -83,6 +85,7 @@ export default function Security() {
   const [mfaLoaded, setMfaLoaded] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaPassword, setMfaPassword] = useState('');
   const [emailMfaLoading, setEmailMfaLoading] = useState(false);
   const [totpState, setTotpState] = useState<'idle' | 'setup' | 'enabled' | 'error'>('idle');
   const [totpUri, setTotpUri] = useState('');
@@ -126,11 +129,15 @@ export default function Security() {
   }
 
   async function toggleEmailMfa(enable: boolean) {
+    if (!mfaPassword) return setMfaError(missingMfaPassword);
     setEmailMfaLoading(true);
     setMfaError(null);
 
     try {
-      const result = await anchor().client.auth.mfa.email.toggle.post({ enable });
+      const result = await anchor().client.auth.mfa.email.toggle.post({
+        enable,
+        password: mfaPassword,
+      });
       if (result.error) {
         setMfaError(getErrorMessage(result.error.value, 'Could not update email MFA.'));
         return;
@@ -145,11 +152,15 @@ export default function Security() {
   }
 
   async function toggleTotpMfa(enable: boolean) {
+    if (!mfaPassword) return setMfaError(missingMfaPassword);
     setTotpMfaLoading(true);
     setMfaError(null);
 
     try {
-      const result = await anchor().client.auth.mfa.totp.toggle.post({ enable });
+      const result = await anchor().client.auth.mfa.totp.toggle.post({
+        enable,
+        password: mfaPassword,
+      });
       if (result.error) {
         setMfaError(getErrorMessage(result.error.value, 'Could not update authenticator MFA.'));
         return;
@@ -203,6 +214,7 @@ export default function Security() {
       setTotpError(code.error.issues[0]?.message ?? null);
       return;
     }
+    if (!mfaPassword) return setTotpError(missingMfaPassword);
 
     setTotpLoading(true);
     setTotpError(null);
@@ -211,6 +223,7 @@ export default function Security() {
       const result = await anchor().client.auth.mfa.totp.enable.post({
         secret: totpSecret,
         code: code.data,
+        password: mfaPassword,
       });
       if (result.error) {
         setTotpError(getErrorMessage(result.error.value, 'Could not enable MFA.'));
@@ -248,11 +261,12 @@ export default function Security() {
   }
 
   async function deleteTotp() {
+    if (!mfaPassword) return setMfaError(missingMfaPassword);
     setTotpDeleteLoading(true);
     setMfaError(null);
 
     try {
-      const result = await anchor().client.auth.mfa.totp.delete();
+      const result = await anchor().client.auth.mfa.totp.delete({ password: mfaPassword });
       if (result.error) {
         setMfaError(getErrorMessage(result.error.value, 'Could not remove authenticator MFA.'));
         return;
@@ -306,6 +320,19 @@ export default function Security() {
           title="Two-step verification"
           description="Ask for a second code when you sign in."
         >
+          <View className="gap-1.5 px-4 py-3">
+            <Label>Current password</Label>
+            <Input
+              value={mfaPassword}
+              onChangeText={setMfaPassword}
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+            />
+            <Text className="text-xs text-muted-foreground">
+              Needed to change two-step verification.
+            </Text>
+          </View>
           <MfaRow
             icon={Mail}
             active={mfaOptions.includes('EMAIL')}

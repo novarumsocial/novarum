@@ -103,6 +103,9 @@ A few files must be created. Hopefully it's not much :')
     base_url = "https://piedpiper.com"
     # enables server timing api for debugging, false by default.
     server_timing = false
+    # addresses or CIDR ranges of your reverse proxy (Caddy, nginx, cloudflared...).
+    # X-Forwarded-For is only trusted from these, and rate limits use the socket address otherwise.
+    trusted_proxies = ["172.16.0.0/12"]
 
     [federation]
     key_dir = "./keys"
@@ -233,6 +236,10 @@ We recommend running everything though a reverse proxy, such as Caddy, but the d
 | cdn.piedpiper.com | http://localhost:3900 |
 
 You'll also need to open `50100-50200/udp` in your firewall for WebRTC connections to work properly.
+
+### Client IP addresses
+
+Auth rate limits are keyed on the client's IP address. Anchor only reads `X-Forwarded-For` when the connection comes from an address listed in `trusted_proxies`, and then takes the rightmost address your proxies did not add themselves. Set it to the address (or Docker network range) your reverse proxy or `cloudflared` connects from. If it's empty, every client behind the proxy shares one rate limit bucket. Never expose Anchor directly while trusting a range that includes the public internet.
 
 ## Anchor hoster mailing list
 

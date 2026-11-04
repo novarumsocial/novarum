@@ -7,6 +7,7 @@ import { genericResponseErrorSchema } from '../../../utils/genericResponseError'
 import { maxSnippetLength, notifyLocal } from '../../../utils/notify';
 import { federationAuth } from '../plugin';
 import { federationErrors, okResponseSchema } from '../schemas';
+import { vetLocalIdentity } from '../../../utils/federatedLocalUser';
 
 // text only: the receiving end shows it as plain text, never as html
 const pushBodySchema = z.object({
@@ -60,6 +61,8 @@ export const push = new Elysia().use(federationAuth).post(
     const guildId =
       input.data.guildId && makeFederatedGuildId(origin.homeserver, input.data.guildId);
     const channelId = makeFederatedChannelId(origin.homeserver, input.data.channelId);
+    const author = await vetLocalIdentity({ guildId, channelId }, input.data.author);
+    if (!author) return { ok: true };
 
     // handles look like @username:homeserver; only the ones of our own users matter
     const localHomeserver = getConfig().server.homeserver;
@@ -87,7 +90,7 @@ export const push = new Elysia().use(federationAuth).post(
         guildId,
         channelId,
         messageId: input.data.messageId,
-        author: input.data.author,
+        author,
         snippet: input.data.snippet,
       }
     );

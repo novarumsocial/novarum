@@ -72,6 +72,7 @@ type TypingInput = {
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+export const maxMessageLength = 4000;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 async function stripImageMetadata(file: File) {

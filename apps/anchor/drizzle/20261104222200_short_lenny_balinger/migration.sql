@@ -1,0 +1,1 @@
+ALTER TABLE "local_credential" ADD COLUMN "totpLastCounter" integer;

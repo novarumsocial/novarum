@@ -106,7 +106,7 @@ describe('C. refused baseUrls', () => {
 describe('C. pinned behaviour of accepted baseUrls', () => {
   // The discovered baseUrl may carry any public port. A throwaway https listener on the fake's public IP stands in for a
   // redis-like service there; its log is read back through docker exec.
-  test('https://evil.test:6379 (non-default public port) is used as is', async () => {
+  test('https://evil.test:6379 (non-default public port) only gets a discovery GET, which it fails', async () => {
     const log = '/tmp/ssrf-6379.log';
     const server = `
       Bun.serve({ hostname: '203.0.113.66', port: 6379, tls: { cert: Bun.file('/certs/evil.test.crt'), key: Bun.file('/certs/evil.test.key') },
@@ -126,7 +126,7 @@ describe('C. pinned behaviour of accepted baseUrls', () => {
       const seen = await eventually(async () => (await exec('fake', `cat ${log}`)).stdout.trim(), {
         message: 'request on :6379',
       });
-      expect(seen).toBe('POST evil.test:6379/federation/invites/code1/accept');
+      expect(seen).toBe('GET evil.test:6379/.well-known/anchor/info');
       // and nothing at all on the standard port besides discovery
       expect((await fake.requests(1)).map((r) => `${r.method} ${r.path}`)).toEqual([
         'GET /.well-known/anchor/info',
@@ -156,43 +156,37 @@ describe('C. confused deputy: baseUrl pointing at another real anchor', () => {
   const membersOf = async (guildId: string) =>
     (await pgFor('b')`select "userId" from guild_member where "guildId" = ${guildId}`).length;
 
-  // Today anchor-p signs a request for host b.test and sends it to b.test although the user asked for evil.test. b-proxy forwards it
-  // to anchor-b, which tries to verify it: b has to discover p.test first, and its own log says so. Nothing should have been sent.
-  test.failing(
-    'known gap (confused deputy): p sends the signed invite accept to b.test when evil.test declares it as baseUrl',
-    async () => {
-      const { code } = await invite();
-      await publicDiscovery({ baseUrl: 'https://b.test' });
-      const since = new Date();
-      const res = await ctx.actor.as('/invite/accept', {
-        method: 'POST',
-        json: { code, homeserver: 'evil.test' },
-      });
-      expect(res.status).toBeGreaterThanOrEqual(400);
-      await Bun.sleep(1000);
-      expect(await logsSince('b', since)).not.toContain('p.test');
-    }
-  );
+  // b.test's own discovery names b.test, so p refuses the baseUrl before signing anything for it. If p had sent the request,
+  // anchor-b would have had to discover p.test to verify it, and its log would say so.
+  test('p refuses to send the signed invite accept to b.test when evil.test declares it as baseUrl', async () => {
+    const { code } = await invite();
+    await publicDiscovery({ baseUrl: 'https://b.test' });
+    const since = new Date();
+    const res = await ctx.actor.as('/invite/accept', {
+      method: 'POST',
+      json: { code, homeserver: 'evil.test' },
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    await Bun.sleep(1000);
+    expect(await logsSince('b', since)).not.toContain('p.test');
+  });
 
   // The same attack where the deputy and the victim can reach each other: anchor-a (private mode) with the fake's private identity
   // declaring anchor-b's real URL. a signs for host 172.30.0.12, b verifies the signature and adds the user to its guild.
-  test.failing(
-    'known gap (confused deputy): a user of A joins B`s guild through a homeserver that declares B as its baseUrl',
-    async () => {
-      const { code, guildId } = await invite();
-      await freshAnchor('a'); // a caches discovery of 172.30.0.66 for 5 minutes, other suites use it
-      await fake.respond(1, '/.well-known/anchor/info', {
-        discovery: { baseUrl: anchors.b.baseUrl },
-      });
-      const victim = await signup('a');
-      const res = await victim.fetch('/invite/accept', {
-        method: 'POST',
-        body: JSON.stringify({ code, homeserver: '172.30.0.66' }),
-      });
-      expect(res.status).toBeGreaterThanOrEqual(400);
-      expect(await membersOf(guildId)).toBe(1); // only the owner
-    }
-  );
+  test('a user of A cannot join B`s guild through a homeserver that declares B as its baseUrl', async () => {
+    const { code, guildId } = await invite();
+    await freshAnchor('a'); // a caches discovery of 172.30.0.66 for 5 minutes, other suites use it
+    await fake.respond(1, '/.well-known/anchor/info', {
+      discovery: { baseUrl: anchors.b.baseUrl },
+    });
+    const victim = await signup('a');
+    const res = await victim.fetch('/invite/accept', {
+      method: 'POST',
+      body: JSON.stringify({ code, homeserver: '172.30.0.66' }),
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(await membersOf(guildId)).toBe(1); // only the owner
+  });
 
   afterAll(() => freshAnchor('a'), 60_000);
 });

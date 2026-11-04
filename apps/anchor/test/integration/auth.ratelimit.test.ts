@@ -77,9 +77,7 @@ test('login/mfa/email: the 4th request from one IP is 429', async () => {
   expect(results).toEqual([401, 401, 401, 429]);
 });
 
-// gap: authRateLimit() plugins with the same (max, duration) are deduplicated by Elysia, so the
-// password-reset/request limiter (3 per 15 min, same as login/mfa/email) is never applied
-test.failing('password-reset/request: the 4th request from one IP is 429', async () => {
+test('password-reset/request: the 4th request from one IP is 429', async () => {
   const ip = freshIp();
   const results = await statuses(
     '/auth/password-reset/request',
@@ -90,8 +88,7 @@ test.failing('password-reset/request: the 4th request from one IP is 429', async
   expect(results).toEqual([200, 200, 200, 429]);
 });
 
-// gap: same dedup as above, the login/mfa limiter (10 per minute) is the same plugin instance as /login's
-test.failing('login/mfa: the 11th attempt from one IP is 429', async () => {
+test('login/mfa: the 11th attempt from one IP is 429', async () => {
   const ip = freshIp();
   const results = await statuses(
     '/auth/login/mfa',
@@ -118,11 +115,44 @@ test('reset-password: the 6th attempt from one IP is 429', async () => {
   expect(results).toEqual([400, 400, 400, 400, 400, 429]);
 });
 
-// The limiter trusts the first X-Forwarded-For value (elysia-ip headersFirst), so a client that can set the header
-// picks its own bucket. Deployment requirement: a trusted reverse proxy must overwrite X-Forwarded-For.
-test('a spoofed X-Forwarded-For bypasses the limit (documented: the proxy must overwrite it)', async () => {
-  const results = await statuses('/auth/login', 15, freshIp, badLogin);
-  expect(results).toEqual(Array(15).fill(401));
+test('X-Forwarded-For is ignored when the peer is not a trusted proxy', async () => {
+  const direct = await spawnAnchor({
+    name: 'authlimit-direct',
+    config: { server: { trusted_proxies: [] } },
+  });
+  try {
+    const out: number[] = [];
+    for (let i = 0; i < 11; i++)
+      out.push(
+        (await post(direct.url, '/auth/login', badLogin(), { 'x-forwarded-for': freshIp() })).status
+      );
+    expect(out.slice(0, 10)).toEqual(Array(10).fill(401));
+    expect(out[10]).toBe(429);
+  } finally {
+    await direct.destroy();
+  }
+});
+
+test('only the address the trusted proxy appended counts, not what the client prepended', async () => {
+  const proxied = await spawnAnchor({
+    name: 'authlimit-proxied',
+    config: { server: { trusted_proxies: ['127.0.0.1', '::1'] } },
+  });
+  try {
+    const ip = freshIp();
+    const out: number[] = [];
+    for (let i = 0; i < 11; i++)
+      out.push(
+        (
+          await post(proxied.url, '/auth/login', badLogin(), {
+            'x-forwarded-for': `${freshIp()}, ${ip}`,
+          })
+        ).status
+      );
+    expect(out[10]).toBe(429);
+  } finally {
+    await proxied.destroy();
+  }
 });
 
 test('a restart clears the counters (in-memory limiter)', async () => {

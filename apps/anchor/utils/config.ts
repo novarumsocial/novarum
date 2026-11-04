@@ -12,6 +12,11 @@ const schema = z.object({
       .boolean()
       .optional()
       .default(process.env.NODE_ENV !== 'production'),
+    // reverse proxies (addresses or CIDR ranges) whose X-Forwarded-For is trusted for the client IP
+    trusted_proxies: z
+      .array(z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()]))
+      .optional()
+      .default([]),
   }),
   federation: z.object({
     key_dir: z.string().optional().default('./keys'),

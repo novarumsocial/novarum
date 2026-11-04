@@ -15,6 +15,7 @@ import { dmRecipients, notifyInBackground } from '../../../utils/notify';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from '../../message/store';
 import {
   getPingRecipients,
+  maxMessageLength,
   messageEdited,
   pingedHandles,
   verifyPendingAttachments,
@@ -24,13 +25,14 @@ import { getFederatedChannelAccess } from '../access';
 import { canSendInChannel } from '../../../utils/channelAccess';
 import { federationAuth } from '../plugin';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
+import { uploadQuotaExceeded } from '../../../utils/uploadQuota';
 
 const defaultPageSize = 50;
 const maxPageSize = 100;
 
 // what the sender may put in a message; anything else in the body is ignored
 const sendBodySchema = z.object({
-  content: z.string().nullable(),
+  content: z.string().max(maxMessageLength).nullable(),
   nonce: z.string(),
   replyTo: z.string().nullish(),
 });
@@ -197,7 +199,7 @@ export const messageRoutes = new Elysia()
     async ({ params, payload, remoteUser, server, status }) => {
       const messageId = z.string().safeParse(payload.messageId);
       if (!messageId.success) return status(400, { error: 'Invalid message ID' });
-      const content = z.string().nullable().safeParse(payload.content);
+      const content = z.string().max(maxMessageLength).nullable().safeParse(payload.content);
       if (!content.success) return status(400, { error: 'Invalid federation message' });
 
       const access = await getFederatedChannelAccess(params.id, remoteUser);
@@ -357,6 +359,9 @@ export const messageRoutes = new Elysia()
 
       const access = await getFederatedChannelAccess(params.id, remoteUser, true);
       if (!access.ok) return status(access.status, { error: access.error });
+      if (await uploadQuotaExceeded(access.user.id, upload.data.size)) {
+        return status(429, { error: 'Upload limit reached, try again later' });
+      }
 
       return createPendingAttachment({
         channelId: access.channel.id,
@@ -373,6 +378,7 @@ export const messageRoutes = new Elysia()
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         415: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
       },
     }
   );
