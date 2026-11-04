@@ -1,6 +1,10 @@
 import Elysia, { t } from 'elysia';
 import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
-import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
+import {
+  makeFederatedGuildId,
+  parseFederatedChannelId,
+  parseFederatedGuildId,
+} from '../../utils/federationIds';
 import { discoverRemoteAnchor, postSignedFederationJson } from '../../utils/discovery';
 import { remoteSupports } from '../../utils/federationFeatures';
 import { federationChannelPath } from '../../utils/federationClient';
@@ -31,6 +35,9 @@ const connectionActive = new Map<string, { userId: string; active: boolean }>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
 const voiceSocketByUser = new Map<string, string>();
 const pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+// one ring request per user at a time; while it is out, only the newest one waits behind it
+const ringsInFlight = new Set<string>();
+const nextRings = new Map<string, () => Promise<unknown>>();
 const openSockets = new Map<string, { session: SessionWithUser; close: () => void }>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
@@ -43,6 +50,28 @@ const voiceStateResponseSchema = z.object({
 
 export function isUserActive(userId: string) {
   return [...connectionActive.values()].some((state) => state.userId === userId && state.active);
+}
+
+// the channel id comes from the client, so only reach out to a homeserver the user already has a DM
+// or a guild on, instead of anywhere the id names
+async function knowsFederatedChannel(userId: string, channelId: string, homeserver: string) {
+  if (await db.query.channelMembers.findFirst({ where: { channelId, userId } })) return true;
+  const prefix = makeFederatedGuildId(homeserver, '');
+  const memberships = await db.query.guildMembers.findMany({ where: { userId } });
+  return memberships.some((membership) => membership.guildId.startsWith(prefix));
+}
+
+function ringRemote(userId: string, send: () => Promise<unknown>) {
+  if (ringsInFlight.has(userId)) return void nextRings.set(userId, send);
+  ringsInFlight.add(userId);
+  void send()
+    .catch(() => null)
+    .finally(() => {
+      ringsInFlight.delete(userId);
+      const next = nextRings.get(userId);
+      nextRings.delete(userId);
+      if (next) ringRemote(userId, next);
+    });
 }
 
 export function closeSessionSockets(matches: (session: SessionWithUser) => boolean) {
@@ -200,6 +229,14 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     if (message.type === 'voice.join') {
       const federatedChannel = parseFederatedChannelId(message.channelId);
       if (federatedChannel) {
+        if (
+          !(await knowsFederatedChannel(
+            session.userId,
+            message.channelId,
+            federatedChannel.homeserver
+          ))
+        )
+          return;
         const result = await postSignedFederationJson(
           federatedChannel.homeserver,
           federationChannelPath(federatedChannel, 'voice-state'),
@@ -245,11 +282,21 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     if (message.type === 'call.ring') {
       const federatedChannel = parseFederatedChannelId(message.channelId);
       if (federatedChannel) {
-        void postSignedFederationJson(
-          federatedChannel.homeserver,
-          federationChannelPath(federatedChannel, 'ring'),
-          { user: federationUserPayload(session), ringing: message.ringing }
-        ).catch(() => null);
+        if (
+          !(await knowsFederatedChannel(
+            session.userId,
+            message.channelId,
+            federatedChannel.homeserver
+          ))
+        )
+          return;
+        ringRemote(session.userId, () =>
+          postSignedFederationJson(
+            federatedChannel.homeserver,
+            federationChannelPath(federatedChannel, 'ring'),
+            { user: federationUserPayload(session), ringing: message.ringing }
+          )
+        );
         return;
       }
 

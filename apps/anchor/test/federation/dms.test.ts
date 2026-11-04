@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { anchors, resetHarness, restart, signup, stackIsUp } from '../harness/federation';
+import { anchors, fake, resetHarness, restart, signup, stackIsUp } from '../harness/federation';
 import { call, send } from '../harness/chat';
 import { connect } from '../harness/realtime';
 import {
@@ -253,6 +253,20 @@ describe('calls', () => {
     const echoed = await rt.waitFor('call.ringing', (e) => e.data.channelId === shadowId);
     expect(echoed.data.ringing).toBe(true);
     rtA.close();
+    rt.close();
+  });
+
+  test('voice.join and call.ring for a homeserver the user has no DM or guild on send nothing there', async () => {
+    const b = await signup('b');
+    const rt = await connect(b);
+    const since = Date.now();
+    for (const id of ['x', 'y', 'z']) {
+      const channelId = fedChannelId('172.30.0.66', id);
+      rt.send({ type: 'voice.join', channelId });
+      rt.send({ type: 'call.ring', channelId, ringing: true });
+    }
+    await Bun.sleep(1500);
+    expect(await fake.requests(1, { since })).toEqual([]);
     rt.close();
   });
 });
