@@ -93,37 +93,42 @@ export async function discoverRemoteAnchor(homeserver: string, options?: { refre
   }
 }
 
+async function fetchAnchorInfo(discoveryUrl: URL, clean: string) {
+  await assertSafeFederationUrl(discoveryUrl);
+
+  const response = await fetch(discoveryUrl, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+    redirect: 'error',
+    signal: AbortSignal.timeout(federationRequestTimeoutMs),
+  });
+
+  if (!response.ok) {
+    await markHomeserverGuildStatus(clean, false);
+    throw new DiscoveryError(
+      `remote returned ${response.status} ${response.statusText || 'during discovery'}`
+    );
+  }
+
+  const data = (await readJson(response)) as Partial<AnchorInfo> | null;
+  if (!data || typeof data !== 'object') {
+    throw new DiscoveryError(`Invalid discovery response for ${clean}`);
+  }
+
+  const discoveredHomeserver = normalizeFederationHomeserver(data.homeserver);
+  if (discoveredHomeserver !== clean) {
+    throw new DiscoveryError(`Homeserver mismatch: expected ${clean}, got ${data.homeserver}`);
+  }
+  return data;
+}
+
 async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
   const discoveryUrl = new URL('/.well-known/anchor/info', anchorUrlFromHomeserver(clean));
 
   try {
-    await assertSafeFederationUrl(discoveryUrl);
-
-    const response = await fetch(discoveryUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      redirect: 'error',
-      signal: AbortSignal.timeout(federationRequestTimeoutMs),
-    });
-
-    if (!response.ok) {
-      await markHomeserverGuildStatus(clean, false);
-      throw new DiscoveryError(
-        `remote returned ${response.status} ${response.statusText || 'during discovery'}`
-      );
-    }
-
-    const data = (await readJson(response)) as Partial<AnchorInfo> | null;
-    if (!data || typeof data !== 'object') {
-      throw new DiscoveryError(`Invalid discovery response for ${clean}`);
-    }
-
-    const discoveredHomeserver = normalizeFederationHomeserver(data.homeserver);
-    if (discoveredHomeserver !== clean) {
-      throw new DiscoveryError(`Homeserver mismatch: expected ${clean}, got ${data.homeserver}`);
-    }
+    const data = await fetchAnchorInfo(discoveryUrl, clean);
 
     if (data.publicKey?.algorithm !== 'ed25519' || !data.publicKey.id || !data.publicKey.key) {
       throw new DiscoveryError(`Invalid discovery public key for ${clean}`);
@@ -138,11 +143,16 @@ async function discoverRemoteAnchorUncached(clean: string, homeserver: string) {
       throw new DiscoveryError(`Invalid discovery base URL for ${clean}`);
     }
     await assertSafeFederationUrl(baseUrl);
+    // we sign requests for the baseUrl host, so it must really be this homeserver and not another
+    // one the remote wants us to talk to in our users' name
+    if (baseUrl.origin !== discoveryUrl.origin) {
+      await fetchAnchorInfo(new URL('/.well-known/anchor/info', baseUrl), clean);
+    }
 
     await markHomeserverGuildStatus(clean, true);
 
     return {
-      homeserver: discoveredHomeserver,
+      homeserver: clean,
       baseUrl: baseUrl.toString().replace(/\/+$/, ''),
       version: data.version,
       publicKey: data.publicKey,
