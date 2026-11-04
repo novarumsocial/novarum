@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { realtime } from '$lib/realtime.svelte';
   import { FileText, Paperclip, Send, X } from '@lucide/svelte';
-  import { chat } from '$lib/chat-state.svelte';
+  import { chat, maxMessageLength } from '$lib/chat-state.svelte';
   import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
   import { device } from '$lib/device.svelte';
@@ -449,6 +449,7 @@
     <textarea
       bind:value={content}
       bind:this={textarea}
+      maxlength={maxMessageLength}
       onkeydown={handleKeydown}
       onkeyup={handleKeyup}
       oninput={updateSearch}

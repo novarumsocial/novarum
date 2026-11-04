@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Message } from '$lib/types/chat';
-  import { chat } from '$lib/chat-state.svelte';
+  import { chat, maxMessageLength } from '$lib/chat-state.svelte';
   import { isSelf, useSession } from '$lib/session.svelte';
   import { Button, type ButtonVariant } from '$lib/components/ui/button/index.js';
   import {
@@ -350,6 +350,7 @@
               <Textarea
                 bind:value={editContent}
                 bind:ref={editMsgTextarea}
+                maxlength={maxMessageLength}
                 rows={3}
                 class="resize-none"
                 aria-label="Edit message"

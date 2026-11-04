@@ -82,6 +82,7 @@ export type PickedFile = { uri: string; name: string; mimeType: string; size: nu
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+export const maxMessageLength = 4000;
 const reencodedImageFormats = {
   'image/jpeg': SaveFormat.JPEG,
   'image/png': SaveFormat.PNG,

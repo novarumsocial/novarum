@@ -16,6 +16,8 @@ import { z } from 'zod';
 import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
+export const maxMessageLength = 4000;
+
 const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
   pingedHandles: z.array(z.string()).optional(),
@@ -121,8 +123,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
     {
       query: t.Object({
         channelId: t.String(),
-        cursor: t.Number(),
-        amount: t.Number({ min: 20, max: 100, default: 50 }),
+        cursor: t.Integer({ minimum: 0 }),
+        amount: t.Integer({ minimum: 20, maximum: 100, default: 50 }),
       }),
       response: {
         200: messageListResponseSchema,
@@ -285,7 +287,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
     {
       body: t.Object({
         channelId: t.String(),
-        content: t.Nullable(t.String()),
+        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
         nonce: t.String(),
         replyTo: t.Optional(t.String()),
         attachmentIds: t.Optional(
@@ -404,7 +406,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       body: t.Object({
         channelId: t.String(),
         messageId: t.String(),
-        content: t.Nullable(t.String()),
+        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
       }),
       response: {
         200: messageResponseSchema,

@@ -20,7 +20,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { useAnchor } from '@/lib/anchor';
-import { useChat, type PickedFile } from '@/lib/chat-state';
+import { maxMessageLength, useChat, type PickedFile } from '@/lib/chat-state';
 import { realtime, useRealtime } from '@/lib/realtime';
 import type { Author } from '@/lib/types/chat';
 import { cn, formatBytes } from '@/lib/utils';
@@ -368,6 +368,7 @@ export function MessageInput({
         <Textarea
           ref={input}
           value={content}
+          maxLength={maxMessageLength}
           onChangeText={(text) => {
             setContent(text);
             if (text.trim()) onTyping();

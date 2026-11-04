@@ -174,6 +174,20 @@ describe('replies', () => {
   });
 });
 
+test('content is capped at 4000 characters when sending and editing', async () => {
+  const { owner, channel } = await world();
+  expect((await send(owner, channel.id, 'x'.repeat(4000))).status).toBe(200);
+  expect((await send(owner, channel.id, 'x'.repeat(4001))).status).toBe(422);
+  const msg = (await send(owner, channel.id, 'short')).body.message;
+  const edit = await call(owner, 'POST', '/message/edit', {
+    channelId: channel.id,
+    messageId: msg.id,
+    content: 'x'.repeat(4001),
+  });
+  expect(edit.status).toBe(422);
+  expect((await list(owner, channel.id)).body.messages.at(-1).content).toBe('short');
+});
+
 describe('edit', () => {
   test('the author edits: content changes and edited is set', async () => {
     const { owner, channel } = await world();
@@ -321,12 +335,12 @@ describe('list', () => {
     ).toBe(422);
   });
 
-  // real bug (not in the plan): the schema says Number({ min: 20, max: 100 }) but `min`/`max` are not TypeBox
-  // keywords (`minimum`/`maximum` are), so nothing is enforced and a client can request any page size
-  test.failing('amount outside 20..100 is rejected', async () => {
+  test('amount outside 20..100 and a negative or fractional cursor are rejected', async () => {
     const { owner, channel } = await world();
-    for (const amount of [19, 101, 100000])
+    for (const amount of [19, 101, 100000, 20.5])
       expect((await list(owner, channel.id, 0, amount)).status).toBe(422);
+    for (const cursor of [-1, 0.5])
+      expect((await list(owner, channel.id, cursor)).status).toBe(422);
   });
 
   test('members read, non-members get 403, unknown channel 404, anonymous 401', async () => {
