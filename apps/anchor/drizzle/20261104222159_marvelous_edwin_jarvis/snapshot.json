@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "cf446bcd-0ade-4d84-b799-0d8d604974ca",
+  "id": "06822d06-8389-429d-852d-0956522bf172",
   "prevIds": [
-    "948cda81-21c0-411d-ac7e-4e352eced09a"
+    "594d9271-82e3-45b0-98e7-3da96bb872a7"
   ],
   "ddl": [
     {
@@ -475,6 +475,19 @@
       "generated": null,
       "identity": null,
       "name": "position",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "ownerOnly",
       "entityType": "columns",
       "schema": "public",
       "table": "channel"
@@ -1268,19 +1281,6 @@
       "generated": null,
       "identity": null,
       "name": "totpSecret",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "local_credential"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "totpLastCounter",
       "entityType": "columns",
       "schema": "public",
       "table": "local_credential"

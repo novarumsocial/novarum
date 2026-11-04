@@ -1,4 +1,4 @@
--- seed for the schema after the 16 migration(s) before 20261013165332_thin_butterfly
+-- seed for the schema after the 19 migration(s) before 20261104222200_short_lenny_balinger
 -- frozen: do not edit once the migration is merged
 
 INSERT INTO "user" ("id", "avatarUrl", "displayName", "createdAt", "homeserverName", "isBot", "updatedAt", "username", "status", "isHomeserverAdmin", "bannerUrl", "about", "avatarColor", "speakingRingColor") VALUES
@@ -55,9 +55,9 @@ INSERT INTO "message_ping" ("messageId", "userId") VALUES
   ('m1', 'u2'),
   ('m2', 'u1');
 
-INSERT INTO "attachment" ("channelId", "contentType", "createdAt", "filename", "id", "messageId", "objectKey", "size", "status", "uploaderId") VALUES
-  ('c1', 'image/png', '2026-07-24 10:00:00+00', 'cat.png', 'a1', 'm1', 'attachments/a1/cat.png', 1234, 'READY', 'u1'),
-  ('c1', 'text/plain', '2026-07-24 10:00:00+00', 'pending.txt', 'a2', NULL, 'attachments/a2/pending.txt', 12, 'PENDING', 'u2');
+INSERT INTO "attachment" ("channelId", "contentType", "createdAt", "filename", "id", "messageId", "objectKey", "size", "status", "uploaderId", "width", "height") VALUES
+  ('c1', 'image/png', '2026-07-24 10:00:00+00', 'cat.png', 'a1', 'm1', 'attachments/a1/cat.png', 1234, 'READY', 'u1', 640, 480),
+  ('c1', 'text/plain', '2026-07-24 10:00:00+00', 'pending.txt', 'a2', NULL, 'attachments/a2/pending.txt', 12, 'PENDING', 'u2', NULL, NULL);
 
 INSERT INTO "channel_read_state" ("channelId", "lastReadCreatedAt", "lastReadMessageId", "userId") VALUES
   ('c1', '2026-07-24 10:00:00+00', 'm1', 'u2');
