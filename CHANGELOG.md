@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.2.1](https://github.com/novarumsocial/novarum/compare/v0.2.0...v0.2.1) (2026-11-04)
+
+
+### chore
+
+* release 0.2.1 ([891dc36](https://github.com/novarumsocial/novarum/commit/891dc3671fd559db6d3ab479acb8eb0cdaac10d0))
+
+
+### Features
+
+* **anchor:** implement preview slots ([61b7979](https://github.com/novarumsocial/novarum/commit/61b797900d30c16988b0e8f6b0cf48f0b41f04ff))
+* **channels:** owner-only message sending ([e2d9929](https://github.com/novarumsocial/novarum/commit/e2d9929983c207d938d29f3f39f64c0aeb7c42ef))
+* **messages:** implement [@everyone](https://github.com/everyone) ([50066f4](https://github.com/novarumsocial/novarum/commit/50066f4866aab281e42b77dc3a1f4614a462bc6c))
+
+
+### Bug Fixes
+
+* **anchor:** limit payload length to 1MiB ([d32ea7d](https://github.com/novarumsocial/novarum/commit/d32ea7da80a63cdd70e186eb5c7f072c5851338c))
+* **anchor:** prevent otp bruteforce attacks from header issue ([a467bb1](https://github.com/novarumsocial/novarum/commit/a467bb146338b8ce7f542358853a4a85494878dd))
+* **anchor:** regenerate security migrations on top of main ([2fbd4e7](https://github.com/novarumsocial/novarum/commit/2fbd4e7876ec9754496581fac79ee3442c97dceb))
+* **auth:** revoke sessions on password reset and require password for mfa changes ([73cf062](https://github.com/novarumsocial/novarum/commit/73cf0626f5699fbeae361b3f370eaff12a5a80d1))
+* **federation:** allow a single dm per pair through dm notify ([44073a5](https://github.com/novarumsocial/novarum/commit/44073a5b0e655e77620b65f6854a0823186ecbb0))
+* **federation:** keep federated guild channels in sync with the host ([59e46a1](https://github.com/novarumsocial/novarum/commit/59e46a17a39cf7cd874a4c5e3f1f0981d05e7b8e))
+* **federation:** only trust a discovered baseUrl that serves the same homeserver ([fb9d0b2](https://github.com/novarumsocial/novarum/commit/fb9d0b2b41fa8201de03a798f130056d01182e95))
+* **federation:** prevent forcing friend accepts ([e13a194](https://github.com/novarumsocial/novarum/commit/e13a1942c49516ee3a625799bc3835fcfc3d2f9a))
+* **federation:** send a guild's channels when a member server subscribes ([a6d242b](https://github.com/novarumsocial/novarum/commit/a6d242b2ff21e78d0ece2f92b02174a991b057c3))
+* **federation:** stop hosts from impersonating local users ([f075ad8](https://github.com/novarumsocial/novarum/commit/f075ad89ce0fddc5fe286e71e1953965dec5025b))
+* fix tests for vulnerability patches ([d6092a8](https://github.com/novarumsocial/novarum/commit/d6092a8858fe4a51adc2f297af09ba7a264a018f))
+* **messages:** cap message length and validate list paging ([21c2bfe](https://github.com/novarumsocial/novarum/commit/21c2bfed16be33b5a709c33470264cc759097cf7))
+* security vulnerabilities ([#40](https://github.com/novarumsocial/novarum/issues/40)) ([f081266](https://github.com/novarumsocial/novarum/commit/f081266a8779da95ac7bf77e80036088f4f9adfc))
+* **upload:** copy claimed attachments so uploaders can't swap them ([93a7231](https://github.com/novarumsocial/novarum/commit/93a723108a0b77e5b6cd8a7d84bb5893393f3274))
+* **upload:** limit pending uploads per user and clean up unclaimed ones ([3ee914c](https://github.com/novarumsocial/novarum/commit/3ee914c8037391d55c0f0b1f2af86503ffd8ff25))
+* **voice:** add deepfilternet3 voice suppression strength ([2391b8d](https://github.com/novarumsocial/novarum/commit/2391b8d85308e827ce3ed9aabb57b46a484554ed))
+* **voice:** only reach homeservers the user already has a dm or guild on ([3fb5c0d](https://github.com/novarumsocial/novarum/commit/3fb5c0db66f6ab3ec7612fe591653039333c341b))
+* **voice:** random mutes on certain users ([6344c55](https://github.com/novarumsocial/novarum/commit/6344c552622d109aa4d3a1bedb0eb813225456a5))
+
 ## [0.2.0](https://github.com/novarumsocial/novarum/compare/v0.1.0...v0.2.0) (2026-10-27)
 
 
