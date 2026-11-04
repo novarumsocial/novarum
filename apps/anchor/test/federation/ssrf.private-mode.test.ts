@@ -52,34 +52,21 @@ const t1 = (hs: string) =>
     headers: { ...garbageFederationHeaders(hs, '{}'), 'content-type': 'application/json' },
   });
 
-describe('I. a declared baseUrl may point at loopback, link-local and internal hosts (pin)', () => {
+describe('I. a declared baseUrl on loopback, link-local and internal hosts only gets a discovery GET', () => {
   test.each([
     ['http://127.0.0.1:8080', 'a', 'loopback8080'],
     ['http://169.254.169.254', 'meta', 'metadata'],
     ['http://169.254.169.254:8080', 'meta', 'metadata8080'],
     ['http://172.30.0.99:8080', 'net', 'http8080'],
   ] as const)(
-    '%s receives the signed POST (T4) and the user lookup (T3)',
+    '%s is asked for its discovery document, does not name the homeserver, and is never sent anything signed',
     async (baseUrl, where, listener) => {
       await fake.respond(1, '/.well-known/anchor/info', { discovery: { baseUrl } });
-      const results = await runTriggers(ctx, homeserver, ['T1', 'T2', 'T3', 'T4', 'T6']);
-      // discovery accepted the baseUrl: only the signature/key is wrong (T1/T2), the canary's answers are not valid federation replies (T3/T4/T6)
-      expect(results.T1![0]!.status).toBe(401);
-      expect(results.T2![0]).toMatchObject({ status: 1008, text: 'Unknown federation key' });
-      expect(results.T3![0]!.status).toBe(404);
-      expect(results.T4![0]!.status).toBe(502);
-      expect(await hit(where, listener)).toEqual(
-        expect.arrayContaining([
-          'GET /federation/users/alice',
-          'POST /federation/invites/code1/accept',
-        ])
-      );
-      expect((await hit(where, listener)).some((h) => h.includes('/messages/send'))).toBe(true);
-      // the signed request carries the sender identity and is addressed to the hostile host
-      const post = (await canary.hits(where, listener)).find(
-        (h) => h.method === 'POST' && h.path?.includes('/federation/invites')
-      )!;
-      expect(post.headers?.['x-novarum-homeserver']).toBe('172.30.0.11');
+      const results = await runTriggers(ctx, homeserver, ['T1', 'T3', 'T4', 'T6']);
+      expect(results.T1![0]!.status).toBe(400);
+      expect(results.T4![0]!.status).toBeGreaterThanOrEqual(400);
+      const hits = await hit(where, listener);
+      expect(hits.every((h) => h === 'GET /.well-known/anchor/info')).toBe(true);
     }
   );
 });
@@ -100,17 +87,14 @@ describe('I. a homeserver name that is itself a private address is contacted ove
 });
 
 describe('I. scheme policy for public hosts', () => {
-  // The plan expects "http still refused for public targets". assertSafeFederationUrl lets private-mode anchors use http for any host,
-  // so a discovered baseUrl of http://evil.test passes (anchor-a cannot route to the public side, so only the acceptance is visible).
-  test.failing(
-    'known gap: a private-mode anchor refuses a plain http baseUrl on a public host',
-    async () => {
-      await fake.respond(1, '/.well-known/anchor/info', {
-        discovery: { baseUrl: 'http://evil.test' },
-      });
-      expect((await t1(homeserver)).status).toBe(400); // today: 401 "Unknown federation key", discovery accepted the baseUrl
-    }
-  );
+  // private-mode anchors may use http for any host, but a baseUrl on another origin has to serve the same homeserver's
+  // discovery document, and http://evil.test is not routable from the private segment, so it is refused
+  test('a private-mode anchor refuses a plain http baseUrl on a public host', async () => {
+    await fake.respond(1, '/.well-known/anchor/info', {
+      discovery: { baseUrl: 'http://evil.test' },
+    });
+    expect((await t1(homeserver)).status).toBe(400);
+  });
 
   test('a public homeserver name is contacted over https, not http', async () => {
     // evil.test resolves for anchor-a but is not routable from the private segment: what matters is that the attempt is https (port 443)

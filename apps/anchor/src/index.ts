@@ -11,6 +11,7 @@ import { exit, argv } from 'process';
 import { startFriendSyncRetry } from '../modules/friends/services.ts';
 import { startPendingUploadReaper } from '../utils/uploadQuota';
 import { createApp } from './app';
+import { setListeningServer } from '../utils/clientIp';
 
 if (argv[2] === 'cli') {
   await import('./cli/index.ts');
@@ -35,6 +36,7 @@ startFriendSyncRetry();
 startPendingUploadReaper();
 
 const app = createApp().listen(getConfig().server.listen_port);
+setListeningServer(app.server);
 
 const federatedDms = await db
   .select({ id: channels.id })

@@ -424,8 +424,7 @@ describe('signed attachment urls', () => {
     expect(Buffer.from(await second.arrayBuffer())).toEqual(first);
   });
 
-  // gap: the cached copy is served with `file.type` from a bare S3 file handle, which comes back as ", application/octet-stream"
-  test.failing('a cached preview keeps its image/webp content type', async () => {
+  test('a cached preview keeps its image/webp content type', async () => {
     const { att } = await attached();
     await previewOf(att);
     expect((await previewOf(att)).headers.get('content-type')).toBe('image/webp');
@@ -511,8 +510,10 @@ describe('quota and cleanup', () => {
     const sql = connect(anchor.databaseUrl);
     try {
       await sql`UPDATE attachment SET "createdAt" = now() - interval '2 hours' WHERE id IN ${sql([stale.attachmentId, kept.attachmentId])}`;
+      // the db module reads DATABASE_URL once at import; anchors spawned later must not inherit it
       process.env.DATABASE_URL = anchor.databaseUrl;
       const { reapPendingUploads } = await import('../../utils/uploadQuota');
+      delete process.env.DATABASE_URL;
       await reapPendingUploads();
 
       const left = await sql`SELECT id FROM attachment WHERE "uploaderId" = ${owner.user.id}`;

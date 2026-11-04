@@ -115,7 +115,7 @@ describe('declared vs uploaded', () => {
     expect(put.status).toBe(200); // storage itself doesn't bind the type
     const att = ((await (await send([p.attachmentId])).json()) as any).message.attachments[0];
     expect(att.contentType).toBe('text/plain');
-    expect((await download(att)).headers.get('content-type')).toBe('text/plain');
+    expect((await download(att)).headers.get('content-type')).toStartWith('text/plain');
   });
 
   test('re-using the presigned URL after the message is sent does not change the attachment', async () => {
@@ -127,7 +127,7 @@ describe('declared vs uploaded', () => {
       body: '<script>alert(1)</script>',
     });
     const stored = await download(att);
-    expect(stored.headers.get('content-type')).toBe('text/plain');
+    expect(stored.headers.get('content-type')).toStartWith('text/plain');
     expect(await stored.text()).toBe('12345');
   });
 

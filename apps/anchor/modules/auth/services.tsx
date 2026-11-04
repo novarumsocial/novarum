@@ -30,7 +30,7 @@ import {
   verifyTOTPWithGracePeriod,
 } from '../../utils/otp';
 import { mfaMethodSchema } from '../../src/db/zod';
-import { clientIp } from '../../utils/clientIp';
+import { clientIp, listeningServer } from '../../utils/clientIp';
 import { closeSessionSockets } from '../realtime/services';
 
 const maxOtpAttempts = 5;
@@ -61,6 +61,7 @@ const authRateLimit = (
       headers: { 'Content-Type': 'application/json' },
     }),
     generator,
+    injectServer: listeningServer,
   });
 
 export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend({

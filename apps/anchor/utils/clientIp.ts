@@ -21,6 +21,11 @@ const isTrusted = (address: string) => {
   return version !== 0 && trustedProxies().check(address, version === 6 ? 'ipv6' : 'ipv4');
 };
 
+// a plugin only sees its own Elysia instance, which never listens, so the app hands over the real one
+let listening: Server<unknown> | null = null;
+export const setListeningServer = (server: Server<unknown> | null) => (listening = server);
+export const listeningServer = () => listening;
+
 export function clientIp(request: Request, server: Server<unknown> | null) {
   const socket = server?.requestIP(request)?.address;
   if (!socket) return '';

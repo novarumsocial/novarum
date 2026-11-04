@@ -131,17 +131,12 @@ describe('password reset', () => {
   test('at most 3 codes are active per email', async () => {
     const u = await signup(anchor.url);
     for (let i = 0; i < 3; i++) await requestCode(u.email);
-    const since = Date.now() - 1000;
     expect((await request(u.email)).status).toBe(200);
     await Bun.sleep(500);
-    const recent = (await messagesFor(u.email)).filter(
-      (m) => new Date(m.Created).getTime() >= since
-    );
-    expect(recent).toHaveLength(0);
+    expect(await messagesFor(u.email)).toHaveLength(3);
   });
 
-  // gap: reset-password only updates the hash; sessions created before the reset stay valid
-  test.failing('every session created before the reset is revoked', async () => {
+  test('every session created before the reset is revoked', async () => {
     const u = await signup(anchor.url);
     const other = parseSetCookie(await login(u.user.username, u.password))!;
     const code = await requestCode(u.email);

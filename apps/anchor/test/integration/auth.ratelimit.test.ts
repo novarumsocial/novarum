@@ -134,9 +134,25 @@ test('X-Forwarded-For is ignored when the peer is not a trusted proxy', async ()
 });
 
 test('only the address the trusted proxy appended counts, not what the client prepended', async () => {
-  const ip = freshIp();
-  const results = await statuses('/auth/login', 11, () => `${freshIp()}, ${ip}`, badLogin);
-  expect(results[10]).toBe(429);
+  const proxied = await spawnAnchor({
+    name: 'authlimit-proxied',
+    config: { server: { trusted_proxies: ['127.0.0.1', '::1'] } },
+  });
+  try {
+    const ip = freshIp();
+    const out: number[] = [];
+    for (let i = 0; i < 11; i++)
+      out.push(
+        (
+          await post(proxied.url, '/auth/login', badLogin(), {
+            'x-forwarded-for': `${freshIp()}, ${ip}`,
+          })
+        ).status
+      );
+    expect(out[10]).toBe(429);
+  } finally {
+    await proxied.destroy();
+  }
 });
 
 test('a restart clears the counters (in-memory limiter)', async () => {
