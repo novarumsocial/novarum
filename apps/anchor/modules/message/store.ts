@@ -19,16 +19,22 @@ function insertPings(
 }
 
 /** Saves a message with its pings, claims its uploaded attachments and reopens closed DMs. */
-export function createMessage(input: {
+export async function createMessage(input: {
   channel: { id: string; guildId: string | null };
   authorId: string;
   content: string | null;
   replyTo: string | null;
   nonce: string;
   pingRecipients: PingRecipient[];
-  attachments: { id: string; width: number | null; height: number | null }[];
+  attachments: {
+    id: string;
+    objectKey: string;
+    pendingObjectKey: string;
+    width: number | null;
+    height: number | null;
+  }[];
 }) {
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(messages)
       .values({
@@ -49,6 +55,7 @@ export function createMessage(input: {
         .set({
           messageId: created.id,
           status: 'ATTACHED',
+          objectKey: attachment.objectKey,
           width: attachment.width,
           height: attachment.height,
         })
@@ -69,6 +76,16 @@ export function createMessage(input: {
 
     return created;
   });
+
+  await Promise.all(
+    input.attachments.map((attachment) =>
+      storage
+        .file(attachment.pendingObjectKey)
+        .delete()
+        .catch(() => {})
+    )
+  );
+  return created;
 }
 
 /** Replaces the content of a message and the pings that came with it. */

@@ -554,24 +554,37 @@ export async function verifyPendingAttachments(
     });
     if (!attachment) return { ok: false as const, error: 'Invalid attachment' };
 
+    // the uploader can PUT to the pending key until its URL expires, so the message gets a copy
+    // under a key they never had a URL for, stored with the type they declared
+    const claimed = { ...attachment, objectKey: `${attachment.objectKey}/claimed` };
     try {
-      const metadata = await storage.file(attachment.objectKey).stat();
-      if (metadata.size !== attachment.size) {
-        await storage
-          .file(attachment.objectKey)
-          .delete()
-          .catch(() => {});
-        return { ok: false as const, error: `${attachment.filename} has an invalid size` };
-      }
-    } catch (e) {
-      console.log('meow', e);
+      await storage.write(claimed.objectKey, storage.file(attachment.objectKey), {
+        type: attachment.contentType,
+      });
+    } catch {
       return {
         ok: false as const,
         error: `${attachment.filename} has not finished uploading`,
       };
     }
+    const { size } = await storage.file(claimed.objectKey).stat();
+    if (size !== attachment.size) {
+      await Promise.all(
+        [attachment.objectKey, claimed.objectKey].map((key) =>
+          storage
+            .file(key)
+            .delete()
+            .catch(() => {})
+        )
+      );
+      return { ok: false as const, error: `${attachment.filename} has an invalid size` };
+    }
 
-    attachments.push({ ...attachment, ...(await imageSize(attachment)) });
+    attachments.push({
+      ...claimed,
+      pendingObjectKey: attachment.objectKey,
+      ...(await imageSize(claimed)),
+    });
   }
 
   return { ok: true as const, value: attachments };

@@ -98,34 +98,37 @@ describe('declared vs uploaded', () => {
     expect((await send([p.attachmentId])).status).toBe(400);
   });
 
-  // gap: Content-Type is not part of the presigned signature, so the uploader picks the type storage serves the object with
-  test.failing(
-    'a PUT with a different Content-Type than presigned is refused by storage',
-    async () => {
-      const { put } = await upload(
-        '<html>hi</html>',
-        { contentType: 'text/plain' },
-        { 'content-type': 'text/html' }
-      );
-      expect(put.status).toBeGreaterThanOrEqual(400);
-    }
-  );
+  const download = async (att: { url: string }) => {
+    const url = new URL(att.url);
+    const redirect = await fetch(`${anchor.url}${url.pathname}${url.search}`, {
+      redirect: 'manual',
+    });
+    return fetch(redirect.headers.get('location')!);
+  };
 
-  test('...and the claimed attachment is still reported (and downloaded through the redirect) with a type', async () => {
+  test('a PUT with another Content-Type is still served with the declared one once claimed', async () => {
     const { p, put } = await upload(
       '<html>hi</html>',
       { contentType: 'text/plain' },
       { 'content-type': 'text/html' }
     );
-    expect(put.status).toBe(200); // pins the gap above
+    expect(put.status).toBe(200); // storage itself doesn't bind the type
     const att = ((await (await send([p.attachmentId])).json()) as any).message.attachments[0];
-    expect(att.contentType).toBe('text/plain'); // the DB keeps the declared type
-    const url = new URL(att.url);
-    const redirect = await fetch(`${anchor.url}${url.pathname}${url.search}`, {
-      redirect: 'manual',
+    expect(att.contentType).toBe('text/plain');
+    expect((await download(att)).headers.get('content-type')).toBe('text/plain');
+  });
+
+  test('re-using the presigned URL after the message is sent does not change the attachment', async () => {
+    const { p } = await upload('12345', { contentType: 'text/plain' });
+    const att = ((await (await send([p.attachmentId])).json()) as any).message.attachments[0];
+    await fetch(p.uploadUrl, {
+      method: 'PUT',
+      headers: { 'content-type': 'text/html' },
+      body: '<script>alert(1)</script>',
     });
-    const stored = await fetch(redirect.headers.get('location')!);
-    expect(stored.headers.get('content-type')).toBe('text/html'); // storage serves what the uploader sent
+    const stored = await download(att);
+    expect(stored.headers.get('content-type')).toBe('text/plain');
+    expect(await stored.text()).toBe('12345');
   });
 
   test('re-using the presigned URL overwrites the object; the claim checks the final size', async () => {
