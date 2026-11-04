@@ -25,6 +25,7 @@ import { sniffAudioVideo } from '../../utils/sniffAudioVideo';
 import { Demuxer, Decoder, Scaler } from 'node-av/api';
 import { getConfig } from '../../utils/config';
 import { maxInputPixels } from '../../utils/optimizeWebp';
+import { uploadQuotaExceeded } from '../../utils/uploadQuota';
 
 const attachmentQuery = t.Object({ exp: t.Numeric(), sig: t.String() });
 
@@ -208,7 +209,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
           { filename: body.filename, contentType: body.contentType, size: body.size },
           {
             response: presignedUploadSchema,
-            forward: passThrough(400, 401, 403, 404, 415),
+            forward: passThrough(400, 401, 403, 404, 415, 429),
             errors: {
               failed: 'Remote upload failed',
               invalid: 'Remote homeserver returned an invalid upload',
@@ -217,6 +218,9 @@ export const upload = new Elysia({ tags: ['Upload'] })
         );
         if (!remoteUpload.ok) return status(remoteUpload.status, remoteUpload.error);
         return remoteUpload.data;
+      }
+      if (await uploadQuotaExceeded(session.userId, body.size)) {
+        return status(429, { error: 'Upload limit reached, try again later' });
       }
 
       return createPendingAttachment({
@@ -242,6 +246,7 @@ export const upload = new Elysia({ tags: ['Upload'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         415: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
       },
     }

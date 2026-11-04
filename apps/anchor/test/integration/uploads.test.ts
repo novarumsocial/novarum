@@ -474,3 +474,54 @@ describe('cdn signing', () => {
     expect(url.searchParams.has('cdn_sig')).toBe(false);
   });
 });
+
+describe('quota and cleanup', () => {
+  const textUpload = (u: User, channelId: string, size = 5) =>
+    presign(u, { channelId, filename: 'a.txt', contentType: 'text/plain', size });
+
+  test('at most 20 unclaimed uploads per user, other users are unaffected', async () => {
+    const { owner, channelId, join } = await setup();
+    for (let i = 0; i < 20; i++) expect((await textUpload(owner, channelId)).status).toBe(200);
+    const blocked = await textUpload(owner, channelId);
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: 'Upload limit reached, try again later' });
+    expect((await textUpload(await join(), channelId)).status).toBe(200);
+  });
+
+  test('at most 1 GiB uploaded per user per day, claimed files included', async () => {
+    const { owner, channelId } = await setup();
+    const sql = connect(anchor.databaseUrl);
+    try {
+      await sql`INSERT INTO attachment (id, "objectKey", filename, "contentType", size, status, "uploaderId", "channelId")
+        VALUES (${crypto.randomUUID()}, ${crypto.randomUUID()}, 'big', 'text/plain', ${1024 ** 3 - 4}, 'ATTACHED', ${owner.user.id}, ${channelId})`;
+    } finally {
+      await sql.close();
+    }
+    expect((await textUpload(owner, channelId, 4)).status).toBe(200);
+    expect((await textUpload(owner, channelId, 1)).status).toBe(429);
+  });
+
+  test('unclaimed uploads older than an hour lose their row and object; claimed and fresh ones stay', async () => {
+    const { owner, channelId } = await setup();
+    const stale = await uploaded(owner, channelId, Buffer.from('stale'), 'text/plain');
+    const fresh = await uploaded(owner, channelId, Buffer.from('fresh'), 'text/plain');
+    const kept = await uploaded(owner, channelId, Buffer.from('kept!'), 'text/plain');
+    expect((await send(owner, channelId, [kept.attachmentId])).status).toBe(200);
+
+    const sql = connect(anchor.databaseUrl);
+    try {
+      await sql`UPDATE attachment SET "createdAt" = now() - interval '2 hours' WHERE id IN ${sql([stale.attachmentId, kept.attachmentId])}`;
+      process.env.DATABASE_URL = anchor.databaseUrl;
+      const { reapPendingUploads } = await import('../../utils/uploadQuota');
+      await reapPendingUploads();
+
+      const left = await sql`SELECT id FROM attachment WHERE "uploaderId" = ${owner.user.id}`;
+      expect(left.map((row: { id: string }) => row.id).sort()).toEqual(
+        [fresh.attachmentId, kept.attachmentId].sort()
+      );
+      expect((await send(owner, channelId, [stale.attachmentId])).status).toBe(400);
+    } finally {
+      await sql.close();
+    }
+  });
+});

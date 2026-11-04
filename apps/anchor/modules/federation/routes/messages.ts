@@ -25,6 +25,7 @@ import { getFederatedChannelAccess } from '../access';
 import { canSendInChannel } from '../../../utils/channelAccess';
 import { federationAuth } from '../plugin';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
+import { uploadQuotaExceeded } from '../../../utils/uploadQuota';
 
 const defaultPageSize = 50;
 const maxPageSize = 100;
@@ -358,6 +359,9 @@ export const messageRoutes = new Elysia()
 
       const access = await getFederatedChannelAccess(params.id, remoteUser, true);
       if (!access.ok) return status(access.status, { error: access.error });
+      if (await uploadQuotaExceeded(access.user.id, upload.data.size)) {
+        return status(429, { error: 'Upload limit reached, try again later' });
+      }
 
       return createPendingAttachment({
         channelId: access.channel.id,
@@ -374,6 +378,7 @@ export const messageRoutes = new Elysia()
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         415: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
       },
     }
   );
