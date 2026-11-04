@@ -86,6 +86,16 @@ export function verifyTOTPWithGracePeriod(
   otp: string,
   gracePeriodInSeconds: number
 ): boolean {
+  return matchTOTPCounter(key, intervalInSeconds, digits, otp, gracePeriodInSeconds) !== null;
+}
+
+export function matchTOTPCounter(
+  key: Uint8Array,
+  intervalInSeconds: number,
+  digits: number,
+  otp: string,
+  gracePeriodInSeconds: number
+): number | null {
   if (gracePeriodInSeconds < 0) {
     throw new TypeError('Grace period must be a positive number');
   }
@@ -98,11 +108,11 @@ export function verifyTOTPWithGracePeriod(
   );
   while (counter <= maxCounter) {
     if (verifyHOTP(key, counter, digits, otp)) {
-      return true;
+      return Number(counter);
     }
     counter++;
   }
-  return false;
+  return null;
 }
 
 export function createHOTPKeyURI(

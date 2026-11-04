@@ -75,6 +75,7 @@ export const localCredentials = pgTable('local_credential', {
   passwordHash: text('passwordHash').notNull(),
 
   totpSecret: bytea('totpSecret'),
+  totpLastCounter: integer('totpLastCounter'),
   mfaOptions: mfaMethod('mfaOptions')
     .array()
     .notNull()

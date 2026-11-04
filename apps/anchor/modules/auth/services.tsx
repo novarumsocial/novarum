@@ -1,19 +1,21 @@
 import Elysia, { t } from 'elysia';
+import type { Server } from 'bun';
 import { randomString } from '../../utils/randomString';
 import {
   createBlankSessionCookie,
   createSession,
   createSessionCookie,
   deleteSessionToken,
+  parseSessionToken,
   sessionCookieName,
   validateSessionToken,
 } from './provider';
 import { getConfig } from '../../utils/config';
-import { db, emailOtps, localCredentials, users } from '../../src/db';
+import { db, emailOtps, localCredentials, sessions, users } from '../../src/db';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { and, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import OTPEmail from '../../src/emails/otp';
 import { transporter } from '../../utils/services/email';
 import { createHmac, randomInt } from 'node:crypto';
@@ -24,15 +26,27 @@ import {
   decodeBase32,
   encodeBase32,
   generateRandomKey,
+  matchTOTPCounter,
   verifyTOTPWithGracePeriod,
 } from '../../utils/otp';
 import { mfaMethodSchema } from '../../src/db/zod';
 import { clientIp } from '../../utils/clientIp';
+import { closeSessionSockets } from '../realtime/services';
 
 const maxOtpAttempts = 5;
 const maxActiveResetCodes = 3;
 
-const authRateLimit = (path: string, max: number, duration: number) =>
+const sessionId = (request: Request) =>
+  parseSessionToken(
+    new Bun.CookieMap(request.headers.get('cookie') ?? '').get(sessionCookieName) ?? ''
+  )?.sessionId ?? '';
+
+const authRateLimit = (
+  path: string,
+  max: number,
+  duration: number,
+  generator: (request: Request, server: Server<unknown> | null) => string = clientIp
+) =>
   rateLimit({
     scoping: 'scoped',
     // a function seeds each limiter randomly, otherwise Elysia dedupes the ones with equal max/duration
@@ -40,12 +54,13 @@ const authRateLimit = (path: string, max: number, duration: number) =>
     duration,
     countFailedRequest: true,
     skip: (request) =>
-      request.method !== 'POST' || new URL(request.url).pathname !== `/auth${path}`,
+      !['POST', 'DELETE'].includes(request.method) ||
+      new URL(request.url).pathname !== `/auth${path}`,
     errorResponse: new Response(JSON.stringify({ error: 'Too many requests. Try again later.' }), {
       status: 429,
       headers: { 'Content-Type': 'application/json' },
     }),
-    generator: clientIp,
+    generator,
   });
 
 export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend({
@@ -67,6 +82,10 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
   .use(authRateLimit('/signup', 5, 60 * 60_000)) // 3 requests per hour
   .use(authRateLimit('/reset-password', 5, 15 * 60_000)) // 5 requests per 15 minutes
   .use(authRateLimit('/password-reset/request', 3, 15 * 60_000)) // 3 requests per 15 minutes
+  .use(authRateLimit('/mfa/totp/enable', 10, 15 * 60_000, sessionId))
+  .use(authRateLimit('/mfa/totp/toggle', 10, 15 * 60_000, sessionId))
+  .use(authRateLimit('/mfa/email/toggle', 10, 15 * 60_000, sessionId))
+  .use(authRateLimit('/mfa/totp', 10, 15 * 60_000, sessionId))
   .post(
     '/signup',
     async ({ body, cookie, status }) => {
@@ -292,19 +311,20 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         return status(401, { error: 'Invalid verification request' });
       }
 
+      const totpCounter =
+        body.method === 'TOTP' && credential.totpSecret
+          ? matchTOTPCounter(
+              decodeBase32(Buffer.from(credential.totpSecret).toString()),
+              30,
+              6,
+              body.code,
+              30
+            )
+          : null;
       const validCode =
         body.method === 'EMAIL'
           ? hashOtp(Number(body.code)) === pendingChallenge.otp
-          : Boolean(
-              credential.totpSecret &&
-              verifyTOTPWithGracePeriod(
-                decodeBase32(Buffer.from(credential.totpSecret).toString()),
-                30,
-                6,
-                body.code,
-                30
-              )
-            );
+          : totpCounter !== null && (await claimTotpCounter(credential.userId, totpCounter));
       if (!validCode) {
         await db
           .update(emailOtps)
@@ -359,6 +379,9 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       const sessionCookie = cookie[sessionCookieName]?.value as string | undefined;
       if (sessionCookie) {
         await deleteSessionToken(sessionCookie);
+        closeSessionSockets(
+          (session) => session.id === parseSessionToken(sessionCookie)?.sessionId
+        );
       }
 
       const blankCookie = createBlankSessionCookie();
@@ -468,6 +491,8 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         .update(localCredentials)
         .set({ passwordHash })
         .where(eq(localCredentials.userId, credential.userId));
+      await db.delete(sessions).where(eq(sessions.userId, credential.userId));
+      closeSessionSockets((session) => session.userId === credential.userId);
 
       return { success: true, message: 'Password reset successfully' };
     },
@@ -596,6 +621,9 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
+      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+        return status(403, { error: 'Incorrect password' });
+      }
 
       if (localCreds.totpSecret) {
         return status(400, { error: 'TOTP is already enabled for this user' });
@@ -603,9 +631,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
 
       const { secret, code } = body;
 
-      const isValid = verifyTOTPWithGracePeriod(decodeBase32(secret), 30, 6, code, 60);
-
-      if (!isValid) {
+      if (!verifyTOTPWithGracePeriod(decodeBase32(secret), 30, 6, code, 60)) {
         return status(400, { error: 'Invalid TOTP code' });
       }
 
@@ -636,6 +662,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     },
     {
       body: t.Object({
+        password: t.String({ maxLength: 1024 }),
         secret: t.String(),
         code: t.String({ minLength: 6, maxLength: 6 }),
       }),
@@ -646,6 +673,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
       },
@@ -669,6 +697,9 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
+      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+        return status(403, { error: 'Incorrect password' });
+      }
 
       await db
         .update(localCredentials)
@@ -686,6 +717,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     },
     {
       body: t.Object({
+        password: t.String({ maxLength: 1024 }),
         enable: t.Boolean(),
       }),
       response: {
@@ -695,6 +727,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
@@ -717,6 +750,9 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
+      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+        return status(403, { error: 'Incorrect password' });
+      }
 
       if (enable && !localCreds.totpSecret) {
         return status(400, { error: 'TOTP is not set up for this user' });
@@ -735,6 +771,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
     },
     {
       body: t.Object({
+        password: t.String({ maxLength: 1024 }),
         enable: t.Boolean(),
       }),
       response: {
@@ -744,13 +781,14 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
   )
   .delete(
     '/mfa/totp',
-    async ({ cookie, status }) => {
+    async ({ cookie, body, status }) => {
       const token = cookie[sessionCookieName]?.value as string | undefined;
       const session = await validateSessionToken(token);
       if (!session) {
@@ -765,6 +803,9 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
+      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+        return status(403, { error: 'Incorrect password' });
+      }
       if (!localCreds.totpSecret) {
         return status(400, { error: 'TOTP is not set up for this user' });
       }
@@ -773,6 +814,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         .update(localCredentials)
         .set({
           totpSecret: null,
+          totpLastCounter: null,
           mfaOptions: sql`array_remove(${localCredentials.mfaOptions}, 'TOTP'::mfa_method)`,
         })
         .where(eq(localCredentials.userId, session.userId));
@@ -780,6 +822,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       return { success: true, message: 'TOTP MFA disabled successfully' };
     },
     {
+      body: t.Object({ password: t.String({ maxLength: 1024 }) }),
       response: {
         200: z.object({
           success: z.boolean(),
@@ -787,6 +830,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         }),
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }
@@ -821,6 +865,20 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       },
     }
   );
+
+async function claimTotpCounter(userId: string, counter: number) {
+  const [claimed] = await db
+    .update(localCredentials)
+    .set({ totpLastCounter: counter })
+    .where(
+      and(
+        eq(localCredentials.userId, userId),
+        or(isNull(localCredentials.totpLastCounter), lt(localCredentials.totpLastCounter, counter))
+      )
+    )
+    .returning({ userId: localCredentials.userId });
+  return Boolean(claimed);
+}
 
 export function userResponse(user: Parameters<typeof publicUser>[0], email: string | null = null) {
   const { userId: id, ...profile } = publicUser(user);

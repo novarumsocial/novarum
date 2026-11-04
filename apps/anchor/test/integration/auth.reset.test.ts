@@ -4,6 +4,7 @@ import { connect } from '../harness/db';
 import { clearMail, latestOtpFor, messagesFor } from '../harness/mail';
 import { meStatus, post } from '../harness/http';
 import { parseSetCookie, signup } from '../harness/users';
+import { openRealtime } from '../harness/ws';
 
 let anchor: RunningAnchor;
 beforeAll(async () => {
@@ -32,6 +33,35 @@ describe('password reset', () => {
     expect(res.status).toBe(200);
     expect((await login(u.user.username, u.password)).status).toBe(401);
     expect((await login(u.user.username, 'a-brand-new-password')).status).toBe(200);
+  });
+
+  test('a reset signs out every session and closes their sockets', async () => {
+    const u = await signup(anchor.url);
+    const other = await signup(anchor.url);
+    const second = parseSetCookie(await login(u.user.username, u.password))!;
+    const socket = await openRealtime(anchor.url, u.cookie);
+    const otherSocket = await openRealtime(anchor.url, other.cookie);
+
+    expect((await reset(u.email, await requestCode(u.email))).status).toBe(200);
+    expect(await meStatus(anchor.url, u.cookie)).toBe(401);
+    expect(await meStatus(anchor.url, second)).toBe(401);
+    expect((await socket.waitClosed()).code).toBe(1008);
+    expect(await meStatus(anchor.url, other.cookie)).toBe(200);
+    expect(otherSocket.closed).toBeNull();
+    otherSocket.close();
+  });
+
+  test('logging out closes the sockets of that session only', async () => {
+    const u = await signup(anchor.url);
+    const second = parseSetCookie(await login(u.user.username, u.password))!;
+    const loggedOut = await openRealtime(anchor.url, u.cookie);
+    const kept = await openRealtime(anchor.url, second);
+
+    expect((await u.fetch('/auth/logout', { method: 'POST' })).status).toBe(200);
+    expect((await loggedOut.waitClosed()).code).toBe(1008);
+    await Bun.sleep(200);
+    expect(kept.closed).toBeNull();
+    kept.close();
   });
 
   test('requesting for an unknown email answers the same and sends nothing', async () => {

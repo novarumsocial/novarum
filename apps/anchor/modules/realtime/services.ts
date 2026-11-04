@@ -31,6 +31,7 @@ const connectionActive = new Map<string, { userId: string; active: boolean }>();
 const federatedVoiceChannelsByUser = new Map<string, string>();
 const voiceSocketByUser = new Map<string, string>();
 const pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const openSockets = new Map<string, { session: SessionWithUser; close: () => void }>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
     guildId: z.string().nullable(),
@@ -42,6 +43,12 @@ const voiceStateResponseSchema = z.object({
 
 export function isUserActive(userId: string) {
   return [...connectionActive.values()].some((state) => state.userId === userId && state.active);
+}
+
+export function closeSessionSockets(matches: (session: SessionWithUser) => boolean) {
+  for (const socket of openSockets.values()) {
+    if (matches(socket.session)) socket.close();
+  }
 }
 
 export function startPresenceCleanup() {
@@ -125,6 +132,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
 
     // @ts-ignore fuh ts
     ws.data.session = session;
+    openSockets.set(ws.id, { session, close: () => ws.close(1008, 'Session ended') });
 
     const memberships = await db.query.guildMembers.findMany({
       where: { userId: session.userId },
@@ -310,6 +318,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     clearInterval(pingIntervals.get(ws.id));
     pingIntervals.delete(ws.id);
     connectionActive.delete(ws.id);
+    openSockets.delete(ws.id);
     // @ts-ignore using it here
     const session = ws.data.session as SessionWithUser;
     if (!session) return;

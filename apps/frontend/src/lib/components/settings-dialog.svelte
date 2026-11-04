@@ -101,6 +101,8 @@
   let mfaLoaded = $state(false);
   let mfaLoading = $state(false);
   let mfaError = $state<string | null>(null);
+  let mfaPassword = $state('');
+  const missingMfaPassword = 'Enter your current password to change two-step verification.';
   let emailMfaLoading = $state(false);
   let totpState = $state<'idle' | 'setup' | 'enabled' | 'error'>('idle');
   let totpUri = $state('');
@@ -349,11 +351,15 @@
   }
 
   async function toggleEmailMfa(enable: boolean) {
+    if (!mfaPassword) return void (mfaError = missingMfaPassword);
     emailMfaLoading = true;
     mfaError = null;
 
     try {
-      const result = await anchor.client.auth.mfa.email.toggle.post({ enable });
+      const result = await anchor.client.auth.mfa.email.toggle.post({
+        enable,
+        password: mfaPassword,
+      });
       if (result.error) {
         mfaError = getErrorMessage(result.error.value, 'Could not update email MFA.');
         return;
@@ -370,11 +376,15 @@
   }
 
   async function toggleTotpMfa(enable: boolean) {
+    if (!mfaPassword) return void (mfaError = missingMfaPassword);
     totpMfaLoading = true;
     mfaError = null;
 
     try {
-      const result = await anchor.client.auth.mfa.totp.toggle.post({ enable });
+      const result = await anchor.client.auth.mfa.totp.toggle.post({
+        enable,
+        password: mfaPassword,
+      });
       if (result.error) {
         mfaError = getErrorMessage(result.error.value, 'Could not update authenticator MFA.');
         return;
@@ -436,6 +446,7 @@
       totpError = 'Enter the 6-digit code from your authenticator app.';
       return;
     }
+    if (!mfaPassword) return void (totpError = missingMfaPassword);
 
     totpLoading = true;
     totpError = null;
@@ -444,6 +455,7 @@
       const result = await anchor.client.auth.mfa.totp.enable.post({
         secret: totpSecret,
         code: totpCode,
+        password: mfaPassword,
       });
       if (result.error) {
         totpError = getErrorMessage(result.error.value, 'Could not enable MFA.');
@@ -474,11 +486,12 @@
   }
 
   async function deleteTotp() {
+    if (!mfaPassword) return void (mfaError = missingMfaPassword);
     totpDeleteLoading = true;
     mfaError = null;
 
     try {
-      const result = await anchor.client.auth.mfa.totp.delete();
+      const result = await anchor.client.auth.mfa.totp.delete({ password: mfaPassword });
       if (result.error) {
         mfaError = getErrorMessage(result.error.value, 'Could not remove authenticator MFA.');
         return;
@@ -964,6 +977,19 @@
                 title="Two-step verification"
                 description="Ask for a second code when you sign in."
               >
+                <div class="grid gap-1.5 px-4 py-3">
+                  <Label for="mfa-password">Current password</Label>
+                  <Input
+                    id="mfa-password"
+                    type="password"
+                    autocomplete="current-password"
+                    bind:value={mfaPassword}
+                    class="h-9"
+                  />
+                  <p class="text-xs text-muted-foreground">
+                    Needed to change two-step verification.
+                  </p>
+                </div>
                 <div class="flex items-center justify-between gap-4 px-4 py-3">
                   <div class="flex min-w-0 items-start gap-3">
                     <div

@@ -31,7 +31,7 @@ async function enableTotp(u: User) {
   expect(uri).toContain(secret);
   const res = await u.fetch('/auth/mfa/totp/enable', {
     method: 'POST',
-    body: JSON.stringify({ secret, code: totpNow(secret) }),
+    body: JSON.stringify({ secret, code: totpNow(secret), password: u.password }),
   });
   expect(res.status).toBe(200);
   return secret;
@@ -71,7 +71,7 @@ describe('TOTP', () => {
     expect((await u.fetch('/auth/mfa/totp/qr')).status).toBe(400);
     const again = await u.fetch('/auth/mfa/totp/enable', {
       method: 'POST',
-      body: JSON.stringify({ secret, code: totpNow(secret) }),
+      body: JSON.stringify({ secret, code: totpNow(secret), password: u.password }),
     });
     expect(again.status).toBe(400);
   });
@@ -82,7 +82,7 @@ describe('TOTP', () => {
     const wrong = totpAt(secret, 600);
     const res = await u.fetch('/auth/mfa/totp/enable', {
       method: 'POST',
-      body: JSON.stringify({ secret, code: wrong }),
+      body: JSON.stringify({ secret, code: wrong, password: u.password }),
     });
     expect(res.status).toBe(400);
     expect(await (await u.fetch('/auth/mfa')).json()).toEqual({ mfaOptions: [] });
@@ -117,8 +117,7 @@ describe('TOTP', () => {
     expect((await mfaLogin(c.challenge, 'EMAIL', '123456')).status).toBe(401);
   });
 
-  // gap (RFC 6238 5.2): a TOTP code is accepted again for a new challenge inside its validity window
-  test.failing('a TOTP code cannot be replayed on a second login', async () => {
+  test('a TOTP code cannot be replayed on a second login', async () => {
     const u = await signup(anchor.url);
     const secret = await enableTotp(u);
     const code = totpNow(secret);
@@ -129,9 +128,17 @@ describe('TOTP', () => {
   test('toggle off skips the challenge, toggle on needs a secret, DELETE /mfa/totp removes it', async () => {
     const u = await signup(anchor.url);
     const toggle = (enable: boolean) =>
-      u.fetch('/auth/mfa/totp/toggle', { method: 'POST', body: JSON.stringify({ enable }) });
+      u.fetch('/auth/mfa/totp/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ enable, password: u.password }),
+      });
+    const remove = () =>
+      u.fetch('/auth/mfa/totp', {
+        method: 'DELETE',
+        body: JSON.stringify({ password: u.password }),
+      });
     expect((await toggle(true)).status).toBe(400);
-    expect((await u.fetch('/auth/mfa/totp', { method: 'DELETE' })).status).toBe(400);
+    expect((await remove()).status).toBe(400);
 
     const secret = await enableTotp(u);
     expect((await toggle(false)).status).toBe(200);
@@ -141,7 +148,7 @@ describe('TOTP', () => {
     expect((await toggle(true)).status).toBe(200);
     expect((await passwordLogin(u)).status).toBe(202);
 
-    expect((await u.fetch('/auth/mfa/totp', { method: 'DELETE' })).status).toBe(200);
+    expect((await remove()).status).toBe(200);
     expect(await (await u.fetch('/auth/mfa')).json()).toEqual({ mfaOptions: [] });
     expect((await passwordLogin(u)).status).toBe(200);
     // the secret is gone, so qr hands out a new one
@@ -152,7 +159,10 @@ describe('TOTP', () => {
 
 describe('email MFA', () => {
   const toggleEmail = (u: User, enable: boolean) =>
-    u.fetch('/auth/mfa/email/toggle', { method: 'POST', body: JSON.stringify({ enable }) });
+    u.fetch('/auth/mfa/email/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ enable, password: u.password }),
+    });
 
   test('login -> /login/mfa/email sends a code -> /login/mfa with it creates the session', async () => {
     const u = await signup(anchor.url);
@@ -238,5 +248,58 @@ test('a challenge locks after 5 wrong codes, even for the right one', async () =
   expect(res.status).toBe(401);
   expect(await res.json()).toEqual({
     error: 'This verification request has expired. Sign in again.',
+  });
+});
+
+describe('changing MFA needs the current password', () => {
+  const routes = [
+    ['POST', '/auth/mfa/email/toggle', { enable: true }],
+    ['POST', '/auth/mfa/totp/toggle', { enable: false }],
+    ['DELETE', '/auth/mfa/totp', {}],
+  ] as const;
+
+  test('a wrong or missing password is refused and changes nothing', async () => {
+    const u = await signup(anchor.url);
+    const secret = await enableTotp(u);
+    for (const [method, path, body] of routes) {
+      const wrong = await u.fetch(path, {
+        method,
+        body: JSON.stringify({ ...body, password: 'not-the-password' }),
+      });
+      expect(wrong.status).toBe(403);
+      expect((await u.fetch(path, { method, body: JSON.stringify(body) })).status).toBe(422);
+    }
+    expect(await (await u.fetch('/auth/mfa')).json()).toEqual({ mfaOptions: ['TOTP'] });
+    expect((await mfaLogin((await challenge(u)).challenge, 'TOTP', totpNow(secret))).status).toBe(
+      200
+    );
+  });
+
+  test('enrolling TOTP with a stolen session is refused without the password', async () => {
+    const u = await signup(anchor.url);
+    const { secret } = (await (await u.fetch('/auth/mfa/totp/qr')).json()) as { secret: string };
+    const res = await u.fetch('/auth/mfa/totp/enable', {
+      method: 'POST',
+      body: JSON.stringify({ secret, code: totpNow(secret), password: 'not-the-password' }),
+    });
+    expect(res.status).toBe(403);
+    expect(await (await u.fetch('/auth/mfa')).json()).toEqual({ mfaOptions: [] });
+  });
+
+  test('password guesses through a session are limited per session', async () => {
+    const u = await signup(anchor.url);
+    const guess = () =>
+      u.fetch('/auth/mfa/email/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ enable: false, password: 'not-the-password' }),
+      });
+    for (let i = 0; i < 10; i++) expect((await guess()).status).toBe(403);
+    expect((await guess()).status).toBe(429);
+    const other = await signup(anchor.url);
+    const res = await other.fetch('/auth/mfa/email/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ enable: false, password: 'not-the-password' }),
+    });
+    expect(res.status).toBe(403);
   });
 });
