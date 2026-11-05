@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "deee60e2-f688-4789-bd8e-b28f1068ff3c",
+  "id": "c822bbb2-77e9-458e-834f-f795748f04c5",
   "prevIds": [
-    "0eb1decd-54bf-4ade-9e79-283865f8405e"
+    "e5a08146-3607-445d-9aa5-d64eabc3730e"
   ],
   "ddl": [
     {
@@ -538,6 +538,19 @@
       "table": "channel"
     },
     {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "ownerOnly",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel"
+    },
+    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -624,6 +637,19 @@
       "generated": null,
       "identity": null,
       "name": "intent",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "email_otps"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "attempts",
       "entityType": "columns",
       "schema": "public",
       "table": "email_otps"
@@ -1313,6 +1339,19 @@
       "generated": null,
       "identity": null,
       "name": "totpSecret",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "local_credential"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "totpLastCounter",
       "entityType": "columns",
       "schema": "public",
       "table": "local_credential"

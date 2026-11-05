@@ -283,7 +283,7 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(0);
     },
   },
-  '20261026103024_channel_canvas': {
+  '20261105153240_channel_canvas': {
     check: async (url) => {
       // existing channels start without a canvas, and can get one
       expect(await rows(url, `SELECT 1 FROM channel_canvas`)).toHaveLength(0);

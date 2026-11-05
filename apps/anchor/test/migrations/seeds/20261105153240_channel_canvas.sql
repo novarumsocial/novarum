@@ -1,6 +1,5 @@
--- seed for the schema after the 17 migration(s) before 20261026103024_channel_canvas
+-- seed for the schema after the 20 migration(s) before 20261105153240_channel_canvas
 -- frozen: do not edit once the migration is merged
-
 INSERT INTO "user" ("id", "avatarUrl", "displayName", "createdAt", "homeserverName", "isBot", "updatedAt", "username", "status", "isHomeserverAdmin", "bannerUrl", "about", "avatarColor", "speakingRingColor") VALUES
   ('u1', NULL, 'ALICE', '2026-07-20 10:00:00+00', 'localhost', false, '2026-07-20 10:00:00+00', 'alice', 'OFFLINE', true, 'https://localhost/banner.png', 'hello', '#112233', '#abcdef'),
   ('u2', NULL, 'BOB', '2026-07-20 10:00:00+00', 'localhost', false, '2026-07-20 10:00:00+00', 'bob', 'OFFLINE', false, NULL, NULL, '#112233', '#abcdef'),
