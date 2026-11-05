@@ -2,6 +2,7 @@
   import {
     BellRing,
     Hash,
+    CornerUpLeft,
     Megaphone,
     Menu,
     NotebookPen,
@@ -514,26 +515,6 @@
         </div>
       {/if}
 
-      {#if replyingTo}
-        <div
-          class="flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs sm:px-4"
-        >
-          <span class="min-w-0 flex-1 truncate text-muted-foreground">
-            Replying to <span class="font-medium text-foreground"
-              >{replyingTo.author.displayName || replyingTo.author.username}</span
-            >
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Cancel reply"
-            onclick={() => (replyingTo = null)}
-          >
-            <X class="size-3.5" />
-          </Button>
-        </div>
-      {/if}
-
       {#if chat.canSendInCurrentChannel}
         <MessageInput
           placeholder={channel.type === 'DM'
@@ -541,7 +522,33 @@
             : `Message #${channel.name}`}
           onSend={sendMessage}
           onTyping={() => chat.onTyping()}
+          context={replyingTo ? replyContext : undefined}
         />
+        {#snippet replyContext()}
+          <div class="flex items-center gap-2 py-1.5 pr-1.5 pl-3 text-xs">
+            <CornerUpLeft class="size-3.5 shrink-0 text-primary" />
+            <div class="min-w-0 flex-1 border-l-2 border-primary/50 pl-2">
+              <p class="truncate text-muted-foreground">
+                Replying to <span class="font-medium text-foreground"
+                  >{replyingTo?.author.displayName || replyingTo?.author.username}</span
+                >
+              </p>
+              <p class="truncate text-muted-foreground">
+                {replyingTo?.content ||
+                  `${replyingTo?.attachments.length} attachment${replyingTo?.attachments.length === 1 ? '' : 's'}`}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Cancel reply"
+              title="Cancel reply"
+              onclick={() => (replyingTo = null)}
+            >
+              <X class="size-3.5" />
+            </Button>
+          </div>
+        {/snippet}
       {:else}
         <div
           class="flex min-h-12 shrink-0 items-center justify-center gap-2 border-t border-border px-3 text-sm text-muted-foreground"

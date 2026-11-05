@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
   import { realtime } from '$lib/realtime.svelte';
-  import { FileText, Paperclip, Send, X } from '@lucide/svelte';
+  import { FileText, Paperclip, SendHorizontal, X } from '@lucide/svelte';
+  import type { Snippet } from 'svelte';
+  import { cn } from '$lib/utils';
   import { chat, maxMessageLength } from '$lib/chat-state.svelte';
   import { anchor } from '$lib/anchor.svelte';
   import type { Author } from '$lib/types/chat';
@@ -59,11 +61,18 @@
     placeholder = 'Send a message',
     onSend = () => {},
     onTyping = () => {},
+    context,
   }: {
     placeholder?: string;
     onSend?: (content: string | null, files: File[]) => void | Promise<void>;
     onTyping?: () => void;
+    // a row above the text, inside the composer (what you are replying to)
+    context?: Snippet;
   } = $props();
+
+  const canSend = $derived((!!content.trim() || files.length > 0) && !sending);
+  // only shown once the limit is close, so it never competes with the message itself
+  const remaining = $derived(maxMessageLength - content.length);
 
   async function handleSend() {
     const trimmed = content.trim() || null;
@@ -318,7 +327,7 @@
 <svelte:window onkeydown={windowKeyDown} onpaste={handlePaste} />
 
 <div
-  class="relative border-t border-border p-2 sm:p-4"
+  class="relative px-2 pb-2 sm:px-4 sm:pb-4"
   role="group"
   aria-label="Message composer"
   ondragenter={handleDragEnter}
@@ -388,98 +397,141 @@
     </div>
   {/if}
 
-  {#if files.length > 0}
-    <div class="mb-2 flex gap-2 overflow-x-auto pb-1">
-      {#each files as file, index (`${file.name}:${file.size}:${file.lastModified}`)}
-        <div
-          class="group relative size-24 shrink-0 overflow-hidden rounded-none border border-border bg-muted/30"
-          title={file.name}
-        >
-          {#if previews[index]}
-            <img src={previews[index]} alt={file.name} class="size-full object-cover" />
-          {:else}
-            <div class="flex size-full flex-col items-center justify-center gap-1.5 px-2 pb-4">
-              <FileText class="size-5 text-primary" />
-              <p class="w-full truncate text-center text-[11px] font-medium">{file.name}</p>
-            </div>
-          {/if}
-          <span
-            class="absolute bottom-1 left-1 bg-background/80 px-1 py-px font-mono text-[9px] tracking-wide text-muted-foreground uppercase backdrop-blur"
-          >
-            {formatBytes(file.size)}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            class="absolute top-1 right-1 bg-background/80 backdrop-blur transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
-            disabled={sending}
-            aria-label={`Remove ${file.name}`}
-            onclick={() => (files = files.filter((item) => item !== file))}
-          >
-            <X class="size-3" />
-          </Button>
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  {#if sendError}
-    <p
-      class="mb-2 border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive"
-    >
-      {sendError}
-    </p>
-  {/if}
-
   <div
-    class={`flex items-end gap-2 border bg-background p-2 transition-colors focus-within:border-primary/50 ${draggingFiles ? 'border-primary bg-primary/5' : 'border-border'}`}
+    class={cn(
+      'relative border bg-card transition-colors focus-within:border-primary/60',
+      draggingFiles ? 'border-primary' : 'border-border'
+    )}
   >
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      class="self-center text-muted-foreground hover:text-foreground"
-      aria-label="Add attachments"
-      onclick={() => fileInput.click()}
-    >
-      <Paperclip class="size-4" />
-    </Button>
-    <input
-      bind:this={fileInput}
-      type="file"
-      multiple
-      class="sr-only"
-      aria-label="Choose files to attach"
-      onchange={handleFileInput}
-    />
-    <textarea
-      bind:value={content}
-      bind:this={textarea}
-      maxlength={maxMessageLength}
-      onkeydown={handleKeydown}
-      onkeyup={handleKeyup}
-      oninput={updateSearch}
-      onclick={updateSearch}
-      {placeholder}
-      role="combobox"
-      aria-autocomplete="list"
-      aria-expanded={emojiStart !== null || mentionStart !== null}
-      aria-controls={mentionStart !== null ? 'mention-search-results' : 'emoji-search-results'}
-      aria-activedescendant={mentionStart !== null && mentionResults.length
-        ? `mention-result-${selectedMention}`
-        : emojiStart !== null && emojiResults.length
-          ? `emoji-result-${selectedEmoji}`
-          : undefined}
-      rows="1"
-      class="min-h-10 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-    ></textarea>
-    <Button
-      onclick={handleSend}
-      size="icon-lg"
-      disabled={(!content.trim() && files.length === 0) || sending}
-      aria-label="Send message"
-      class={device.isComputer ? 'md:hidden' : ''}
-    >
-      <Send class="size-4" />
-    </Button>
+    {#if context}
+      <div class="border-b border-border/60">{@render context()}</div>
+    {/if}
+
+    {#if files.length > 0}
+      <div class="flex gap-2 overflow-x-auto border-b border-border/60 p-2">
+        {#each files as file, index (`${file.name}:${file.size}:${file.lastModified}`)}
+          <div
+            class="group relative size-20 shrink-0 overflow-hidden border border-border bg-background"
+            title={file.name}
+          >
+            {#if previews[index]}
+              <img src={previews[index]} alt={file.name} class="size-full object-cover" />
+            {:else}
+              <div class="flex size-full flex-col items-center justify-center gap-1.5 px-2 pb-4">
+                <FileText class="size-5 text-primary" />
+                <p class="w-full truncate text-center text-[11px] font-medium">{file.name}</p>
+              </div>
+            {/if}
+            <span
+              class="absolute bottom-1 left-1 bg-background/80 px-1 py-px text-[10px] text-muted-foreground tabular-nums backdrop-blur"
+            >
+              {formatBytes(file.size)}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              class="absolute top-1 right-1 bg-background/80 backdrop-blur transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-visible:opacity-100"
+              disabled={sending}
+              aria-label={`Remove ${file.name}`}
+              onclick={() => (files = files.filter((item) => item !== file))}
+            >
+              <X class="size-3" />
+            </Button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if sendError}
+      <p
+        class="border-b border-border/60 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        role="alert"
+      >
+        {sendError}
+      </p>
+    {/if}
+
+    <div class="flex items-end gap-1 p-1.5">
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        class="size-10 shrink-0 text-muted-foreground hover:text-foreground"
+        aria-label="Add attachments"
+        title="Add attachments"
+        onclick={() => fileInput.click()}
+      >
+        <Paperclip class="size-4" />
+      </Button>
+      <input
+        bind:this={fileInput}
+        type="file"
+        multiple
+        class="sr-only"
+        aria-label="Choose files to attach"
+        onchange={handleFileInput}
+      />
+      <textarea
+        bind:value={content}
+        bind:this={textarea}
+        maxlength={maxMessageLength}
+        onkeydown={handleKeydown}
+        onkeyup={handleKeyup}
+        oninput={updateSearch}
+        onclick={updateSearch}
+        {placeholder}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={emojiStart !== null || mentionStart !== null}
+        aria-controls={mentionStart !== null ? 'mention-search-results' : 'emoji-search-results'}
+        aria-activedescendant={mentionStart !== null && mentionResults.length
+          ? `mention-result-${selectedMention}`
+          : emojiStart !== null && emojiResults.length
+            ? `emoji-result-${selectedEmoji}`
+            : undefined}
+        rows="1"
+        class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
+      ></textarea>
+      {#if remaining <= 200}
+        <span
+          class={cn(
+            'flex h-10 shrink-0 items-center px-1 text-xs tabular-nums',
+            remaining <= 0
+              ? 'text-destructive'
+              : remaining <= 50
+                ? 'text-amber-500'
+                : 'text-muted-foreground'
+          )}
+          aria-live="polite"
+          title="Characters left"
+        >
+          {remaining}
+        </span>
+      {/if}
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        onclick={handleSend}
+        disabled={!canSend}
+        aria-label="Send message"
+        title={device.isComputer ? 'Send (Enter)' : 'Send'}
+        class={cn(
+          'size-10 shrink-0 transition-colors',
+          canSend
+            ? 'bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground'
+            : 'text-muted-foreground'
+        )}
+      >
+        <SendHorizontal class="size-4" />
+      </Button>
+    </div>
+
+    {#if draggingFiles}
+      <div
+        class="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 border border-dashed border-primary bg-card/90 text-sm font-medium text-primary"
+      >
+        <Paperclip class="size-4" />
+        Drop to attach
+      </div>
+    {/if}
   </div>
 </div>

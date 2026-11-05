@@ -4,6 +4,7 @@
     PanelBottomOpen,
     PanelRightClose,
     PanelRightOpen,
+    ZoomOut,
   } from '@lucide/svelte';
   import { slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -12,6 +13,7 @@
   import type { Voice } from '$lib/voice.svelte';
   import { fitTiles, type VoiceTile } from '$lib/voice-layout';
   import VoiceTileView from './voice-tile.svelte';
+  import { ZoomPan } from '$lib/zoom-pan.svelte';
 
   let {
     tiles,
@@ -43,6 +45,19 @@
   const spotlight = $derived(tiles.find((tile) => tile.key === spotlightKey) ?? null);
   const rest = $derived(spotlight ? tiles.filter((tile) => tile.key !== spotlight.key) : tiles);
 
+  // a spotlighted stream can be zoomed into, to read small text on someone's screen
+  const zoom = new ZoomPan();
+  const zoomable = $derived(spotlight?.kind === 'screen');
+  $effect(() => {
+    void spotlightKey;
+    zoom.reset();
+  });
+  $effect(() => {
+    void spotlightWidth;
+    void spotlightHeight;
+    zoom.pan(0, 0);
+  });
+
   // Landscape puts the filmstrip on the side, portrait along the bottom. Driven by the
   // measured stage rather than breakpoints, so phone landscape behaves too.
   const sideStrip = $derived(stageWidth > stageHeight * 1.1);
@@ -55,14 +70,22 @@
   const overflows = $derived(grid.rows * (grid.height + GAP) - GAP > stageHeight + 1);
 
   function onKeydown(event: KeyboardEvent) {
-    if (event.key.toLowerCase() !== 'h' || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (!spotlight || rest.length === 0) return;
+    if (event.ctrlKey || event.metaKey || event.altKey || !spotlight) return;
     if (
       event.target instanceof HTMLElement &&
       event.target.closest('input, textarea, select, [contenteditable="true"]')
     ) {
       return;
     }
+
+    const key = event.key.toLowerCase();
+    if (zoomable && ['+', '=', '-', '0'].includes(key)) {
+      event.preventDefault();
+      if (key === '0') zoom.reset();
+      else zoom.zoomBy(key === '-' ? 1 / 1.25 : 1.25);
+      return;
+    }
+    if (key !== 'h' || rest.length === 0) return;
 
     event.preventDefault();
     stripCollapsed = !stripCollapsed;
@@ -89,7 +112,24 @@
           fitWithin={{ width: spotlightWidth, height: spotlightHeight }}
           onSelect={onExitSpotlight}
           ariaLabel="Show grid view"
+          zoom={zoomable ? zoom : undefined}
         />
+
+        {#if zoomable && zoom.zoomed}
+          <button
+            type="button"
+            class={cn(
+              'absolute top-2 left-2 z-10 flex h-7 items-center gap-1.5 bg-black/60 px-2 text-xs font-medium text-white tabular-nums backdrop-blur hover:bg-black/75',
+              settings.value.circleIcons && 'rounded-full'
+            )}
+            aria-label="Reset zoom (0)"
+            title="Reset zoom (0)"
+            onclick={() => zoom.reset()}
+          >
+            <ZoomOut class="size-3.5" />
+            {Math.round(zoom.scale * 100)}%
+          </button>
+        {/if}
 
         {#if rest.length > 0}
           <button

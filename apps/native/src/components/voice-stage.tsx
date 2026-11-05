@@ -65,10 +65,12 @@ export function VoiceStage({
               onLayout={(e) => setSpotlightSize(e.nativeEvent.layout)}
             >
               <VoiceTileView
+                key={spotlight.key}
                 tile={spotlight}
                 fitWithin={spotlightSize}
                 onSelect={onExitSpotlight}
                 ariaLabel="Show grid view"
+                zoomable={spotlight.kind === 'screen'}
               />
 
               {rest.length > 0 && (

@@ -667,32 +667,6 @@ export function ChatArea({
           )}
         </View>
 
-        {replyingTo && (
-          <View className="flex-row items-center gap-2 border-t border-border bg-background pl-3">
-            <Icon as={Reply} size={16} className="text-primary" />
-            <View className="min-w-0 flex-1 border-l-2 border-primary/50 py-1.5 pl-2">
-              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                Replying to{' '}
-                <Text className="text-xs font-semibold text-foreground">
-                  {replyingTo.author.displayName || replyingTo.author.username}
-                </Text>
-              </Text>
-              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                {replyingTo.content ||
-                  `${replyingTo.attachments.length} attachment${replyingTo.attachments.length === 1 ? '' : 's'}`}
-              </Text>
-            </View>
-            <Button
-              variant="ghost"
-              size="icon"
-              accessibilityLabel="Cancel reply"
-              onPress={() => setReplyingTo(null)}
-            >
-              <Icon as={X} size={16} />
-            </Button>
-          </View>
-        )}
-
         {canSend ? (
           <MessageInput
             placeholder={
@@ -701,6 +675,33 @@ export function ChatArea({
             onSend={sendMessage}
             onTyping={() => void chat().onTyping()}
             focusOn={replyingTo?.id ?? null}
+            context={
+              replyingTo ? (
+                <View className="flex-row items-center gap-2 pl-3">
+                  <Icon as={Reply} size={16} className="text-primary" />
+                  <View className="min-w-0 flex-1 border-l-2 border-primary/50 py-1.5 pl-2">
+                    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                      Replying to{' '}
+                      <Text className="text-xs font-semibold text-foreground">
+                        {replyingTo.author.displayName || replyingTo.author.username}
+                      </Text>
+                    </Text>
+                    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                      {replyingTo.content ||
+                        `${replyingTo.attachments.length} attachment${replyingTo.attachments.length === 1 ? '' : 's'}`}
+                    </Text>
+                  </View>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    accessibilityLabel="Cancel reply"
+                    onPress={() => setReplyingTo(null)}
+                  >
+                    <Icon as={X} size={16} />
+                  </Button>
+                </View>
+              ) : undefined
+            }
           />
         ) : (
           <View className="min-h-12 flex-row items-center justify-center gap-2 border-t border-border px-3">

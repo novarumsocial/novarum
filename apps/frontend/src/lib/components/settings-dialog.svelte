@@ -531,9 +531,12 @@
   });
 
   let pushError = $state<string | null>(null);
+  // push failed, but notifications still arrive while the app is open
+  let pushWarning = $state<string | null>(null);
 
   async function setPushNotifications(enabled: boolean) {
     pushError = null;
+    pushWarning = null;
     if (!enabled) {
       settings.value.pushNotifications = false;
       void disablePush();
@@ -559,9 +562,14 @@
     try {
       await enablePush();
     } catch (error) {
-      pushError = error instanceof Error ? error.message : 'Could not set up push notifications';
-      settings.value.pushNotifications = false;
-      return;
+      const reason = error instanceof Error ? error.message : 'Could not set up push notifications';
+      // without a push service, a browser still shows notifications while Novarum is open
+      if (!canShow) {
+        pushError = reason;
+        settings.value.pushNotifications = false;
+        return;
+      }
+      pushWarning = `${reason}, so notifications only arrive while Novarum is open.`;
     }
 
     settings.value.pushNotifications = true;
@@ -1247,6 +1255,9 @@
                   onCheckedChange={setMessagePreview}
                 />
               </SettingsRow>
+              {#if pushWarning}
+                <p class="px-4 py-2 text-xs text-amber-500" aria-live="polite">{pushWarning}</p>
+              {/if}
               {#if pushError}
                 <p class="px-4 py-2 text-xs text-destructive" aria-live="polite">{pushError}</p>
               {/if}

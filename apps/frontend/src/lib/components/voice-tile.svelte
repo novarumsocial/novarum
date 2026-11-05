@@ -6,6 +6,7 @@
   import { fallbackAvatarBg, initialsFor, type VoiceTile } from '$lib/voice-layout';
   import Avatar from './avatar.svelte';
   import ParticipantContextMenu from './participant-context-menu.svelte';
+  import type { ZoomPan } from '$lib/zoom-pan.svelte';
 
   let {
     tile,
@@ -16,6 +17,7 @@
     fitWithin,
     onSelect,
     ariaLabel,
+    zoom,
   }: {
     tile: VoiceTile;
     voice: Voice;
@@ -29,12 +31,21 @@
     // isn't clickable.
     onSelect?: () => void;
     ariaLabel?: string;
+    // lets the viewer zoom and pan the video (the spotlighted stream)
+    zoom?: ZoomPan;
   } = $props();
 
   const isSelf = $derived(tile.identity === voice.localIdentity);
   const isScreen = $derived(tile.kind === 'screen');
   const track = $derived(isScreen ? tile.state.screenTrack : tile.state.cameraTrack);
   const ringColor = $derived(tile.member?.speakingRingColor ?? '#00d492');
+  const zoomable = $derived(!!zoom && !!track);
+
+  // while zoomed, or right after a drag, a click pans instead of leaving the spotlight
+  function select() {
+    if (zoomable && (zoom!.zoomed || zoom!.moved)) return;
+    onSelect?.();
+  }
 
   let videoAspect = $state(16 / 9);
   const box = $derived.by(() => {
@@ -77,17 +88,23 @@
       isScreen && 'bg-black',
       onSelect &&
         'cursor-pointer transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2',
-      box.width === undefined && 'size-full'
+      box.width === undefined && 'size-full',
+      zoomable && 'touch-none select-none',
+      zoomable && zoom!.zoomed && 'cursor-grab active:cursor-grabbing hover:brightness-100'
     )}
     style:width={box.width === undefined ? undefined : `${box.width}px`}
     style:height={box.height === undefined ? undefined : `${box.height}px`}
-    onclick={onSelect}
+    onclick={select}
+    ondblclick={() => zoomable && zoom!.reset()}
+    {@attach zoomable && zoom!.attach}
     aria-label={onSelect ? (ariaLabel ?? `Spotlight ${tile.name}`) : undefined}
   >
     {#if track}
       <!-- object-contain, not cover: never crop someone's camera to fit the tile shape -->
       <video
-        class="size-full object-contain"
+        class="size-full origin-top-left object-contain"
+        style:transform={zoomable ? zoom!.transform : undefined}
+        draggable="false"
         autoplay
         playsinline
         muted={isSelf}

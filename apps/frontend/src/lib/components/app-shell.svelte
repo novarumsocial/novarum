@@ -119,6 +119,12 @@
       null
   );
 
+  // a voice channel's call takes the whole width, so it has no member list
+  const showMembers = $derived(chat.route.kind === 'guild' && currentChannel?.type !== 'VOICE');
+  $effect(() => {
+    if (!showMembers) mobileMembersOpen = false;
+  });
+
   $effect(() => {
     if (!booting) chat.syncActiveChannel();
   });
@@ -189,7 +195,7 @@
     if (mobileNavigationOpen && x < 0) mobileNavigationOpen = false;
     else if (mobileMembersOpen && x > 0) mobileMembersOpen = false;
     else if (x > 0 && window.innerWidth < 768) openNavigation();
-    else if (x < 0 && window.innerWidth < 1024 && chat.route.kind === 'guild') {
+    else if (x < 0 && window.innerWidth < 1024 && showMembers) {
       openMembers();
     }
   }
@@ -335,7 +341,6 @@
         onJoin={() => voice.join(currentChannel.id).catch(() => null)}
         onLeave={leaveVoice}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
-        onToggleMembers={toggleMembers}
       />
     {:else}
       <main class="relative flex min-w-0 flex-1 items-center justify-center bg-background px-6">
@@ -356,7 +361,7 @@
         </div>
       </main>
     {/if}
-    {#if chat.route.kind === 'guild'}
+    {#if showMembers}
       <div
         class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0 {settings
           .value.showMemberList

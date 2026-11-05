@@ -91,10 +91,15 @@ async function subscribeWebPush(retry = true) {
     await subscription!.unsubscribe();
     subscription = null;
   }
-  subscription ??= await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: bytes,
-  });
+  subscription ??= await registration.pushManager
+    .subscribe({ userVisibleOnly: true, applicationServerKey: bytes })
+    .catch((error: unknown) => {
+      // Chromium's "Registration failed - push service error": the browser has no working push
+      // service (Brave with Google push off, Chromium without Google services, a broken profile)
+      if (error instanceof DOMException && error.name === 'AbortError')
+        throw new Error("This browser couldn't reach its push service");
+      throw error;
+    });
 
   if (await saveSubscription('WEBPUSH', webSubscriptionSchema.parse(subscription.toJSON()))) return;
 

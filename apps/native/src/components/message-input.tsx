@@ -6,8 +6,16 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, FileText, Files, ImageIcon, Paperclip, Send, X } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Camera,
+  FileText,
+  Files,
+  ImageIcon,
+  Paperclip,
+  SendHorizontal,
+  X,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +85,7 @@ export function MessageInput({
   onSend = () => {},
   onTyping = () => {},
   focusOn = null,
+  context,
 }: {
   placeholder?: string;
   // the chat shows the message as "sending" right away; this only throws when it could not even take it
@@ -84,6 +93,8 @@ export function MessageInput({
   onTyping?: () => void;
   // focus the input whenever this changes to something (chat-area passes the id of the message being replied to)
   focusOn?: string | null;
+  // a row above the text, inside the composer (what you are replying to)
+  context?: ReactNode;
 }) {
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<PickedFile[]>([]);
@@ -233,10 +244,12 @@ export function MessageInput({
     );
 
   const canSend = (content.trim().length > 0 || files.length > 0) && !sending;
+  // only shown once the limit is close, so it never competes with the message itself
+  const remaining = maxMessageLength - content.length;
 
   return (
     <View
-      className="border-t border-border bg-background p-2"
+      className="bg-background px-2 pt-1"
       style={{ paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 8) }}
     >
       {(mentionResults.length > 0 || emojiMatches.length > 0) && (
@@ -283,111 +296,132 @@ export function MessageInput({
         </ScrollView>
       )}
 
-      {files.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
-          <View className="flex-row gap-2">
-            {files.map((file, index) => {
-              const progress = uploadProgress[index];
-              return (
-                <View
-                  key={file.uri}
-                  className="size-24 overflow-hidden border border-border bg-muted/30"
-                >
-                  {file.mimeType.startsWith('image/') ? (
-                    <Image
-                      source={{ uri: file.uri }}
-                      contentFit="cover"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        opacity: progress === undefined ? 1 : 0.6,
-                      }}
-                    />
-                  ) : (
-                    <View className="flex-1 items-center justify-center gap-1.5 px-2 pb-4">
-                      <Icon as={FileText} size={20} className="text-primary" />
-                      <Text
-                        className="w-full text-center text-[11px] font-medium"
-                        numberOfLines={1}
-                      >
-                        {file.name}
+      <View className={cn('border bg-card', focused ? 'border-primary/60' : 'border-border')}>
+        {context ? <View className="border-b border-border/60">{context}</View> : null}
+        {files.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="border-b border-border/60"
+            contentContainerClassName="p-2"
+          >
+            <View className="flex-row gap-2">
+              {files.map((file, index) => {
+                const progress = uploadProgress[index];
+                return (
+                  <View
+                    key={file.uri}
+                    className="size-20 overflow-hidden border border-border bg-background"
+                  >
+                    {file.mimeType.startsWith('image/') ? (
+                      <Image
+                        source={{ uri: file.uri }}
+                        contentFit="cover"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          opacity: progress === undefined ? 1 : 0.6,
+                        }}
+                      />
+                    ) : (
+                      <View className="flex-1 items-center justify-center gap-1.5 px-2 pb-4">
+                        <Icon as={FileText} size={20} className="text-primary" />
+                        <Text
+                          className="w-full text-center text-[11px] font-medium"
+                          numberOfLines={1}
+                        >
+                          {file.name}
+                        </Text>
+                      </View>
+                    )}
+                    <View className="absolute bottom-1 left-1 bg-background/80 px-1 py-px">
+                      <Text className="text-[10px] text-muted-foreground">
+                        {formatBytes(file.size)}
                       </Text>
                     </View>
-                  )}
-                  <View className="absolute bottom-1 left-1 bg-background/80 px-1 py-px">
-                    <Text className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-                      {formatBytes(file.size)}
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${file.name}`}
-                    disabled={sending}
-                    hitSlop={10}
-                    onPress={() => setFiles(files.filter((item) => item !== file))}
-                    className={cn(
-                      'absolute top-1 right-1 size-7 items-center justify-center bg-background/80',
-                      sending && 'opacity-40'
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${file.name}`}
+                      disabled={sending}
+                      hitSlop={10}
+                      onPress={() => setFiles(files.filter((item) => item !== file))}
+                      className={cn(
+                        'absolute top-1 right-1 size-7 items-center justify-center bg-background/80',
+                        sending && 'opacity-40'
+                      )}
+                    >
+                      <Icon as={X} size={14} />
+                    </Pressable>
+                    {progress !== undefined && (
+                      <View
+                        className="absolute bottom-0 left-0 h-0.5 bg-primary"
+                        style={{ width: `${progress * 100}%` }}
+                      />
                     )}
-                  >
-                    <Icon as={X} size={14} />
-                  </Pressable>
-                  {progress !== undefined && (
-                    <View
-                      className="absolute bottom-0 left-0 h-0.5 bg-primary"
-                      style={{ width: `${progress * 100}%` }}
-                    />
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
-      )}
-
-      {sendError ? (
-        <Text className="mb-2 border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {sendError}
-        </Text>
-      ) : null}
-
-      <View
-        className={cn(
-          'flex-row items-end gap-1 border bg-background p-1',
-          focused ? 'border-primary/50' : 'border-border'
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
         )}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel="Add attachments"
-          onPress={() => setAttachOpen(true)}
-        >
-          <Icon as={Paperclip} size={18} className="text-muted-foreground" />
-        </Button>
-        <Textarea
-          ref={input}
-          value={content}
-          maxLength={maxMessageLength}
-          onChangeText={(text) => {
-            setContent(text);
-            if (text.trim()) onTyping();
-          }}
-          onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={placeholder}
-          accessibilityLabel={placeholder}
-          className="max-h-40 min-h-11 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px]"
-        />
-        <Button
-          size="icon"
-          disabled={!canSend}
-          accessibilityLabel="Send message"
-          onPress={handleSend}
-        >
-          <Icon as={Send} size={18} className="text-primary-foreground" />
-        </Button>
+        {sendError ? (
+          <Text className="border-b border-border/60 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {sendError}
+          </Text>
+        ) : null}
+        <View className="flex-row items-end gap-1 p-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel="Add attachments"
+            onPress={() => setAttachOpen(true)}
+          >
+            <Icon as={Paperclip} size={18} className="text-muted-foreground" />
+          </Button>
+          <Textarea
+            ref={input}
+            value={content}
+            maxLength={maxMessageLength}
+            onChangeText={(text) => {
+              setContent(text);
+              if (text.trim()) onTyping();
+            }}
+            onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            accessibilityLabel={placeholder}
+            className="max-h-40 min-h-11 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px]"
+          />
+          {remaining <= 200 && (
+            <Text
+              className={cn(
+                'h-11 px-1 text-xs leading-[44px]',
+                remaining <= 0
+                  ? 'text-destructive'
+                  : remaining <= 50
+                    ? 'text-amber-500'
+                    : 'text-muted-foreground'
+              )}
+              accessibilityLabel={`${remaining} characters left`}
+            >
+              {remaining}
+            </Text>
+          )}
+          <Button
+            size="icon"
+            variant={canSend ? 'default' : 'ghost'}
+            disabled={!canSend}
+            accessibilityLabel="Send message"
+            onPress={handleSend}
+          >
+            <Icon
+              as={SendHorizontal}
+              size={18}
+              className={canSend ? 'text-primary-foreground' : 'text-muted-foreground'}
+            />
+          </Button>
+        </View>
       </View>
 
       {/* mounted only while open: an always-mounted sheet in the composer never presented */}
