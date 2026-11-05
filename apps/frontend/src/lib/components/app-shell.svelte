@@ -55,18 +55,17 @@
       ])
     )
   );
-  const hasUnreadDms = $derived(
-    dms.list.some(
-      (dm) => dm.unread && notificationSettings.showsUnread({ channelId: dm.id, guildId: null })
-    )
+  const unreadDms = $derived(
+    dms.list
+      .filter(
+        (dm) => dm.unread && notificationSettings.showsUnread({ channelId: dm.id, guildId: null })
+      )
+      .sort((a, b) => (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''))
   );
 
   // shown in the tab title and, on desktop, as the app badge
   const unreadTotal = $derived(
-    Object.values(guildMentions).reduce((sum, count) => sum + count, 0) +
-      dms.list.filter(
-        (dm) => dm.unread && notificationSettings.showsUnread({ channelId: dm.id, guildId: null })
-      ).length
+    Object.values(guildMentions).reduce((sum, count) => sum + count, 0) + unreadDms.length
   );
 
   // push subscriptions go stale (endpoints change, sessions get replaced), so renew them once per start
@@ -256,7 +255,7 @@
           servers={chat.servers}
           activeId={chat.activeServer}
           mentions={guildMentions}
-          {hasUnreadDms}
+          {unreadDms}
           friendRequests={friends.incoming.length}
           onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}

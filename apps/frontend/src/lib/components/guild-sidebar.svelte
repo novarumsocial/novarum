@@ -5,6 +5,8 @@
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
 
   import type { Server } from '$lib/types/chat';
+  import { goto } from '$app/navigation';
+  import { dmPath, type DmEntry } from '$lib/dms.svelte';
   import { settings } from '$lib/settings.svelte';
 
   import Avatar from './avatar.svelte';
@@ -16,7 +18,7 @@
     servers,
     activeId,
     mentions,
-    hasUnreadDms = false,
+    unreadDms = [],
     friendRequests = 0,
     onSelect,
     onCreateServer,
@@ -25,7 +27,7 @@
     servers: Server[];
     activeId: string | null;
     mentions: Record<string, number>;
-    hasUnreadDms?: boolean;
+    unreadDms?: DmEntry[];
     friendRequests?: number;
     onSelect: (id?: string) => void;
     onCreateServer?: (server: Server) => void;
@@ -90,7 +92,7 @@
     class:rounded-full={settings.value.circleIcons}
     aria-label={friendRequests
       ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
-      : hasUnreadDms
+      : unreadDms.length
         ? 'Home, unread direct messages'
         : 'Home'}
   >
@@ -112,12 +114,28 @@
       >
         {friendRequests > 99 ? '99+' : friendRequests}
       </span>
-    {:else if hasUnreadDms}
+    {:else if unreadDms.length}
       <span
         class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
       ></span>
     {/if}
   </button>
+
+  {#each unreadDms as dm (dm.id)}
+    {@const other = dm.participants[0]}
+    {@const name = other ? other.displayName || other.username : 'Direct Message'}
+    <button
+      onclick={() => goto(dmPath(dm.id))}
+      class="relative size-10 cursor-pointer transition-opacity hover:opacity-90"
+      aria-label="{name}, unread direct message"
+      title={name}
+    >
+      <Avatar src={other?.avatarUrl} {name} class="size-full" />
+      <span
+        class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
+      ></span>
+    </button>
+  {/each}
 
   <div class="my-0.5 h-px w-7 bg-border/50"></div>
 

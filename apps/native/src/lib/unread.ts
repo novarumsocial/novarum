@@ -1,4 +1,4 @@
-// Port of the `guildMentions`, `hasUnreadDms` and `unreadTotal` values in apps/frontend/src/lib/components/app-shell.svelte,
+// Port of the `guildMentions`, `unreadDms` and `unreadTotal` values in apps/frontend/src/lib/components/app-shell.svelte,
 // shared by the shell (app badge) and the sidebars. The hooks also re-render when the notification levels change.
 import { useMemo } from 'react';
 import { useChat } from './chat-state';
@@ -24,9 +24,11 @@ export const selectGuildMentions = (
   );
 
 const unreadDms = (list: ReturnType<typeof useDms.getState>['list']) =>
-  list.filter(
-    (dm) => dm.unread && notificationSettings().showsUnread({ channelId: dm.id, guildId: null })
-  );
+  list
+    .filter(
+      (dm) => dm.unread && notificationSettings().showsUnread({ channelId: dm.id, guildId: null })
+    )
+    .sort((a, b) => (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''));
 
 export function useGuildMentions() {
   const channelsByServer = useChat((s) => s.channelsByServer);
@@ -58,11 +60,11 @@ export function useGuildUnread() {
   );
 }
 
-export function useHasUnreadDms() {
+export function useUnreadDms() {
   const list = useDms((s) => s.list);
   const entries = useNotificationSettings((s) => s.entries);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => unreadDms(list).length > 0, [list, entries]);
+  return useMemo(() => unreadDms(list), [list, entries]);
 }
 
 // shown as the app icon badge (the web: tab title and the desktop badge)

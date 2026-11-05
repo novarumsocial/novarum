@@ -24,7 +24,7 @@ import { dmPath, dms, type DmEntry } from '@/lib/dms';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import type { ChannelCategory } from '@/lib/types/chat';
-import { useGuildMentions, useGuildUnread, useHasUnreadDms } from '@/lib/unread';
+import { useGuildMentions, useGuildUnread, useUnreadDms } from '@/lib/unread';
 import { useVoice, voice } from '@/lib/voice';
 
 const noCategories: ChannelCategory[] = [];
@@ -44,7 +44,7 @@ export default function Hub() {
   const guildMentions = useGuildMentions();
   const guildUnread = useGuildUnread();
   const navigation = useNavigation();
-  const hasUnreadDms = useHasUnreadDms();
+  const unreadDms = useUnreadDms();
   const server = servers.find((item) => item.id === hubServer) ?? null;
 
   // the guild's members, for the avatars in its voice channels and its settings
@@ -106,7 +106,7 @@ export default function Hub() {
           activeId={server?.id ?? null}
           mentions={guildMentions}
           unread={guildUnread}
-          hasUnreadDms={hasUnreadDms}
+          unreadDms={unreadDms}
           onSelect={selectServer}
         />
         <GestureDetector gesture={swipe}>

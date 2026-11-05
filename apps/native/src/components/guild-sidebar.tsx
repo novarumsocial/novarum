@@ -14,6 +14,8 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, useChat } from '@/lib/chat-state';
+import { dmPath, type DmEntry } from '@/lib/dms';
+import { goto } from '@/lib/navigation';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
 import type { Server } from '@/lib/types/chat';
@@ -42,14 +44,14 @@ export const GuildSidebar = memo(function GuildSidebar({
   activeId,
   mentions,
   unread = {},
-  hasUnreadDms = false,
+  unreadDms = [],
   onSelect,
 }: {
   servers: Server[];
   activeId: string | null;
   mentions: Record<string, number>;
   unread?: Record<string, boolean>;
-  hasUnreadDms?: boolean;
+  unreadDms?: DmEntry[];
   onSelect: (id?: string) => void;
 }) {
   const circleIcons = useSettings((s) => s.circleIcons);
@@ -77,12 +79,12 @@ export const GuildSidebar = memo(function GuildSidebar({
       style={{ paddingTop: insets.top + 8 }}
     >
       <View className="w-full items-center">
-        <Pill active={activeId === null} unread={hasUnreadDms} />
+        <Pill active={activeId === null} unread={unreadDms.length > 0} />
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ selected: activeId === null }}
           onPress={() => onSelect(undefined)}
-          accessibilityLabel={hasUnreadDms ? 'Home, unread direct messages' : 'Home'}
+          accessibilityLabel={unreadDms.length ? 'Home, unread direct messages' : 'Home'}
           className={cn(
             'size-12 items-center justify-center active:opacity-80',
             activeId === null ? 'bg-primary' : 'bg-card',
@@ -99,6 +101,30 @@ export const GuildSidebar = memo(function GuildSidebar({
           </Svg>
         </Pressable>
       </View>
+
+      {unreadDms.map((dm) => {
+        const other = dm.participants[0];
+        const name = other ? other.displayName || other.username : 'Direct Message';
+        return (
+          <View key={dm.id} className="w-full items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${name}, unread direct message`}
+              onPress={() => goto(dmPath(dm.id))}
+              className={cn(
+                'size-12 overflow-hidden active:opacity-80',
+                circleIcons && 'rounded-full'
+              )}
+            >
+              <Avatar src={other?.avatarUrl} name={name} className="size-full" />
+            </Pressable>
+            <View
+              pointerEvents="none"
+              className="absolute right-2 bottom-0 size-4 rounded-full border-[3px] border-background bg-destructive"
+            />
+          </View>
+        );
+      })}
 
       <View className="h-0.5 w-8 bg-border" />
 
