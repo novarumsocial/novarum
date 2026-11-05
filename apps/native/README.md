@@ -19,6 +19,7 @@ bun run --filter native start     # Metro only, once a dev build is installed
 bun run --filter native check   # types (only errors in apps/native count, see scripts/check.ts)
 bun run --filter native bundle  # full Hermes bundle, catches bad imports
 bun run --filter native sync-theme  # after editing colors in apps/frontend/src/routes/layout.css
+bun run --filter native build-canvas  # after editing canvas-editor/ (the canvas WebView page)
 ```
 
 ## Where things are
