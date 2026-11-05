@@ -1,4 +1,5 @@
 // Port of apps/frontend/src/routes/register/+page.svelte
+import { anchor } from '@/lib/anchor';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, type Href } from 'expo-router';
 import { AtSign, CircleCheck, Eye, EyeOff, Lock, Mail, Server, User } from 'lucide-react-native';
@@ -60,7 +61,7 @@ export default function Register() {
     mode: 'onChange',
     defaultValues: {
       username: '',
-      homeserver: 'novarum.me',
+      homeserver: anchor().homeServer,
       displayName: '',
       email: '',
       password: '',

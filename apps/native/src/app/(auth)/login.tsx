@@ -1,4 +1,5 @@
 // Port of apps/frontend/src/routes/login/+page.svelte
+import { anchor } from '@/lib/anchor';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, type Href } from 'expo-router';
 import { ArrowLeft, AtSign, Lock, LogIn, Mail, Server, Smartphone } from 'lucide-react-native';
@@ -105,7 +106,7 @@ export default function Login() {
 
   const { control, handleSubmit, setFocus } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { homeServer: 'novarum.me', username: '', password: '' },
+    defaultValues: { homeServer: anchor().homeServer, username: '', password: '' },
   });
 
   const submit = handleSubmit(async (data) => {

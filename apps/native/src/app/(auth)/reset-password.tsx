@@ -63,7 +63,7 @@ export default function ResetPassword() {
 
   const requestForm = useForm<z.infer<typeof requestSchema>>({
     resolver: zodResolver(requestSchema),
-    defaultValues: { homeServer: 'novarum.me', email: '' },
+    defaultValues: { homeServer: anchor().homeServer, email: '' },
   });
 
   const resetForm = useForm<z.infer<typeof resetSchema>>({

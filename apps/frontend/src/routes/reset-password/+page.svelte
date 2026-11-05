@@ -35,7 +35,7 @@
     );
 
   const requestSchema = z.object({
-    homeServer: homeServerSchema.default('novarum.me'),
+    homeServer: homeServerSchema.default(anchor.homeServer),
     email: z.email('Enter a valid email.').default(''),
   });
 
@@ -203,7 +203,6 @@
                       class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                     />
 
-                    <!-- TODO: when possible, instead of placeholder="novarum.me" remember last logged in instance from localstorage -->
                     <Input
                       {...props}
                       bind:value={$requestData.homeServer}
