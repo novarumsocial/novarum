@@ -262,7 +262,14 @@ class ChatState {
   }
 
   selectChannel(id: string) {
-    if (this.activeServer) return goto(guildPath(this.activeServer, id));
+    if (dms.get(id)) return goto(dmPath(id));
+    const serverId = Object.keys(this.channelsByServer).find((serverId) =>
+      this.channelsByServer[serverId]!.some((category) =>
+        category.channels.some((channel) => channel.id === id)
+      )
+    );
+    const target = serverId ?? this.activeServer;
+    if (target) return goto(guildPath(target, id));
   }
 
   messagePath(id: string) {
