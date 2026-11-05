@@ -127,6 +127,41 @@ export const notifications = new Elysia({ prefix: '/notifications', tags: ['Noti
       response: { 200: z.object({ success: z.boolean() }), 401: genericResponseErrorSchema },
     }
   )
+  .get(
+    '/subscriptions',
+    async ({ session }) => {
+      const rows = await db.query.pushSubscriptions.findMany({
+        where: { userId: session.userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      // the endpoint url is what lets anyone push to the device, so only its host leaves the server
+      return {
+        subscriptions: rows.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          host: new URL(row.endpoint).host,
+          createdAt: row.createdAt.toISOString(),
+          current: row.sessionId === session.id,
+        })),
+      };
+    },
+    {
+      response: {
+        200: z.object({
+          subscriptions: z.array(
+            z.object({
+              id: z.string(),
+              kind: z.enum(['WEBPUSH', 'UNIFIEDPUSH']),
+              host: z.string(),
+              createdAt: z.string(),
+              current: z.boolean(),
+            })
+          ),
+        }),
+        401: genericResponseErrorSchema,
+      },
+    }
+  )
   .post(
     '/subscriptions',
     async ({ body, session, status }) => {

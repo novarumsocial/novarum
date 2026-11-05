@@ -57,6 +57,7 @@
   import { cn } from '$lib/utils';
   import SettingsGroup from './settings-group.svelte';
   import SettingsRow from './settings-row.svelte';
+  import SettingsDevices from './settings-devices.svelte';
   import MicTest from './mic-test.svelte';
 
   let { open = $bindable(false), voice }: { open: boolean; voice: Voice } = $props();
@@ -620,6 +621,7 @@
   const pages = $derived([
     { id: 'account', group: 'You', title: 'Account', icon: User },
     { id: 'security', group: 'You', title: 'Privacy & security', icon: ShieldCheck },
+    { id: 'devices', group: 'You', title: 'Devices', icon: Smartphone },
     { id: 'appearance', group: 'App', title: 'Appearance', icon: Palette },
     { id: 'notifications', group: 'App', title: 'Notifications', icon: Bell },
     { id: 'voice', group: 'App', title: 'Voice & audio', icon: Volume2 },
@@ -1162,6 +1164,11 @@
                 {/if}
               </SettingsGroup>
             {/if}
+          </Tabs.Content>
+
+          <Tabs.Content value="devices" class="space-y-6 outline-none">
+            {@render head('Devices', 'Phones that get your notifications.')}
+            <SettingsDevices onOpenNotifications={() => (activeTab = 'notifications')} />
           </Tabs.Content>
 
           <Tabs.Content value="appearance" class="space-y-6 outline-none">

@@ -52,6 +52,7 @@ describe('settings', () => {
       ['PUT', '/notifications/settings/x', { level: 'ALL' }],
       ['DELETE', '/notifications/settings/x', undefined],
       ['POST', '/notifications/subscriptions', subscription],
+      ['GET', '/notifications/subscriptions', undefined],
     ] as const) {
       expect((await call(anonymous(anchor.url), method, path, body)).status).toBe(401);
     }
@@ -173,6 +174,37 @@ describe('subscriptions', () => {
     expect((await call(u, 'DELETE', `/notifications/subscriptions/${id}`)).status).toBe(404);
   });
 
+  test('GET lists only your own devices, without their endpoint path', async () => {
+    const [u, other] = await Promise.all([user(), user()]);
+    expect((await call(u, 'GET', '/notifications/subscriptions')).body).toEqual({
+      subscriptions: [],
+    });
+    const { id, label } = await sink.subscribe(u, `list-${u.user.id}`, 'UNIFIEDPUSH');
+    await sink.subscribe(other);
+
+    const res = await call(u, 'GET', '/notifications/subscriptions');
+    expect(res.status).toBe(200);
+    expect(res.body.subscriptions).toEqual([
+      {
+        id,
+        kind: 'UNIFIEDPUSH',
+        host: expect.stringMatching(/^127\.0\.0\.1:\d+$/),
+        createdAt: expect.any(String),
+        current: true,
+      },
+    ]);
+    expect(JSON.stringify(res.body)).not.toContain(label);
+
+    // a device registered by another session of the same account isn't this one
+    const otherSession = `other-${id}`;
+    await sql`INSERT INTO session (id, "userId", "secretHash", "createdAt", "expiresAt")
+      VALUES (${otherSession}, ${u.user.id}, ${Buffer.from([0])}, now(), now() + interval '1 day')`;
+    await sql`UPDATE push_subscription SET "sessionId" = ${otherSession} WHERE id = ${id}`;
+    expect(
+      (await call(u, 'GET', '/notifications/subscriptions')).body.subscriptions[0].current
+    ).toBe(false);
+  });
+
   test("another account cannot take over a device's endpoint while the owner's session is alive", async () => {
     const [owner, thief] = await Promise.all([user(), user()]);
     const { id, label } = await sink.subscribe(owner);
@@ -248,6 +280,24 @@ describe('what gets pushed', () => {
     await sink.settle();
     expect(sink.for(bystanderDevice.label)).toHaveLength(0);
     expect(sink.for(label)).toHaveLength(1);
+  });
+
+  test('a UnifiedPush device gets a numeric id per channel and an absolute app url', async () => {
+    const [owner, b] = await Promise.all([user(), user()]);
+    const { guild, channel } = await createGuild(owner);
+    await join(owner, guild.id, b);
+    const { label } = await sink.subscribe(b, undefined, 'UNIFIEDPUSH');
+
+    const first = await send(owner, channel.id, `one ${b.user.handle}`);
+    await send(owner, channel.id, `two ${b.user.handle}`);
+    const pushes = await eventually(() => (sink.for(label).length >= 2 ? sink.for(label) : null), {
+      message: 'unifiedpush pushes',
+    });
+    expect(Number.isInteger(pushes[0].id) && pushes[0].id >= 0).toBe(true);
+    expect(pushes[1].id).toBe(pushes[0].id);
+    expect(pushes[0].url).toBe(
+      `novarum://guilds/${guild.id}/${channel.id}/${first.body.message.id}`
+    );
   });
 
   test('a message with no mention pushes nothing', async () => {

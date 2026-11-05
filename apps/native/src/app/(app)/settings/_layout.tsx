@@ -18,6 +18,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="index" options={{ title: 'Settings' }} />
       <Stack.Screen name="account" options={{ title: 'Account' }} />
       <Stack.Screen name="security" options={{ title: 'Privacy & security' }} />
+      <Stack.Screen name="devices" options={{ title: 'Devices' }} />
       <Stack.Screen name="appearance" options={{ title: 'Appearance' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Stack.Screen name="voice" options={{ title: 'Voice & audio' }} />

@@ -83,7 +83,7 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
     if (!allowPushTo(userId)) continue;
 
     const preview = preference?.messagePreview ?? true;
-    const message = JSON.stringify({
+    const message = {
       title: payload.guildId
         ? `${name} (#${channel?.name ?? 'channel'} · ${guild?.name ?? 'server'})`
         : name,
@@ -100,12 +100,26 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
           ? (payload.author.avatarUrl ?? undefined)
           : undefined,
       tag: payload.channelId,
+      // expo-unified-push drops a notification without a numeric id; one per channel, like `tag`
+      id:
+        [...payload.channelId].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0) &
+        0x7fffffff,
       url,
       channelId: payload.channelId,
       messageId: payload.messageId,
-    });
+    };
 
-    await Promise.all(userSubscriptions.map((subscription) => sendPush(subscription, message)));
+    await Promise.all(
+      userSubscriptions.map((subscription) =>
+        sendPush(
+          subscription,
+          // android can only open an absolute url (the app's novarum:// scheme), browsers resolve the path
+          JSON.stringify(
+            subscription.kind === 'UNIFIEDPUSH' ? { ...message, url: `novarum:/${url}` } : message
+          )
+        )
+      )
+    );
   }
 }
 

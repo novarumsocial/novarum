@@ -9,6 +9,7 @@ import {
   LogOut,
   Palette,
   ShieldCheck,
+  Smartphone,
   User,
   Volume2,
   type LucideIcon,
@@ -31,6 +32,7 @@ const groups: { label: string; pages: { href: string; title: string; icon: Lucid
     pages: [
       { href: '/settings/account', title: 'Account', icon: User },
       { href: '/settings/security', title: 'Privacy & security', icon: ShieldCheck },
+      { href: '/settings/devices', title: 'Devices', icon: Smartphone },
     ],
   },
   {

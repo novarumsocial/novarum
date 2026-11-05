@@ -35,7 +35,8 @@ type Settings = {
 };
 
 const defaults: Settings = {
-  pushNotifications: false,
+  // the desktop app is allowed to notify out of the box (apps/electron/src/main.ts grants it)
+  pushNotifications: typeof window !== 'undefined' && !!window.electron,
   messagePreview: true,
   mentionSound: true,
   showOnlineStatus: true,
