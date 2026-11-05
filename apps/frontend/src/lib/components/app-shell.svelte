@@ -354,7 +354,10 @@
     {/if}
     {#if chat.route.kind === 'guild'}
       <div
-        class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0"
+        class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0 {settings
+          .value.showMemberList
+          ? ''
+          : 'lg:hidden'}"
         class:translate-x-full={!mobileMembersOpen}
       >
         <!--
