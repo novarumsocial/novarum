@@ -17,9 +17,7 @@ class NotificationSettingsState {
     const result = await anchor.client.notifications.settings.get();
     if (result.error || !result.data) return;
 
-    this.entries = Object.fromEntries(
-      result.data.settings.map((item: { targetId: string }) => [item.targetId, item])
-    );
+    this.entries = Object.fromEntries(result.data.settings.map((item) => [item.targetId, item]));
   }
 
   level(target: Target) {

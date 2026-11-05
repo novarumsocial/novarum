@@ -185,7 +185,9 @@ export const upload = new Elysia({ tags: ['Upload'] })
       }
 
       if (saveStorage) await storage.write(key, preview.data, { type: preview.type });
-      return new Response(preview.data, { headers: { 'content-type': preview.type } });
+      return new Response(new Uint8Array(preview.data), {
+        headers: { 'content-type': preview.type },
+      });
     },
     { query: attachmentQuery }
   )
