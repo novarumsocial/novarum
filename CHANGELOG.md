@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0](https://github.com/novarumsocial/novarum/compare/v0.2.1...v0.3.0) (2026-11-05)
+
+
+### Features
+
+* **auth:** login, register and reset-password prefill the last homeserver you used instead of novarum.me ([62791f6](https://github.com/novarumsocial/novarum/commit/62791f68ae65dd6c1eff298bfd52acd946a196ce))
+* channel canvas ([#38](https://github.com/novarumsocial/novarum/issues/38)) ([f434ea9](https://github.com/novarumsocial/novarum/commit/f434ea98275936dd7d8bc23b9240f0289263cc0a))
+* deepfilternet automatic voice cancellation ([89e2977](https://github.com/novarumsocial/novarum/commit/89e29778f0c8211b6f9ed2373ee09acfdedfa20f))
+* **frontend:** member list toggle is always visible; on wide screens it shows/hides the list, on narrow screens it opens the drawer (native tablets too) ([72c5fef](https://github.com/novarumsocial/novarum/commit/72c5fef0afc44e76051a6eedd0b4cae4b2e9a30f))
+* **frontend:** show unread dm on sidebar ([2cc01f3](https://github.com/novarumsocial/novarum/commit/2cc01f39634e8d72154cb27f4530e7802cbaf612))
+* **mobile:** devices tab and unifiedpush settings ([b6268e7](https://github.com/novarumsocial/novarum/commit/b6268e73a8c1e0b90c612b5451be924137e2aaa9))
+* **ui:** pinch to zoom in vc + message input redesign ([88e20cc](https://github.com/novarumsocial/novarum/commit/88e20ccc105b099dfdbb2bdc85a2574790fce1a7))
+* **ui:** show more voice information on channel sidebar ([5470ba3](https://github.com/novarumsocial/novarum/commit/5470ba3b656a02c69a597937729abddc02c9f1de))
+* **voice:** save per-user volume, mute and stream volume across reloads ([8438afd](https://github.com/novarumsocial/novarum/commit/8438afd0b7f40e9c9222ec4187c6626a2dd875e4))
+* **voice:** save your own mute/deafen state and apply it when joining a call ([a415be9](https://github.com/novarumsocial/novarum/commit/a415be95f20220e50fed445e00d110e01fd68f77))
+
+
+### Bug Fixes
+
+* **frontend:** loading cursor no longer stays stuck when saving the server order fails ([3e238d4](https://github.com/novarumsocial/novarum/commit/3e238d473bf6bd8276a51139f0a412b0e23f4e52))
+* **frontend:** mobile member drawer no longer opens empty when the member list is turned off in settings ([97cfd83](https://github.com/novarumsocial/novarum/commit/97cfd837657db77619f0581945019e4d4b80a590))
+* **frontend:** voice "connected" button now goes to the server or DM the call is in, not the one you're viewing ([8ec3379](https://github.com/novarumsocial/novarum/commit/8ec3379facd632259391f843b8f12198732a6608))
+* **ui:** dodgy chat area scrolling ([cd543c3](https://github.com/novarumsocial/novarum/commit/cd543c335058224f6023d9fd0a1fb865e6ad8da9))
+
 ## [0.2.1](https://github.com/novarumsocial/novarum/compare/v0.2.0...v0.2.1) (2026-11-04)
 
 
