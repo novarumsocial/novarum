@@ -97,9 +97,9 @@
   }
 
   let scrollContainer = $state<HTMLDivElement | null>(null);
+  let scrollContent = $state<HTMLDivElement | null>(null);
   let olderLoading = $state(false);
   let previousChannelId: string | null = null;
-  let previousMessageCount = 0;
   let unreadBoundary = $state<{ channelId: string; lastReadMessageId: string | null } | null>(null);
   let replyingTo = $state<Message | null>(null);
   const messagesById = $derived(new Map(messages.map((message) => [message.id, message])));
@@ -126,34 +126,83 @@
   });
 
   $effect(() => {
-    const channelChanged = channel.id !== previousChannelId;
-    const messageId = chat.activeMessage;
-    const messageCount = messages.length;
-    const newMessageArrived = messageCount > previousMessageCount;
-    previousMessageCount = messageCount;
-
-    if (channelChanged) {
-      unreadBoundary = channel.unread
-        ? { channelId: channel.id, lastReadMessageId: channel.lastReadMessageId }
-        : null;
-      replyingTo = null;
-      olderLoading = false;
-    }
-
-    if (!scrollContainer || loading || olderLoading) return;
+    if (channel.id === previousChannelId) return;
     previousChannelId = channel.id;
+    unreadBoundary = channel.unread
+      ? { channelId: channel.id, lastReadMessageId: channel.lastReadMessageId }
+      : null;
+    replyingTo = null;
+    olderLoading = false;
+  });
+
+  /*
+   * Scrolling has one rule set, so late layout (thumbnails, embeds, older pages) can't fight it:
+   * - while `stuck`, the view follows the bottom, however the content or the viewport resize
+   * - otherwise the message at the top of the view keeps its place on screen
+   * Scrolling up unsticks, reaching the bottom sticks again. The browser's own scroll anchoring
+   * is off (overflow-anchor: none) so it can't move things a second time.
+   */
+  let stuck = true;
+  let lastScrollTop = 0;
+  let anchor: { element: Element; offset: number } | null = null;
+
+  function scrollToBottom() {
+    if (!scrollContainer) return;
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    lastScrollTop = scrollContainer.scrollTop;
+  }
+
+  // the first message whose bottom is inside the view, and how far it sits from the top
+  function captureAnchor() {
+    const container = scrollContainer;
+    if (!container) return;
+    const top = container.getBoundingClientRect().top;
+    const element = [...container.querySelectorAll('[data-message-id]')].find(
+      (item) => item.getBoundingClientRect().bottom > top
+    );
+    anchor = element ? { element, offset: element.getBoundingClientRect().top - top } : null;
+  }
+
+  function keepPosition() {
+    const container = scrollContainer;
+    if (!container || loading) return;
+    if (stuck) return scrollToBottom();
+    if (!anchor?.element.isConnected) return captureAnchor();
+    const top = container.getBoundingClientRect().top;
+    container.scrollTop += anchor.element.getBoundingClientRect().top - top - anchor.offset;
+    lastScrollTop = container.scrollTop;
+  }
+
+  $effect(() => {
+    if (!scrollContainer || !scrollContent) return;
+    const observer = new ResizeObserver(keepPosition);
+    observer.observe(scrollContainer);
+    observer.observe(scrollContent);
+    return () => observer.disconnect();
+  });
+
+  // opening a channel lands at the bottom; a linked message (search, reply, notification) is centred
+  let settledChannel: string | null = null;
+  $effect(() => {
+    const channelId = channel.id;
+    const messageId = chat.activeMessage;
+    if (loading || !scrollContainer) return;
+    const channelChanged = channelId !== settledChannel;
+    // the message id leaving the url (after jumping to a reply) must not move the view
+    if (!channelChanged && !messageId) return;
+    settledChannel = channelId;
 
     void tick().then(() => {
-      if (messageId) {
-        document.getElementById(messageId)?.scrollIntoView({ block: 'center' });
-        return;
+      const target = messageId ? document.getElementById(messageId) : null;
+      if (target) {
+        stuck = false;
+        target.scrollIntoView({ block: 'center' });
+        lastScrollTop = scrollContainer?.scrollTop ?? 0;
+        captureAnchor();
+      } else {
+        stuck = true;
+        scrollToBottom();
       }
-
-      // covers the case where the message id gets removed off the url
-      // such as when you click on a reply
-      if (!messageId && !channelChanged && !newMessageArrived) return;
-
-      if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
     });
   });
 
@@ -188,35 +237,33 @@
     unreadBoundary = null;
     replyingTo = null;
     void send(item);
-    // a new pending message scrolls into view, like your own sent messages do
-    void tick().then(() => scrollContainer?.scrollTo({ top: scrollContainer.scrollHeight }));
+    // sending always brings you back down to your message
+    stuck = true;
+    void tick().then(scrollToBottom);
   }
 
   function onScroll() {
     const container = scrollContainer;
-    if (!container || loading || olderLoading) return;
-    if (container.scrollTop > 100) return;
-    if (!chat.hasMoreMessages(channel.id)) return;
+    if (!container) return;
+    const top = container.scrollTop;
+    const fromBottom = container.scrollHeight - container.clientHeight - top;
+    // only a real move up unsticks, so content growing under a stuck view never does
+    if (fromBottom < 48) stuck = true;
+    else if (top < lastScrollTop - 1) stuck = false;
+    lastScrollTop = top;
+    captureAnchor();
 
+    if (loading || olderLoading || top > 100 || !chat.hasMoreMessages(channel.id)) return;
     void loadOlder();
   }
 
+  // older messages are prepended; keepPosition holds the view on the same message meanwhile
   async function loadOlder() {
-    const container = scrollContainer;
-    if (!container || loading || olderLoading) return;
-
-    const channelId = channel.id;
-    const previousHeight = container.scrollHeight;
-    const previousTop = container.scrollTop;
+    if (!scrollContainer || loading || olderLoading) return;
+    captureAnchor();
     olderLoading = true;
-
-    await chat.loadOlderMessages(channelId);
+    await chat.loadOlderMessages(channel.id);
     olderLoading = false;
-    await tick();
-
-    if (scrollContainer && channel.id === channelId) {
-      scrollContainer.scrollTop = scrollContainer.scrollHeight - previousHeight + previousTop;
-    }
   }
 </script>
 
@@ -406,94 +453,96 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <div
         bind:this={scrollContainer}
-        class="min-h-0 min-w-0 flex-1 overflow-y-auto"
+        class="min-h-0 min-w-0 flex-1 overflow-y-auto [overflow-anchor:none]"
         onscroll={onScroll}
       >
-        {#if olderLoading}
-          <div class="space-y-5 px-3 pt-4 sm:px-4">
-            {@render skeletonRows(2)}
-          </div>
-        {/if}
-        <div class="flex min-h-full flex-col justify-end px-3 py-4 sm:px-4">
-          {#if loading}
-            <div class="space-y-5">
-              {@render skeletonRows(5)}
-            </div>
-          {:else if messages.length === 0 && channelPending.length === 0}
-            <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
-              {#if channel.type === 'DM'}
-                <Avatar
-                  src={channel.avatarUrl}
-                  name={channel.name}
-                  class="size-14 text-lg"
-                  bgColor={channel.avatarColor}
-                />
-              {/if}
-              <div class="border border-dashed border-border p-4">
-                <p class="text-sm font-medium text-foreground">
-                  {channel.type === 'DM'
-                    ? `This is the beginning of your conversation with ${channel.name}.`
-                    : 'No messages yet'}
-                </p>
-                {#if channel.type !== 'DM'}
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    Start the conversation in #{channel.name}.
-                  </p>
-                {/if}
-              </div>
-            </div>
-          {:else}
-            <div>
-              {#each messages as msg, i}
-                {@const prev = messages[i - 1]}
-                {@const firstUnread = i === firstUnreadIndex}
-                {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
-                {@const grouped =
-                  !firstUnread &&
-                  prev !== undefined &&
-                  prev.author.username === msg.author.username &&
-                  prev.author.server === msg.author.server &&
-                  msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
-                {@const dayDivider =
-                  (i > 0 &&
-                    msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
-                  i === 0}
-                {#if dayDivider}
-                  <div
-                    class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
-                    role="separator"
-                    aria-label={msg.timestamp.toLocaleDateString()}
-                  >
-                    <span class="h-px flex-1 bg-muted-foreground/20"></span>
-                    <span>{formatDate(msg.timestamp)}</span>
-                  </div>
-                {/if}
-                {#if firstUnread}
-                  <div
-                    id={`unread-${channel.id}`}
-                    class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
-                    role="separator"
-                    aria-label="New messages"
-                  >
-                    <span class="h-px flex-1 bg-destructive"></span>
-                    <span>New</span>
-                  </div>
-                {/if}
-                <MessageComponent
-                  message={msg}
-                  {repliedMessage}
-                  {grouped}
-                  {onDelete}
-                  {onEdit}
-                  onReply={() => (replyingTo = msg)}
-                  {onProfileCall}
-                />
-              {/each}
-              {#each channelPending as item (item.id)}
-                {@render pendingMessage(item)}
-              {/each}
+        <div bind:this={scrollContent} class="flex min-h-full flex-col">
+          {#if olderLoading}
+            <div class="space-y-5 px-3 pt-4 sm:px-4">
+              {@render skeletonRows(2)}
             </div>
           {/if}
+          <div class="flex flex-1 flex-col justify-end px-3 py-4 sm:px-4">
+            {#if loading}
+              <div class="space-y-5">
+                {@render skeletonRows(5)}
+              </div>
+            {:else if messages.length === 0 && channelPending.length === 0}
+              <div class="mb-4 flex max-w-md flex-col items-start gap-3 select-none">
+                {#if channel.type === 'DM'}
+                  <Avatar
+                    src={channel.avatarUrl}
+                    name={channel.name}
+                    class="size-14 text-lg"
+                    bgColor={channel.avatarColor}
+                  />
+                {/if}
+                <div class="border border-dashed border-border p-4">
+                  <p class="text-sm font-medium text-foreground">
+                    {channel.type === 'DM'
+                      ? `This is the beginning of your conversation with ${channel.name}.`
+                      : 'No messages yet'}
+                  </p>
+                  {#if channel.type !== 'DM'}
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      Start the conversation in #{channel.name}.
+                    </p>
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <div>
+                {#each messages as msg, i (msg.id)}
+                  {@const prev = messages[i - 1]}
+                  {@const firstUnread = i === firstUnreadIndex}
+                  {@const repliedMessage = (msg.replyTo && messagesById.get(msg.replyTo)) || null}
+                  {@const grouped =
+                    !firstUnread &&
+                    prev !== undefined &&
+                    prev.author.username === msg.author.username &&
+                    prev.author.server === msg.author.server &&
+                    msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
+                  {@const dayDivider =
+                    (i > 0 &&
+                      msg.timestamp.toDateString() !== messages[i - 1].timestamp.toDateString()) ||
+                    i === 0}
+                  {#if dayDivider}
+                    <div
+                      class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
+                      role="separator"
+                      aria-label={msg.timestamp.toLocaleDateString()}
+                    >
+                      <span class="h-px flex-1 bg-muted-foreground/20"></span>
+                      <span>{formatDate(msg.timestamp)}</span>
+                    </div>
+                  {/if}
+                  {#if firstUnread}
+                    <div
+                      id={`unread-${channel.id}`}
+                      class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
+                      role="separator"
+                      aria-label="New messages"
+                    >
+                      <span class="h-px flex-1 bg-destructive"></span>
+                      <span>New</span>
+                    </div>
+                  {/if}
+                  <MessageComponent
+                    message={msg}
+                    {repliedMessage}
+                    {grouped}
+                    {onDelete}
+                    {onEdit}
+                    onReply={() => (replyingTo = msg)}
+                    {onProfileCall}
+                  />
+                {/each}
+                {#each channelPending as item (item.id)}
+                  {@render pendingMessage(item)}
+                {/each}
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
 

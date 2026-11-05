@@ -269,6 +269,7 @@
       <div
         {...props}
         id={message.id}
+        data-message-id={message.id}
         class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
           ? 'bg-amber-400/10 hover:bg-amber-400/15'
           : 'hover:bg-muted/30'}"
