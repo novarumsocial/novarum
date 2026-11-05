@@ -1411,20 +1411,33 @@
               </SettingsRow>
               {#if settings.value.noiseSuppressionModel === 'deepfilternet'}
                 <SettingsRow
-                  title="Noise suppression strength"
-                  description="Higher removes more noise but can make your voice sound muffled."
-                  stacked
-                  id="noise-level"
+                  title="Automatic strength"
+                  description="Adjusts to how noisy your room is."
+                  id="noise-auto"
                 >
-                  <Slider
-                    type="single"
-                    min={0}
-                    max={60}
-                    step={1}
-                    value={settings.value.noiseSuppressionLevel}
-                    onValueChange={(level) => voice.setNoiseSuppressionLevel(level)}
+                  <Switch
+                    id="noise-auto"
+                    checked={settings.value.noiseSuppressionAuto}
+                    onCheckedChange={(auto) => voice.setNoiseSuppressionAuto(auto)}
                   />
                 </SettingsRow>
+                {#if !settings.value.noiseSuppressionAuto}
+                  <SettingsRow
+                    title="Noise suppression strength"
+                    description="Higher removes more noise but can make your voice sound muffled."
+                    stacked
+                    id="noise-level"
+                  >
+                    <Slider
+                      type="single"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={settings.value.noiseSuppressionLevel}
+                      onValueChange={(level) => voice.setNoiseSuppressionLevel(level)}
+                    />
+                  </SettingsRow>
+                {/if}
               {/if}
               <SettingsRow
                 title="Mic test"

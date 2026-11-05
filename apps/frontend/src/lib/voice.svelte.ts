@@ -29,7 +29,7 @@ import ScreenOff from './sounds/screen-off.opus?url';
 
 import { settings, type NoiseSuppressionModel } from './settings.svelte';
 import { RnnoiseProcessor } from './rnnoise-processor';
-import { DeepFilterProcessor, setDeepFilterLevel } from './deepfilter-processor';
+import { DeepFilterProcessor, deepFilterLevel, setDeepFilterLevel } from './deepfilter-processor';
 
 const livekitConnectionTimeoutMs = 15_000;
 const noiseProcessor = () =>
@@ -613,6 +613,13 @@ export class Voice {
   setNoiseSuppressionLevel(level: number) {
     settings.value.noiseSuppressionLevel = level;
     setDeepFilterLevel(level);
+  }
+
+  setNoiseSuppressionAuto(auto: boolean) {
+    settings.value.noiseSuppressionAuto = auto;
+    // start manual mode where auto left off so the voice doesn't suddenly change
+    if (!auto)
+      this.setNoiseSuppressionLevel(deepFilterLevel() ?? settings.value.noiseSuppressionLevel);
   }
 
   async setEchoCancellation(enabled: boolean) {
