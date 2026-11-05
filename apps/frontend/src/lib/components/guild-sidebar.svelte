@@ -92,9 +92,7 @@
     class:rounded-full={settings.value.circleIcons}
     aria-label={friendRequests
       ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
-      : unreadDms.length
-        ? 'Home, unread direct messages'
-        : 'Home'}
+      : 'Home'}
   >
     <svg
       fill="currentColor"
@@ -114,10 +112,6 @@
       >
         {friendRequests > 99 ? '99+' : friendRequests}
       </span>
-    {:else if unreadDms.length}
-      <span
-        class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
-      ></span>
     {/if}
   </button>
 

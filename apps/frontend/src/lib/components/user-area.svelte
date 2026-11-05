@@ -3,6 +3,9 @@
     AudioWaveform,
     Mic,
     MicOff,
+    MonitorUp,
+    Video,
+    VideoOff,
     Headphones,
     HeadphoneOff,
     PhoneOff,
@@ -47,6 +50,7 @@
     voiceChannelName: string | null;
     onLeaveVoice: () => void;
   } = $props();
+  const canScreenShare = !!navigator.mediaDevices?.getDisplayMedia;
   let acctSwitcherOpen = $state(false);
   const otherAccounts = $derived(
     session.accounts.filter((account) => account.homeServer !== anchor.homeServer)
@@ -206,8 +210,58 @@
           <PhoneOff class="size-4" />
         </button>
       </div>
+
+      <div class="mt-2 grid grid-cols-2 gap-1.5">
+        {@render mediaToggle(
+          voice.selfCamera,
+          voice.selfCamera ? 'Turn off camera' : 'Turn on camera',
+          'Camera',
+          () => voice.setCamera(!voice.selfCamera),
+          true
+        )}
+        {#if canScreenShare}
+          {@render mediaToggle(
+            voice.selfScreenShare,
+            voice.selfScreenShare ? 'Stop sharing your screen' : 'Share your screen',
+            'Screen',
+            () => voice.setScreenShare(!voice.selfScreenShare),
+            false
+          )}
+        {/if}
+      </div>
     </div>
   {/if}
+
+  {#snippet mediaToggle(
+    on: boolean,
+    label: string,
+    text: string,
+    toggle: () => void,
+    camera: boolean
+  )}
+    <button
+      type="button"
+      class={cn(
+        'flex h-8 items-center justify-center gap-1.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+        on
+          ? 'bg-primary text-primary-foreground hover:bg-primary/85'
+          : 'bg-sidebar-accent text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground',
+        settings.value.circleIcons && 'rounded-full'
+      )}
+      disabled={!voice.connected}
+      aria-label={label}
+      aria-pressed={on}
+      title={label}
+      onclick={toggle}
+    >
+      {#if camera}
+        {#if on}<Video class="size-4" />{:else}<VideoOff class="size-4" />{/if}
+      {:else}
+        <MonitorUp class="size-4" />
+      {/if}
+      {text}
+    </button>
+  {/snippet}
 
   <div class="flex h-14 items-center gap-2.5 px-3">
     <Popover.Root bind:open={acctSwitcherOpen}>

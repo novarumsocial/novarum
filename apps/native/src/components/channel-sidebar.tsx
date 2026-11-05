@@ -19,6 +19,7 @@ import {
   Plus,
   Settings,
   UserRoundPlus,
+  Video,
   Volume2,
 } from 'lucide-react-native';
 import { memo, useState } from 'react';
@@ -230,9 +231,32 @@ export const ChannelSidebar = memo(function ChannelSidebar({
               <Text numberOfLines={1} className="flex-1 text-sm text-muted-foreground">
                 {name}
               </Text>
-              {voiceState?.selfMuted && <Icon as={MicOff} size={14} className="text-rose-400" />}
+              {voiceState?.selfMuted && (
+                <Icon as={MicOff} size={14} className="text-rose-400" accessibilityLabel="Muted" />
+              )}
               {voiceState?.selfDeafened && (
-                <Icon as={HeadphoneOff} size={14} className="text-rose-400" />
+                <Icon
+                  as={HeadphoneOff}
+                  size={14}
+                  className="text-rose-400"
+                  accessibilityLabel="Deafened"
+                />
+              )}
+              {voiceState?.camera && (
+                <Icon
+                  as={Video}
+                  size={14}
+                  className="text-muted-foreground"
+                  accessibilityLabel="Camera on"
+                />
+              )}
+              {voiceState?.screenShare && (
+                <View
+                  className={cn('bg-rose-600 px-1 py-px', circleIcons && 'rounded-full')}
+                  accessibilityLabel="Sharing their screen"
+                >
+                  <Text className="text-[10px] font-bold text-white">LIVE</Text>
+                </View>
               )}
             </View>
           );

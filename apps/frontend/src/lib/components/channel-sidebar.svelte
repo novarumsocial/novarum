@@ -6,6 +6,7 @@
     Hash,
     LogOut,
     MicOff,
+    Video,
     Plus,
     Settings,
     UserRoundPlus,
@@ -501,7 +502,8 @@
                 <div class="ml-6 mt-0.5 space-y-0.5 pb-0.5">
                   {#each connectedVoiceUsers as state (state.userId)}
                     {@const name = state.name || nameFor(state.userId)}
-                    {@const voiceState = voice?.voiceStates.get(state.userId)}
+                    {@const live =
+                      voice?.channelId === ch.id ? voice.voiceStates.get(state.userId) : undefined}
                     {@const user = userFor(state.userId)!}
 
                     <ProfileCard {user} class="group flex w-full cursor-auto">
@@ -519,7 +521,7 @@
                                 state.userId
                               )}"
                             />
-                            {#if voice?.channelId === ch.id && voiceState?.speaking}
+                            {#if live?.speaking}
                               <div
                                 class="pointer-events-none absolute inset-0"
                                 style:box-shadow="inset 0 0 0 1.5px {userFor(state.userId)
@@ -534,11 +536,26 @@
                             {name}
                           </span>
 
-                          {#if voice?.channelId === ch.id && voiceState?.selfMuted && !voiceState?.selfDeafened}
-                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                          {:else if voiceState?.selfDeafened}
-                            <MicOff class="size-3.5 shrink-0 text-rose-400" />
-                            <HeadphoneOff class="size-3.5 shrink-0 text-rose-400" />
+                          {#if live?.selfDeafened}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" aria-label="Muted" />
+                            <HeadphoneOff
+                              class="size-3.5 shrink-0 text-rose-400"
+                              aria-label="Deafened"
+                            />
+                          {:else if live?.selfMuted}
+                            <MicOff class="size-3.5 shrink-0 text-rose-400" aria-label="Muted" />
+                          {/if}
+                          {#if live?.camera}
+                            <Video class="size-3.5 shrink-0" aria-label="Camera on" />
+                          {/if}
+                          {#if live?.screenShare}
+                            <span
+                              class="shrink-0 bg-rose-600 px-1 py-px text-[10px] leading-none font-bold text-white"
+                              class:rounded-full={settings.value.circleIcons}
+                              title="Sharing their screen"
+                            >
+                              LIVE
+                            </span>
                           {/if}
                         </div>
                       </ParticipantContextMenu>

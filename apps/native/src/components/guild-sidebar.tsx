@@ -79,12 +79,13 @@ export const GuildSidebar = memo(function GuildSidebar({
       style={{ paddingTop: insets.top + 8 }}
     >
       <View className="w-full items-center">
-        <Pill active={activeId === null} unread={unreadDms.length > 0} />
+        {/* unread DMs show as their own avatars below, so Home itself doesn't light up for them */}
+        <Pill active={activeId === null} unread={false} />
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ selected: activeId === null }}
           onPress={() => onSelect(undefined)}
-          accessibilityLabel={unreadDms.length ? 'Home, unread direct messages' : 'Home'}
+          accessibilityLabel="Home"
           className={cn(
             'size-12 items-center justify-center active:opacity-80',
             activeId === null ? 'bg-primary' : 'bg-card',
