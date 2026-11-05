@@ -44,7 +44,7 @@
     onDelete,
     onEdit,
     onOpenNavigation,
-    onOpenMembers,
+    onToggleMembers,
     onCall,
     onRing,
     onProfileCall,
@@ -62,7 +62,7 @@
     onDelete: (messageId: string) => void | Promise<void>;
     onEdit: (messageId: string, content: string | null) => void | Promise<void>;
     onOpenNavigation?: () => void;
-    onOpenMembers?: () => void;
+    onToggleMembers?: () => void;
     onCall?: () => void;
     onRing?: () => void;
     onProfileCall?: (channelId: string) => void;
@@ -342,9 +342,8 @@
       <Button
         variant="ghost"
         size="icon-lg"
-        class="lg:hidden"
-        onclick={onOpenMembers}
-        aria-label="Open members"
+        onclick={onToggleMembers}
+        aria-label="Toggle member list"
       >
         <Users class="size-5" />
       </Button>

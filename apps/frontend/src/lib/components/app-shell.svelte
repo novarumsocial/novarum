@@ -205,6 +205,11 @@
     mobileMembersOpen = true;
   }
 
+  function toggleMembers() {
+    if (window.innerWidth >= 1024) settings.value.showMemberList = !settings.value.showMemberList;
+    else openMembers();
+  }
+
   onMount(() => {
     const disconnect = realtime.connect();
     void boot();
@@ -299,7 +304,7 @@
         onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
         onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
-        onOpenMembers={() => (mobileMembersOpen = true)}
+        onToggleMembers={toggleMembers}
         onCall={() => startCall(currentChannel.id)}
         onRing={() => realtime.ringCall(currentChannel.id)}
         onProfileCall={startCall}
@@ -331,7 +336,7 @@
         onJoin={() => voice.join(currentChannel.id).catch(() => null)}
         onLeave={leaveVoice}
         onOpenNavigation={() => (mobileNavigationOpen = true)}
-        onOpenMembers={() => (mobileMembersOpen = true)}
+        onToggleMembers={toggleMembers}
       />
     {:else}
       <main class="relative flex min-w-0 flex-1 items-center justify-center bg-background px-6">

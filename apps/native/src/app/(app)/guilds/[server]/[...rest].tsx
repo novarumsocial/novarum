@@ -20,7 +20,7 @@ import {
 import { useDms } from '@/lib/dms';
 import { realtime } from '@/lib/realtime';
 import { useSession } from '@/lib/session';
-import { useSettings } from '@/lib/settings';
+import { settings, useSettings } from '@/lib/settings';
 import type { Author, Message } from '@/lib/types/chat';
 import { startCall, useVoice, voice } from '@/lib/voice';
 
@@ -104,7 +104,13 @@ export default function ChannelScreen() {
         }
         onDelete={(messageId) => chat().deleteMessage(channel.id, messageId)}
         onEdit={(messageId, content) => chat().editMessage(channel.id, messageId, content)}
-        onOpenMembers={width < 1024 && channel.type !== 'DM' ? openMembers : undefined}
+        onOpenMembers={
+          channel.type === 'DM'
+            ? undefined
+            : width < 1024
+              ? openMembers
+              : () => settings().update({ showMemberList: !showMemberList })
+        }
         onCall={() => {
           if (width < 768) setCallExpanded(true);
           startCall(channel.id);

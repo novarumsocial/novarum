@@ -36,7 +36,7 @@
     onJoin,
     onLeave,
     onOpenNavigation,
-    onOpenMembers,
+    onToggleMembers,
     embedded = false,
     expanded = false,
     onToggleExpand,
@@ -47,7 +47,7 @@
     onJoin: () => void;
     onLeave: () => void;
     onOpenNavigation?: () => void;
-    onOpenMembers?: () => void;
+    onToggleMembers?: () => void;
     embedded?: boolean;
     expanded?: boolean;
     onToggleExpand?: () => void;
@@ -284,15 +284,16 @@
           </Tooltip.Root>
         {/if}
 
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          class="lg:hidden"
-          onclick={onOpenMembers}
-          aria-label="Open members"
-        >
-          <Users class="size-5" />
-        </Button>
+        {#if onToggleMembers}
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            onclick={onToggleMembers}
+            aria-label="Toggle member list"
+          >
+            <Users class="size-5" />
+          </Button>
+        {/if}
       </div>
     </div>
   {/if}
