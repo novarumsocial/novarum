@@ -69,9 +69,12 @@
 
     reordering = true;
     document.documentElement.classList.toggle('cursor-spinner', true);
-    await onReorder?.(orderedServers.map((server) => server.id));
-    document.documentElement.classList.toggle('cursor-spinner', false);
-    reordering = false;
+    try {
+      await onReorder?.(orderedServers.map((server) => server.id));
+    } finally {
+      document.documentElement.classList.toggle('cursor-spinner', false);
+      reordering = false;
+    }
   }
 </script>
 
