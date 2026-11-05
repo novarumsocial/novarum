@@ -76,12 +76,18 @@ export type VoiceVideoTrack = VideoTrack;
 export type AudioOutput = 'speaker' | 'earpiece' | 'bluetooth';
 export type CameraFacing = 'user' | 'environment';
 const participantAudioKey = 'novarum:participant-audio';
+const selfAudioKey = 'novarum:self-audio';
 const participantAudioSchema = z.object({
   volume: z.number(),
   muted: z.boolean(),
   screenVolume: z.number(),
 });
 type ParticipantAudio = z.infer<typeof participantAudioSchema>;
+const selfAudioSchema = z.object({
+  muted: z.boolean(),
+  deafened: z.boolean(),
+  mutedBeforeDeafen: z.boolean(),
+});
 
 function loadStored<T>(key: string, schema: z.ZodType<T>) {
   try {
@@ -90,6 +96,8 @@ function loadStored<T>(key: string, schema: z.ZodType<T>) {
     return undefined;
   }
 }
+
+const storedSelfAudio = loadStored(selfAudioKey, selfAudioSchema);
 
 type VoiceStore = {
   room: Room | null;
@@ -197,6 +205,14 @@ export const useVoice = create<VoiceStore>((set, get) => {
     participant.setVolume(
       silent ? 0 : get().participantScreenVolume(identity),
       Track.Source.ScreenShareAudio
+    );
+  };
+
+  const saveSelfAudio = () => {
+    const { selfMuted, selfDeafened, mutedBeforeDeafen } = get();
+    storage.set(
+      selfAudioKey,
+      JSON.stringify({ muted: selfMuted, deafened: selfDeafened, mutedBeforeDeafen })
     );
   };
 
@@ -396,9 +412,9 @@ export const useVoice = create<VoiceStore>((set, get) => {
     room: null,
     channelId: null,
     connectionState: ConnectionState.Disconnected,
-    selfMuted: false,
-    mutedBeforeDeafen: false,
-    selfDeafened: false,
+    selfMuted: storedSelfAudio?.muted ?? false,
+    mutedBeforeDeafen: storedSelfAudio?.mutedBeforeDeafen ?? false,
+    selfDeafened: storedSelfAudio?.deafened ?? false,
     selfCamera: false,
     selfScreenShare: false,
     cameraFacing: 'user',
@@ -539,6 +555,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
 
     async setMuted(muted) {
       set({ selfMuted: muted });
+      saveSelfAudio();
       play(muted ? 'mute' : 'unmute');
       void Haptics.selectionAsync();
 
@@ -558,6 +575,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
         mutedBeforeDeafen: deafened ? s.selfMuted : s.mutedBeforeDeafen,
         selfMuted: deafened ? true : s.mutedBeforeDeafen,
       }));
+      saveSelfAudio();
       play(deafened ? 'deafen' : 'undeafen');
       void Haptics.selectionAsync();
 

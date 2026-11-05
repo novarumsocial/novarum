@@ -35,12 +35,18 @@ import { DeepFilterProcessor, deepFilterLevel, setDeepFilterLevel } from './deep
 const livekitConnectionTimeoutMs = 15_000;
 
 const participantAudioKey = 'novarum:participant-audio';
+const selfAudioKey = 'novarum:self-audio';
 const participantAudioSchema = z.object({
   volume: z.number(),
   muted: z.boolean(),
   screenVolume: z.number(),
 });
 type ParticipantAudio = z.infer<typeof participantAudioSchema>;
+const selfAudioSchema = z.object({
+  muted: z.boolean(),
+  deafened: z.boolean(),
+  mutedBeforeDeafen: z.boolean(),
+});
 
 function loadStored<T>(key: string, schema: z.ZodType<T>) {
   try {
@@ -49,6 +55,8 @@ function loadStored<T>(key: string, schema: z.ZodType<T>) {
     return undefined;
   }
 }
+
+const storedSelfAudio = loadStored(selfAudioKey, selfAudioSchema);
 const noiseProcessor = () =>
   settings.value.noiseSuppressionModel === 'rnnoise'
     ? new RnnoiseProcessor()
@@ -83,9 +91,9 @@ export class Voice {
   connectionState = $state<ConnectionState>(ConnectionState.Disconnected);
   private connectionAttempt = 0;
 
-  selfMuted = $state<boolean>(false);
-  mutedBeforeDeafen = $state<boolean>(false);
-  selfDeafened = $state<boolean>(false);
+  selfMuted = $state<boolean>(storedSelfAudio?.muted ?? false);
+  mutedBeforeDeafen = $state<boolean>(storedSelfAudio?.mutedBeforeDeafen ?? false);
+  selfDeafened = $state<boolean>(storedSelfAudio?.deafened ?? false);
   selfCamera = $state<boolean>(false);
   selfScreenShare = $state<boolean>(false);
   audioPlaybackBlocked = $state<boolean>(false);
@@ -268,9 +276,20 @@ export class Voice {
     leaveSound.play();
   }
 
+  private saveSelfAudio() {
+    localStorage.setItem(
+      selfAudioKey,
+      JSON.stringify({
+        muted: this.selfMuted,
+        deafened: this.selfDeafened,
+        mutedBeforeDeafen: this.mutedBeforeDeafen,
+      })
+    );
+  }
 
   async setMuted(muted: boolean) {
     this.selfMuted = muted;
+    this.saveSelfAudio();
     if (muted) {
       muteSound.play();
     } else {
@@ -298,6 +317,7 @@ export class Voice {
       undeafenSound.play();
       this.selfMuted = this.mutedBeforeDeafen;
     }
+    this.saveSelfAudio();
 
     if (!this.room) return;
 
