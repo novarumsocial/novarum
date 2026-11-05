@@ -12,6 +12,7 @@ import { anchor } from './anchor.svelte';
 import { realtime } from './realtime.svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { Sound } from 'svelte-sound';
+import { z } from 'zod';
 
 // sounds
 import JoinEffect from './sounds/join.opus?url';
@@ -32,6 +33,22 @@ import { RnnoiseProcessor } from './rnnoise-processor';
 import { DeepFilterProcessor, deepFilterLevel, setDeepFilterLevel } from './deepfilter-processor';
 
 const livekitConnectionTimeoutMs = 15_000;
+
+const participantAudioKey = 'novarum:participant-audio';
+const participantAudioSchema = z.object({
+  volume: z.number(),
+  muted: z.boolean(),
+  screenVolume: z.number(),
+});
+type ParticipantAudio = z.infer<typeof participantAudioSchema>;
+
+function loadStored<T>(key: string, schema: z.ZodType<T>) {
+  try {
+    return schema.parse(JSON.parse(localStorage.getItem(key) ?? 'null'));
+  } catch {
+    return undefined;
+  }
+}
 const noiseProcessor = () =>
   settings.value.noiseSuppressionModel === 'rnnoise'
     ? new RnnoiseProcessor()
@@ -77,10 +94,11 @@ export class Voice {
   voiceStates = new SvelteMap<string, VoiceState>();
   // remote screen shares are only subscribed to once the user chooses to watch them
   watchedStreams = new SvelteSet<string>();
-  private participantAudio = new SvelteMap<
-    string,
-    { volume: number; muted: boolean; screenVolume: number }
-  >();
+  private participantAudio = new SvelteMap<string, ParticipantAudio>(
+    Object.entries(
+      loadStored(participantAudioKey, z.record(z.string(), participantAudioSchema)) ?? {}
+    )
+  );
   private remoteAudioElements = new Map<RemoteTrack, HTMLMediaElement>();
   private endedTrackListeners = new WeakSet<VoiceVideoTrack>();
 
@@ -250,6 +268,7 @@ export class Voice {
     leaveSound.play();
   }
 
+
   async setMuted(muted: boolean) {
     this.selfMuted = muted;
     if (muted) {
@@ -379,31 +398,30 @@ export class Voice {
     return this.participantAudio.get(identity)?.screenVolume ?? 1;
   }
 
-  setParticipantVolume(identity: string, volume: number) {
+  private setParticipantAudio(identity: string, patch: Partial<ParticipantAudio>) {
     this.participantAudio.set(identity, {
-      volume: Math.max(0, Math.min(3, volume)),
+      volume: this.participantVolume(identity),
       muted: this.participantMuted(identity),
       screenVolume: this.participantScreenVolume(identity),
+      ...patch,
     });
+    localStorage.setItem(
+      participantAudioKey,
+      JSON.stringify(Object.fromEntries(this.participantAudio))
+    );
     this.updateParticipantAudio(identity);
+  }
+
+  setParticipantVolume(identity: string, volume: number) {
+    this.setParticipantAudio(identity, { volume: Math.max(0, Math.min(3, volume)) });
   }
 
   setParticipantMuted(identity: string, muted: boolean) {
-    this.participantAudio.set(identity, {
-      volume: this.participantVolume(identity),
-      muted,
-      screenVolume: this.participantScreenVolume(identity),
-    });
-    this.updateParticipantAudio(identity);
+    this.setParticipantAudio(identity, { muted });
   }
 
   setParticipantScreenVolume(identity: string, volume: number) {
-    this.participantAudio.set(identity, {
-      volume: this.participantVolume(identity),
-      muted: this.participantMuted(identity),
-      screenVolume: Math.max(0, Math.min(3, volume)),
-    });
-    this.updateParticipantAudio(identity);
+    this.setParticipantAudio(identity, { screenVolume: Math.max(0, Math.min(3, volume)) });
   }
 
   async setCamera(enabled: boolean) {

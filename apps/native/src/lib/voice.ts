@@ -24,6 +24,8 @@ import { chat } from './chat-state';
 import { realtime } from './realtime';
 import { settings } from './settings';
 import { playSound, setInCall } from './sounds';
+import { storage } from './storage';
+import { z } from 'zod';
 
 // must run once before `Room` is used
 registerGlobals();
@@ -73,7 +75,21 @@ export type VoiceVideoTrack = VideoTrack;
 
 export type AudioOutput = 'speaker' | 'earpiece' | 'bluetooth';
 export type CameraFacing = 'user' | 'environment';
-type ParticipantAudio = { volume: number; muted: boolean; screenVolume: number };
+const participantAudioKey = 'novarum:participant-audio';
+const participantAudioSchema = z.object({
+  volume: z.number(),
+  muted: z.boolean(),
+  screenVolume: z.number(),
+});
+type ParticipantAudio = z.infer<typeof participantAudioSchema>;
+
+function loadStored<T>(key: string, schema: z.ZodType<T>) {
+  try {
+    return schema.parse(JSON.parse(storage.getString(key) ?? 'null'));
+  } catch {
+    return undefined;
+  }
+}
 
 type VoiceStore = {
   room: Room | null;
@@ -193,6 +209,7 @@ export const useVoice = create<VoiceStore>((set, get) => {
     set((s) => ({
       participantAudio: { ...s.participantAudio, [identity]: { ...current, ...patch } },
     }));
+    storage.set(participantAudioKey, JSON.stringify(get().participantAudio));
     updateParticipantAudio(identity);
   };
 
@@ -389,7 +406,8 @@ export const useVoice = create<VoiceStore>((set, get) => {
     audioOutputs: ['speaker', 'earpiece'],
     voiceStates: new Map(),
     watchedStreams: new Set(),
-    participantAudio: {},
+    participantAudio:
+      loadStored(participantAudioKey, z.record(z.string(), participantAudioSchema)) ?? {},
     audioLoopbackTesting: false,
     audioLoopbackTrack: null,
 
