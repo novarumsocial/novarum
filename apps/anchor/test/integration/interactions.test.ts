@@ -550,6 +550,53 @@ describe('slash commands', () => {
     w.rt.close();
   });
 
+  test('a bot only answers in public where it may post itself', async () => {
+    const w = await world();
+    await call(w.owner, 'PATCH', `/channel/${w.channel.id}`, { ownerOnly: true });
+    const memberRt = await connect(w.member);
+    const { started, answered, interaction } = await interact(
+      w,
+      () => command(w.member, w, 'ping'),
+      async (i) => {
+        const refused = await respond(w.bot, i, 'callback', {
+          type: 'message',
+          data: { content: 'announcement' },
+        });
+        expect(refused.status).toBe(403);
+        expect(refused.body.error).toBe('This bot cannot send messages in this channel');
+        return respond(w.bot, i, 'callback', {
+          type: 'message',
+          data: { content: 'just you', ephemeral: true },
+        });
+      }
+    );
+    expect(answered.status).toBe(200);
+    expect(started.body).toMatchObject({ type: 'message', ephemeral: true });
+    expect(
+      (await respond(w.bot, interaction, 'followup', { content: 'announcement' })).status
+    ).toBe(403);
+    expect((await list(w.owner, w.channel.id)).body.messages).toEqual([]);
+    memberRt.close();
+    w.rt.close();
+  });
+
+  test('a person can only start so many interactions a minute', async () => {
+    const w = await world();
+    const bogus = () =>
+      call(w.member, 'POST', '/interactions', {
+        channelId: w.channel.id,
+        type: 'command',
+        botId: 'not-a-bot',
+        name: 'ping',
+        options: [],
+      });
+    for (let i = 0; i < 120; i++) expect((await bogus()).status).toBe(404);
+    expect((await bogus()).status).toBe(429);
+    // others are not affected
+    expect((await command(w.owner, w, 'nope')).status).toBe(404);
+    w.rt.close();
+  });
+
   test('outsiders cannot start interactions', async () => {
     const w = await world();
     expect((await command(w.outsider, w, 'ping')).status).toBe(403);

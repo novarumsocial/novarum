@@ -22,6 +22,7 @@ import { canAddBot } from '../../utils/guildRoles';
 import { publicUser } from '../../utils/publicUser';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { randomString } from '../../utils/randomString';
+import { rateLimiter } from '../../utils/rateLimit';
 import { guildChannels, persistFederatedInviteSnapshot } from '../invite/services';
 import { unsubscribeUserFromGuild } from '../realtime/services';
 
@@ -30,7 +31,7 @@ import { unsubscribeUserFromGuild } from '../realtime/services';
 
 export type BotRole = 'ADMIN' | 'MEMBER';
 export type BotRef = { username: string; homeserver: string };
-type Failure = { ok: false; status: 400 | 403 | 404 | 409 | 502; error: string };
+type Failure = { ok: false; status: 400 | 403 | 404 | 409 | 429 | 502; error: string };
 type Result = { ok: true } | Failure;
 type User = typeof users.$inferSelect;
 
@@ -53,6 +54,7 @@ const grantTtlMs = 60_000;
 function createGrant(botId: string, host: string, guildId: string) {
   const grant = randomString();
   grants.set(grant, { botId, host: host.toLowerCase(), guildId, expires: Date.now() + grantTtlMs });
+  setTimeout(() => grants.delete(grant), grantTtlMs).unref?.();
   return grant;
 }
 
@@ -70,6 +72,10 @@ function consumeGrant(grant: string | undefined, botId: string, host: string, gu
 
 // ---- adding -----------------------------------------------------------------------------------
 
+// every try can leave a grant and a placeholder row behind for a while, and asks another server
+export const maxBotAddsPerMinute = 10;
+export const allowBotAdd = rateLimiter(maxBotAddsPerMinute);
+
 const remoteJoinResponseSchema = z.object({ user: federationUserSchema });
 const remoteErrorSchema = z.object({ error: z.string() });
 
@@ -81,6 +87,7 @@ export async function requestAddBot(
   bot: BotRef,
   role: BotRole
 ): Promise<Result> {
+  if (!allowBotAdd(adder.userId)) return fail(429, 'Too many bots added, try again later');
   const federatedGuild = parseFederatedGuildId(guildId);
   if (!federatedGuild) {
     const guild = await db.query.guilds.findFirst({ where: { id: guildId } });
@@ -120,8 +127,8 @@ export async function requestAddBot(
   if (!result) return fail(502, 'Could not reach remote homeserver');
   if (!result.response.ok) {
     const error = remoteErrorSchema.safeParse(result.data);
-    const status = [400, 403, 404, 409].includes(result.response.status)
-      ? (result.response.status as 400 | 403 | 404 | 409)
+    const status = [400, 403, 404, 409, 429].includes(result.response.status)
+      ? (result.response.status as 400 | 403 | 404 | 409 | 429)
       : 502;
     return fail(status, error.success ? error.data.error : 'Remote homeserver refused the bot');
   }
@@ -167,19 +174,30 @@ export async function hostAddBot(
     if (await isMember(guild.id, botUser.id)) return fail(409, 'This bot is already in the guild');
     await addMember(guild.id, botUser.id, role);
   } else {
+    const remote = await reachBotHomeserver(bot.homeserver);
+    if (!remote.ok) return remote;
     // The bot's homeserver starts following the guild as soon as it agrees, and we only let a
     // homeserver follow guilds it has members in, so the membership comes first and goes again
     // if the bot's homeserver refuses.
-    const placeholder = await remoteUserRow(bot);
-    if (await isMember(guild.id, placeholder.id)) {
+    const placeholder = await remoteUserRow({ ...bot, homeserver: remote.homeserver });
+    if (!placeholder.ok) return placeholder;
+    if (await isMember(guild.id, placeholder.user.id)) {
       return fail(409, 'This bot is already in the guild');
     }
-    await addMember(guild.id, placeholder.id, role);
-    const joined = await askBotToJoin(guild, bot, role, grant);
+    await addMember(guild.id, placeholder.user.id, role);
+    const joined = await askBotToJoin(remote.homeserver, guild, bot, role, grant);
     if (!joined.ok) {
       await db
         .delete(guildMembers)
-        .where(and(eq(guildMembers.guildId, guild.id), eq(guildMembers.userId, placeholder.id)));
+        .where(
+          and(eq(guildMembers.guildId, guild.id), eq(guildMembers.userId, placeholder.user.id))
+        );
+      const elsewhere = await db.query.guildMembers.findFirst({
+        where: { userId: placeholder.user.id },
+      });
+      if (placeholder.created && !elsewhere) {
+        await db.delete(users).where(eq(users.id, placeholder.user.id));
+      }
       return joined;
     }
     botUser = joined.user;
@@ -213,13 +231,25 @@ export async function hostAddBot(
 const isMember = async (guildId: string, userId: string) =>
   !!(await db.query.guildMembers.findFirst({ where: { guildId, userId } }));
 
-// our row for a remote bot, made bare when we've never seen it; its profile arrives with the join
+async function reachBotHomeserver(homeserver: string) {
+  const remote = await discoverRemoteAnchor(homeserver).catch(() => null);
+  if (!remote) return fail(502, "Could not reach the bot's homeserver");
+  if (!remoteSupports(remote, 'bots')) {
+    return fail(400, "The bot's homeserver doesn't support bots");
+  }
+  return { ok: true as const, homeserver: remote.homeserver.toLowerCase() };
+}
+
+// our row for a remote bot, made bare when we've never seen it; its profile arrives with the join.
+// A person we already know by that name stays a person: it can't be added as a bot.
 async function remoteUserRow(bot: BotRef) {
-  const homeserver = bot.homeserver.toLowerCase();
-  const existing = await db.query.users.findFirst({
-    where: { username: bot.username, homeserver },
-  });
-  if (existing) return existing;
+  const { homeserver, username } = bot;
+  const existing = await db.query.users.findFirst({ where: { username, homeserver } });
+  if (existing) {
+    return existing.isBot
+      ? { ok: true as const, user: existing, created: false }
+      : fail(400, 'That user is not a bot');
+  }
   const now = new Date();
   const [created] = await db
     .insert(users)
@@ -233,9 +263,8 @@ async function remoteUserRow(bot: BotRef) {
     })
     .onConflictDoNothing()
     .returning();
-  return (
-    created ?? (await db.query.users.findFirst({ where: { username: bot.username, homeserver } }))!
-  );
+  if (created) return { ok: true as const, user: created, created: true };
+  return remoteUserRow(bot);
 }
 
 async function addMember(guildId: string, userId: string, role: BotRole) {
@@ -250,18 +279,14 @@ async function addMember(guildId: string, userId: string, role: BotRole) {
 
 // the bot lives on another homeserver, which has to agree to it joining
 async function askBotToJoin(
+  homeserver: string,
   guild: { id: string; name: string; description: string | null; avatarUrl: string | null },
   bot: BotRef,
   role: BotRole,
   grant: string | undefined
 ): Promise<{ ok: true; user: User } | Failure> {
-  const remote = await discoverRemoteAnchor(bot.homeserver).catch(() => null);
-  if (!remote) return fail(502, "Could not reach the bot's homeserver");
-  if (!remoteSupports(remote, 'bots'))
-    return fail(400, "The bot's homeserver doesn't support bots");
-
   const result = await postSignedFederationJson(
-    remote.homeserver,
+    homeserver,
     `/federation/bots/${encodeURIComponent(bot.username)}/join`,
     {
       guild: {
@@ -290,7 +315,7 @@ async function askBotToJoin(
     !answer.success ||
     !answer.data.user.isBot ||
     answer.data.user.username !== bot.username ||
-    answer.data.user.homeserver.toLowerCase() !== remote.homeserver.toLowerCase()
+    answer.data.user.homeserver.toLowerCase() !== homeserver
   ) {
     return fail(502, "The bot's homeserver returned an invalid bot");
   }

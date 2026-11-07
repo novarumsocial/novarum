@@ -177,7 +177,8 @@ describe('bot accounts', () => {
     } finally {
       await Promise.all([capped.destroy(), off.destroy()]);
     }
-  });
+    // two more anchors have to boot and migrate, which takes longer than 5s on a busy machine
+  }, 60_000);
 
   test('deleting a bot kills its token, frees the username and takes it out of its guilds', async () => {
     const owner = await signup(anchor.url);
@@ -359,6 +360,22 @@ describe('adding bots to guilds', () => {
     expect(
       (await addBot(owner, guild.id, { username: 'nobody', homeserver: 'localhost' })).status
     ).toBe(404);
+  });
+
+  test('adding bots is rate limited, and unreachable homeservers leave no rows behind', async () => {
+    const owner = await signup(anchor.url);
+    const { guild } = await createGuild(owner);
+    const ghost = { username: `ghost${Date.now()}`, homeserver: 'nowhere.invalid' };
+    expect((await addBot(owner, guild.id, ghost)).status).toBe(502);
+    expect(await sql(`SELECT id FROM "user" WHERE username = '${ghost.username}'`)).toHaveLength(0);
+    for (let i = 1; i < 10; i++) {
+      expect(
+        (await addBot(owner, guild.id, { username: 'nobody', homeserver: 'localhost' })).status
+      ).toBe(404);
+    }
+    expect(
+      (await addBot(owner, guild.id, { username: 'nobody', homeserver: 'localhost' })).status
+    ).toBe(429);
   });
 
   test('removing a bot sends guild.deleted and stops its guild events', async () => {

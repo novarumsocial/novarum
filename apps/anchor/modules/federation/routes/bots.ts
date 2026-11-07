@@ -2,9 +2,11 @@ import Elysia from 'elysia';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { federationUserSchema } from '../../../utils/federationPayload';
+import { publicUserSchema } from '../../../utils/publicUser';
 import {
   acceptJoin,
   acceptLeave,
+  allowBotAdd,
   hostAddBot,
   hostRemoveBot,
   publicBotProfile,
@@ -19,12 +21,13 @@ const errors = {
   403: genericResponseErrorSchema,
   404: genericResponseErrorSchema,
   409: genericResponseErrorSchema,
+  429: genericResponseErrorSchema,
   502: genericResponseErrorSchema,
 };
 
 const addBodySchema = z.object({
-  username: z.string().min(1).max(32),
-  homeserver: z.string().min(1).max(255),
+  username: publicUserSchema.shape.username,
+  homeserver: publicUserSchema.shape.homeserver,
   role: z.enum(['ADMIN', 'MEMBER']),
   grant: z.string().max(64).optional(),
 });
@@ -72,6 +75,11 @@ export const bots = new Elysia()
       if (!body.success) return status(400, { error: 'Invalid bot' });
       const access = await getFederatedGuildAccess(params.id, remoteUser);
       if (!access.ok) return status(access.status, { error: access.error });
+      // people add bots, like on the client routes; an ADMIN bot doesn't bring in others
+      if (access.user.isBot) return status(403, { error: 'Bots cannot add bots' });
+      if (!allowBotAdd(access.user.id)) {
+        return status(429, { error: 'Too many bots added, try again later' });
+      }
 
       const { role, grant, ...bot } = body.data;
       const added = await hostAddBot(server, access.guild, access.user.id, bot, role, grant);
@@ -87,6 +95,7 @@ export const bots = new Elysia()
       if (!body.success) return status(400, { error: 'Invalid bot' });
       const access = await getFederatedGuildAccess(params.id, remoteUser);
       if (!access.ok) return status(access.status, { error: access.error });
+      if (access.user.isBot) return status(403, { error: 'Bots cannot remove bots' });
 
       const removed = await hostRemoveBot(server, access.guild, access.user.id, body.data.userId);
       if (!removed.ok) return status(removed.status, { error: removed.error });

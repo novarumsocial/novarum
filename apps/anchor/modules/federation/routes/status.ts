@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db, users } from '../../../src/db';
 import { userStatusSchema } from '../../../src/db/zod';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
-import { userProfile } from '../../../utils/publicUser';
+import { remoteProfile } from '../../../utils/publicUser';
 import { publishRealtime } from '../../../utils/publishRealtime';
 import { getFederatedGuildAccess } from '../access';
 import { federationAuth } from '../plugin';
@@ -84,7 +84,7 @@ export const userStatus = new Elysia()
 
       await db
         .update(users)
-        .set({ ...userProfile(remoteUser), status: nextStatus.data, updatedAt: new Date() })
+        .set({ ...remoteProfile(remoteUser), status: nextStatus.data, updatedAt: new Date() })
         .where(eq(users.id, access.user.id));
 
       if (server) {
@@ -132,7 +132,7 @@ export const userStatus = new Elysia()
         .update(users)
         .set({
           status: body.data.status,
-          ...(memberships.length ? { ...userProfile(remoteUser), updatedAt: new Date() } : {}),
+          ...(memberships.length ? { ...remoteProfile(remoteUser), updatedAt: new Date() } : {}),
         })
         .where(eq(users.id, remote.id));
 

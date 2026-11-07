@@ -8,7 +8,8 @@ import { postSignedFederationJson } from '../../utils/discovery';
 import { publicUser } from '../../utils/publicUser';
 import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { randomString } from '../../utils/randomString';
-import { canAccessChannel } from '../../utils/channelAccess';
+import { rateLimiter } from '../../utils/rateLimit';
+import { canAccessChannel, canSendInChannel } from '../../utils/channelAccess';
 import { commandListSchema, type Command, type CommandOption } from '../../utils/botSchemas';
 import { messagePayload } from '../../utils/messagePayload';
 import { createMessage, editMessage } from '../message/store';
@@ -29,7 +30,7 @@ import type {
 
 type User = typeof users.$inferSelect;
 type Channel = { id: string; guildId: string | null; type: string };
-type Failure = { ok: false; status: 400 | 403 | 404 | 502 | 504; error: string };
+type Failure = { ok: false; status: 400 | 403 | 404 | 429 | 502 | 504; error: string };
 const fail = (status: Failure['status'], error: string): Failure => ({ ok: false, status, error });
 
 export const interactionLifetimeMs = 15 * 60_000;
@@ -37,6 +38,9 @@ export const interactionLifetimeMs = 15 * 60_000;
 // some room for a bot on another homeserver
 const ackTimeoutMs = (botIsRemote: boolean) => (botIsRemote ? 5_000 : 3_000);
 const maxFollowups = 10;
+// autocomplete asks on every keystroke, so this leaves room for typing
+export const maxInteractionsPerMinute = 120;
+const allowInteraction = rateLimiter(maxInteractionsPerMinute);
 
 type HostInteraction = {
   id: string;
@@ -208,6 +212,7 @@ export async function startInteraction(
   user: User,
   input: InteractionInput
 ): Promise<{ ok: true; result: InteractionResult } | Failure> {
+  if (!allowInteraction(user.id)) return fail(429, 'Too many interactions, slow down');
   if (!channel.guildId) return fail(404, 'Channel not found');
   const guildId = channel.guildId;
   if (!(await canAccessChannel(channel, user.id, input.type !== 'autocomplete'))) {
@@ -352,8 +357,9 @@ export async function respond(
   if (action.action === 'followup') {
     if (isEmpty(action.body)) return fail(400, emptyMessage);
     if (interaction.followups >= maxFollowups) return fail(400, 'Too many follow-up messages');
+    const sent = await sendResponse(server, interaction, action.body);
+    if (!sent.ok) return sent;
     interaction.followups++;
-    await sendResponse(server, interaction, action.body);
     return { ok: true };
   }
 
@@ -364,10 +370,12 @@ export async function respond(
   if (!original) {
     if (!interaction.deferred) return fail(404, 'There is no original response');
     if (isEmpty(action.body)) return fail(400, emptyMessage);
-    interaction.original = await sendResponse(server, interaction, {
+    const sent = await sendResponse(server, interaction, {
       ...action.body,
       ephemeral: interaction.ephemeral,
     });
+    if (!sent.ok) return sent;
+    interaction.original = sent.message;
     return { ok: true };
   }
   return editResponse(server, interaction, original, action.body);
@@ -389,10 +397,13 @@ async function handleCallback(
   switch (callback.type) {
     case 'autocomplete':
       return { ok: true, result: { type: 'autocomplete', choices: callback.data.choices } };
-    case 'message':
+    case 'message': {
       if (isEmpty(callback.data)) return fail(400, emptyMessage);
-      interaction.original = await sendResponse(server, interaction, callback.data);
-      return { ok: true, result: { type: 'message', ephemeral: interaction.original.ephemeral } };
+      const sent = await sendResponse(server, interaction, callback.data);
+      if (!sent.ok) return sent;
+      interaction.original = sent.message;
+      return { ok: true, result: { type: 'message', ephemeral: sent.message.ephemeral } };
+    }
     case 'deferred':
       interaction.deferred = true;
       interaction.ephemeral = callback.data?.ephemeral ?? false;
@@ -419,7 +430,7 @@ async function sendResponse(
   server: Server | null,
   interaction: HostInteraction,
   body: ResponseMessage
-) {
+): Promise<{ ok: true; message: { id: string; ephemeral: boolean } } | Failure> {
   const { channel, bot } = interaction;
   if (body.ephemeral) {
     const message: EphemeralMessage = {
@@ -436,7 +447,13 @@ async function sendResponse(
     };
     remember(ephemerals, message.id, { message, botId: bot.id, userId: interaction.user.id });
     await deliverEphemeral(server, interaction.user, message);
-    return { id: message.id, ephemeral: true };
+    return { ok: true, message: { id: message.id, ephemeral: true } };
+  }
+
+  // the bot answers as itself, so an owner-only channel only takes its answer when it may post there
+  const stored = await db.query.channels.findFirst({ where: { id: channel.id } });
+  if (!stored || !(await canSendInChannel(stored, bot.id))) {
+    return fail(403, 'This bot cannot send messages in this channel');
   }
 
   const content = body.content ?? null;
@@ -458,7 +475,7 @@ async function sendResponse(
       data: messagePayload({ ...created, attachments: [] }, channel, bot),
     });
   }
-  return { id: created.id, ephemeral: false };
+  return { ok: true, message: { id: created.id, ephemeral: false } };
 }
 
 async function editResponse(

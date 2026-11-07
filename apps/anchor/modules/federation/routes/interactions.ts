@@ -21,6 +21,7 @@ const errors = {
   ...federationErrors,
   403: genericResponseErrorSchema,
   404: genericResponseErrorSchema,
+  429: genericResponseErrorSchema,
   502: genericResponseErrorSchema,
   504: genericResponseErrorSchema,
 };

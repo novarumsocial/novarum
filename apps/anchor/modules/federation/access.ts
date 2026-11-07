@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db, users } from '../../src/db';
 import { canAccessChannel } from '../../utils/channelAccess';
 import type { FederationUserPayload } from '../../utils/federationPayload';
-import { userProfile } from '../../utils/publicUser';
+import { remoteProfile } from '../../utils/publicUser';
 
 const forbidden = { ok: false as const, status: 403 as const, error: 'Forbidden' };
 
@@ -17,7 +17,7 @@ function findRemoteUser(remoteUser: FederationUserPayload) {
 // the remote sends its user's current profile with every request, so we keep our copy fresh.
 // Most requests carry nothing new, so we only write when something actually changed.
 async function refreshProfile(user: typeof users.$inferSelect, remoteUser: FederationUserPayload) {
-  const profile = userProfile(remoteUser);
+  const profile = remoteProfile(remoteUser);
   const changed = Object.entries(profile).some(
     ([key, value]) => user[key as keyof typeof profile] !== value
   );

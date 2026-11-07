@@ -390,6 +390,7 @@ export const botGuilds = new Elysia({ tags: ['Bots'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
       },
     }
@@ -436,6 +437,7 @@ export const botGuilds = new Elysia({ tags: ['Bots'] })
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
       },
     }

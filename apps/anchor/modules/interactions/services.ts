@@ -6,7 +6,7 @@ import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { guildCommands, startInteraction } from './host';
-import { botRespond } from './relay';
+import { botRespond, expectEphemerals } from './relay';
 import {
   callbackSchema,
   guildCommandsSchema,
@@ -20,6 +20,7 @@ const errors = {
   401: genericResponseErrorSchema,
   403: genericResponseErrorSchema,
   404: genericResponseErrorSchema,
+  429: genericResponseErrorSchema,
   502: genericResponseErrorSchema,
   504: genericResponseErrorSchema,
 };
@@ -85,6 +86,8 @@ export const interactions = new Elysia({ tags: ['Bots'] })
       ) {
         return status(403, { error: 'Forbidden' });
       }
+      // the bot's ephemeral answer can arrive before the host answers this request
+      expectEphemerals(session.userId, federatedChannel.homeserver);
       const remote = await callRemote(
         federatedChannel.homeserver,
         federationChannelPath(federatedChannel, 'interactions'),
@@ -92,7 +95,7 @@ export const interactions = new Elysia({ tags: ['Bots'] })
         input,
         {
           response: interactionResultSchema,
-          forward: passThrough(400, 403, 404, 504),
+          forward: passThrough(400, 403, 404, 429, 504),
           errors: {
             failed: 'Remote interaction failed',
             invalid: 'Remote interaction was invalid',

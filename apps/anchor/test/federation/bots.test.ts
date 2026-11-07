@@ -53,14 +53,14 @@ const makeAdminOnA = async (guildId: string, user: TestUser) =>
     AND "userId" = (SELECT id FROM "user" WHERE username = ${user.user.username} AND "homeserverName" = ${user.user.homeserver.toLowerCase()})`;
 
 /** an A guild with a public B bot in it, connected and subscribed */
-async function world() {
+async function world(role: 'MEMBER' | 'ADMIN' = 'MEMBER') {
   const owner = await signup('a');
   const { guild, channel } = await createGuild(owner, 'botguild');
   const botOwner = await signup('b');
   const bot = await createBot(botOwner);
   await call(bot, 'PUT', '/bots/@me/commands', { commands });
   const rt = await connectBot(api('b'), bot.token);
-  const added = await addBot(owner, guild.id, bot.bot);
+  const added = await addBot(owner, guild.id, bot.bot, role);
   if (added.status !== 200)
     throw new Error(`add failed: ${added.status} ${JSON.stringify(added.body)}`);
   const shadowGuild = fedGuildId(hostA, guild.id);
@@ -488,7 +488,118 @@ describe('hostile homeservers', () => {
         })
       ).status
     ).toBe(403);
+
+    // the host can't whisper at a member out of the blue, even as a bot of a guild they're in
+    const whisper = () =>
+      a.send('b', 'POST', '/federation/interactions/ephemeral', {
+        username: person.user.username,
+        message,
+      });
+    expect((await whisper()).status).toBe(403);
+    // once they used an interaction there, the bot's answers get through
+    const shadowChannel = fedChannelId(hostA, w.channel.id);
+    await call(person, 'POST', '/interactions', {
+      channelId: shadowChannel,
+      type: 'command',
+      botId: 'not-a-bot',
+      name: 'ping',
+      options: [],
+    });
+    expect((await whisper()).status).toBe(200);
+    // but only from a bot, and only in a channel of that guild
+    const asPerson = { ...message, author: { ...message.author, isBot: false } };
+    const elsewhere = { ...message, channelId: 'not-a-channel' };
+    for (const forgedMessage of [asPerson, elsewhere]) {
+      expect(
+        (
+          await a.send('b', 'POST', '/federation/interactions/ephemeral', {
+            username: person.user.username,
+            message: forgedMessage,
+          })
+        ).status
+      ).toBe(403);
+    }
     w.rt.close();
+  });
+
+  test('a bot homeserver cannot turn its bot into a person to dodge removal', async () => {
+    const w = await world('ADMIN');
+    const b = await signerFor('b');
+    const typing = await b.send('a', 'POST', `/federation/channels/${w.channel.id}/typing`, {
+      user: userPayload(w.bot.bot, { isBot: false }),
+    });
+    expect(typing.status).toBe(200);
+    const users = await call(w.owner, 'GET', `/channel/${w.channel.id}/users`);
+    expect(users.body.users.find((u: any) => u.username === w.bot.bot.username)).toMatchObject({
+      isBot: true,
+      role: 'ADMIN',
+    });
+    expect(
+      (await call(w.owner, 'DELETE', `/guilds/${w.guild.id}/bots/${await botIdOnA(w)}`)).status
+    ).toBe(200);
+    w.rt.close();
+  });
+
+  test('a homeserver cannot turn its person into a bot either', async () => {
+    const owner = await signup('a');
+    const { guild, channel } = await createGuild(owner);
+    const person = await signup('b');
+    await joinRemote(owner, guild.id, person);
+    const b = await signerFor('b');
+    await b.send('a', 'POST', `/federation/channels/${channel.id}/typing`, {
+      user: userPayload(person.user, { isBot: true }),
+    });
+    const sent = await b.send('a', 'POST', `/federation/channels/${channel.id}/messages/send`, {
+      user: userPayload(person.user, { isBot: true }),
+      content: null,
+      nonce: 'n1',
+      embeds: [{ title: 'not a bot' }],
+    });
+    expect(sent.status).toBe(400);
+    expect(sent.json.error).toBe('Only bots can send embeds or buttons');
+    // nor be added to a guild as one
+    const added = await addBot(owner, guild.id, person.user);
+    expect(added.status).toBe(400);
+    expect(added.body.error).toBe('That user is not a bot');
+  });
+
+  test('a remote ADMIN bot cannot add or remove bots', async () => {
+    const w = await world('ADMIN');
+    const b = await signerFor('b');
+    const other = await createBot(w.botOwner);
+    const added = await b.send('a', 'POST', `/federation/guilds/${w.guild.id}/bots`, {
+      user: userPayload(w.bot.bot, { isBot: true }),
+      username: other.bot.username,
+      homeserver: anchors.b.homeserver,
+      role: 'MEMBER',
+    });
+    expect(added.status).toBe(403);
+    expect((await call(other, 'GET', '/guilds/list')).body.guilds).toEqual([]);
+
+    const memberBot = await createBot(w.botOwner);
+    expect((await addBot(w.owner, w.guild.id, memberBot.bot)).status).toBe(200);
+    const users = await call(w.owner, 'GET', `/channel/${w.channel.id}/users`);
+    const memberBotId = users.body.users.find(
+      (u: any) => u.username === memberBot.bot.username
+    ).userId;
+    const removed = await b.send('a', 'POST', `/federation/guilds/${w.guild.id}/bots/remove`, {
+      user: userPayload(w.bot.bot, { isBot: true }),
+      userId: memberBotId,
+    });
+    expect(removed.status).toBe(403);
+    w.rt.close();
+  });
+
+  test('a bot that does not exist leaves no user row behind on the host', async () => {
+    const owner = await signup('a');
+    const { guild } = await createGuild(owner);
+    const ghost = { username: `ghost${Date.now()}`, homeserver: anchors.b.homeserver };
+    expect((await addBot(owner, guild.id, ghost)).status).toBe(404);
+    const rows = await pg('a')`SELECT id FROM "user" WHERE username = ${ghost.username}`;
+    expect(rows).toHaveLength(0);
+    // and names that can't be anyone's are refused before anything is asked
+    const badName = await addBot(owner, guild.id, { ...ghost, username: 'no/slash' });
+    expect(badName.status).toBe(422);
   });
 
   test('responses to an interaction need the bot it went to', async () => {

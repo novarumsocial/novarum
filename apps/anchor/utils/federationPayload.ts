@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, users } from '../src/db';
 import { discoverRemoteAnchor, federationRequestTimeoutMs } from './discovery';
-import { publicUser, publicUserSchema, userProfile } from './publicUser';
+import { publicUser, publicUserSchema, remoteProfile } from './publicUser';
 import { randomString } from './randomString';
 import { readJson } from './parseJson';
 
@@ -52,7 +52,7 @@ export async function upsertFederatedUser(input: FederationUserPayload) {
   if (existing) {
     const [updated] = await db
       .update(users)
-      .set({ ...userProfile(userInput), updatedAt: now })
+      .set({ ...remoteProfile(userInput), updatedAt: now })
       .where(eq(users.id, existing.id))
       .returning();
     if (!updated) throw new Error('Could not update federated user');
@@ -69,7 +69,7 @@ export async function upsertFederatedUser(input: FederationUserPayload) {
     })
     .onConflictDoUpdate({
       target: [users.username, users.homeserver],
-      set: { ...userProfile(userInput), updatedAt: now },
+      set: { ...remoteProfile(userInput), updatedAt: now },
     })
     .returning();
 

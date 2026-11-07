@@ -218,12 +218,13 @@ export const triggers = {
   T7: async ({ actor }: Ctx, hs: string) => [
     await actor.as(`/bots/lookup?username=evil&homeserver=${encodeURIComponent(hs)}`),
   ],
-  /** T8: adding a bot of the homeserver to a guild of ours */
+  /** T8: adding a bot of the homeserver to a guild of ours (a fresh adder: adding bots is rate limited) */
   T8: async ({ actor }: Ctx, hs: string) => {
-    const created = await actor.as('/guilds/create', { method: 'POST', json: { name: 'ssrf' } });
+    const adder = await makeActor(actor.name);
+    const created = await adder.as('/guilds/create', { method: 'POST', json: { name: 'ssrf' } });
     const guildId = JSON.parse(created.text).guild.id as string;
     return [
-      await actor.as(`/guilds/${encodeURIComponent(guildId)}/bots`, {
+      await adder.as(`/guilds/${encodeURIComponent(guildId)}/bots`, {
         method: 'POST',
         json: { username: 'evil', homeserver: hs, role: 'MEMBER' },
       }),
