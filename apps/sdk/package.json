@@ -8,12 +8,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
   "files": [
     "dist",
+    "src",
     "README.md"
   ],
   "keywords": [

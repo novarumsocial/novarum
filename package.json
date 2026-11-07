@@ -21,7 +21,8 @@
     "typescript": "^5"
   },
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "bot-demo"
   ],
   "trustedDependencies": [
     "electron"
