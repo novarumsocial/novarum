@@ -15,7 +15,7 @@ import {
   uploadPresign,
   noStoreRedirect,
 } from '../../utils/services/storage';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { requestSession, type SessionWithUser } from '../auth/provider';
 import { canAccessChannel } from '../../utils/channelAccess';
 import { attachments, db } from '../../src/db';
 import { z } from 'zod';
@@ -88,8 +88,11 @@ async function renderPreview(file: ArrayBuffer) {
   return null;
 }
 
-async function requireUploadAccess(channelId: string, contentType: string, token: unknown) {
-  const session = await validateSessionToken(typeof token === 'string' ? token : undefined);
+async function requireUploadAccess(
+  channelId: string,
+  contentType: string,
+  session: SessionWithUser | null
+) {
   if (!session) return { ok: false as const, status: 401 as const, error: 'Unauthorized' };
   if (!isAllowedAttachmentType(contentType)) {
     return { ok: false as const, status: 415 as const, error: 'Unsupported file type' };
@@ -193,11 +196,11 @@ export const upload = new Elysia({ tags: ['Upload'] })
   )
   .post(
     '/upload/presign',
-    async ({ body, cookie, status }) => {
+    async ({ body, cookie, request, status }) => {
       const access = await requireUploadAccess(
         body.channelId,
         body.contentType,
-        cookie[sessionCookieName]?.value
+        await requestSession(cookie, request)
       );
       if (!access.ok) return status(access.status, { error: access.error });
 

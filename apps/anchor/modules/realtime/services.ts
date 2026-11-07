@@ -1,5 +1,5 @@
 import Elysia, { t } from 'elysia';
-import { sessionCookieName, validateSessionToken, type SessionWithUser } from '../auth/provider';
+import { requestSession, sessionCookieName, type SessionWithUser } from '../auth/provider';
 import {
   makeFederatedGuildId,
   parseFederatedChannelId,
@@ -44,7 +44,10 @@ const pingIntervals = new Map<string, ReturnType<typeof setInterval>>();
 // one ring request per user at a time; while it is out, only the newest one waits behind it
 const ringsInFlight = new Set<string>();
 const nextRings = new Map<string, () => Promise<unknown>>();
-const openSockets = new Map<string, { session: SessionWithUser; close: () => void }>();
+const openSockets = new Map<
+  string,
+  { session: SessionWithUser; close: () => void; unsubscribe: (topic: string) => void }
+>();
 const voiceStateResponseSchema = z.object({
   state: z.object({
     guildId: z.string().nullable(),
@@ -83,6 +86,13 @@ function ringRemote(userId: string, send: () => Promise<unknown>) {
 export function closeSessionSockets(matches: (session: SessionWithUser) => boolean) {
   for (const socket of openSockets.values()) {
     if (matches(socket.session)) socket.close();
+  }
+}
+
+// someone left (or was removed from) a guild: their open sockets stop getting its events
+export function unsubscribeUserFromGuild(userId: string, guildId: string) {
+  for (const socket of openSockets.values()) {
+    if (socket.session.userId === userId) socket.unsubscribe(`guildEvents:${guildId}`);
   }
 }
 
@@ -174,9 +184,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     }),
   ]),
   async open(ws) {
-    const token = ws.data.cookie[sessionCookieName]?.value as string | undefined;
     // @ts-ignore messages can arrive before open finishes, so they await this instead
-    ws.data.sessionReady = validateSessionToken(token);
+    ws.data.sessionReady = requestSession(ws.data.cookie, ws.data.request);
     // @ts-ignore same
     const session = (await ws.data.sessionReady) as SessionWithUser | null;
     if (!session) {
@@ -186,7 +195,11 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
 
     // @ts-ignore fuh ts
     ws.data.session = session;
-    openSockets.set(ws.id, { session, close: () => ws.close(1008, 'Session ended') });
+    openSockets.set(ws.id, {
+      session,
+      close: () => ws.close(1008, 'Session ended'),
+      unsubscribe: (topic) => ws.unsubscribe(topic),
+    });
 
     const memberships = await db.query.guildMembers.findMany({
       where: { userId: session.userId },

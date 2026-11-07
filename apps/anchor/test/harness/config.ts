@@ -28,6 +28,7 @@ export type ConfigOverrides = {
   network?: Record<string, Json>;
   voice?: Record<string, Json>;
   email?: Record<string, Json>;
+  bots?: Record<string, Json>;
 };
 
 /** reads test/config.toml, applies overrides, writes it to dir/config.toml and returns the path */

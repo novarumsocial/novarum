@@ -86,6 +86,14 @@ const schema = z.object({
     })
     .optional()
     .default({}),
+  bots: z
+    .object({
+      // whether local users can create bots; existing bots keep working when this is turned off
+      enabled: z.boolean().optional().default(true),
+      max_per_user: z.number().int().nonnegative().optional().default(25),
+    })
+    .optional()
+    .prefault({}),
   network: z
     .object({
       proxy_url: z.url().optional(),

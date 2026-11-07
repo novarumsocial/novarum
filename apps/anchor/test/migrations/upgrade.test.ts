@@ -296,6 +296,27 @@ const specs: Record<string, Spec> = {
       );
     },
   },
+  '20261107130138_flashy_iron_fist': {
+    check: async (url) => {
+      // existing messages have no bot extras
+      expect(
+        await rows(
+          url,
+          `SELECT id FROM message WHERE embeds IS NOT NULL OR components IS NOT NULL OR interaction IS NOT NULL`
+        )
+      ).toHaveLength(0);
+      await query(
+        url,
+        `INSERT INTO "user" (id, username, "homeserverName", "isBot", "createdAt", "updatedAt") VALUES ('b1', 'helper', 'localhost', true, now(), now())`
+      );
+      await query(url, `INSERT INTO bot ("userId", "ownerId") VALUES ('b1', 'u1')`);
+      expect(
+        await rows(url, `SELECT 1 FROM bot WHERE "userId" = 'b1' AND public AND commands = '[]'`)
+      ).toHaveLength(1);
+      await query(url, `UPDATE message SET embeds = '[{"title":"t"}]' WHERE id = 'm1'`);
+      expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

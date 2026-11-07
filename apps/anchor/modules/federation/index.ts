@@ -1,4 +1,5 @@
 import Elysia from 'elysia';
+import { bots } from './routes/bots';
 import { channels } from './routes/channels';
 import { dms } from './routes/dms';
 import { friends } from './routes/friends';
@@ -22,4 +23,5 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
   .use(userStatus)
   .use(dms)
   .use(push)
-  .use(realtime);
+  .use(realtime)
+  .use(bots);

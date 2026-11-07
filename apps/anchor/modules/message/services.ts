@@ -1,5 +1,5 @@
 import Elysia, { t } from 'elysia';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { requestSession } from '../auth/provider';
 import { publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
@@ -32,9 +32,8 @@ const messageResponseSchema = z.object({ message: messageSchema });
 const successResponseSchema = z.object({ success: z.boolean() });
 
 export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
-  .resolve(async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+  .resolve(async ({ cookie, request, status }) => {
+    const session = await requestSession(cookie, request);
     if (!session) {
       return status(401, { error: 'Unauthorized' });
     }

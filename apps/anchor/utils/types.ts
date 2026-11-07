@@ -1,4 +1,5 @@
 import type { PublicUser } from './publicUser';
+import type { ActionRow, Embed, MessageInteraction } from './botSchemas';
 
 export type RealtimeEvent =
   | {
@@ -51,6 +52,15 @@ export type RealtimeEvent =
           status: 'ONLINE' | 'OFFLINE';
         };
       };
+    }
+  | {
+      type: 'member.left';
+      data: { guildId: string; userId: string };
+    }
+  | {
+      // only to the user who left (or was removed from) the guild
+      type: 'guild.deleted';
+      data: { guildId: string };
     }
   | {
       type: 'voice.states.snapshot';
@@ -154,6 +164,9 @@ export type MessageEventData = {
   attachments: AttachmentPayload[];
   createdAt: string;
   author: PublicUser;
+  embeds?: Embed[];
+  components?: ActionRow[];
+  interaction?: MessageInteraction | null;
 };
 
 export type DmChannel = {
