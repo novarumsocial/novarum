@@ -16,7 +16,11 @@ bot's own homeserver.
 - **Events** of the guild reach the bot's homeserver like they reach any member's, and from there the bot's socket.
 - **Interactions** are checked by the guild's homeserver, which knows the guild, its members, its messages and the
   bot's commands. It sends them to the bot's homeserver, and the bot's answers go back the same way. Private answers go
-  straight to the person's own homeserver, which only accepts them for guilds that homeserver actually hosts.
+  straight to the person's own homeserver, which only accepts them for guilds that homeserver actually hosts, and only
+  for a while after the person used a command or button there.
+- **Trust**: a bot's homeserver controls the bot, so treat a remote bot like any member from that homeserver. It can
+  only do what its role allows in your guild, it can't add other bots, and it can always be removed: whether an account
+  is a bot is fixed when your homeserver first sees it.
 - **Removing** a bot from a guild tells its homeserver, and a bot leaving tells the guild's homeserver.
 
 Both homeservers need a version of Anchor with bots. With an older one, adding a bot fails with a clear message.

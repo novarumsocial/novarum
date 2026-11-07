@@ -85,7 +85,8 @@ messages.
 
 ### Answers only one person sees
 
-Add `ephemeral: true` and only the person who used the command sees the answer. Ephemeral messages are never stored:
+Add `ephemeral: true` and only the person who used the command sees the answer. A public answer in an owner-only
+channel is refused unless the bot was added as an admin, so answer there ephemerally. Ephemeral messages are never stored:
 they disappear when the person reloads, and they can dismiss them.
 
 ```ts
