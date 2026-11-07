@@ -164,18 +164,27 @@ export async function hostAddBot(
       return fail(403, 'This bot is private');
     }
     botUser = local.user;
+    if (await isMember(guild.id, botUser.id)) return fail(409, 'This bot is already in the guild');
+    await addMember(guild.id, botUser.id, role);
   } else {
+    // The bot's homeserver starts following the guild as soon as it agrees, and we only let a
+    // homeserver follow guilds it has members in, so the membership comes first and goes again
+    // if the bot's homeserver refuses.
+    const placeholder = await remoteUserRow(bot);
+    if (await isMember(guild.id, placeholder.id)) {
+      return fail(409, 'This bot is already in the guild');
+    }
+    await addMember(guild.id, placeholder.id, role);
     const joined = await askBotToJoin(guild, bot, role, grant);
-    if (!joined.ok) return joined;
+    if (!joined.ok) {
+      await db
+        .delete(guildMembers)
+        .where(and(eq(guildMembers.guildId, guild.id), eq(guildMembers.userId, placeholder.id)));
+      return joined;
+    }
     botUser = joined.user;
   }
 
-  const existing = await db.query.guildMembers.findFirst({
-    where: { guildId: guild.id, userId: botUser.id },
-  });
-  if (existing) return fail(409, 'This bot is already in the guild');
-
-  await addMember(guild.id, botUser.id, role);
   if (server) {
     publishRealtime(server, `guildEvents:${guild.id}`, {
       type: 'member.joined',
@@ -199,6 +208,34 @@ export async function hostAddBot(
     }
   }
   return { ok: true };
+}
+
+const isMember = async (guildId: string, userId: string) =>
+  !!(await db.query.guildMembers.findFirst({ where: { guildId, userId } }));
+
+// our row for a remote bot, made bare when we've never seen it; its profile arrives with the join
+async function remoteUserRow(bot: BotRef) {
+  const homeserver = bot.homeserver.toLowerCase();
+  const existing = await db.query.users.findFirst({
+    where: { username: bot.username, homeserver },
+  });
+  if (existing) return existing;
+  const now = new Date();
+  const [created] = await db
+    .insert(users)
+    .values({
+      id: randomString(),
+      username: bot.username,
+      homeserver,
+      isBot: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return (
+    created ?? (await db.query.users.findFirst({ where: { username: bot.username, homeserver } }))!
+  );
 }
 
 async function addMember(guildId: string, userId: string, role: BotRole) {

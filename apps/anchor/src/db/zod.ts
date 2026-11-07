@@ -13,6 +13,7 @@ import {
   users,
 } from './schema';
 import { publicUserSchema } from '../../utils/publicUser';
+import { componentsSchema, embedsSchema, messageInteractionSchema } from '../../utils/botSchemas';
 
 const isoDateSchema = z.iso.datetime();
 
@@ -86,7 +87,14 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     replyTo: true,
     createdAt: true,
   })
-  .extend({ edited: z.boolean().default(false), editedTime: isoDateSchema.optional() });
+  .extend({
+    edited: z.boolean().default(false),
+    editedTime: isoDateSchema.optional(),
+    // older homeservers don't send these; a remote's broken embed is dropped instead of the message
+    embeds: embedsSchema.default([]).catch([]),
+    components: componentsSchema.default([]).catch([]),
+    interaction: messageInteractionSchema.nullish().catch(null),
+  });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {
   status: friendStatusSchema,

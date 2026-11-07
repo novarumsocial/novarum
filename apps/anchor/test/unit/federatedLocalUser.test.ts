@@ -25,7 +25,9 @@ beforeAll(async () => {
     query: {
       users: {
         findFirst: async ({ where }: any) =>
-          localUsers.find((u) => u.username === where.username && u.homeserver === where.homeserver),
+          localUsers.find(
+            (u) => u.username === where.username && u.homeserver === where.homeserver
+          ),
         findMany: async ({ where }: any) => localUsers.filter((u) => where.id.in.includes(u.id)),
       },
       guildMembers: {
@@ -65,7 +67,32 @@ const message = (user: ReturnType<typeof author>): RealtimeEvent =>
     },
   }) as never;
 
+const withInteraction = (user: ReturnType<typeof author>): RealtimeEvent => {
+  const event = message(author('somebot', 'evil.test')) as any;
+  return { ...event, data: { ...event.data, interaction: { id: 'i1', name: 'ping', user } } };
+};
+
 describe('vetBridgedEvent', () => {
+  test('"<someone> used /command" keeps a remote invoker and a local member, but not a local outsider', async () => {
+    const remote = (await vetBridgedEvent(
+      bridge,
+      withInteraction(author('mallory', 'evil.test'))
+    )) as any;
+    expect(remote.data.interaction.user.username).toBe('mallory');
+    const member = (await vetBridgedEvent(
+      bridge,
+      withInteraction(author('alice', 'localhost'))
+    )) as any;
+    expect(member.data.interaction.user.displayName).toBe('Alice');
+    // the message survives, the claim that bob used the command does not
+    const forged = (await vetBridgedEvent(
+      bridge,
+      withInteraction(author('bob', 'localhost'))
+    )) as any;
+    expect(forged.data.interaction).toBeNull();
+    expect(forged.data.content).toBe('hi');
+  });
+
   test("a remote author is the host's to describe", async () => {
     const event = message(author('mallory', 'evil.test'));
     expect(await vetBridgedEvent(bridge, event)).toEqual(event);
@@ -115,7 +142,7 @@ describe('vetBridgedEvent', () => {
     expect(await vetBridgedEvent(bridge, ring)).toBeNull();
   });
 
-  test("events naming one of our own user ids are forged and dropped", async () => {
+  test('events naming one of our own user ids are forged and dropped', async () => {
     const status = (userId: string) =>
       ({ type: 'user.status.changed', data: { userId, status: 'ONLINE' } }) as RealtimeEvent;
     expect(await vetBridgedEvent(bridge, status('local-alice'))).toBeNull();

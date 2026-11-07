@@ -83,6 +83,12 @@ const guildRoutes: Route[] = [
     expected: [401, 403, 403, 200],
   },
   {
+    key: 'GET /guilds/{id}/commands',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/commands`,
+    expected: [401, 404, 200, 200],
+  },
+  {
     key: 'DELETE /guilds/{id}/bots/{userId}',
     method: 'DELETE',
     path: (fx) => `/guilds/${fx.guild.id}/bots/${fx.removableBot.userId}`,
@@ -308,6 +314,7 @@ const botDifferences: Record<string, number> = {
   'POST /invite/accept': 401,
   'POST /guilds/{id}/bots': 401,
   'DELETE /guilds/{id}/bots/{userId}': 401,
+  'GET /guilds/{id}/commands': 401,
 };
 
 describe('guild routes as a MEMBER bot', () => {

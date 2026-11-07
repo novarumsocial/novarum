@@ -1,5 +1,6 @@
 import type { PublicUser } from './publicUser';
 import type { ActionRow, Embed, MessageInteraction } from './botSchemas';
+import type { EphemeralMessage, InteractionPayload } from '../modules/interactions/schemas';
 
 export type RealtimeEvent =
   | {
@@ -128,6 +129,16 @@ export type RealtimeEvent =
   | {
       type: 'friends.changed';
       data: Record<string, never>;
+    }
+  | {
+      // only to a bot: someone used one of its commands or buttons
+      type: 'interaction.created';
+      data: InteractionPayload;
+    }
+  | {
+      // only to the person who used the command: a bot's answer nobody else sees
+      type: 'message.ephemeral';
+      data: EphemeralMessage;
     }
   | {
       type: 'user.updated';

@@ -15,6 +15,7 @@ import { dm } from '../modules/dm/services';
 import { friends } from '../modules/friends/services.ts';
 import { notifications } from '../modules/notifications/services';
 import { botGuilds, botSelf, developers } from '../modules/bots/services';
+import { interactionResponses, interactions } from '../modules/interactions/services';
 import openapi from '@elysia/openapi';
 import { serverTiming } from '@elysia/server-timing';
 
@@ -68,4 +69,6 @@ export const createApp = () =>
     .use(developers)
     .use(botSelf)
     .use(botGuilds)
+    .use(interactions)
+    .use(interactionResponses)
     .get('/', () => 'this is anchor');
