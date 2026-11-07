@@ -6,6 +6,7 @@ import { useSession } from './session.svelte';
 import type { PublicUser } from 'anchor/public-user';
 import { dms, dmPath } from './dms.svelte';
 import { mentionsEveryone } from './utils';
+import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
 
 function initialsFor(name: string) {
   const initials = name
@@ -50,6 +51,11 @@ type AddMessageInput = {
     url: string;
     previewUrl: string;
   }[];
+  embeds?: Embed[];
+  components?: ActionRow[];
+  interaction?: MessageInteraction | null;
+  ephemeral?: boolean;
+  thinking?: boolean;
 };
 
 type ChannelMemberInput = PublicUser & {
@@ -110,6 +116,13 @@ function messageFromInput(message: AddMessageInput): Message {
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
     pingedHandles: message.pingedHandles ?? [],
+    embeds: message.embeds ?? [],
+    components: message.components ?? [],
+    interaction: message.interaction
+      ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
+      : null,
+    ephemeral: message.ephemeral,
+    thinking: message.thinking,
   };
 }
 
@@ -176,6 +189,7 @@ function currentRoute(): ChatRoute {
   const [first, second, third] = (page.params.path ?? '').split('/').filter(Boolean);
 
   if (!first) return { kind: 'home' };
+  if (first === 'developers') return { kind: 'developers', botId: second ?? null };
   if (first === 'dms') return { kind: 'dms', channelId: second ?? null, messageId: third ?? null };
 
   return {
@@ -206,7 +220,9 @@ class ChatState {
   activeChannel = $derived(
     this.route.kind === 'guild' || this.route.kind === 'dms' ? this.route.channelId : null
   );
-  activeMessage = $derived(this.route.kind === 'home' ? null : this.route.messageId);
+  activeMessage = $derived(
+    this.route.kind === 'home' || this.route.kind === 'developers' ? null : this.route.messageId
+  );
 
   editingMessage = $state<boolean>(false);
   editingMessageId = $state<string | null>(null);
@@ -401,10 +417,16 @@ class ChatState {
   }
 
   addMessage(message: AddMessageInput) {
-    const channelMessages = this.messagesByChannel[message.channelId] ?? [];
+    // a bot's answer takes the place of its "thinking…"
+    const thinkingId = message.interaction && `thinking:${message.interaction.id}`;
+    const channelMessages = (this.messagesByChannel[message.channelId] ?? []).filter(
+      (item) => item.id !== thinkingId
+    );
     if (channelMessages.some((item) => item.id === message.id)) return;
 
     this.setChannelMessages(message.channelId, [...channelMessages, messageFromInput(message)]);
+    // these only live on this screen, the server has never heard of their ids
+    if (message.ephemeral || message.thinking) return;
 
     if (this.activeChannel !== message.channelId) {
       const handle = useSession().user?.handle.toLowerCase();
@@ -418,6 +440,20 @@ class ChatState {
     } else {
       void this.markRead(message.channelId, message.id, message.createdAt);
     }
+  }
+
+  /** a bot's answer only this person sees; the same id again replaces it (an edit) */
+  addEphemeral(message: AddMessageInput) {
+    const messages = this.messagesByChannel[message.channelId] ?? [];
+    if (!messages.some((item) => item.id === message.id)) return this.addMessage(message);
+    this.setChannelMessages(
+      message.channelId,
+      messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+    );
+  }
+
+  removeMember(userId: string) {
+    this.members = this.members.filter((member) => member.userId !== userId);
   }
 
   removeMessage(channelId: string, messageId: string) {

@@ -499,6 +499,8 @@
                   {@const grouped =
                     !firstUnread &&
                     prev !== undefined &&
+                    !msg.interaction &&
+                    !msg.ephemeral &&
                     prev.author.username === msg.author.username &&
                     prev.author.server === msg.author.server &&
                     msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}

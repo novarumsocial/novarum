@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BotBadge from './bot-badge.svelte';
   import type { Snippet } from 'svelte';
   import type { Author } from '$lib/types/chat';
   import * as Popover from '$lib/components/ui/popover/index.js';
@@ -205,11 +206,7 @@
 
     <div class="mt-2 flex items-center gap-2">
       <Popover.Title class="truncate text-base font-semibold">{name}</Popover.Title>
-      {#if user.isBot}
-        <span class="bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-primary">
-          BOT
-        </span>
-      {/if}
+      {#if user.isBot}<BotBadge />{/if}
     </div>
     <Popover.Description class="flex items-center gap-1 truncate font-mono text-[11px]">
       <span class="truncate">@{user.username}:{user.server}</span>

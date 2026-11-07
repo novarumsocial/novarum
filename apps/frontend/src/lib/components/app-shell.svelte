@@ -20,6 +20,7 @@
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
+  import DevelopersHome from './developers-home.svelte';
   import DmSidebar from './dm-sidebar.svelte';
   import CallRinging from './call-ringing.svelte';
   import { X } from '@lucide/svelte';
@@ -290,7 +291,7 @@
             voiceStates={chat.voiceStates}
           />
         {/if}
-        {#if chat.route.kind === 'home' || chat.route.kind === 'dms'}
+        {#if chat.route.kind === 'home' || chat.route.kind === 'dms' || chat.route.kind === 'developers'}
           <DmSidebar onCall={startCall} />
         {/if}
       </div>
@@ -299,6 +300,8 @@
 
     {#if chat.route.kind === 'home'}
       <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
+    {:else if chat.route.kind === 'developers'}
+      <DevelopersHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
     {:else if currentChannel && (currentChannel.type === 'TEXT' || currentChannel.type === 'DM')}
       <ChatArea
         channel={currentChannel}
