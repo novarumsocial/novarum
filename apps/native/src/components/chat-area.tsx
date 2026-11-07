@@ -296,6 +296,8 @@ export function ChatArea({
       const grouped =
         !firstUnread &&
         prev !== undefined &&
+        !message.interaction &&
+        !message.ephemeral &&
         prev.author.username === message.author.username &&
         prev.author.server === message.author.server &&
         message.timestamp.getTime() - prev.timestamp.getTime() < GROUP_WINDOW;

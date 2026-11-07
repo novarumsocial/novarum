@@ -8,6 +8,8 @@ import { Image } from 'expo-image';
 import {
   Copy,
   Download,
+  EyeOff,
+  SquareSlash,
   FileText,
   IdCardLanyard,
   Link,
@@ -26,6 +28,9 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { Avatar } from '@/components/avatar';
 import { AudioPlayer } from '@/components/audio-player';
+import { BotBadge } from '@/components/bot-badge';
+import { MessageComponents } from '@/components/message-components';
+import { MessageEmbed } from '@/components/message-embed';
 import { openAttachmentViewer } from '@/components/attachment-viewer';
 import { handlePattern } from '@/components/emoji-text';
 import { Markdown } from '@/components/markdown';
@@ -33,11 +38,12 @@ import { ProfileCard } from '@/components/profile-card';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Textarea } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { VideoPlayer } from '@/components/video-player';
-import { chat, maxMessageLength, useChat } from '@/lib/chat-state';
+import { chat, maxMessageLength, selectActiveChannel, useChat } from '@/lib/chat-state';
 import { formatDate, formatTime } from '@/lib/format-date';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
@@ -234,6 +240,7 @@ function MessageMenu({
     onClose();
     action();
   };
+  const localOnly = !!message.ephemeral || !!message.thinking;
 
   return (
     <Sheet open={open} onClose={onClose}>
@@ -244,7 +251,8 @@ function MessageMenu({
         </Text>
         {` · ${formatDate(message.timestamp)} at ${formatTime(message.timestamp)}`}
       </Text>
-      <SheetItem icon={Reply} label="Reply" onPress={then(onReply)} />
+      {/* ephemeral answers and "thinking…" only exist on this screen: nothing to reply to, link or delete */}
+      {!localOnly && <SheetItem icon={Reply} label="Reply" onPress={then(onReply)} />}
       {own && (
         <SheetItem
           icon={Pencil}
@@ -259,18 +267,22 @@ function MessageMenu({
         label="Copy Text"
         onPress={then(() => void Clipboard.setStringAsync(message.content ?? ''))}
       />
-      <SheetItem
-        icon={Link}
-        label="Copy Message Link"
-        onPress={then(
-          () => void Clipboard.setStringAsync(`${webOrigin}${chat().messagePath(message.id)}`)
-        )}
-      />
-      <SheetItem
-        icon={IdCardLanyard}
-        label="Copy Message ID"
-        onPress={then(() => void Clipboard.setStringAsync(message.id))}
-      />
+      {!localOnly && (
+        <SheetItem
+          icon={Link}
+          label="Copy Message Link"
+          onPress={then(
+            () => void Clipboard.setStringAsync(`${webOrigin}${chat().messagePath(message.id)}`)
+          )}
+        />
+      )}
+      {!localOnly && (
+        <SheetItem
+          icon={IdCardLanyard}
+          label="Copy Message ID"
+          onPress={then(() => void Clipboard.setStringAsync(message.id))}
+        />
+      )}
       {own && <SheetItem icon={Trash2} label="Delete" destructive onPress={then(onDelete)} />}
     </Sheet>
   );
@@ -308,6 +320,8 @@ export const Message = memo(function Message({
     !!author && `@${author.username}:${author.server}`.toLowerCase() === selfHandle;
   const own = isMe(message.author);
   const authorName = message.author.displayName || message.author.username;
+  const localOnly = !!message.ephemeral || !!message.thinking;
+  const channelId = useChat((s) => selectActiveChannel(s)) ?? '';
 
   const inGuild = useChat((s) => s.route.kind === 'guild');
   const selfMentioned = useMemo(() => {
@@ -359,8 +373,8 @@ export const Message = memo(function Message({
 
   // swipe left a bit to reply, or further on your own message to edit it. Right swipes are left alone so the
   // stack's swipe back keeps working.
-  const latest = useRef({ message, onReply, own });
-  latest.current = { message, onReply, own };
+  const latest = useRef({ message, onReply, own, localOnly });
+  latest.current = { message, onReply, own, localOnly };
   const reply = () => latest.current.onReply(latest.current.message);
   const translateX = useRef(new Animated.Value(0)).current;
   // the reply icon behind the row is an SVG, only worth mounting while a swipe is happening
@@ -375,7 +389,7 @@ export const Message = memo(function Message({
       );
     return PanResponder.create({
       onMoveShouldSetPanResponder: (_event, { dx, dy }) =>
-        dx < -10 && Math.abs(dx) > Math.abs(dy) * 2,
+        !latest.current.localOnly && dx < -10 && Math.abs(dx) > Math.abs(dy) * 2,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         stage = 0;
@@ -450,13 +464,30 @@ export const Message = memo(function Message({
               <Avatar
                 src={message.author.avatarUrl}
                 name={authorName}
-                className="mt-0.5 size-9"
+                className={cn(message.interaction ? 'mt-5' : 'mt-0.5', 'size-9')}
                 bgColor={message.author.avatarColor}
               />
             </ProfileCard>
           )}
 
           <View className="min-w-0 flex-1">
+            {message.interaction && (
+              <View className="mb-0.5 flex-row items-center gap-1">
+                <Icon as={SquareSlash} size={12} className="text-primary/70" />
+                <Text
+                  className="shrink text-[11px] leading-4 text-muted-foreground"
+                  numberOfLines={1}
+                >
+                  <Text className="text-[11px] font-medium text-foreground/75">
+                    {message.interaction.user.displayName || message.interaction.user.username}
+                  </Text>
+                  {' used '}
+                  <Text className="text-[11px] font-medium text-foreground/75">
+                    /{message.interaction.name}
+                  </Text>
+                </Text>
+              </View>
+            )}
             {!grouped && (
               <View className="flex-row items-baseline gap-2">
                 <ProfileCard user={message.author} className="shrink">
@@ -464,6 +495,7 @@ export const Message = memo(function Message({
                     {authorName}
                   </Text>
                 </ProfileCard>
+                {message.author.isBot && <BotBadge className="self-center" />}
                 <Text className="text-[11px] text-muted-foreground">
                   {formatTime(message.timestamp)}
                 </Text>
@@ -509,7 +541,7 @@ export const Message = memo(function Message({
 
             {editing ? (
               <EditBox message={message} onEdit={onEdit} />
-            ) : message.content?.trim() || message.edited ? (
+            ) : message.content?.trim() || (message.edited && !message.embeds.length) ? (
               <Markdown
                 content={message.content?.trim() ? message.content : ''}
                 links
@@ -527,6 +559,36 @@ export const Message = memo(function Message({
                 )}
               </Markdown>
             ) : null}
+
+            {message.thinking && (
+              <View className="flex-row items-center gap-1.5" accessibilityLiveRegion="polite">
+                <Spinner />
+                <Text className="text-sm text-muted-foreground">{authorName} is thinking…</Text>
+              </View>
+            )}
+            {message.embeds.map((embed, index) => (
+              <MessageEmbed key={index} embed={embed} />
+            ))}
+            {message.components.length > 0 && (
+              <MessageComponents
+                rows={message.components}
+                channelId={channelId}
+                messageId={message.id}
+              />
+            )}
+            {message.ephemeral && !message.thinking && (
+              <View className="mt-1 flex-row items-center gap-1.5">
+                <Icon as={EyeOff} size={12} className="text-muted-foreground" />
+                <Text className="text-[11px] text-muted-foreground">Only you can see this</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => chat().removeMessage(channelId, message.id)}
+                >
+                  <Text className="text-[11px] text-link">Dismiss</Text>
+                </Pressable>
+              </View>
+            )}
 
             {videos.map((attachment) => (
               // the same width as a single image, so a video doesn't take over the screen

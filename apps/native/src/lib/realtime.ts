@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { publicUserSchema } from 'anchor/public-user';
+import { componentsSchema, embedsSchema, messageInteractionSchema } from 'anchor/bot-schemas';
 import type { RealtimeEvent } from 'anchor';
 import { anchor } from './anchor';
 import { chat, selectActiveChannel } from './chat-state';
@@ -85,12 +86,34 @@ const messageEventDataSchema = z.object({
   content: z.string().nullable(),
   nonce: z.string(),
   replyTo: z.string().nullable().default(null),
-  editedTime: z.string().optional(),
+  editedTime: isoDateSchema.optional(),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentSchema),
   createdAt: isoDateSchema,
   author: publicUserSchema,
+  // eden revives an embed's ISO timestamp into a Date too; the shared schema wants the string back
+  embeds: z.preprocess(
+    (embeds) =>
+      Array.isArray(embeds)
+        ? embeds.map((embed) =>
+            embed?.timestamp instanceof Date
+              ? { ...embed, timestamp: embed.timestamp.toISOString() }
+              : embed
+          )
+        : embeds,
+    embedsSchema.default([])
+  ),
+  components: componentsSchema.default([]),
+  interaction: messageInteractionSchema.nullish(),
 });
+
+const ephemeralMessageSchema = messageEventDataSchema
+  .omit({ nonce: true, replyTo: true, attachments: true, pingedHandles: true })
+  .extend({
+    guildId: z.string(),
+    interaction: messageInteractionSchema.nullable(),
+    ephemeral: z.literal(true),
+  });
 
 const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
@@ -127,6 +150,14 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       channelId: z.string(),
       guildId: z.string().nullable(),
     }),
+  }),
+  z.object({
+    type: z.literal('message.ephemeral'),
+    data: ephemeralMessageSchema,
+  }),
+  z.object({
+    type: z.literal('member.left'),
+    data: z.object({ guildId: z.string(), userId: z.string() }),
   }),
   z.object({
     type: z.literal('dm.created'),
@@ -419,6 +450,12 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     }
     if (event.type === 'member.joined') {
       chat().addOrUpdateMember(event.data.guildId, event.data.user);
+    }
+    if (event.type === 'member.left') {
+      chat().removeMember(event.data.userId);
+    }
+    if (event.type === 'message.ephemeral') {
+      chat().addEphemeral({ ...event.data, attachments: [], pingedHandles: [], replyTo: null });
     }
     if (event.type === 'voice.states.snapshot') {
       chat().setVoiceStates(event.data.guildIds, event.data.states, event.data.dmIds);
