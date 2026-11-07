@@ -1,0 +1,105 @@
+---
+title: 'Your first bot'
+description: 'Make a Novarum bot, give it a token and run it with @novarum/sdk.'
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A bot is an account your code controls. It lives on a homeserver like any person does, it can be added to guilds
+(on its own homeserver or on others), and from there it can:
+
+- read and send messages in every channel of the guild,
+- register **slash commands** people can use,
+- answer with **embeds** and **buttons**, including messages only one person can see.
+
+If you have written a Discord bot before, most of this will feel familiar.
+
+## Make the bot
+
+<Steps>
+
+1. Open Novarum and pick **Developers** under Friends.
+2. Press **New bot**, choose a username and a display name. The username becomes the bot's handle, like
+   `@weatherbot:novarum.me`.
+3. Copy the token from the **Token** tab. It is only shown once. If you lose it, press **Reset token** to make a new
+   one (the old one stops working straight away).
+
+</Steps>
+
+<Aside type="caution">
+  Anyone with the token controls the bot. Keep it in an environment variable or a `.env` file, never
+  in your code or in git.
+</Aside>
+
+## Run it
+
+The SDK works with [Bun](https://bun.sh) and Node.js 20+.
+
+```sh
+bun add @novarum/sdk
+```
+
+Put the token in a `.env` file next to your code (Bun loads it for you):
+
+```sh
+BOT_TOKEN=your-token-here
+```
+
+Then write `bot.ts`, using the homeserver your bot lives on as `baseUrl`:
+
+```ts
+import { Client } from '@novarum/sdk';
+
+const client = new Client({
+  token: process.env.BOT_TOKEN!,
+  baseUrl: 'https://anchor.novarum.me',
+});
+
+client.on('ready', () => console.log(`Logged in as ${client.user!.tag}`));
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (message.content === '!ping') await message.reply('Pong!');
+});
+
+await client.login();
+```
+
+```sh
+bun bot.ts
+```
+
+<Aside>
+  `baseUrl` is the address of the bot's Anchor, which is not always the same as its homeserver name.
+  For example, the `novarum.me` homeserver runs at `https://anchor.novarum.me`. The developer panel
+  shows the right value in its quickstart.
+</Aside>
+
+## Add it to a guild
+
+Open your bot in the developer panel and go to **Add to a guild**. You get a link like:
+
+```
+https://app.novarum.me/authorize?bot=@weatherbot:novarum.me
+```
+
+Whoever opens it picks one of their guilds and adds the bot. Guild owners can also add a bot by its handle from
+**Server settings → Bots**.
+
+The bot can join as a **Member**, which can read and send messages like anyone else, or as an **Admin**, which can
+also manage channels and post in owner-only channels. Only the guild owner can add an admin bot.
+
+### Public and private bots
+
+Bots are public by default: anyone who manages a guild can add them. Turn off **Public bot** in the **General** tab
+and only you can add it. That works for guilds on other homeservers too: start from your own homeserver and it vouches
+for you.
+
+## What's next
+
+- [Slash commands](/bots/slash-commands/): commands with options, autocomplete and private answers.
+- [Embeds and buttons](/bots/embeds-and-buttons/): rich messages people can click.
+- [SDK reference](/bots/sdk/): every event, class and builder.
+- [HTTP API](/bots/http-api/): talk to Anchor without the SDK, from any language.
+
+There is also a complete example in the Novarum repository, in the `bot-demo` folder.

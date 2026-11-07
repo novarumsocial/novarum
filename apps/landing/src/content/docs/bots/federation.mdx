@@ -1,0 +1,34 @@
+---
+title: 'Bots across homeservers'
+description: 'How bots work in guilds on other homeservers, and what homeserver admins can configure.'
+---
+
+Bots federate like people do. A bot on `alpha.example` can be added to a guild hosted on `beta.example`, and people from
+`gamma.example` in that guild can use its commands and buttons. Your code doesn't change: it only ever talks to the
+bot's own homeserver.
+
+## How it works
+
+- **Adding** a bot asks the guild's homeserver, which checks that you may add bots there (owner or admin), then asks the
+  bot's homeserver whether the bot agrees. Public bots always agree. A private bot only joins when its owner asked for
+  it, starting from the bot's own homeserver, which gives the guild's homeserver a one-time permission for that one
+  guild.
+- **Events** of the guild reach the bot's homeserver like they reach any member's, and from there the bot's socket.
+- **Interactions** are checked by the guild's homeserver, which knows the guild, its members, its messages and the
+  bot's commands. It sends them to the bot's homeserver, and the bot's answers go back the same way. Private answers go
+  straight to the person's own homeserver, which only accepts them for guilds that homeserver actually hosts.
+- **Removing** a bot from a guild tells its homeserver, and a bot leaving tells the guild's homeserver.
+
+Both homeservers need a version of Anchor with bots. With an older one, adding a bot fails with a clear message.
+
+## For homeserver admins
+
+Bots need no setup. To limit them, add this to `config.toml`:
+
+```toml
+[bots]
+# whether people on this homeserver can make bots (existing bots keep working)
+enabled = true
+# how many bots each person can make
+max_per_user = 25
+```

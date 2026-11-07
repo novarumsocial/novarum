@@ -1,0 +1,128 @@
+---
+title: 'Slash commands'
+description: 'Register commands with options and autocomplete, and answer them, publicly or privately.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When someone types `/` in a guild, Novarum lists the commands of every bot in it. Picking one shows a small form for
+its options, and the bot gets an `interactionCreate` event with what they filled in.
+
+## Registering commands
+
+Commands are global: you register them once and they work in every guild the bot is in. `commands.set` replaces the
+whole list, so it is safe to call every time the bot starts.
+
+```ts
+import { Client, SlashCommandBuilder } from '@novarum/sdk';
+
+client.on('ready', async () => {
+  await client.commands.set([
+    new SlashCommandBuilder().setName('ping').setDescription('Checks that the bot is alive'),
+    new SlashCommandBuilder()
+      .setName('roll')
+      .setDescription('Rolls a die')
+      .addIntegerOption((o) =>
+        o.setName('sides').setDescription('Sides').setMinValue(2).setMaxValue(100)
+      ),
+  ]);
+});
+```
+
+A bot can have up to 100 commands. Names are 1–32 lowercase letters, digits, `-` or `_`; descriptions are up to 100
+characters.
+
+### Options
+
+| Builder method     | Type      | Extras                                                          |
+| ------------------ | --------- | --------------------------------------------------------------- |
+| `addStringOption`  | `string`  | `addChoices`, `setAutocomplete`, `setMinLength`, `setMaxLength` |
+| `addIntegerOption` | `integer` | `addChoices`, `setAutocomplete`, `setMinValue`, `setMaxValue`   |
+| `addNumberOption`  | `number`  | same as integers                                                |
+| `addBooleanOption` | `boolean` |                                                                 |
+| `addUserOption`    | `user`    | the person picks a member of the guild                          |
+
+Every option has `setName`, `setDescription` and `setRequired`. Up to 25 options per command; required ones come first.
+
+The homeserver checks every value against your definition before your bot hears about it, so you never get a missing
+required option, a number out of range or a choice that isn't in the list.
+
+A command with no options runs as soon as it is picked.
+
+## Answering
+
+```ts
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isCommand()) return;
+
+  if (interaction.commandName === 'roll') {
+    const sides = interaction.options.getInteger('sides') ?? 6;
+    await interaction.reply(`🎲 ${1 + Math.floor(Math.random() * sides)}`);
+  }
+});
+```
+
+Read options with `getString`, `getInteger`, `getNumber`, `getBoolean` and `getUser`. Pass `true` as the second
+argument to throw when an option is missing instead of getting `null`.
+
+The answer shows "_someone_ used /roll" above it, so everyone knows where it came from.
+
+<Aside type="caution">
+  You have **3 seconds** to answer (5 when your bot and the guild are on different homeservers).
+  After that the person sees "The bot didn't respond in time". If you need longer, defer.
+</Aside>
+
+### Deferring
+
+```ts
+await interaction.deferReply(); // shows "<bot> is thinking…"
+const forecast = await fetchForecast();
+await interaction.editReply({ embeds: [forecastEmbed(forecast)] });
+```
+
+After acknowledging (with `reply` or `deferReply`) you have 15 minutes to `editReply` and send up to 10 `followUp`
+messages.
+
+### Answers only one person sees
+
+Add `ephemeral: true` and only the person who used the command sees the answer. Ephemeral messages are never stored:
+they disappear when the person reloads, and they can dismiss them.
+
+```ts
+await interaction.reply({ content: 'Only you can see this', ephemeral: true });
+await interaction.deferReply({ ephemeral: true }); // the edit will be private too
+```
+
+## Autocomplete
+
+Mark a string or number option with `setAutocomplete()` and your bot is asked for suggestions while the person types:
+
+```ts
+new SlashCommandBuilder()
+  .setName('weather')
+  .setDescription('Shows the weather')
+  .addStringOption((o) => o.setName('city').setDescription('City').setRequired().setAutocomplete());
+
+client.on('interactionCreate', async (interaction) => {
+  if (interaction.isAutocomplete() && interaction.commandName === 'weather') {
+    const typed = interaction.options.getFocused().value.toLowerCase();
+    await interaction.respond(
+      cities.filter((c) => c.toLowerCase().includes(typed)).map((c) => ({ name: c, value: c }))
+    );
+  }
+});
+```
+
+Send at most 25 suggestions. An option can't have both choices and autocomplete.
+
+## User options
+
+A `user` option gives you the member they picked:
+
+```ts
+const member = interaction.options.getUser('member', true);
+await interaction.reply(`Hi ${member.tag}!`); // @name:homeserver mentions them
+```
+
+Users are identified by their handle (`@name:homeserver`) everywhere, including across homeservers. `user.id` is the
+id the guild's homeserver uses; prefer the handle when you store people.
