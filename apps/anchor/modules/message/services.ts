@@ -17,6 +17,9 @@ import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 
 export const maxMessageLength = 4000;
+// a remote channel is walked page by page on every list, so a host that never stops paging is cut off here
+const maxRemoteMessagePages = 100;
+const remotePageSize = 100;
 
 const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
@@ -25,7 +28,8 @@ const messageSchema = messageResponseBaseSchema.extend({
   author: publicUserSchema,
 });
 const messageListResponseSchema = z.object({ messages: z.array(messageSchema) });
-const federatedMessageListResponseSchema = messageListResponseSchema.extend({
+const federatedMessageListResponseSchema = z.object({
+  messages: z.array(messageSchema).max(remotePageSize),
   nextCursor: z.string().nullable(),
 });
 const messageResponseSchema = z.object({ message: messageSchema });
@@ -64,6 +68,9 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
 
         // the remote sends the channel one page at a time
         do {
+          if (seenCursors.size >= maxRemoteMessagePages) {
+            return status(502, { error: 'Remote channel history is too long' });
+          }
           const page = await fetchRemoteMessagePage(federatedChannel, session, cursor);
           if (!page.ok) return status(page.status, page.error);
 
@@ -491,7 +498,7 @@ function fetchRemoteMessagePage(
     channel.homeserver,
     federationChannelPath(channel, 'messages'),
     session,
-    { limit: 100, ...(cursor ? { cursor } : {}) },
+    { limit: remotePageSize, ...(cursor ? { cursor } : {}) },
     {
       response: federatedMessageListResponseSchema,
       forward: passThrough(401, 403, 404),
