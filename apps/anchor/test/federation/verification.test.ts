@@ -163,6 +163,11 @@ describe('signed request checks', () => {
       const res = await ping(1, { host: '172.30.0.12' });
       expect([res.status, res.json?.error]).toEqual([401, 'Invalid signature']);
     });
+    test('a request signed for another homeserver, replayed with its Host header', async () => {
+      const s = await signed(1, 'a', pingPath, pingBody(hsOf(1)), { host: '172.30.0.12' });
+      const res = await sendSigned(s, undefined, { host: '172.30.0.12' });
+      expect([res.status, res.json?.error]).toEqual([401, 'Invalid signature']);
+    });
     test('different homeserver (header says .67, signed as .66 with .67 advertising .66 key)', async () => {
       await restartAnchor('a');
       const k = await fake.info(1);
