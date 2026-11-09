@@ -57,7 +57,7 @@ export function MessageComponents({
                 size="sm"
                 variant={look.variant}
                 className={'className' in look ? look.className : undefined}
-                disabled={button.disabled || !!pressing}
+                disabled={button.disabled || !!pressing?.startsWith(`${messageId}:`)}
                 accessibilityState={{ busy }}
                 onPress={async () =>
                   setError(await interactions().pressButton(channelId, messageId, button.customId))

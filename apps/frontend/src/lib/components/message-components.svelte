@@ -46,7 +46,7 @@
             variant={look.variant}
             size="sm"
             class={cn(look.class)}
-            disabled={button.disabled || !!interactions.pressing}
+            disabled={button.disabled || !!interactions.pressing?.startsWith(`${messageId}:`)}
             aria-busy={busy}
             onclick={() => press(button.customId)}
           >
