@@ -1,0 +1,56 @@
+name: Release SDK development build
+
+on:
+  workflow_dispatch:
+  # called by release-please.yml to publish a development build for each release
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish @novarum/sdk to npm
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check, test and build
+        run: |
+          bun run check
+          bun run test
+          bun run build
+        working-directory: apps/sdk
+
+      # e.g. 1.2.0-dev.57: every run gets a higher number, and the dev tag keeps `latest` untouched
+      - name: Set development version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          base="${RELEASE_VERSION:-$(jq -r .version package.json)}"
+          npm version "${base%%-*}-dev.${{ github.run_number }}" --no-git-tag-version
+        working-directory: apps/sdk
+
+      - name: Publish to npm
+        run: npm publish --access public --tag dev --provenance
+        working-directory: apps/sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
