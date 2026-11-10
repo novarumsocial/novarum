@@ -66,7 +66,9 @@ export async function verifyFederationRequest(
     'v1',
     request.method.toUpperCase(),
     signedPath ?? `${url.pathname}${url.search}`,
-    url.host,
+    // our own host, never the Host header: otherwise a request signed for another homeserver
+    // could be replayed here by sending it with that homeserver's Host
+    new URL(getConfig().server.base_url).host,
     homeserver,
     date,
     nonce,
