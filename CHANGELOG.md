@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.0](https://github.com/novarumsocial/novarum/compare/v0.2.1...v0.3.0) (2026-11-10)
+
+
+### Features
+
+* **anchor:** bot accounts, tokens and guild membership ([2a239d8](https://github.com/novarumsocial/novarum/commit/2a239d8814474a80b742d33e73d63cb1db5f3856))
+* **anchor:** embeds, buttons, slash commands and interactions ([e10da76](https://github.com/novarumsocial/novarum/commit/e10da764916da682a5057b9a7fe32e14e6fa2793))
+* **auth:** login, register and reset-password prefill the last homeserver you used instead of novarum.me ([62791f6](https://github.com/novarumsocial/novarum/commit/62791f68ae65dd6c1eff298bfd52acd946a196ce))
+* bot api ([ea7c85e](https://github.com/novarumsocial/novarum/commit/ea7c85e5acd42ae8e7bb92b44bcc81d75c1fe49c))
+* bot api ([#42](https://github.com/novarumsocial/novarum/issues/42)) ([ea7c85e](https://github.com/novarumsocial/novarum/commit/ea7c85e5acd42ae8e7bb92b44bcc81d75c1fe49c))
+* **bot-demo:** demo bot built with @novarum/sdk ([6bda6f0](https://github.com/novarumsocial/novarum/commit/6bda6f0f035284cd16a1994ef4c1c6c995e348af))
+* channel canvas ([#38](https://github.com/novarumsocial/novarum/issues/38)) ([f434ea9](https://github.com/novarumsocial/novarum/commit/f434ea98275936dd7d8bc23b9240f0289263cc0a))
+* deepfilternet automatic voice cancellation ([89e2977](https://github.com/novarumsocial/novarum/commit/89e29778f0c8211b6f9ed2373ee09acfdedfa20f))
+* **frontend:** developer panel, bot authorize page, slash commands, embeds and buttons ([96c088b](https://github.com/novarumsocial/novarum/commit/96c088bf93bbdf82ef54840751189e32756d2069))
+* **frontend:** member list toggle is always visible; on wide screens it shows/hides the list, on narrow screens it opens the drawer (native tablets too) ([72c5fef](https://github.com/novarumsocial/novarum/commit/72c5fef0afc44e76051a6eedd0b4cae4b2e9a30f))
+* **frontend:** redesign the developers page ([485ab95](https://github.com/novarumsocial/novarum/commit/485ab95d3b9d1de4348ccad04cb5b4e0eb76bc60))
+* **frontend:** show unread dm on sidebar ([2cc01f3](https://github.com/novarumsocial/novarum/commit/2cc01f39634e8d72154cb27f4530e7802cbaf612))
+* **mobile:** devices tab and unifiedpush settings ([b6268e7](https://github.com/novarumsocial/novarum/commit/b6268e73a8c1e0b90c612b5451be924137e2aaa9))
+* **native:** bot messages, embeds, buttons, slash commands and guild bots ([53a5c3a](https://github.com/novarumsocial/novarum/commit/53a5c3a37f8e033894285326ad5d93416ad2ae68))
+* **sdk:** @novarum/sdk ([c203aa6](https://github.com/novarumsocial/novarum/commit/c203aa6998f7a0e49d7387fbda659aac409c1a0b))
+* **ui:** pinch to zoom in vc + message input redesign ([88e20cc](https://github.com/novarumsocial/novarum/commit/88e20ccc105b099dfdbb2bdc85a2574790fce1a7))
+* **ui:** show more voice information on channel sidebar ([5470ba3](https://github.com/novarumsocial/novarum/commit/5470ba3b656a02c69a597937729abddc02c9f1de))
+* **voice:** save per-user volume, mute and stream volume across reloads ([8438afd](https://github.com/novarumsocial/novarum/commit/8438afd0b7f40e9c9222ec4187c6626a2dd875e4))
+* **voice:** save your own mute/deafen state and apply it when joining a call ([a415be9](https://github.com/novarumsocial/novarum/commit/a415be95f20220e50fed445e00d110e01fd68f77))
+
+
+### Bug Fixes
+
+* all buttons of same command have same loading state ([f4fafe6](https://github.com/novarumsocial/novarum/commit/f4fafe642ac755002f9a717081c2c7f436a185ed))
+* **anchor:** bind federation signatures to our own host ([a7135c2](https://github.com/novarumsocial/novarum/commit/a7135c2229253ad87688866cfa62891ab79d51d6))
+* **anchor:** cap remote message history paging ([33fac64](https://github.com/novarumsocial/novarum/commit/33fac648cee51e8066fbf71e59f616c96b0be84d))
+* **anchor:** harden federated bots against identity flips, owner-only bypass and floods ([a5be7b3](https://github.com/novarumsocial/novarum/commit/a5be7b3453dd0960ccb503a0416d22bd7e79a5d6))
+* **frontend:** loading cursor no longer stays stuck when saving the server order fails ([3e238d4](https://github.com/novarumsocial/novarum/commit/3e238d473bf6bd8276a51139f0a412b0e23f4e52))
+* **frontend:** mobile member drawer no longer opens empty when the member list is turned off in settings ([97cfd83](https://github.com/novarumsocial/novarum/commit/97cfd837657db77619f0581945019e4d4b80a590))
+* **frontend:** voice "connected" button now goes to the server or DM the call is in, not the one you're viewing ([8ec3379](https://github.com/novarumsocial/novarum/commit/8ec3379facd632259391f843b8f12198732a6608))
+* **sdk:** replace anchor.novarum.me with a.novarum.me ([761020c](https://github.com/novarumsocial/novarum/commit/761020c34f301ad2bd39e4ec7c8d6155a587e16d))
+* **ui:** dodgy chat area scrolling ([cd543c3](https://github.com/novarumsocial/novarum/commit/cd543c335058224f6023d9fd0a1fb865e6ad8da9))
+
 ## [0.2.1](https://github.com/novarumsocial/novarum/compare/v0.2.0...v0.2.1) (2026-11-04)
 
 
