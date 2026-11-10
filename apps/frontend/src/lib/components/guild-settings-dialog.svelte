@@ -4,7 +4,10 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
-  import { Users, Palette, Cog, Tags, Trash2, Camera } from '@lucide/svelte';
+  import { Users, Palette, Cog, Tags, Trash2, Camera, Bot } from '@lucide/svelte';
+  import * as Select from '$lib/components/ui/select/index.js';
+  import BotBadge from './bot-badge.svelte';
+  import { addBotToGuild, parseBotHandle, removeBotFromGuild } from '$lib/bots.svelte';
   import { anchor } from '$lib/anchor.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import type { Server } from '$lib/types/chat';
@@ -27,6 +30,33 @@
       .map((part) => part[0]?.toUpperCase())
       .join('')
       .slice(0, 2);
+  }
+
+  let botHandle = $state('');
+  let botRole = $state<'MEMBER' | 'ADMIN'>('MEMBER');
+  let botBusy = $state(false);
+  let botMessage = $state<{ ok: boolean; text: string } | null>(null);
+  const bots = $derived(chat.members.filter((member) => member.isBot));
+
+  async function addBot(event: SubmitEvent) {
+    event.preventDefault();
+    const ref = parseBotHandle(botHandle);
+    if (!ref)
+      return void (botMessage = { ok: false, text: 'Use a full handle, like @name:server.' });
+    botBusy = true;
+    const error = await addBotToGuild(server.id, ref, botRole);
+    botBusy = false;
+    botMessage = error
+      ? { ok: false, text: error }
+      : { ok: true, text: `Added @${ref.username}:${ref.homeserver}.` };
+    if (!error) botHandle = '';
+  }
+
+  async function removeBot(userId: string) {
+    botBusy = true;
+    const error = await removeBotFromGuild(server.id, userId);
+    botBusy = false;
+    botMessage = error ? { ok: false, text: error } : null;
   }
 
   let fileInput: HTMLInputElement;
@@ -112,6 +142,14 @@
           >
             <Users class="size-3.5" />
             Members
+          </Tabs.Trigger>
+
+          <Tabs.Trigger
+            value="bots"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
+          >
+            <Bot class="size-3.5" />
+            Bots
           </Tabs.Trigger>
 
           <Tabs.Trigger
@@ -213,6 +251,86 @@
               {#if chat.members.length === 0}
                 <p class="text-[11px] text-muted-foreground">No members found.</p>
               {/if}
+            </div>
+          </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="bots" class="sm:h-full sm:overflow-y-auto sm:pr-1">
+          <div class="space-y-5 pb-1">
+            <form class="grid gap-2" onsubmit={addBot}>
+              <Label for="bot-handle">Add a bot</Label>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="bot-handle"
+                  bind:value={botHandle}
+                  placeholder="@weatherbot:novarum.me"
+                  autocomplete="off"
+                  spellcheck="false"
+                  oninput={() => (botMessage = null)}
+                />
+                <Select.Root
+                  type="single"
+                  value={botRole}
+                  onValueChange={(value) => (botRole = value === 'ADMIN' ? 'ADMIN' : 'MEMBER')}
+                >
+                  <Select.Trigger class="sm:w-32" aria-label="Role"
+                    >{botRole === 'ADMIN' ? 'Admin' : 'Member'}</Select.Trigger
+                  >
+                  <Select.Content>
+                    <Select.Item value="MEMBER">Member</Select.Item>
+                    <Select.Item value="ADMIN">Admin</Select.Item>
+                  </Select.Content>
+                </Select.Root>
+                <Button type="submit" disabled={botBusy || !botHandle.trim()}>Add</Button>
+              </div>
+              {#if botMessage}
+                <p
+                  class="text-xs {botMessage.ok ? 'text-emerald-500' : 'text-destructive'}"
+                  role="status"
+                >
+                  {botMessage.text}
+                </p>
+              {:else}
+                <p class="text-[11px] text-muted-foreground">
+                  Bots can read and send messages in every channel. Only the guild owner can add
+                  admin bots.
+                </p>
+              {/if}
+            </form>
+
+            <div class="space-y-1.5">
+              <p class="text-xs font-medium">
+                In this guild <span class="text-muted-foreground">({bots.length})</span>
+              </p>
+              {#each bots as member (member.userId)}
+                <div class="flex items-center gap-3 border bg-card px-3 py-2">
+                  <Avatar
+                    src={member.avatarUrl}
+                    name={member.displayName || member.username}
+                    class="size-8 shrink-0 text-xs"
+                    bgColor={member.avatarColor}
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="flex items-center gap-1.5 truncate text-sm font-medium">
+                      {member.displayName || member.username}
+                      <BotBadge />
+                    </p>
+                    <p class="truncate text-xs text-muted-foreground">
+                      @{member.username}:{member.server}
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="xs"
+                    disabled={botBusy}
+                    onclick={() => removeBot(member.userId)}>Remove</Button
+                  >
+                </div>
+              {:else}
+                <p class="text-[11px] text-muted-foreground">
+                  No bots yet. Add one with its handle, or open a bot's invite link.
+                </p>
+              {/each}
             </div>
           </div>
         </Tabs.Content>

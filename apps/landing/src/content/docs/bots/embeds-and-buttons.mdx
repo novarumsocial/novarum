@@ -1,0 +1,108 @@
+---
+title: 'Embeds and buttons'
+description: 'Send rich cards and buttons, and react when people press them.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Only bots can send embeds and buttons. Anything that sends a message (`channel.send`, `message.reply`,
+`interaction.reply`, `editReply`, `followUp`) takes them.
+
+## Embeds
+
+```ts
+import { EmbedBuilder } from '@novarum/sdk';
+
+await channel.send({
+  embeds: [
+    new EmbedBuilder()
+      .setAuthor({ name: 'Weather service', iconUrl: 'https://example.com/logo.png' })
+      .setTitle('Lisbon')
+      .setURL('https://example.com/lisbon')
+      .setDescription('Sunny all day. *Bring a hat.*')
+      .setColor('#f5a524')
+      .addFields(
+        { name: 'High', value: '24 °C', inline: true },
+        { name: 'Low', value: '16 °C', inline: true }
+      )
+      .setThumbnail('https://example.com/sun.png')
+      .setFooter({ text: 'Updated hourly' })
+      .setTimestamp(),
+  ],
+});
+```
+
+| Part        | Limit                                   |
+| ----------- | --------------------------------------- |
+| embeds      | 10 per message                          |
+| title       | 256 characters                          |
+| description | 4096 characters, Markdown               |
+| fields      | 25; name 256, value 1024 characters     |
+| author name | 256 characters                          |
+| footer      | 2048 characters                         |
+| color       | a number like `0xf5a524` or `'#f5a524'` |
+
+Every link and image has to be `http://` or `https://`. Images are loaded by each person's client straight from the
+URL you give, so use addresses you are happy for them to see.
+
+## Buttons
+
+```ts
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from '@novarum/sdk';
+
+await interaction.reply({
+  content: 'Ready to flip?',
+  components: [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('flip').setLabel('Flip').setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setURL('https://en.wikipedia.org/wiki/Coin_flipping')
+        .setLabel('About coins')
+        .setStyle(ButtonStyle.Link)
+    ),
+  ],
+});
+```
+
+Styles are `Primary`, `Secondary`, `Success`, `Danger` and `Link`. A message has up to 5 rows of up to 5 buttons;
+custom ids are up to 100 characters and unique within a message. Link buttons open their URL and never reach your bot.
+
+### When someone presses one
+
+```ts
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isButton()) return;
+  if (interaction.customId === 'flip') {
+    const side = Math.random() < 0.5 ? 'Heads' : 'Tails';
+    await interaction.update({ content: `${side}! Flip again?` });
+  }
+});
+```
+
+A button press can be answered like a command (`reply`, `deferReply`, ephemeral or not), and also with:
+
+- `update(...)`: edit the message the button is on, as the answer.
+- `deferUpdate()`: acknowledge now and edit it later with `editReply(...)`.
+
+To turn a button off, update the message with the button `setDisabled()`.
+
+### How long buttons work
+
+Buttons don't expire. As long as the message exists and your bot is in the guild, every press reaches your bot as a
+new interaction, even after it restarts. Put what you need to remember in the custom id (like `poll:42:yes`) or in your
+own storage, rather than in memory.
+
+<Aside>
+  Buttons on ephemeral messages are the exception: those messages are never stored, so their buttons
+  work for 15 minutes.
+</Aside>
+
+## Editing your messages
+
+```ts
+const message = await channel.send('Counting…');
+await message.edit({ content: 'Done!', components: [] });
+```
+
+Bots can edit and delete their own messages. Leaving `embeds` or `components` out of an edit keeps them as they are;
+pass an empty array to remove them.

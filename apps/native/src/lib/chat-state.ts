@@ -10,6 +10,7 @@ import { goHome, goto } from './navigation';
 import { session } from './session';
 import { storage } from './storage';
 import { mentionsEveryone } from './utils';
+import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
 
 function initialsFor(name: string) {
@@ -57,6 +58,11 @@ type AddMessageInput = {
     width?: number | null;
     height?: number | null;
   }[];
+  embeds?: Embed[];
+  components?: ActionRow[];
+  interaction?: MessageInteraction | null;
+  ephemeral?: boolean;
+  thinking?: boolean;
 };
 
 type ChannelMemberInput = PublicUser & {
@@ -117,6 +123,13 @@ function messageFromInput(message: AddMessageInput): Message {
     attachments: message.attachments ?? [],
     replyTo: message.replyTo ?? null,
     pingedHandles: message.pingedHandles ?? [],
+    embeds: message.embeds ?? [],
+    components: message.components ?? [],
+    interaction: message.interaction
+      ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
+      : null,
+    ephemeral: message.ephemeral,
+    thinking: message.thinking,
   };
 }
 
@@ -322,6 +335,8 @@ type ChatState = {
   addChannel: (channel: AddChannelInput) => Channel;
   setMessages: (channelId: string, messages: AddMessageInput[]) => void;
   addMessage: (message: AddMessageInput) => void;
+  addEphemeral: (message: AddMessageInput) => void;
+  removeMember: (userId: string) => void;
   removeMessage: (channelId: string, messageId: string) => void;
   updateMessage: (channelId: string, message: AddMessageInput) => void;
   updateMemberStatus: (userId: string, status: 'ONLINE' | 'OFFLINE') => void;
@@ -759,10 +774,16 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     addMessage(message) {
-      const channelMessages = get().messagesByChannel[message.channelId] ?? [];
+      // a bot's answer takes the place of its "thinking…"
+      const thinkingId = message.interaction && `thinking:${message.interaction.id}`;
+      const channelMessages = (get().messagesByChannel[message.channelId] ?? []).filter(
+        (item) => item.id !== thinkingId
+      );
       if (channelMessages.some((item) => item.id === message.id)) return;
 
       setChannelMessages(message.channelId, [...channelMessages, messageFromInput(message)]);
+      // these only live on this screen, the server has never heard of their ids
+      if (message.ephemeral || message.thinking) return;
 
       if (selectActiveChannel(get()) !== message.channelId) {
         const handle = session().user?.handle.toLowerCase();
@@ -777,6 +798,19 @@ export const useChat = create<ChatState>((set, get) => {
         void markRead(message.channelId, message.id, message.createdAt);
       }
     },
+
+    // a bot's answer only this person sees; the same id again replaces it (an edit)
+    addEphemeral(message) {
+      const messages = get().messagesByChannel[message.channelId] ?? [];
+      if (!messages.some((item) => item.id === message.id)) return get().addMessage(message);
+      setChannelMessages(
+        message.channelId,
+        messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+      );
+    },
+
+    removeMember: (userId) =>
+      set({ members: get().members.filter((member) => member.userId !== userId) }),
 
     removeMessage(channelId, messageId) {
       const messages = get().messagesByChannel[channelId];

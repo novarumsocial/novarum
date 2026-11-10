@@ -386,7 +386,12 @@ export async function vetBridgedEvent(
     case 'message.created':
     case 'message.updated': {
       const author = await vetLocalIdentity(scope, event.data.author);
-      return author && { ...event, data: { ...event.data, author } };
+      if (!author || !event.data.interaction)
+        return author && { ...event, data: { ...event.data, author } };
+      // "<someone> used /command" must not name one of our people who isn't there
+      const invoker = await vetLocalIdentity(scope, event.data.interaction.user);
+      const interaction = invoker ? { ...event.data.interaction, user: invoker } : null;
+      return { ...event, data: { ...event.data, author, interaction } };
     }
     case 'member.joined': {
       const user = await vetLocalIdentity(scope, event.data.user);

@@ -1,0 +1,88 @@
+---
+title: 'SDK reference'
+description: 'The Client, its events, and the classes and builders of @novarum/sdk.'
+---
+
+## Client
+
+```ts
+const client = new Client({
+  token: process.env.BOT_TOKEN!, // required
+  baseUrl: 'https://anchor.novarum.me', // required: the bot's Anchor
+  reconnect: true, // reconnect when the connection drops (default)
+});
+await client.login(); // resolves once `ready` fired
+```
+
+| Member                       | What it is                                                    |
+| ---------------------------- | ------------------------------------------------------------- |
+| `client.user`                | the bot, as a `User`                                          |
+| `client.application`         | the bot's settings: `public`, `commands`, `guildCount`, …     |
+| `client.guilds`              | `Map<id, Guild>` of the guilds it is in, kept up to date      |
+| `client.channel(id)`         | finds a channel in any of them                                |
+| `client.commands.set([...])` | replaces the global slash commands                            |
+| `client.commands.fetch()`    | the registered commands                                       |
+| `client.sendMessage(id, …)`  | sends to a channel by id                                      |
+| `client.rest`                | the raw HTTP client (`get`, `post`, `put`, `patch`, `delete`) |
+| `client.destroy()`           | disconnects for good                                          |
+
+The client reconnects with backoff when the connection drops, and reloads its guilds when it is back. A refused token
+(close code 1008) is not retried.
+
+### Events
+
+| Event               | Arguments                                                              |
+| ------------------- | ---------------------------------------------------------------------- |
+| `ready`             | `client`                                                               |
+| `messageCreate`     | `Message`                                                              |
+| `messageUpdate`     | `Message`                                                              |
+| `messageDelete`     | `{ id, channelId, guildId }`                                           |
+| `interactionCreate` | `CommandInteraction`, `ButtonInteraction` or `AutocompleteInteraction` |
+| `guildCreate`       | `Guild` (the bot was added to it)                                      |
+| `guildDelete`       | `{ id }` (removed, or it left)                                         |
+| `guildMemberAdd`    | `{ guildId, user }`                                                    |
+| `guildMemberRemove` | `{ guildId, userId }`                                                  |
+| `channelCreate`     | `Channel`                                                              |
+| `channelUpdate`     | `Channel`                                                              |
+| `typingStart`       | `{ channelId, user }`                                                  |
+| `presenceUpdate`    | `{ userId, status }`                                                   |
+| `userUpdate`        | `User`                                                                 |
+| `disconnect`        | `code, reason`                                                         |
+| `error`             | `Error`                                                                |
+| `raw`               | every event as the server sent it                                      |
+
+Bots get every event of every guild they are in, including the content of every message.
+
+## Structures
+
+**`Message`**: `id`, `content`, `author` (a `User`), `channelId`, `guildId`, `embeds`, `components`, `createdAt`,
+`channel`, `guild`, `mentionsMe`, and `reply(...)`, `edit(...)`, `delete()`.
+
+**`User`**: `id`, `username`, `homeserver`, `displayName`, `bot`, `avatarUrl`, `tag` (`@name:homeserver`, which also
+mentions them in a message). The raw profile is in `data`.
+
+**`Guild`**: `id`, `name`, `channels` (`Map<id, Channel>`), `members()`, `leave()`.
+
+**`Channel`**: `id`, `name`, `type` (`TEXT` or `VOICE`), `guild`, `send(...)`, `sendTyping()`, `messages(amount)`,
+`members()`.
+
+**Interactions** share `id`, `user`, `channelId`, `guildId`, `channel`, `guild`, and the type checks `isCommand()`,
+`isButton()`, `isAutocomplete()`.
+
+- `CommandInteraction`: `commandName`, `options`, `reply`, `deferReply`, `editReply`, `followUp`.
+- `ButtonInteraction`: `customId`, `message`, the same four, plus `update` and `deferUpdate`.
+- `AutocompleteInteraction`: `commandName`, `options` (with `getFocused()`), `respond(choices)`.
+
+## Builders
+
+`SlashCommandBuilder`, `EmbedBuilder`, `ButtonBuilder` (with `ButtonStyle`) and `ActionRowBuilder` work like their
+discord.js namesakes. Anywhere a builder is accepted, the plain object (`toJSON()`'s output) is accepted too.
+
+## Errors
+
+A failed request throws a `NovarumAPIError` with `status`, `method`, `path` and the server's message. Requests that are
+rate limited (429) are retried once after the delay the server asks for.
+
+## Mentions
+
+`userMention(user)` and `user.tag` give `@name:homeserver`. People are pinged when a message contains their handle.

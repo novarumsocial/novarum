@@ -10,6 +10,10 @@
   import { device } from '$lib/device.svelte';
   import { isSelf } from '$lib/session.svelte';
   import { formatBytes } from '$lib/utils';
+  import { interactions, type GuildBotCommands } from '$lib/bots.svelte';
+  import type { Command } from 'anchor/bot-schemas';
+  import CommandForm from './command-form.svelte';
+  import Avatar from './avatar.svelte';
 
   let content = $state('');
   let files = $state<File[]>([]);
@@ -25,6 +29,49 @@
   let mentionQuery = $state('');
   let mentionStart = $state<number | null>(null);
   let selectedMention = $state(0);
+  let selectedCommand = $state(0);
+  let activeCommand = $state<{ entry: GuildBotCommands; command: Command } | null>(null);
+  // "/name" with nothing after it, in a guild: the person is picking a slash command
+  const commandQuery = $derived(
+    chat.activeServer && /^\/[\w-]*$/.test(content) ? content.slice(1).toLowerCase() : null
+  );
+  const commandResults = $derived(
+    commandQuery === null
+      ? []
+      : interactions
+          .commandsFor(chat.activeServer)
+          .flatMap((entry) => entry.commands.map((command) => ({ entry, command })))
+          .filter(({ command }) => command.name.startsWith(commandQuery))
+          .slice(0, 10)
+  );
+  $effect(() => {
+    if (commandQuery !== null && chat.activeServer)
+      void interactions.loadCommands(chat.activeServer);
+  });
+
+  async function pickCommand(result: { entry: GuildBotCommands; command: Command }) {
+    content = '';
+    selectedCommand = 0;
+    // nothing to fill in: run it right away, like sending a message
+    if (!result.command.options?.length && chat.activeChannel) {
+      sendError = '';
+      sendError =
+        (await interactions.runCommand(
+          chat.activeChannel,
+          result.entry,
+          result.command.name,
+          []
+        )) ?? '';
+      return;
+    }
+    activeCommand = result;
+  }
+
+  function closeCommand() {
+    activeCommand = null;
+    requestAnimationFrame(() => textarea?.focus());
+  }
+
   const emojiResults = $derived(
     realtime.emojiQuery.trim() === emojiQuery.trim() ? realtime.emojiResults : []
   );
@@ -94,6 +141,21 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (commandResults.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedCommand =
+          (selectedCommand + (e.key === 'ArrowDown' ? 1 : -1) + commandResults.length) %
+          commandResults.length;
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        pickCommand(commandResults[selectedCommand] ?? commandResults[0]!);
+        return;
+      }
+    }
+
     if (mentionStart !== null && mentionResults.length) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
@@ -337,6 +399,40 @@
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
 >
+  {#if commandResults.length}
+    <div
+      id="command-search-results"
+      role="listbox"
+      aria-label="Slash commands"
+      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-72 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[32rem]"
+    >
+      {#each commandResults as result, index (`${result.entry.bot.userId}:${result.command.name}`)}
+        <button
+          id={`command-result-${index}`}
+          type="button"
+          role="option"
+          aria-selected={selectedCommand === index}
+          class={`flex w-full min-w-0 items-center gap-2.5 px-2 py-1.5 text-left text-xs transition-colors ${selectedCommand === index ? 'bg-primary text-primary-foreground' : 'text-popover-foreground hover:bg-muted'}`}
+          onmousedown={(event) => event.preventDefault()}
+          onmouseenter={() => (selectedCommand = index)}
+          onclick={() => pickCommand(result)}
+        >
+          <Avatar
+            src={result.entry.bot.avatarUrl}
+            name={result.entry.bot.displayName || result.entry.bot.username}
+            class="size-5 shrink-0 text-[10px]"
+            bgColor={result.entry.bot.avatarColor}
+          />
+          <span class="shrink-0 font-semibold">/{result.command.name}</span>
+          <span class="min-w-0 truncate opacity-75">{result.command.description}</span>
+          <span class="ml-auto shrink-0 opacity-60"
+            >{result.entry.bot.displayName || result.entry.bot.username}</span
+          >
+        </button>
+      {/each}
+    </div>
+  {/if}
+
   {#if emojiStart !== null && emojiResults.length}
     <div
       id="emoji-search-results"
@@ -451,7 +547,16 @@
       </p>
     {/if}
 
-    <div class="flex items-end gap-1 p-1.5">
+    {#if activeCommand && chat.activeChannel}
+      <CommandForm
+        entry={activeCommand.entry}
+        command={activeCommand.command}
+        channelId={chat.activeChannel}
+        onClose={closeCommand}
+      />
+    {/if}
+
+    <div class="flex items-end gap-1 p-1.5" class:hidden={!!activeCommand}>
       <Button
         variant="ghost"
         size="icon-lg"
@@ -481,13 +586,19 @@
         {placeholder}
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={emojiStart !== null || mentionStart !== null}
-        aria-controls={mentionStart !== null ? 'mention-search-results' : 'emoji-search-results'}
-        aria-activedescendant={mentionStart !== null && mentionResults.length
-          ? `mention-result-${selectedMention}`
-          : emojiStart !== null && emojiResults.length
-            ? `emoji-result-${selectedEmoji}`
-            : undefined}
+        aria-expanded={emojiStart !== null || mentionStart !== null || commandResults.length > 0}
+        aria-controls={commandResults.length
+          ? 'command-search-results'
+          : mentionStart !== null
+            ? 'mention-search-results'
+            : 'emoji-search-results'}
+        aria-activedescendant={commandResults.length
+          ? `command-result-${selectedCommand}`
+          : mentionStart !== null && mentionResults.length
+            ? `mention-result-${selectedMention}`
+            : emojiStart !== null && emojiResults.length
+              ? `emoji-result-${selectedEmoji}`
+              : undefined}
         rows="1"
         class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
       ></textarea>

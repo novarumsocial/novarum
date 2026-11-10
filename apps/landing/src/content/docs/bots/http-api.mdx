@@ -1,0 +1,99 @@
+---
+title: 'HTTP API'
+description: 'Build bots in any language: authentication, the realtime socket and every bot endpoint.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The SDK is a thin layer over Anchor's HTTP API, which you can use from any language. Every homeserver also serves the
+full OpenAPI specification at `/openapi`.
+
+## Authentication
+
+Send the token in the `Authorization` header:
+
+```http
+Authorization: Bot <token>
+```
+
+Bot tokens only work in that header, and people's session cookies don't work in it.
+
+## Realtime
+
+Open a WebSocket to `/realtime` with the same header. The server sends JSON events:
+
+```json
+{ "type": "message.created", "data": { "id": "…", "channelId": "…", "content": "hi", "author": { … } } }
+```
+
+- On connect you get `voice.states.snapshot`; from then on the socket is ready.
+- When you are added to a guild you get `guild.created`. Send `{ "type": "subscribe.guild", "guildId": "…" }` to start
+  getting its events (guilds you were already in are subscribed on connect).
+- `guild.deleted` means you left or were removed.
+- `misc.ping` arrives every 30 seconds. If nothing arrives for over a minute, reconnect.
+- `interaction.created` is someone using one of your commands or buttons (see below).
+
+## Endpoints
+
+| Endpoint                                          | What it does                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------- |
+| `GET /bots/@me`                                   | the bot and its settings                                        |
+| `GET /bots/@me/commands`                          | its commands                                                    |
+| `PUT /bots/@me/commands`                          | replaces them: `{ "commands": [ … ] }`                          |
+| `POST /bots/@me/guilds/:id/leave`                 | leaves a guild                                                  |
+| `GET /guilds/list`                                | guilds and their channels                                       |
+| `GET /channel/:id/users`                          | members of a channel's guild                                    |
+| `GET /message/list?channelId=&cursor=0&amount=50` | recent messages                                                 |
+| `POST /message/send`                              | `{ channelId, content, nonce, replyTo?, embeds?, components? }` |
+| `POST /message/edit`                              | `{ channelId, messageId, content, embeds?, components? }`       |
+| `POST /message/delete`                            | `{ channelId, messageId }`                                      |
+| `POST /channel/:id/typing`                        | shows the bot typing                                            |
+
+`nonce` is any unique string you pick: sending the same nonce twice returns the first message instead of a duplicate.
+
+Bots can't create guilds, accept invites, add friends or open DMs.
+
+## Interactions
+
+An `interaction.created` event looks like this:
+
+```json
+{
+  "id": "…",
+  "token": "…",
+  "type": "command",
+  "guildId": "…",
+  "channelId": "…",
+  "user": { "userId": "…", "username": "alice", "homeserver": "novarum.me", … },
+  "data": { "name": "roll", "options": [{ "name": "sides", "type": "integer", "value": 20 }] }
+}
+```
+
+`type` is `command`, `autocomplete` (one option has `"focused": true`) or `button` (`data.customId` and `message` say
+which). A `user` option's value is the member's handle, with their profile in `user`.
+
+Answer within 3 seconds:
+
+```http
+POST /interactions/:id/:token/callback
+```
+
+| `type`           | `data`                                           | For                          |
+| ---------------- | ------------------------------------------------ | ---------------------------- |
+| `message`        | `{ content?, embeds?, components?, ephemeral? }` | commands and buttons         |
+| `deferred`       | `{ ephemeral? }`                                 | commands and buttons         |
+| `update`         | `{ content?, embeds?, components? }`             | buttons: edits their message |
+| `deferredUpdate` | none                                             | buttons                      |
+| `autocomplete`   | `{ choices: [{ name, value }] }`                 | autocomplete                 |
+
+Then, for 15 minutes:
+
+- `PATCH /interactions/:id/:token/original` edits the answer (or sends the one a `deferred` was waiting for).
+- `POST /interactions/:id/:token/followup` sends another message, up to 10.
+
+Only the bot that got the interaction can answer it, and only with its token.
+
+<Aside>
+  These all go to your bot's own homeserver, even when the guild is hosted on another one: it passes
+  them on.
+</Aside>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
+  import { Bot, LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { dms, dmPath } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
@@ -40,7 +40,15 @@
         <Users class="size-4 shrink-0" />
         <span class="flex-1 truncate">Friends</span>
       </button>
-
+    {/if}
+    <button
+      class={itemClass(chat.route.kind === 'developers')}
+      onclick={() => goto('/guilds/developers')}
+    >
+      <Bot class="size-4 shrink-0" />
+      <span class="flex-1 truncate">Developers</span>
+    </button>
+    {#if device.isComputer}
       <Separator class="mt-3" />
     {/if}
 

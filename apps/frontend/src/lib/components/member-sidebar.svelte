@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BotBadge from './bot-badge.svelte';
   import { Users } from '@lucide/svelte';
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
@@ -83,8 +84,9 @@
               </div>
               <div class="flex min-w-0 flex-1">
                 <span class="block truncate text-sm text-foreground">{name}</span>
+                {#if member.isBot}<BotBadge class="mt-0.5 ml-1.5 shrink-0" />{/if}
                 <span
-                  class="block truncate text-[10px] text-muted-foreground ml-1 mt-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                  class="block min-w-0 shrink-[100] truncate text-[10px] text-muted-foreground ml-1 mt-0.5 opacity-0 transition-opacity group-hover:opacity-100"
                 >
                   ({member.server})
                 </span>
@@ -144,7 +146,7 @@
                 <div class="flex min-w-0 flex-1">
                   <span class="block truncate text-sm text-foreground">{name}</span>
                   <span
-                    class="block truncate text-[10px] text-muted-foreground ml-1 mt-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                    class="block min-w-0 shrink-[100] truncate text-[10px] text-muted-foreground ml-1 mt-0.5 opacity-0 transition-opacity group-hover:opacity-100"
                   >
                     ({member.server})
                   </span>

@@ -24,6 +24,14 @@ import { createPendingAttachment } from '../../upload/services';
 import { getFederatedChannelAccess } from '../access';
 import { canSendInChannel } from '../../../utils/channelAccess';
 import { federationAuth } from '../plugin';
+import { messageExtras } from '../../../utils/messagePayload';
+import {
+  componentsSchema,
+  embedsSchema,
+  type ActionRow,
+  type Embed,
+  type MessageInteraction,
+} from '../../../utils/botSchemas';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
 import { uploadQuotaExceeded } from '../../../utils/uploadQuota';
 
@@ -35,6 +43,14 @@ const sendBodySchema = z.object({
   content: z.string().max(maxMessageLength).nullable(),
   nonce: z.string(),
   replyTo: z.string().nullish(),
+  embeds: embedsSchema.optional(),
+  components: componentsSchema.optional(),
+});
+const editBodySchema = z.object({
+  messageId: z.string(),
+  content: z.string().max(maxMessageLength).nullable(),
+  embeds: embedsSchema.optional(),
+  components: componentsSchema.optional(),
 });
 const attachmentIdsSchema = z
   .array(z.string())
@@ -76,6 +92,9 @@ type MessageForResponse = {
   updatedAt: Date;
   attachments: Parameters<typeof attachmentPayload>[0][];
   pingedHandles?: string[];
+  embeds?: Embed[] | null;
+  components?: ActionRow[] | null;
+  interaction?: MessageInteraction | null;
 };
 
 function federatedMessageResponse(
@@ -97,6 +116,7 @@ function federatedMessageResponse(
     attachments: message.attachments.map(attachmentPayload),
     createdAt: message.createdAt.toISOString(),
     author: publicUser(author),
+    ...messageExtras(message),
   };
 }
 
@@ -109,9 +129,9 @@ export const messageRoutes = new Elysia()
       if (!body.success) return status(400, { error: 'Invalid federation message' });
       const attachmentIds = attachmentIdsSchema.safeParse(payload.attachmentIds);
       if (!attachmentIds.success) return status(400, { error: 'Invalid attachment IDs' });
-      const { content, nonce } = body.data;
+      const { content, nonce, embeds, components } = body.data;
       const replyTo = body.data.replyTo ?? null;
-      if (content === null && attachmentIds.data.length === 0) {
+      if (content === null && attachmentIds.data.length === 0 && !embeds?.length) {
         return status(400, { error: 'Message content or an attachment is required' });
       }
 
@@ -119,6 +139,10 @@ export const messageRoutes = new Elysia()
       if (!access.ok) return status(access.status, { error: access.error });
       if (!(await canSendInChannel(access.channel, access.user.id))) {
         return status(403, { error: 'Only the guild owner can send messages in this channel' });
+      }
+      // judged by our own row, which only says bot when the homeserver introduced it as one
+      if ((embeds || components) && !access.user.isBot) {
+        return status(400, { error: 'Only bots can send embeds or buttons' });
       }
 
       const replyTarget = replyTo
@@ -164,6 +188,8 @@ export const messageRoutes = new Elysia()
         nonce,
         pingRecipients,
         attachments: attachments.value,
+        embeds: embeds ?? null,
+        components: components ?? null,
       });
       const message = {
         ...created,
@@ -199,11 +225,16 @@ export const messageRoutes = new Elysia()
     async ({ params, payload, remoteUser, server, status }) => {
       const messageId = z.string().safeParse(payload.messageId);
       if (!messageId.success) return status(400, { error: 'Invalid message ID' });
-      const content = z.string().max(maxMessageLength).nullable().safeParse(payload.content);
-      if (!content.success) return status(400, { error: 'Invalid federation message' });
+      const body = editBodySchema.safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid federation message' });
+      const content = { data: body.data.content };
+      const { embeds, components } = body.data;
 
       const access = await getFederatedChannelAccess(params.id, remoteUser);
       if (!access.ok) return status(access.status, { error: access.error });
+      if ((embeds || components) && !access.user.isBot) {
+        return status(400, { error: 'Only bots can send embeds or buttons' });
+      }
 
       const existing = await db.query.messages.findFirst({
         where: { id: messageId.data, channelId: params.id },
@@ -211,7 +242,11 @@ export const messageRoutes = new Elysia()
       });
       if (!existing) return status(404, { error: 'Message not found' });
       if (existing.authorId !== access.user.id) return status(403, { error: 'Forbidden' });
-      if (content.data === null && existing.attachments.length === 0) {
+      if (
+        content.data === null &&
+        existing.attachments.length === 0 &&
+        !(embeds ?? existing.embeds)?.length
+      ) {
         return status(400, { error: 'Message content or an attachment is required' });
       }
 
@@ -228,7 +263,10 @@ export const messageRoutes = new Elysia()
       );
 
       const alreadyPinged = await pingedUserIds(existing.id);
-      const updated = await editMessage(existing.id, content.data, pingRecipients);
+      const updated = await editMessage(existing.id, content.data, pingRecipients, {
+        embeds,
+        components,
+      });
 
       const response = federatedMessageResponse(
         {

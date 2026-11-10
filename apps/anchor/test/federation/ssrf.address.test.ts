@@ -164,8 +164,9 @@ describe('A. DNS answers', () => {
     await dns.nxdomain(nx);
     await dns.servfail(sf);
     await expectRefused(ctx, nx, { reason: 'getaddrinfo ENOTFOUND' });
-    // Bun's lookup (getaddrinfo) reports a SERVFAIL answer as ETIMEOUT straight away; only dns.resolve says ESERVFAIL
-    await expectRefused(ctx, sf, { reason: /getaddrinfo E(SERVFAIL|TIMEOUT)$/ });
+    // Bun's lookup (getaddrinfo) reports a SERVFAIL answer as ETIMEOUT or EAI_AGAIN depending on the version; only
+    // dns.resolve says ESERVFAIL
+    await expectRefused(ctx, sf, { reason: /getaddrinfo E(SERVFAIL|TIMEOUT|AI_AGAIN)$/ });
   });
 
   test('no answer at all is refused within about 10s', async () => {

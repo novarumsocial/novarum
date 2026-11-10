@@ -1,5 +1,5 @@
 import Elysia, { t } from 'elysia';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { requestSession } from '../auth/provider';
 import { publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId } from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
@@ -15,6 +15,8 @@ import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
 import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
+import { messageExtras } from '../../utils/messagePayload';
+import { componentsSchema, embedsSchema } from '../../utils/botSchemas';
 
 export const maxMessageLength = 4000;
 // a remote channel is walked page by page on every list, so a host that never stops paging is cut off here
@@ -36,9 +38,8 @@ const messageResponseSchema = z.object({ message: messageSchema });
 const successResponseSchema = z.object({ success: z.boolean() });
 
 export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
-  .resolve(async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+  .resolve(async ({ cookie, request, status }) => {
+    const session = await requestSession(cookie, request);
     if (!session) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -123,6 +124,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
                 ? message.createdAt.toISOString()
                 : message.createdAt,
             author: publicUser(message.author),
+            ...messageExtras(message),
           };
         }),
       };
@@ -145,9 +147,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
   .post(
     '/send',
     async ({ body, session, status, server }) => {
-      const { channelId, content, nonce, replyTo, attachmentIds = [] } = body;
-      if (content === null && attachmentIds.length === 0) {
+      const { channelId, content, nonce, replyTo, attachmentIds = [], embeds, components } = body;
+      if (content === null && attachmentIds.length === 0 && !embeds?.length) {
         return status(400, { error: 'Message content or an attachment is required' });
+      }
+      if ((embeds || components) && !session.user.isBot) {
+        return status(400, { error: 'Only bots can send embeds or buttons' });
       }
 
       const channel = await db.query.channels.findFirst({
@@ -167,7 +172,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           federatedChannel.homeserver,
           federationChannelPath(federatedChannel, 'messages/send'),
           session,
-          { content, nonce, replyTo, attachmentIds },
+          { content, nonce, replyTo, attachmentIds, embeds, components },
           {
             response: messageResponseSchema,
             forward: passThrough(400, 401, 403, 404, 409),
@@ -231,6 +236,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
                 ? priorMsg.createdAt.toISOString()
                 : priorMsg.createdAt,
             author: publicUser(session.user),
+            ...messageExtras(priorMsg),
           },
         };
       }
@@ -260,6 +266,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         nonce,
         pingRecipients,
         attachments: attachments.value,
+        embeds: embeds ?? null,
+        components: components ?? null,
       });
       const responseAttachments = attachments.value.map(attachmentPayload);
       const responseMessage = {
@@ -275,6 +283,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         createdAt:
           message.createdAt instanceof Date ? message.createdAt.toISOString() : message.createdAt,
         author: publicUser(session.user),
+        ...messageExtras(message),
       };
 
       if (server) {
@@ -292,14 +301,18 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       return { message: responseMessage };
     },
     {
-      body: t.Object({
-        channelId: t.String(),
-        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
-        nonce: t.String(),
-        replyTo: t.Optional(t.String()),
-        attachmentIds: t.Optional(
-          t.Array(t.String(), { maxItems: maxAttachmentCount, uniqueItems: true })
-        ),
+      body: z.object({
+        channelId: z.string(),
+        content: z.string().max(maxMessageLength).nullable(),
+        nonce: z.string(),
+        replyTo: z.string().optional(),
+        attachmentIds: z
+          .array(z.string())
+          .max(maxAttachmentCount)
+          .refine((ids) => new Set(ids).size === ids.length, 'Attachment IDs must be unique')
+          .optional(),
+        embeds: embedsSchema.optional(),
+        components: componentsSchema.optional(),
       }),
       response: {
         200: messageResponseSchema,
@@ -315,7 +328,10 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
   .post(
     '/edit',
     async ({ body, session, status, server }) => {
-      const { channelId, messageId, content } = body;
+      const { channelId, messageId, content, embeds, components } = body;
+      if ((embeds || components) && !session.user.isBot) {
+        return status(400, { error: 'Only bots can send embeds or buttons' });
+      }
       const channel = await db.query.channels.findFirst({
         where: { id: channelId },
       });
@@ -330,7 +346,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           federatedChannel.homeserver,
           federationChannelPath(federatedChannel, 'messages/edit'),
           session,
-          { messageId, content },
+          { messageId, content, embeds, components },
           {
             response: messageResponseSchema,
             forward: passThrough(400, 401, 403, 404),
@@ -359,7 +375,11 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       });
       if (!existing) return status(404, { error: 'Message not found' });
       if (existing.authorId !== session.userId) return status(403, { error: 'Forbidden' });
-      if (content === null && existing.attachments.length === 0) {
+      if (
+        content === null &&
+        existing.attachments.length === 0 &&
+        !(embeds ?? existing.embeds)?.length
+      ) {
         return status(400, { error: 'Message content or an attachment is required' });
       }
 
@@ -374,7 +394,10 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       );
 
       const alreadyPinged = await pingedUserIds(existing.id);
-      const updated = await editMessage(existing.id, content, pingRecipients);
+      const updated = await editMessage(existing.id, content, pingRecipients, {
+        embeds,
+        components,
+      });
 
       const responseMessage = {
         id: updated.id,
@@ -392,6 +415,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         createdAt:
           updated.createdAt instanceof Date ? updated.createdAt.toISOString() : updated.createdAt,
         author: publicUser(session.user),
+        ...messageExtras(updated),
       };
 
       if (server) {
@@ -410,10 +434,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       return { message: responseMessage };
     },
     {
-      body: t.Object({
-        channelId: t.String(),
-        messageId: t.String(),
-        content: t.Nullable(t.String({ maxLength: maxMessageLength })),
+      body: z.object({
+        channelId: z.string(),
+        messageId: z.string(),
+        content: z.string().max(maxMessageLength).nullable(),
+        embeds: embedsSchema.optional(),
+        components: componentsSchema.optional(),
       }),
       response: {
         200: messageResponseSchema,

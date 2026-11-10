@@ -1,6 +1,7 @@
 import Elysia, { t } from 'elysia';
 import { randomString } from '../../utils/randomString';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { requestSession } from '../auth/provider';
+import { canManageGuild } from '../../utils/guildRoles';
 import { publishRealtime } from '../../utils/publishRealtime';
 import {
   makeFederatedChannelId,
@@ -89,9 +90,8 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
       }),
     }
   )
-  .resolve(async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+  .resolve(async ({ cookie, request, status }) => {
+    const session = await requestSession(cookie, request);
     if (!session) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -146,7 +146,8 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
   )
   .post(
     '/create',
-    async ({ body, server, session }) => {
+    async ({ body, server, session, status }) => {
+      if (session.user.isBot) return status(403, { error: 'Bots cannot create guilds' });
       const { name } = body;
 
       const transaction = await db.transaction(async (tx) => {
@@ -230,6 +231,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
       response: {
         200: z.object({ guild: guildSchema }),
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
       },
     }
   )
@@ -338,7 +340,8 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
           id,
           name: guild.name as string,
           down: guild.extAnchorDown ?? false,
-          canManageChannels: !parseFederatedGuildId(id) && guild.ownerId === session.userId,
+          canManageChannels:
+            !parseFederatedGuildId(id) && (await canManageGuild(guild, session.userId)),
           avatarUrl: guild.avatarUrl as string | null,
           description: guild.description as string | null,
           channels: await Promise.all(

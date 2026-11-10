@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { BotBadge } from '@/components/bot-badge';
 import { dms } from '@/lib/dms';
 import { friends, useFriends, type FriendStatus } from '@/lib/friends';
 import { useSession } from '@/lib/session';
@@ -114,11 +115,7 @@ export function ProfileSheet({
           <Text className="shrink text-lg font-semibold" numberOfLines={1}>
             {name}
           </Text>
-          {user.isBot && (
-            <View className="bg-primary/15 px-1.5 py-0.5">
-              <Text className="text-[9px] font-bold tracking-wider text-primary">BOT</Text>
-            </View>
-          )}
+          {user.isBot && <BotBadge />}
         </View>
         <Text className="font-mono text-xs text-muted-foreground" numberOfLines={1}>
           @{user.username}:{user.server}

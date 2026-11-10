@@ -7,6 +7,7 @@ import { Avatar } from '@/components/avatar';
 import { ProfileCard } from '@/components/profile-card';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { BotBadge } from '@/components/bot-badge';
 import { useSettings } from '@/lib/settings';
 import type { Author } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
@@ -73,9 +74,10 @@ export function MemberSidebar({ members }: { members: Author[] }) {
                     />
                   )}
                 </View>
-                <Text numberOfLines={1} className="flex-1 text-sm">
+                <Text numberOfLines={1} className="shrink text-sm">
                   {name}
                 </Text>
+                {member.isBot && <BotBadge />}
               </View>
             </ProfileCard>
           );

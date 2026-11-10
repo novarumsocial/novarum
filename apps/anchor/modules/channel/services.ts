@@ -1,6 +1,7 @@
 import Elysia, { t } from 'elysia';
 import { randomString } from '../../utils/randomString';
-import { sessionCookieName, validateSessionToken } from '../auth/provider';
+import { requestSession } from '../auth/provider';
+import { canManageGuild } from '../../utils/guildRoles';
 import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { canAccessChannel } from '../../utils/channelAccess';
@@ -47,8 +48,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       return;
     }
 
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+    const session = await requestSession(cookie, request);
     if (!session) {
       return status(401, { error: 'Unauthorized' });
     }
@@ -153,7 +153,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       if (!guild) {
         return status(404, { error: 'Guild not found' });
       }
-      if (guild.ownerId !== session.userId) {
+      if (!(await canManageGuild(guild, session.userId))) {
         return status(403, { error: 'Unauthorized' });
       }
 
@@ -224,7 +224,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
         with: { guild: true },
       });
       if (!channel?.guild) return status(404, { error: 'Channel not found' });
-      if (channel.guild.ownerId !== session.userId) {
+      if (!(await canManageGuild(channel.guild, session.userId))) {
         return status(403, { error: 'Unauthorized' });
       }
 
@@ -281,7 +281,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
       if (!guild) {
         return status(404, { error: 'Guild not found' });
       }
-      if (guild.ownerId !== session.userId) {
+      if (!(await canManageGuild(guild, session.userId))) {
         return status(403, { error: 'Unauthorized' });
       }
 

@@ -3,6 +3,7 @@ import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { signup } from '../harness/users';
 import { befriend, unfriend } from '../harness/friends';
 import { anonymous, call, createGuild, join, send } from '../harness/chat';
+import { addBot, createBot } from '../harness/bots';
 
 // §7 authz matrix for the routes of §4.3. Each cell uses a fresh actor, so cells can't influence each other.
 // Statuses were pinned from the code: note the deliberate-looking inconsistencies (401 vs 403 for "not a member").
@@ -32,7 +33,12 @@ async function guildFixture() {
     (fx.code = (await call(owner, 'POST', `/guilds/${guild.id}/invites`, {})).body.invite
       .code as string);
   const memberMessage = (await send(member, channel.id, 'by member')).body.message;
+  const memberBot = await createBot(owner);
+  await addBot(owner, guild.id, memberBot.bot);
   const fx = {
+    memberBot,
+    // removed by the owner cell of DELETE /guilds/{id}/bots/{userId}, so re-added before every cell
+    removableBot: memberBot.bot,
     refreshCode,
     owner,
     guild,
@@ -66,6 +72,34 @@ const textFile = () => {
 };
 
 const guildRoutes: Route[] = [
+  {
+    key: 'POST /guilds/{id}/bots',
+    method: 'POST',
+    path: (fx) => `/guilds/${fx.guild.id}/bots`,
+    body: async (fx) => {
+      const { bot } = await createBot(fx.owner);
+      return { username: bot.username, homeserver: bot.homeserver, role: 'MEMBER' };
+    },
+    expected: [401, 403, 403, 200],
+  },
+  {
+    key: 'GET /guilds/{id}/commands',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/commands`,
+    expected: [401, 404, 200, 200],
+  },
+  {
+    key: 'DELETE /guilds/{id}/bots/{userId}',
+    method: 'DELETE',
+    path: (fx) => `/guilds/${fx.guild.id}/bots/${fx.removableBot.userId}`,
+    body: async (fx) => {
+      const { bot } = await createBot(fx.owner);
+      await addBot(fx.owner, fx.guild.id, bot);
+      fx.removableBot = bot;
+      return undefined;
+    },
+    expected: [401, 404, 403, 200],
+  },
   {
     key: 'POST /guilds/create',
     method: 'POST',
@@ -271,6 +305,54 @@ describe('guild routes: anonymous / non-member / member / owner', () => {
     const known = new Set([...guildRoutes.map((r) => r.key), ...covered]);
     expect(keys.filter((k) => !known.has(k))).toEqual([]);
     expect([...known].filter((k) => !keys.includes(k))).toEqual([]);
+  });
+});
+
+// a bot that is a MEMBER of the guild can do what a member can, minus what bots never do
+const botDifferences: Record<string, number> = {
+  'POST /guilds/create': 403,
+  'POST /invite/accept': 401,
+  'POST /guilds/{id}/bots': 401,
+  'DELETE /guilds/{id}/bots/{userId}': 401,
+  'GET /guilds/{id}/commands': 401,
+};
+
+describe('guild routes as a MEMBER bot', () => {
+  let fx: Fx;
+  beforeAll(async () => {
+    fx = await guildFixture();
+  });
+  beforeEach(() => fx.refreshCode());
+
+  for (const route of guildRoutes) {
+    const expected = botDifferences[route.key] ?? route.expected[2];
+    test(`${route.key} as a bot -> ${expected}`, async () => {
+      const body = await route.body?.(fx);
+      const res = await fx.memberBot.fetch(route.path(fx), {
+        method: route.method,
+        body: body === undefined ? undefined : body instanceof FormData ? body : json(body),
+      });
+      expect(res.status, await res.clone().text()).toBe(expected);
+    });
+  }
+
+  test('a forged bot token behaves like anonymous on every route', async () => {
+    for (const route of guildRoutes.filter((r) => r.expected[0] === 401)) {
+      for (const token of ['forged.token', 'x', 'a.b.c.d', '']) {
+        const body = await route.body?.(fx);
+        const res = await fetch(`${anchor.url}${route.path(fx)}`, {
+          method: route.method,
+          headers: {
+            authorization: `Bot ${token}`,
+            ...(typeof body === 'object' && !(body instanceof FormData)
+              ? { 'content-type': 'application/json' }
+              : {}),
+          },
+          body: body === undefined ? undefined : body instanceof FormData ? body : json(body),
+        });
+        expect(res.status, `${route.key} with bot token "${token}"`).toBe(401);
+      }
+    }
   });
 });
 

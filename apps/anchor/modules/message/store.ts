@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { attachments, channelMembers, db, messagePings, messages } from '../../src/db';
 import { randomString } from '../../utils/randomString';
 import { storage } from '../../utils/services/storage';
+import type { ActionRow, Embed, MessageInteraction } from '../../utils/botSchemas';
 
 // The database writes behind sending, editing and deleting a message. Local users and users of
 // other homeservers (see modules/federation) go through the same functions, so a message
@@ -33,6 +34,9 @@ export async function createMessage(input: {
     width: number | null;
     height: number | null;
   }[];
+  embeds?: Embed[] | null;
+  components?: ActionRow[] | null;
+  interaction?: MessageInteraction | null;
 }) {
   const created = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -44,6 +48,9 @@ export async function createMessage(input: {
         content: input.content,
         replyTo: input.replyTo,
         nonce: input.nonce,
+        embeds: input.embeds ?? null,
+        components: input.components ?? null,
+        interaction: input.interaction ?? null,
       })
       .returning();
     if (!created) throw new Error('Failed to create message');
@@ -88,11 +95,12 @@ export async function createMessage(input: {
   return created;
 }
 
-/** Replaces the content of a message and the pings that came with it. */
+/** Replaces the content of a message (and a bot's embeds and buttons, when given) and its pings. */
 export function editMessage(
   messageId: string,
   content: string | null,
-  pingRecipients: PingRecipient[]
+  pingRecipients: PingRecipient[],
+  extras: { embeds?: Embed[]; components?: ActionRow[] } = {}
 ) {
   return db.transaction(async (tx) => {
     await tx.delete(messagePings).where(eq(messagePings.messageId, messageId));
@@ -100,7 +108,7 @@ export function editMessage(
 
     const [updated] = await tx
       .update(messages)
-      .set({ content })
+      .set({ content, ...extras })
       .where(eq(messages.id, messageId))
       .returning();
     if (!updated) throw new Error('Failed to edit message');

@@ -242,7 +242,7 @@ function isExpired(expiresAt: Date | string | null | undefined) {
   return expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
 }
 
-async function guildChannels(guildId: string) {
+export async function guildChannels(guildId: string) {
   const channels = await db.query.channels.findMany({
     where: { guildId },
     orderBy: { position: 'asc' },
@@ -278,7 +278,11 @@ type RemoteInviteAccept = {
   }>;
 };
 
-async function persistFederatedInviteSnapshot(session: Session, homeserver: string, data: unknown) {
+export async function persistFederatedInviteSnapshot(
+  session: { userId: string },
+  homeserver: string,
+  data: unknown
+) {
   const snapshot = parseRemoteInviteAccept(data, homeserver);
   if (!snapshot) return null;
 

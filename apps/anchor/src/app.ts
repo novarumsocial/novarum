@@ -14,6 +14,8 @@ import { user } from '../modules/user/services';
 import { dm } from '../modules/dm/services';
 import { friends } from '../modules/friends/services.ts';
 import { notifications } from '../modules/notifications/services';
+import { botGuilds, botSelf, developers } from '../modules/bots/services';
+import { interactionResponses, interactions } from '../modules/interactions/services';
 import openapi from '@elysia/openapi';
 import { serverTiming } from '@elysia/server-timing';
 
@@ -43,6 +45,10 @@ export const createApp = () =>
             { name: 'Friends', description: 'the friends/ routes' },
             { name: 'DM', description: 'the dm/ routes' },
             { name: 'Notifications', description: 'the notifications/ routes' },
+            {
+              name: 'Bots',
+              description: 'bot accounts, the developer panel and adding bots to guilds',
+            },
           ],
         },
       })
@@ -60,4 +66,9 @@ export const createApp = () =>
     .use(friends)
     .use(dm)
     .use(notifications)
+    .use(developers)
+    .use(botSelf)
+    .use(botGuilds)
+    .use(interactions)
+    .use(interactionResponses)
     .get('/', () => 'this is anchor');

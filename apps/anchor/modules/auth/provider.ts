@@ -7,13 +7,15 @@ export const sessionCookieName = 'session_token';
 export const sessionExpiresInSeconds = 60 * 60 * 24 * 365; // 1 year
 export const sessionExpiresInMilliseconds = sessionExpiresInSeconds * 1000;
 
-export async function createSession(userId: string): Promise<SessionWithToken> {
+export async function createSession(
+  userId: string,
+  expiresAt = new Date(Date.now() + sessionExpiresInMilliseconds)
+): Promise<SessionWithToken> {
   const now = new Date();
 
   const id = randomString();
   const secret = randomString();
   const secretHash = await hashSecret(secret);
-  const expiresAt = new Date(now.getTime() + sessionExpiresInMilliseconds);
 
   const token = id + '.' + secret;
 
@@ -40,9 +42,34 @@ export async function createSession(userId: string): Promise<SessionWithToken> {
   return session;
 }
 
-export async function validateSessionToken(
-  token: string | undefined
-): Promise<SessionWithUser | null> {
+// the session cookie is for people only: a bot token pasted into a cookie authenticates nothing
+export async function validateSessionToken(token: string | undefined) {
+  const session = await validateAnyToken(token);
+  return session && !session.user.isBot ? session : null;
+}
+
+export async function validateBotToken(token: string | undefined) {
+  const session = await validateAnyToken(token);
+  return session?.user.isBot ? session : null;
+}
+
+/** The session of a request: `Authorization: Bot <token>` for bots, the session cookie for people. */
+export function requestSession(
+  cookie: Record<string, { value?: unknown } | undefined>,
+  request: Request
+) {
+  const authorization = request.headers.get('authorization');
+  if (authorization) {
+    const [scheme, token] = authorization.split(' ');
+    return validateBotToken(scheme === 'Bot' ? token : undefined);
+  }
+  return validateSessionToken(cookie[sessionCookieName]?.value as string | undefined);
+}
+
+// bot tokens don't expire, they are revoked by regenerating them
+export const botTokenExpiry = () => new Date('9999-12-31T00:00:00Z');
+
+async function validateAnyToken(token: string | undefined): Promise<SessionWithUser | null> {
   if (!token) {
     return null;
   }

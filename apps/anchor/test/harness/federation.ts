@@ -261,10 +261,20 @@ export const signup = (name: AnchorName, overrides?: Parameters<typeof signupAt>
 // canary-a / canary-p share their anchor's network namespace, which a restart replaces: they must follow it
 const sidecar = (s: Service) => (s === 'a' ? ['canary-a'] : s === 'p' ? ['canary-p'] : []);
 
+async function waitForCanary(s: Service) {
+  if (s !== 'a' && s !== 'p') return;
+  await eventually(async () => (await fetch(`${canaryAdmin[s]}/health`)).ok, {
+    timeout: 30_000,
+    interval: 200,
+    message: `canary-${s} up`,
+  });
+}
+
 export const restart = async (s: Service) => {
   await compose(['restart', '-t', '1', serviceName(s)]);
   if (s in anchors) await waitForAnchor(s as AnchorName);
   for (const c of sidecar(s)) await compose(['restart', '-t', '1', c]);
+  await waitForCanary(s);
 };
 export const stop = async (s: Service) => {
   for (const c of sidecar(s)) await compose(['stop', '-t', '1', c]);
@@ -274,6 +284,7 @@ export const start = async (s: Service) => {
   await compose(['start', serviceName(s)]);
   if (s in anchors) await waitForAnchor(s as AnchorName);
   for (const c of sidecar(s)) await compose(['start', c]);
+  await waitForCanary(s);
 };
 export const pause = (s: Service) => compose(['pause', serviceName(s)]);
 export const unpause = (s: Service) => compose(['unpause', serviceName(s)]);

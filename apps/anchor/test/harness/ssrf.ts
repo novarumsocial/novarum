@@ -214,6 +214,22 @@ export const triggers = {
       await actor.as(`/channel/${encodeURIComponent(c)}/users`),
     ];
   },
+  /** T7: looking up a bot on the homeserver (the authorize page) */
+  T7: async ({ actor }: Ctx, hs: string) => [
+    await actor.as(`/bots/lookup?username=evil&homeserver=${encodeURIComponent(hs)}`),
+  ],
+  /** T8: adding a bot of the homeserver to a guild of ours (a fresh adder: adding bots is rate limited) */
+  T8: async ({ actor }: Ctx, hs: string) => {
+    const adder = await makeActor(actor.name);
+    const created = await adder.as('/guilds/create', { method: 'POST', json: { name: 'ssrf' } });
+    const guildId = JSON.parse(created.text).guild.id as string;
+    return [
+      await adder.as(`/guilds/${encodeURIComponent(guildId)}/bots`, {
+        method: 'POST',
+        json: { username: 'evil', homeserver: hs, role: 'MEMBER' },
+      }),
+    ];
+  },
 };
 export type TriggerName = keyof typeof triggers;
 export const triggerNames = Object.keys(triggers) as TriggerName[];
@@ -226,6 +242,8 @@ export const refusedStatus: Record<TriggerName, number> = {
   T4: 502,
   T5: 200,
   T6: 502,
+  T7: 404,
+  T8: 502,
 };
 
 /** runs the given triggers (default all) against one target and returns `{T1: [...], ...}` */

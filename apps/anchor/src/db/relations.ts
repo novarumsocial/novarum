@@ -31,6 +31,11 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.users.id,
       to: r.notificationPreferences.userId,
     }),
+    bot: r.one.bots({ from: r.users.id, to: r.bots.userId }),
+  },
+  bots: {
+    user: r.one.users({ from: r.bots.userId, to: r.users.id, optional: false }),
+    owner: r.one.users({ from: r.bots.ownerId, to: r.users.id, optional: false }),
   },
   notificationSettings: {
     user: r.one.users({

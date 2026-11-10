@@ -118,7 +118,14 @@ describe('the socket itself (a hostile homeserver talking to A)', () => {
           data: {
             guildId: guild.id,
             channels: [
-              { id: channel.id, guildId: guild.id, name: 'general', position: 0, type: 'TEXT' },
+              {
+                id: channel.id,
+                guildId: guild.id,
+                name: 'general',
+                position: 0,
+                type: 'TEXT',
+                ownerOnly: false,
+              },
             ],
           },
         },

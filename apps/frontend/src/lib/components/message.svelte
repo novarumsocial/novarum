@@ -13,7 +13,13 @@
     Link,
     Copy,
     IdCardLanyard,
+    LoaderCircle,
+    SquareSlash,
+    EyeOff,
   } from '@lucide/svelte';
+  import BotBadge from './bot-badge.svelte';
+  import MessageEmbed from './message-embed.svelte';
+  import MessageComponents from './message-components.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import AttachmentViewer from './attachment-viewer.svelte';
   import { cn, formatBytes, mentionsEveryone } from '$lib/utils';
@@ -68,68 +74,85 @@
     setTimeout(() => editMsgTextarea?.focus(), 0);
   });
 
-  const dropdownItems: DropdownItems[] = $derived([
-    {
-      label: () => 'Reply',
-      icon: Reply,
-      variant: 'default',
-      onclick: onReply,
-      hideFromShift: true,
-    },
-    ...(isSelf(message.author)
+  // ephemeral answers and "thinking…" only exist on this screen: nothing to reply to, link or delete
+  const localOnly = $derived(!!message.ephemeral || !!message.thinking);
+  const channelId = $derived(chat.activeChannel ?? '');
+
+  const dropdownItems: DropdownItems[] = $derived(
+    localOnly
       ? [
           {
-            label: () => 'Edit Message',
-            icon: Pencil,
-            variant: 'default' as const,
-            hideFromShift: true,
+            label: () => 'Copy Text',
+            icon: Copy,
+            variant: 'default',
             onclick: () => {
-              chat.editingMessage = true;
-              chat.editingMessageId = message.id;
-              dropdownOpen = false;
+              navigator.clipboard.writeText(message.content ?? '');
             },
           },
         ]
-      : []),
-    {
-      label: () => 'Copy Text',
-      icon: Copy,
-      variant: 'default',
-      onclick: () => {
-        navigator.clipboard.writeText(message.content ?? '');
-      },
-    },
-    // TODO: separator here
-    {
-      label: () => 'Copy Message Link',
-      icon: Link,
-      variant: 'default',
-      onclick: () => {
-        const url = chat.messagePath(message.id);
-        navigator.clipboard.writeText(`${window.location.origin}${url}`);
-      },
-    },
-    // TODO: separator here
-    ...(isSelf(message.author)
-      ? [
+      : [
           {
-            label: () => deleteText,
-            icon: Trash2,
-            variant: 'destructive' as const,
-            onclick: deleteMessage,
-            disabled: () => deleting,
-            closeOnSelect: false,
+            label: () => 'Reply',
+            icon: Reply,
+            variant: 'default',
+            onclick: onReply,
+            hideFromShift: true,
+          },
+          ...(isSelf(message.author)
+            ? [
+                {
+                  label: () => 'Edit Message',
+                  icon: Pencil,
+                  variant: 'default' as const,
+                  hideFromShift: true,
+                  onclick: () => {
+                    chat.editingMessage = true;
+                    chat.editingMessageId = message.id;
+                    dropdownOpen = false;
+                  },
+                },
+              ]
+            : []),
+          {
+            label: () => 'Copy Text',
+            icon: Copy,
+            variant: 'default',
+            onclick: () => {
+              navigator.clipboard.writeText(message.content ?? '');
+            },
+          },
+          // TODO: separator here
+          {
+            label: () => 'Copy Message Link',
+            icon: Link,
+            variant: 'default',
+            onclick: () => {
+              const url = chat.messagePath(message.id);
+              navigator.clipboard.writeText(`${window.location.origin}${url}`);
+            },
+          },
+          // TODO: separator here
+          ...(isSelf(message.author)
+            ? [
+                {
+                  label: () => deleteText,
+                  icon: Trash2,
+                  variant: 'destructive' as const,
+                  onclick: deleteMessage,
+                  disabled: () => deleting,
+                  closeOnSelect: false,
+                },
+              ]
+            : []),
+          // TODO: separator here
+          {
+            label: () => 'Copy Message ID',
+            icon: IdCardLanyard,
+            variant: 'default',
+            onclick: () => navigator.clipboard.writeText(message.id),
           },
         ]
-      : []),
-    // TODO: separator here
-    {
-      label: () => 'Copy Message ID',
-      icon: IdCardLanyard,
-      variant: 'default',
-      onclick: () => navigator.clipboard.writeText(message.id),
-    },
-  ]);
+  );
 
   $effect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -297,7 +320,7 @@
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
-              class="mt-0.5 size-9 text-xs"
+              class="{message.interaction ? 'mt-5' : 'mt-0.5'} size-9 text-xs"
               bgColor={message.author.avatarColor}
             />
           </ProfileCard>
@@ -306,6 +329,19 @@
         {/if}
 
         <div class="min-w-0 flex-1">
+          {#if message.interaction}
+            <p
+              class="mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground"
+            >
+              <SquareSlash class="size-3 shrink-0 text-primary/70" aria-hidden="true" />
+              <span class="truncate">
+                <span class="font-medium text-foreground/75"
+                  >{message.interaction.user.displayName || message.interaction.user.username}</span
+                >
+                used <span class="font-medium text-foreground/75">/{message.interaction.name}</span>
+              </span>
+            </p>
+          {/if}
           {#if !grouped}
             <div class="flex items-baseline gap-2">
               <ProfileCard
@@ -315,6 +351,7 @@
               >
                 {authorName}
               </ProfileCard>
+              {#if message.author.isBot}<BotBadge class="self-center" />{/if}
               <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
             </div>
           {/if}
@@ -366,7 +403,7 @@
                 >
               </div>
             </div>
-          {:else if message.content?.trim() || message.edited}
+          {:else if message.content?.trim() || (message.edited && !message.embeds.length)}
             <div class="text-sm leading-relaxed text-foreground/90">
               <Markdown content={message.content?.trim() ? message.content : ''} links>
                 {#snippet trailing()}
@@ -389,7 +426,33 @@
             </div>
           {/if}
 
-          {#if hovered || dropdownOpen || contextMenuOpen}
+          {#if message.thinking}
+            <p class="flex items-center gap-1.5 text-sm text-muted-foreground" aria-live="polite">
+              <LoaderCircle class="size-3.5 animate-spin" />
+              {authorName} is thinking…
+            </p>
+          {/if}
+
+          {#each message.embeds as embed, index (index)}
+            <MessageEmbed {embed} />
+          {/each}
+          {#if message.components.length}
+            <MessageComponents rows={message.components} {channelId} messageId={message.id} />
+          {/if}
+
+          {#if message.ephemeral && !message.thinking}
+            <p class="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <EyeOff class="size-3" aria-hidden="true" />
+              Only you can see this
+              <button
+                type="button"
+                class="text-link hover:underline"
+                onclick={() => chat.removeMessage(channelId, message.id)}>Dismiss</button
+              >
+            </p>
+          {/if}
+
+          {#if (hovered || dropdownOpen || contextMenuOpen) && !localOnly}
             <div class="absolute top-0 right-0">
               <ButtonGroup.Root>
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}

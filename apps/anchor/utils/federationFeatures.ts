@@ -6,6 +6,8 @@ export const federationFeatures = [
   'realtime-mux',
   // one request per homeserver to tell it a user went online or offline
   'status-batch',
+  // bots: adding them to guilds across homeservers, slash commands and interactions
+  'bots',
 ] as const;
 
 export type FederationFeature = (typeof federationFeatures)[number];

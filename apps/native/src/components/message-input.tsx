@@ -21,6 +21,7 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
+import { CommandForm } from '@/components/command-form';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Textarea } from '@/components/ui/input';
@@ -28,7 +29,15 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { useAnchor } from '@/lib/anchor';
-import { maxMessageLength, useChat, type PickedFile } from '@/lib/chat-state';
+import {
+  maxMessageLength,
+  selectActiveChannel,
+  selectActiveServer,
+  useChat,
+  type PickedFile,
+} from '@/lib/chat-state';
+import { interactions, useGuildCommands, type GuildBotCommands } from '@/lib/bots';
+import type { Command } from 'anchor/bot-schemas';
 import { realtime, useRealtime } from '@/lib/realtime';
 import type { Author } from '@/lib/types/chat';
 import { cn, formatBytes } from '@/lib/utils';
@@ -110,6 +119,13 @@ export function MessageInput({
   const members = useChat((s) => s.members);
   const inGuild = useChat((s) => s.route.kind === 'guild');
   const uploadProgress = useChat((s) => s.uploadProgress);
+  const activeServer = useChat((s) => selectActiveServer(s));
+  const activeChannel = useChat((s) => selectActiveChannel(s));
+  const guildCommands = useGuildCommands(activeServer);
+  const [activeCommand, setActiveCommand] = useState<{
+    entry: GuildBotCommands;
+    command: Command;
+  } | null>(null);
   const emojiQuery = useRealtime((s) => s.emojiQuery);
   const emojiResults = useRealtime((s) => s.emojiResults);
 
@@ -138,6 +154,43 @@ export function MessageInput({
       }));
     return [...everyone, ...matches].slice(0, 8);
   }, [members, search, inGuild]);
+  // "/name" with nothing after it, in a guild: the person is picking a slash command
+  const commandQuery =
+    inGuild && /^\/[\w-]*$/.test(content) ? content.slice(1).toLowerCase() : null;
+  const commandResults = useMemo(
+    () =>
+      commandQuery === null
+        ? []
+        : guildCommands
+            .flatMap((entry) => entry.commands.map((command) => ({ entry, command })))
+            .filter(({ command }) => command.name.startsWith(commandQuery))
+            .slice(0, 10),
+    [commandQuery, guildCommands]
+  );
+  const pickingCommand = commandQuery !== null;
+  useEffect(() => {
+    if (pickingCommand && activeServer) void interactions().loadCommands(activeServer);
+  }, [pickingCommand, activeServer]);
+
+  async function pickCommand(result: { entry: GuildBotCommands; command: Command }) {
+    setContent('');
+    // nothing to fill in: run it right away, like sending a message
+    if (!result.command.options?.length && activeChannel) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSendError('');
+      const failed = await interactions().runCommand(
+        activeChannel,
+        result.entry,
+        result.command.name,
+        []
+      );
+      setSendError(failed ?? '');
+      return;
+    }
+    input.current?.blur();
+    setActiveCommand(result);
+  }
+
   const emojiMatches =
     search?.kind === 'emoji' && emojiQuery.trim() === search.query.trim() ? emojiResults : [];
 
@@ -252,6 +305,38 @@ export function MessageInput({
       className="bg-background px-2 pt-1"
       style={{ paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 8) }}
     >
+      {commandResults.length > 0 && (
+        <ScrollView
+          keyboardShouldPersistTaps="always"
+          className="mb-2 max-h-64 border border-border bg-popover"
+        >
+          {commandResults.map((result) => (
+            <Pressable
+              accessibilityRole="button"
+              key={`${result.entry.bot.userId}:${result.command.name}`}
+              onPress={() => void pickCommand(result)}
+              className="min-h-12 flex-row items-center gap-2.5 px-3 active:bg-accent"
+            >
+              <Avatar
+                src={result.entry.bot.avatarUrl}
+                name={result.entry.bot.displayName || result.entry.bot.username}
+                bgColor={result.entry.bot.avatarColor}
+                className="size-6"
+              />
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-semibold">/{result.command.name}</Text>
+                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                  {result.command.description}
+                </Text>
+              </View>
+              <Text className="text-[11px] text-muted-foreground">
+                {result.entry.bot.displayName || result.entry.bot.username}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       {(mentionResults.length > 0 || emojiMatches.length > 0) && (
         <ScrollView
           horizontal
@@ -369,7 +454,15 @@ export function MessageInput({
             {sendError}
           </Text>
         ) : null}
-        <View className="flex-row items-end gap-1 p-1">
+        {activeCommand && activeChannel && (
+          <CommandForm
+            entry={activeCommand.entry}
+            command={activeCommand.command}
+            channelId={activeChannel}
+            onClose={() => setActiveCommand(null)}
+          />
+        )}
+        <View className={cn('flex-row items-end gap-1 p-1', activeCommand && 'hidden')}>
           <Button
             variant="ghost"
             size="icon"

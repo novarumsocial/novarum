@@ -15,6 +15,10 @@
     "./public-user": {
       "types": "./utils/publicUser.ts",
       "import": "./utils/publicUser.ts"
+    },
+    "./bot-schemas": {
+      "types": "./utils/botSchemas.ts",
+      "import": "./utils/botSchemas.ts"
     }
   },
   "module": "src/index.js",

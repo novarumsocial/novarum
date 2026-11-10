@@ -1,3 +1,4 @@
+import type { ActionRow, Embed } from 'anchor/bot-schemas';
 export interface Server {
   id: string;
   name: string;
@@ -45,6 +46,13 @@ export interface Message {
   replyTo: string | null;
   pingedHandles: string[];
   attachments: Attachment[];
+  embeds: Embed[];
+  components: ActionRow[];
+  // "<someone> used /command", on a bot's answer to a slash command
+  interaction: { id: string; name: string; user: Author } | null;
+  // only on this screen: a bot's answer only you can see, or a bot still thinking about it
+  ephemeral?: boolean;
+  thinking?: boolean;
 }
 
 export interface Attachment {
@@ -67,6 +75,7 @@ export interface VoiceUser {
 
 export type ChatRoute =
   | { kind: 'home' }
+  | { kind: 'developers'; botId: string | null }
   | { kind: 'dms'; channelId: string | null; messageId: string | null }
   | {
       kind: 'guild';

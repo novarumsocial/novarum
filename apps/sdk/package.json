@@ -1,0 +1,48 @@
+{
+  "name": "@novarum/sdk",
+  "version": "0.1.0",
+  "description": "Build bots for Novarum: a typed client for the Anchor bot API, slash commands, embeds and buttons.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "novarum",
+    "bot",
+    "sdk",
+    "anchor",
+    "chat"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit -p .",
+    "test": "bun test test/builders.test.ts",
+    "prepublishOnly": "bun run check && bun run test && bun run build",
+    "publish:npm": "npm publish --access public",
+    "test:e2e": "ANCHOR_CONFIG=../anchor/test/config.toml bun test test/e2e.test.ts"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^25.6.2",
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.3"
+  }
+}

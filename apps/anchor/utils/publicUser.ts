@@ -36,3 +36,10 @@ export function publicUser(user: Omit<PublicUser, 'userId'> & { id: string }): P
 export function userProfile(user: UserProfile): UserProfile {
   return userProfileSchema.parse(user);
 }
+
+// What a homeserver may change on our copy of one of its users. Whether it is a bot is settled
+// when we first see it: flipping it later would let a homeserver dodge "remove bot".
+export function remoteProfile(user: UserProfile) {
+  const { isBot: _, ...profile } = userProfile(user);
+  return profile;
+}

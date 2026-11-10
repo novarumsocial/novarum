@@ -8,6 +8,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -17,6 +18,7 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { ActionRow, Command, Embed, MessageInteraction } from '../../utils/botSchemas';
 
 const date = (name: string) =>
   timestamp(name, {
@@ -284,6 +286,12 @@ export const messages = pgTable(
       .$onUpdate(() => new Date()),
 
     deletedAt: date('deletedAt'),
+
+    // only bots can send these
+    embeds: jsonb('embeds').$type<Embed[]>(),
+    components: jsonb('components').$type<ActionRow[]>(),
+    // set when a bot sent this in answer to a slash command
+    interaction: jsonb('interaction').$type<MessageInteraction>(),
   },
   (table) => [
     unique('message_authorId_nonce_unique').on(table.authorId, table.nonce),
@@ -591,4 +599,27 @@ export const pushSubscriptions = pgTable(
     index('push_subscription_userId_idx').on(table.userId),
     index('push_subscription_sessionId_idx').on(table.sessionId),
   ]
+);
+
+// a bot account: a user with isBot, owned by a local user. its token is a session of the bot user.
+export const bots = pgTable(
+  'bot',
+  {
+    userId: text('userId')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    ownerId: text('ownerId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    // anyone who can manage a guild may add a public bot; a private one only its owner
+    public: boolean('public').notNull().default(true),
+
+    // global slash commands, replaced as a whole by the bot
+    commands: jsonb('commands').$type<Command[]>().notNull().default([]),
+
+    createdAt: date('createdAt').notNull().defaultNow(),
+  },
+  (table) => [index('bot_ownerId_idx').on(table.ownerId)]
 );

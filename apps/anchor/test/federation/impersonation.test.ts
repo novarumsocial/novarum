@@ -13,10 +13,20 @@ const routesDir = path.join(anchorRoot, 'modules/federation/routes');
 const source = readdirSync(routesDir)
   .map((file) => readFileSync(path.join(routesDir, file), 'utf8'))
   .join('\n');
-// /push names no user: its ids are rebuilt from the signer (forged senders are in notify.hostile.test.ts)
+// /push names no user: its ids are rebuilt from the signer (forged senders are in notify.hostile.test.ts).
+// The bot routes below act for the signing homeserver itself (a guild host, or the bot's homeserver), and
+// only ever on guilds the signer hosts; forged origins are in bots.test.ts ("hostile homeservers").
+const originOnly = new Set([
+  '/push',
+  '/bots/:username/join',
+  '/bots/:username/leave',
+  '/bots/:username/commands',
+  '/interactions',
+  '/interactions/ephemeral',
+]);
 const postRoutes = [...source.matchAll(/\.post\(\s*'([^']+)'/g)]
   .map((m) => m[1]!)
-  .filter((route) => route !== '/push');
+  .filter((route) => !originOnly.has(route));
 
 type Family = 'user' | 'friends' | 'participants';
 // friends/command and /sync -> 403; everything else with a `user` payload (guild, channel, message, invite, DM, voice, status) -> 401
