@@ -176,6 +176,7 @@ export class Voice {
       audioCaptureDefaults: microphoneCaptureOptions(),
       audioOutput: { deviceId: settings.value.voiceOutputDeviceId },
       videoCaptureDefaults: { deviceId: settings.value.videoInputDeviceId },
+      publishDefaults: { videoCodec: 'vp9', backupCodec: false },
     });
     this.room = room;
     this.bindRoomEvents(room, channelId);

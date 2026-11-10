@@ -52,7 +52,7 @@ import { Client } from '@novarum/sdk';
 
 const client = new Client({
   token: process.env.BOT_TOKEN!,
-  baseUrl: 'https://anchor.novarum.me',
+  baseUrl: 'https://a.novarum.me',
 });
 
 client.on('ready', () => console.log(`Logged in as ${client.user!.tag}`));
@@ -71,7 +71,7 @@ bun bot.ts
 
 <Aside>
   `baseUrl` is the address of the bot's Anchor, which is not always the same as its homeserver name.
-  For example, the `novarum.me` homeserver runs at `https://anchor.novarum.me`. The developer panel
+  For example, the `novarum.me` homeserver runs at `https://a.novarum.me`. The developer panel
   shows the right value in its quickstart.
 </Aside>
 
