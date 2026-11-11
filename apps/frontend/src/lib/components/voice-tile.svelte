@@ -135,7 +135,7 @@
           fallback={initialsFor(tile.name)}
           bgColor={tile.member?.avatarColor}
           class={cn(
-            'rounded-full border-2 border-white/30 bg-black/20 text-white shadow-2xl ring-4 ring-black/10',
+            'rounded-pill border-2 border-white/30 bg-black/20 text-white shadow-2xl ring-4 ring-black/10',
             compact ? 'size-10 text-sm' : 'size-16 text-xl sm:size-24 sm:text-2xl'
           )}
         />

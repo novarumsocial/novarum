@@ -281,7 +281,6 @@
         <ServerSidebar
           servers={chat.servers}
           activeId={chat.activeServer}
-          mentions={guildMentions}
           channels={serverChannels}
           onCreateServer={(server) => chat.createServer(server)}
           onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
@@ -289,7 +288,7 @@
       </div>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
-    {#snippet serverChannels(server: Server, collapse: () => void)}
+    {#snippet serverChannels(server: Server, expanded: boolean, toggle: () => void)}
       <ChannelSidebar
         {server}
         categories={chat.channelsByServer[server.id] ?? []}
@@ -302,7 +301,8 @@
           await chat.saveChannelOrder(server.id, channelIds)}
         onSetOwnerOnly={(channelId, ownerOnly) =>
           void chat.setOwnerOnly(server.id, channelId, ownerOnly)}
-        onCollapse={collapse}
+        folded={!expanded}
+        onToggleFold={toggle}
         canReorder={server.canManageChannels}
         {voice}
         members={chat.members}
@@ -313,15 +313,14 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <!-- open conversations as tabs; the active one joins the panel below it -->
       <div
-        class="relative z-10 -mb-px hidden h-11 shrink-0 items-end gap-1 pt-2 pr-2 md:flex {settings
-          .value.showSidebar
+        class="hidden h-14 shrink-0 items-center gap-2 pr-3 md:flex {settings.value.showSidebar
           ? ''
-          : 'pl-2'}"
+          : 'pl-3'}"
       >
         <Button
           variant="ghost"
           size="icon"
-          class="mb-0.5 text-muted-foreground"
+          class="text-muted-foreground"
           aria-label={settings.value.showSidebar ? 'Hide sidebar' : 'Show sidebar'}
           aria-pressed={settings.value.showSidebar}
           title={settings.value.showSidebar ? 'Hide sidebar' : 'Show sidebar'}
@@ -334,7 +333,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="mb-0.5 {voice.selfMuted ? 'text-rose-400' : 'text-muted-foreground'}"
+            class={voice.selfMuted ? 'text-rose-400' : 'text-muted-foreground'}
             aria-label={voice.selfMuted ? 'Unmute' : 'Mute'}
             title={voice.selfMuted ? 'Unmute' : 'Mute'}
             onclick={() => voice.setMuted(!voice.selfMuted)}
@@ -344,7 +343,7 @@
         {/if}
         <button
           type="button"
-          class="mb-0.5 flex h-8 w-56 shrink-0 cursor-pointer items-center gap-2 border border-border px-2.5 text-sm text-muted-foreground transition-colors hover:border-input hover:text-foreground"
+          class="flex h-9 w-60 shrink-0 cursor-pointer items-center gap-2.5 rounded-pill bg-card px-4 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           onclick={() => (switcherOpen = true)}
         >
           <Search class="size-3.5 shrink-0" />
@@ -354,10 +353,10 @@
       </div>
 
       <div
-        class="flex min-h-0 flex-1 overflow-hidden bg-background md:mr-2 md:mb-2 md:border md:border-border {settings
+        class="flex min-h-0 flex-1 overflow-hidden bg-background md:mr-3 md:mb-3 md:rounded-3xl {settings
           .value.showSidebar
           ? ''
-          : 'md:ml-2'}"
+          : 'md:ml-3'}"
       >
         {#if chat.route.kind === 'home'}
           <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />

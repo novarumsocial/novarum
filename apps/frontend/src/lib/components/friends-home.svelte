@@ -83,10 +83,9 @@
     />
     <span
       class={cn(
-        'absolute -right-1 -bottom-1 size-3.5 border-[3px] border-background group-hover:border-card',
-        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-neutral-500'
+        'absolute -right-1 -bottom-1 size-3.5 rounded-pill border-[3px] border-background group-hover:border-card',
+        entry.status === 'ONLINE' ? 'bg-online' : 'bg-muted-foreground'
       )}
-      class:rounded-full={settings.value.circleIcons}
     ></span>
   </div>
   <div class="min-w-0 flex-1 leading-tight select-none">
@@ -151,7 +150,7 @@
         {#each [{ value: 'online', label: 'Online' }, { value: 'all', label: 'All' }, { value: 'pending', label: 'Pending' }] as item (item.value)}
           <Tabs.Trigger
             value={item.value}
-            class="h-7 flex-none gap-1.5 border-transparent! px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground data-active:bg-muted! data-active:text-foreground"
+            class="h-8 flex-none gap-1.5 rounded-pill! border-transparent! px-3.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground data-active:bg-sidebar-accent! data-active:text-sidebar-accent-foreground"
           >
             {item.label}
             {#if item.value === 'pending' && friends.incoming.length > 0}
@@ -166,7 +165,7 @@
         {/each}
         <Tabs.Trigger
           value="add"
-          class="h-7 flex-none border-transparent! bg-primary! px-2.5 text-sm font-medium text-primary-foreground! hover:bg-primary/85! data-active:bg-transparent! data-active:text-sidebar-primary!"
+          class="h-8 flex-none rounded-pill! border-transparent! bg-primary! px-3.5 text-sm font-medium text-primary-foreground! hover:bg-primary/85! data-active:bg-transparent! data-active:text-sidebar-primary!"
         >
           Add friend
         </Tabs.Trigger>
@@ -191,7 +190,11 @@
             )}
           {:else}
             <div class="relative">
-              <Input placeholder="Search friends" class="h-10 bg-card pr-9" bind:value={query} />
+              <Input
+                placeholder="Search friends"
+                class="h-11 rounded-pill! border-transparent bg-card px-5 pr-10"
+                bind:value={query}
+              />
               <Search
                 class="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
               />
@@ -205,7 +208,7 @@
               {#each list as entry (entry.user.userId)}
                 {@const name = nameFor(entry)}
                 <div
-                  class="group relative flex items-center gap-3 border-t px-3 py-2.5 hover:border-transparent hover:bg-card has-[button:focus-visible]:bg-card [&:hover+div]:border-transparent"
+                  class="group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-card has-[button:focus-visible]:bg-card"
                 >
                   <!-- the whole row opens the DM; the action buttons sit above it -->
                   <button
@@ -369,7 +372,7 @@
             {#each online as entry (entry.user.userId)}
               <button
                 type="button"
-                class="group flex w-full cursor-pointer items-center gap-3 bg-card p-3 text-left hover:bg-muted"
+                class="group flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-card p-3 text-left hover:bg-muted"
                 onclick={() => dms.open(entry.user.userId)}
               >
                 {@render person(entry, 'Online', 'size-10')}

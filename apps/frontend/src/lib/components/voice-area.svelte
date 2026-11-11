@@ -159,7 +159,7 @@
   }
 
   const controlClass = $derived(
-    cn('size-10 sm:size-8', settings.value.circleIcons && 'rounded-full')
+    cn('size-10 sm:size-8', settings.value.circleIcons && 'rounded-pill')
   );
   const micLabel = $derived(voice.selfDeafened ? 'Undeafen' : voice.selfMuted ? 'Unmute' : 'Mute');
   const cameraLabel = $derived(voice.selfCamera ? 'Turn camera off' : 'Turn camera on');
@@ -388,7 +388,7 @@
           class={cn(
             'absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 border border-border bg-sidebar/80 p-2 shadow-lg backdrop-blur transition-opacity duration-300 focus-within:pointer-events-auto focus-within:opacity-100 sm:bottom-4',
             !showControls && 'pointer-events-none opacity-0',
-            settings.value.circleIcons && 'rounded-full'
+            settings.value.circleIcons && 'rounded-pill'
           )}
           role="group"
           aria-label="Call controls"

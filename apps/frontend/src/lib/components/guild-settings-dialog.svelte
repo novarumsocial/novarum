@@ -166,7 +166,7 @@
         <Tabs.Content value="server" class="sm:h-full sm:overflow-y-auto sm:pr-1">
           <div class="space-y-5 pb-1">
             <div class="flex items-center gap-4">
-              <div class="group relative size-16 shrink-0 overflow-hidden rounded-full">
+              <div class="group relative size-16 shrink-0 overflow-hidden rounded-pill">
                 <Avatar src={server.avatarUrl} name={server.name} class="size-16 text-lg" />
 
                 <input

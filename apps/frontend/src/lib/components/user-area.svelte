@@ -89,7 +89,7 @@
   });
 </script>
 
-<div class="shrink-0 border-t border-border">
+<div class="m-2 shrink-0 overflow-hidden rounded-3xl bg-card">
   {#if voice.connected || voice.connecting}
     <div class="border-b border-border/80 px-3 py-2">
       <div class="flex items-center gap-2">
@@ -246,7 +246,7 @@
         on
           ? 'bg-primary text-primary-foreground hover:bg-primary/85'
           : 'bg-sidebar-accent text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground',
-        settings.value.circleIcons && 'rounded-full'
+        settings.value.circleIcons && 'rounded-pill'
       )}
       disabled={!voice.connected}
       aria-label={label}
@@ -277,13 +277,8 @@
             class="size-8 text-xs"
           />
           <span
-            class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+            class="absolute -right-0.5 -bottom-0.5 size-3 rounded-pill border-2 border-card bg-online"
           ></span>
-          {#if settings.value.circleIcons}
-            <span
-              class="rounded-full absolute -right-px -bottom-px size-2.75 border-2 border-sidebar bg-emerald-500"
-            ></span>
-          {/if}
         </div>
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">

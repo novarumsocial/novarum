@@ -14,7 +14,7 @@
 </script>
 
 <article
-  class="mt-1.5 grid max-w-lg grid-cols-[1fr_auto] gap-x-4 border border-l-4 border-border bg-card/60 py-2.5 pr-3 pl-3"
+  class="mt-1.5 grid max-w-lg grid-cols-[1fr_auto] gap-x-4 rounded-2xl border-l-4 border-border bg-card py-3 pr-4 pl-3.5"
   style:border-left-color={accent}
 >
   <div class="min-w-0">

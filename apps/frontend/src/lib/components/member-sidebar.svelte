@@ -60,7 +60,7 @@
             <ProfileCard
               user={member}
               {onCall}
-              class="group flex w-full items-center gap-2 px-1 py-1"
+              class="group flex w-full items-center gap-2.5 rounded-pill px-1.5 py-1 hover:bg-accent"
             >
               <div class="relative">
                 <Avatar
@@ -70,13 +70,8 @@
                   bgColor={member.avatarColor}
                 />
                 <span
-                  class="absolute -bottom-px -right-px size-2.5 border-2 border-background bg-online"
+                  class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-pill border-2 border-background bg-online"
                 ></span>
-                {#if settings.value.circleIcons}
-                  <span
-                    class="rounded-full absolute -bottom-px -right-px size-2.75 border-2 border-background bg-online"
-                  ></span>
-                {/if}
                 <!-- TODO: fix dependency for user.status -->
               </div>
               <div class="flex min-w-0 flex-1">
@@ -131,7 +126,7 @@
               <ProfileCard
                 user={member}
                 {onCall}
-                class="group flex w-full items-center gap-2 px-1 py-1"
+                class="group flex w-full items-center gap-2.5 rounded-pill px-1.5 py-1 hover:bg-accent"
               >
                 <div class="relative">
                   <Avatar

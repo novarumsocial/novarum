@@ -293,8 +293,8 @@
         {...props}
         id={message.id}
         data-message-id={message.id}
-        class="group/row relative -mx-3 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[minmax(0,9rem)_1.5rem_minmax(0,1fr)] px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
-          ? 'bg-amber-400/10 hover:bg-amber-400/15'
+        class="group/row relative -mx-2 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[minmax(0,9rem)_1.5rem_minmax(0,1fr)] rounded-xl px-2 py-0.5 first:mt-0 motion-reduce:animate-none {selfMentioned
+          ? 'bg-tertiary-container/50 hover:bg-tertiary-container/70'
           : 'hover:bg-muted/40'}"
         class:animate-message-flash={chat.activeMessage === message.id}
         onanimationend={() => {
@@ -311,9 +311,6 @@
         onmouseleave={() => (hovered = false)}
         role="group"
       >
-        {#if selfMentioned}
-          <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
-        {/if}
         <!-- Narrow: avatar on the left, name and time above the text. Wide (@2xl): a transcript,
              with the name and a small avatar in a left gutter and the time at the far right. -->
         {#if message.interaction}
@@ -470,7 +467,9 @@
           {/if}
 
           {#if (hovered || dropdownOpen || contextMenuOpen) && !localOnly}
-            <div class="absolute -top-3 right-3 border border-border bg-popover shadow-md">
+            <div
+              class="absolute -top-3 right-3 rounded-pill bg-popover p-0.5 shadow-md shadow-black/20"
+            >
               <ButtonGroup.Root>
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
                   ><Reply class="size-3" /></Button

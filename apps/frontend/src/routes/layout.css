@@ -1,88 +1,99 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
-@import '@fontsource-variable/instrument-sans/standard.css';
-@import '@fontsource-variable/instrument-sans/standard-italic.css';
+@import '@fontsource-variable/dm-sans/standard.css';
+@import '@fontsource-variable/dm-sans/standard-italic.css';
 
 @custom-variant dark (&:is(.dark *));
 
+/* Colour roles follow Material 3: every surface is a faint tint of the violet seed, stepping
+   lighter as it rises (sidebar < background < card < popover < muted). Primary is for the main
+   action, secondary/sidebar-accent for selected things, tertiary for "new here" accents. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.18 0 0);
-  --card: oklch(0.972 0 0);
-  --card-foreground: oklch(0.18 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0 0);
-  --primary: oklch(0.2 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.935 0 0);
-  --secondary-foreground: oklch(0.18 0 0);
-  --muted: oklch(0.948 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.93 0 0);
-  --accent-foreground: oklch(0.18 0 0);
-  --destructive: oklch(0.56 0.2 24);
-  --destructive-foreground: oklch(0.985 0.01 30);
-  --border: oklch(0 0 0 / 11%);
-  --input: oklch(0 0 0 / 18%);
-  --ring: oklch(0.45 0 0);
-  --chart-1: oklch(0.2 0 0);
-  --chart-2: oklch(0.45 0 0);
-  --chart-3: oklch(0.62 0 0);
-  --chart-4: oklch(0.78 0 0);
-  --chart-5: oklch(0.9 0 0);
+  --background: oklch(0.987 0.007 300);
+  --foreground: oklch(0.21 0.022 292);
+  --card: oklch(0.962 0.014 298);
+  --card-foreground: oklch(0.21 0.022 292);
+  --popover: oklch(0.975 0.011 298);
+  --popover-foreground: oklch(0.21 0.022 292);
+  --primary: oklch(0.5 0.16 292);
+  --primary-foreground: oklch(0.99 0.005 300);
+  --secondary: oklch(0.9 0.05 295);
+  --secondary-foreground: oklch(0.26 0.07 292);
+  --muted: oklch(0.935 0.02 298);
+  --muted-foreground: oklch(0.44 0.03 292);
+  --accent: oklch(0.925 0.028 297);
+  --accent-foreground: oklch(0.21 0.022 292);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.99 0.005 30);
+  --border: oklch(0.4 0.05 292 / 16%);
+  --input: oklch(0.4 0.05 292 / 26%);
+  --ring: oklch(0.5 0.16 292);
+  --chart-1: oklch(0.5 0.16 292);
+  --chart-2: oklch(0.52 0.11 5);
+  --chart-3: oklch(0.6 0.1 200);
+  --chart-4: oklch(0.7 0.08 292);
+  --chart-5: oklch(0.85 0.04 292);
   --radius: 0rem;
-  --sidebar: oklch(0.955 0 0);
-  --sidebar-foreground: oklch(0.18 0 0);
-  --sidebar-primary: oklch(0.2 0 0);
-  --link: oklch(0.45 0.13 250);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.9 0 0);
-  --sidebar-accent-foreground: oklch(0.18 0 0);
-  --sidebar-border: oklch(0 0 0 / 11%);
-  --sidebar-ring: oklch(0.45 0 0);
+  --sidebar: oklch(0.94 0.028 298);
+  --sidebar-foreground: oklch(0.21 0.022 292);
+  --sidebar-primary: oklch(0.5 0.16 292);
+  --link: oklch(0.48 0.16 280);
+  --sidebar-primary-foreground: oklch(0.99 0.005 300);
+  --sidebar-accent: oklch(0.86 0.085 295);
+  --sidebar-accent-foreground: oklch(0.26 0.08 292);
+  --sidebar-border: oklch(0.4 0.05 292 / 16%);
+  --sidebar-ring: oklch(0.5 0.16 292);
+  --tertiary: oklch(0.52 0.12 5);
+  --tertiary-foreground: oklch(0.99 0.005 10);
+  --tertiary-container: oklch(0.93 0.04 5);
   --online: oklch(0.6 0.16 155);
 }
 
 .dark {
-  --background: oklch(0.195 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.232 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.245 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.94 0 0);
-  --primary-foreground: oklch(0.17 0 0);
-  --secondary: oklch(0.275 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.258 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.275 0 0);
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.7 0.18 22);
-  --destructive-foreground: oklch(0.16 0 0);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0 0);
-  --chart-1: oklch(0.94 0 0);
-  --chart-2: oklch(0.7 0 0);
-  --chart-3: oklch(0.55 0 0);
-  --chart-4: oklch(0.4 0 0);
-  --chart-5: oklch(0.3 0 0);
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.94 0 0);
-  --link: oklch(0.8 0.085 235);
-  --sidebar-primary-foreground: oklch(0.17 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.7 0 0);
+  --background: oklch(0.21 0.022 292);
+  --foreground: oklch(0.93 0.012 295);
+  --card: oklch(0.255 0.028 292);
+  --card-foreground: oklch(0.93 0.012 295);
+  --popover: oklch(0.28 0.03 292);
+  --popover-foreground: oklch(0.93 0.012 295);
+  --primary: oklch(0.8 0.125 295);
+  --primary-foreground: oklch(0.27 0.1 290);
+  --secondary: oklch(0.38 0.085 292);
+  --secondary-foreground: oklch(0.93 0.04 295);
+  --muted: oklch(0.305 0.034 292);
+  --muted-foreground: oklch(0.77 0.027 294);
+  --accent: oklch(0.31 0.045 292);
+  --accent-foreground: oklch(0.93 0.012 295);
+  --destructive: oklch(0.74 0.15 22);
+  --destructive-foreground: oklch(0.22 0.07 22);
+  --border: oklch(0.85 0.05 295 / 14%);
+  --input: oklch(0.85 0.05 295 / 24%);
+  --ring: oklch(0.82 0.1 295);
+  --chart-1: oklch(0.82 0.1 295);
+  --chart-2: oklch(0.83 0.085 8);
+  --chart-3: oklch(0.8 0.09 200);
+  --chart-4: oklch(0.55 0.07 292);
+  --chart-5: oklch(0.36 0.06 292);
+  --sidebar: oklch(0.165 0.022 292);
+  --sidebar-foreground: oklch(0.93 0.012 295);
+  --sidebar-primary: oklch(0.82 0.1 295);
+  --link: oklch(0.82 0.1 275);
+  --sidebar-primary-foreground: oklch(0.27 0.1 290);
+  --sidebar-accent: oklch(0.42 0.11 292);
+  --sidebar-accent-foreground: oklch(0.94 0.045 295);
+  --sidebar-border: oklch(0.85 0.05 295 / 14%);
+  --sidebar-ring: oklch(0.82 0.1 295);
+  --tertiary: oklch(0.8 0.12 8);
+  --tertiary-foreground: oklch(0.3 0.07 8);
+  --tertiary-container: oklch(0.42 0.1 8);
   --online: oklch(0.78 0.16 155);
 }
 
+/* Everything is square unless the "rounded icons" setting is on. Every radius utility derives
+   from --radius (including rounded-pill), so flipping this one value rounds the whole app. */
 :root[data-rounded='true'] {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 :root[data-rounded='true'] .rounded-none {
@@ -90,9 +101,12 @@
 }
 
 @theme inline {
-  --font-sans: 'Instrument Sans Variable', system-ui, sans-serif;
-  --font-heading: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-sans: 'DM Sans Variable', system-ui, sans-serif;
+  --font-heading: 'DM Sans Variable', system-ui, sans-serif;
   --color-online: var(--online);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-tertiary-container: var(--tertiary-container);
   --animate-message-flash: message-flash 1.5s ease-out;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -134,6 +148,7 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-pill: calc(var(--radius) * 9999);
 
   @keyframes message-flash {
     0%,
@@ -158,8 +173,8 @@
   }
 }
 
-/* The interface is monochrome; the only colour is the one each person picked for themselves.
-   .user-ink takes --user-color (their avatar colour) and lifts it to a readable lightness. */
+/* People's names take the colour they picked for themselves: .user-ink reads --user-color
+   (their avatar colour) and lifts it to a readable lightness. */
 .user-ink {
   --ink-l: 0.45;
   color: var(--foreground);
@@ -239,6 +254,7 @@ html.cursor-spinner * {
 }
 
 *::-webkit-scrollbar-thumb {
+  border-radius: calc(var(--radius) * 0.4);
   background: color-mix(in oklch, var(--muted-foreground), var(--muted));
 }
 

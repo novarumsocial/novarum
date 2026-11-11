@@ -431,7 +431,7 @@
           <div
             class={cn(
               'flex min-w-0 items-center gap-2 border border-border bg-sidebar/80 py-1.5 pr-3 pl-1.5 text-sm text-foreground shadow-lg backdrop-blur',
-              settings.value.circleIcons && 'rounded-full'
+              settings.value.circleIcons && 'rounded-pill'
             )}
           >
             <Avatar
@@ -517,23 +517,31 @@
                     i === 0}
                   {#if dayDivider}
                     <div
-                      class="mt-5 mb-1 flex items-center gap-3 text-xs font-medium text-muted-foreground @2xl:grid @2xl:grid-cols-[minmax(0,9rem)_minmax(0,1fr)]"
+                      class="mt-5 mb-2 flex justify-center"
                       role="separator"
                       aria-label={msg.timestamp.toLocaleDateString()}
                     >
-                      <span class="@2xl:text-right">{formatDate(msg.timestamp)}</span>
-                      <span class="h-px flex-1 bg-border"></span>
+                      <span
+                        class="rounded-pill bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
+                      >
+                        {formatDate(msg.timestamp)}
+                      </span>
                     </div>
                   {/if}
                   {#if firstUnread}
                     <div
                       id={`unread-${channel.id}`}
-                      class="mt-4 flex items-center gap-3 text-xs font-semibold text-destructive @2xl:grid @2xl:grid-cols-[minmax(0,9rem)_minmax(0,1fr)]"
+                      class="mt-4 flex items-center gap-3 text-xs font-semibold text-tertiary"
                       role="separator"
                       aria-label="New messages"
                     >
-                      <span class="@2xl:text-right">New</span>
-                      <span class="h-px flex-1 bg-destructive"></span>
+                      <span class="h-px flex-1 bg-tertiary/50"></span>
+                      <span
+                        class="rounded-pill bg-tertiary-container px-2.5 py-0.5 text-foreground"
+                      >
+                        New
+                      </span>
+                      <span class="h-px flex-1 bg-tertiary/50"></span>
                     </div>
                   {/if}
                   <MessageComponent
@@ -562,12 +570,12 @@
         >
           <span class="flex items-center gap-0.5 mr-2.5">
             <span
-              class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]"
+              class="size-1 animate-bounce rounded-pill bg-muted-foreground [animation-delay:-0.3s]"
             ></span>
             <span
-              class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]"
+              class="size-1 animate-bounce rounded-pill bg-muted-foreground [animation-delay:-0.15s]"
             ></span>
-            <span class="size-1 animate-bounce rounded-full bg-muted-foreground"></span>
+            <span class="size-1 animate-bounce rounded-pill bg-muted-foreground"></span>
           </span>
           {typingText ?? ''}
         </div>

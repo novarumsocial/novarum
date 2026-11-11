@@ -495,8 +495,8 @@
 
   <div
     class={cn(
-      'relative border bg-card transition-colors focus-within:border-foreground/40',
-      draggingFiles ? 'border-foreground' : 'border-input'
+      'relative overflow-hidden rounded-3xl border bg-card transition-colors focus-within:border-primary/60',
+      draggingFiles ? 'border-primary' : 'border-transparent'
     )}
   >
     {#if context}
@@ -628,7 +628,7 @@
         class={cn(
           'size-10 shrink-0 transition-colors',
           canSend
-            ? 'bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground'
+            ? 'bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground dark:hover:bg-primary/85'
             : 'text-muted-foreground'
         )}
       >

@@ -33,7 +33,7 @@
   class={cn(
     'flex shrink-0 items-center justify-center overflow-hidden font-bold select-none',
     bgColor ? 'text-white' : 'bg-secondary text-foreground',
-    settings.value.circleIcons && 'rounded-full',
+    settings.value.circleIcons && 'rounded-pill',
     className
   )}
   style:background-color={bgColor || undefined}

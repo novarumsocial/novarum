@@ -94,7 +94,7 @@
     <Button
       variant="destructive"
       size="icon-lg"
-      class={cn(settings.value.circleIcons && 'rounded-full')}
+      class={cn(settings.value.circleIcons && 'rounded-pill')}
       aria-label="Decline"
       onclick={decline}
     >
@@ -104,7 +104,7 @@
       size="icon-lg"
       class={cn(
         'bg-green-500/20 text-green-500 hover:bg-green-500/30',
-        settings.value.circleIcons && 'rounded-full'
+        settings.value.circleIcons && 'rounded-pill'
       )}
       aria-label="Accept"
       onclick={accept}

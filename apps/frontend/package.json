@@ -14,8 +14,8 @@
     "ui:add": "bun x shadcn-svelte@latest add"
   },
   "devDependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
-    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.30.0",
     "@sveltejs/adapter-static": "^3.0.10",
