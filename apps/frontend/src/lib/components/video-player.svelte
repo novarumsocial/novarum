@@ -32,6 +32,7 @@
     ) { border-radius: var(--radius); }
     .media-default-skin.media-default-skin--video .media-surface:after { border-radius: var(--radius); }
     .media-default-skin.media-default-skin--video .media-button { text-shadow: none; }
+    .media-default-skin.media-default-skin--video { width: 100%; height: 100%; min-height: 0; }
   `);
 
   $effect(() => {
@@ -44,17 +45,22 @@
 </script>
 
 <video-player bind:this={player} controls playsinline class="[--media-border-radius:var(--radius)]">
-  <!-- video-player has no box of its own; the skin is what gets sized. It follows the video's
-       shape, capped in height so a portrait clip doesn't take over the chat. -->
-  <video-skin class="min-h-32 w-fit max-w-full min-w-56 overflow-hidden rounded-none bg-black">
+  <!-- video-player has no box of its own; the skin is what gets sized. It's always a 16:9 box
+       with the clip fitted inside, so portrait videos stay small and the controls always fit. -->
+  <video-skin class="aspect-video w-full overflow-hidden rounded-none bg-black">
     <video
       src={attachment.url}
       poster={attachment.previewUrl}
       preload="metadata"
       aria-label={attachment.filename}
-      class="max-h-96 max-w-full"
+      class="size-full object-contain"
     ></video>
-    <img slot="poster" src={attachment.previewUrl} alt={attachment.filename} />
+    <img
+      slot="poster"
+      src={attachment.previewUrl}
+      alt={attachment.filename}
+      class="size-full object-contain"
+    />
   </video-skin>
 </video-player>
 
