@@ -276,19 +276,21 @@
         : 'md:hidden'}"
       class:-translate-x-full={!mobileNavigationOpen}
     >
-      <!-- one tree for everything: direct messages first, then every server with its channels -->
-      <div class="min-h-0 flex-1 overflow-y-auto pb-2">
-        <DmSidebar onCall={startCall} />
-        <ServerSidebar
-          servers={chat.servers}
-          activeId={chat.activeServer}
-          mentions={guildMentions}
-          channels={serverChannels}
-          onSelect={selectServer}
-          onCreateServer={(server) => chat.createServer(server)}
-          onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
-        />
-      </div>
+      <!-- one list for everything: direct messages, then the servers you keep; the rest wait
+           on a shelf pinned to the bottom -->
+      <ServerSidebar
+        servers={chat.servers}
+        activeId={chat.activeServer}
+        mentions={guildMentions}
+        channels={serverChannels}
+        onSelect={selectServer}
+        onCreateServer={(server) => chat.createServer(server)}
+        onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
+      >
+        {#snippet top()}
+          <DmSidebar onCall={startCall} />
+        {/snippet}
+      </ServerSidebar>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
     {#snippet serverChannels(
