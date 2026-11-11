@@ -15,6 +15,7 @@
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import { sidebarFolds } from '$lib/sidebar-folds.svelte';
+  import { tabs } from '$lib/tabs.svelte';
   import Avatar from './avatar.svelte';
   import NewDmDialog from './new-dm-dialog.svelte';
   import { notificationSettings } from '$lib/notification-settings.svelte';
@@ -107,6 +108,7 @@
             tabindex="0"
             class={itemClass(active) + ' group cursor-pointer'}
             onclick={() => goto(`/guilds/dms/${encodeURIComponent(entry.id)}`)}
+            ondblclick={() => tabs.keep(entry.id)}
             onkeydown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();

@@ -41,6 +41,7 @@
   import ProfileCard from './profile-card.svelte';
   import NotificationMenu from './notification-menu.svelte';
   import { notificationSettings } from '$lib/notification-settings.svelte';
+  import { tabs } from '$lib/tabs.svelte';
 
   let {
     server,
@@ -430,6 +431,7 @@
                   <ContextMenu.Trigger>
                     <button
                       onclick={() => selectChannel(ch)}
+                      ondblclick={() => ch.type === 'TEXT' && tabs.keep(ch.id)}
                       class={cn(
                         'flex h-8 w-full cursor-pointer items-center gap-2 rounded-pill px-3 text-left text-sm transition-colors',
                         activeChannel === ch.id &&

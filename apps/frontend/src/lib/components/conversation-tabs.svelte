@@ -10,11 +10,11 @@
   const byId = $derived(new Map(listConversations().map((item) => [item.id, item])));
   const open = $derived(tabs.ids.flatMap((id) => byId.get(id) ?? []));
 
-  // every conversation you visit becomes a tab; only the route is tracked so closing one sticks
+  // the conversation you're in shows as the preview tab; only the route is tracked so closing sticks
   $effect(() => {
     const id = chat.activeChannel;
     untrack(() => {
-      if (id && chat.currentChannel?.type !== 'VOICE') tabs.open(id);
+      if (id && chat.currentChannel?.type !== 'VOICE') tabs.show(id);
     });
   });
 
@@ -55,9 +55,10 @@
         aria-selected={active}
         title="{item.server ? `#${item.name} in ${item.server.name}` : item.name}{index < 9
           ? ` (Alt+${index + 1})`
-          : ''}"
+          : ''}{tabs.preview === item.id ? '. Double-click to keep this tab' : ''}"
         class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-pill pr-1 pl-3 text-left outline-none focus-visible:bg-accent"
         onclick={() => chat.selectChannel(item.id)}
+        ondblclick={() => tabs.keep(item.id)}
         onauxclick={(event) => event.button === 1 && close(item.id)}
       >
         {#if item.server}
@@ -73,6 +74,7 @@
         <span
           class="max-w-36 shrink-0 truncate"
           class:font-semibold={item.unread || item.mention > 0}
+          class:italic={tabs.preview === item.id}
         >
           {item.name}
         </span>

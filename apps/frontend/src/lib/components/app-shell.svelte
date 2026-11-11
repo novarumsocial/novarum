@@ -24,6 +24,7 @@
   import DmSidebar from './dm-sidebar.svelte';
   import CallRinging from './call-ringing.svelte';
   import ConversationTabs from './conversation-tabs.svelte';
+  import { tabs } from '$lib/tabs.svelte';
   import QuickSwitcher from './quick-switcher.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Mic, MicOff, PanelLeft, Search } from '@lucide/svelte';
@@ -367,8 +368,10 @@
             channel={currentChannel}
             messages={currentMessages}
             loading={currentMessagesLoading}
-            onSend={(content, files, replyTo) =>
-              chat.sendMessage(currentChannel.id, content, files, replyTo)}
+            onSend={(content, files, replyTo) => {
+              tabs.keep(currentChannel.id);
+              return chat.sendMessage(currentChannel.id, content, files, replyTo);
+            }}
             onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
             onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
             onOpenNavigation={() => (mobileNavigationOpen = true)}
