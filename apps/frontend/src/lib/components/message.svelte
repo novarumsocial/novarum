@@ -211,9 +211,17 @@
         !attachment.contentType.startsWith('video/') && !attachment.contentType.startsWith('audio/')
     )
   );
-  const singleImage = $derived(
-    gridAttachments.length === 1 && gridAttachments[0].contentType.startsWith('image/')
+  const imageAttachments = $derived(
+    gridAttachments.filter((attachment) => attachment.contentType.startsWith('image/'))
   );
+  const fileAttachments = $derived(
+    gridAttachments.filter((attachment) => !attachment.contentType.startsWith('image/'))
+  );
+  const singleImage = $derived(imageAttachments.length === 1);
+
+  // "report.final.pdf" -> "PDF"; files without an extension are just a "File"
+  const fileKind = (filename: string) =>
+    filename.includes('.') ? filename.split('.').pop()!.toUpperCase() : 'File';
   let viewerOpen = $state(false);
   let viewerIndex = $state(0);
 
@@ -535,76 +543,89 @@
                 <AudioPlayer {attachment} {hovered} />
               </div>
             {/each}
-            {#if gridAttachments.length > 0}
+            {#if imageAttachments.length > 0}
+              <!-- one image shows at its own shape; several become an even grid of squares -->
               <div
                 class={cn(
-                  'mt-2 grid',
-                  singleImage ? 'w-fit max-w-full' : 'max-w-80 grid-cols-2 gap-1 sm:grid-cols-3'
+                  'mt-2 grid gap-1',
+                  singleImage
+                    ? 'w-fit max-w-full'
+                    : imageAttachments.length === 2 || imageAttachments.length === 4
+                      ? 'max-w-md grid-cols-2'
+                      : 'max-w-md grid-cols-3'
                 )}
               >
-                {#each gridAttachments as attachment (attachment.id)}
-                  {#if attachment.contentType.startsWith('image/')}
-                    <Button
-                      variant="ghost"
+                {#each imageAttachments as attachment (attachment.id)}
+                  <button
+                    type="button"
+                    class={cn(
+                      'group relative min-w-0 cursor-zoom-in overflow-hidden rounded-none bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      singleImage ? 'w-fit max-w-full' : 'aspect-square'
+                    )}
+                    aria-label={`View ${attachment.filename}`}
+                    onclick={() => viewAttachment(attachment.id)}
+                  >
+                    <img
+                      src={attachment.previewUrl}
+                      alt={attachment.filename}
+                      loading="lazy"
+                      decoding="async"
                       class={cn(
-                        'group relative h-auto min-w-0 overflow-hidden rounded-none border border-border bg-muted/30 p-0 hover:border-primary/50 hover:bg-muted/30',
-                        singleImage ? 'w-fit max-w-full' : 'aspect-square'
+                        'block transition-[filter] group-hover:brightness-110',
+                        singleImage
+                          ? 'h-auto max-h-80 w-auto max-w-full min-w-32 object-contain sm:max-w-md'
+                          : 'size-full object-cover'
                       )}
-                      aria-label={`View ${attachment.filename}`}
-                      onclick={() => viewAttachment(attachment.id)}
+                    />
+                  </button>
+                {/each}
+              </div>
+            {/if}
+            {#if fileAttachments.length > 0}
+              <div class="mt-2 flex max-w-md flex-col gap-1.5">
+                {#each fileAttachments as attachment (attachment.id)}
+                  {@const viewable = attachment.contentType === 'application/pdf'}
+                  <div class="flex items-stretch rounded-none bg-card">
+                    <svelte:element
+                      this={viewable ? 'button' : 'a'}
+                      type={viewable ? 'button' : undefined}
+                      href={viewable ? undefined : attachment.url}
+                      target={viewable ? undefined : '_blank'}
+                      rel={viewable ? undefined : 'noreferrer'}
+                      class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-none p-2.5 text-left outline-none hover:bg-muted focus-visible:bg-muted"
+                      aria-label="{viewable ? 'View' : 'Download'} {attachment.filename}"
+                      role={viewable ? 'button' : 'link'}
+                      onclick={viewable ? () => viewAttachment(attachment.id) : undefined}
                     >
-                      <img
-                        src={attachment.previewUrl}
-                        alt={attachment.filename}
-                        loading="lazy"
-                        decoding="async"
-                        class={cn(
-                          'block transition-[filter] group-hover:brightness-110',
-                          singleImage
-                            ? 'h-auto max-h-64 w-auto min-w-32 max-w-full object-contain sm:max-w-80'
-                            : 'size-full object-cover'
-                        )}
-                      />
-                    </Button>
-                  {:else if attachment.contentType === 'application/pdf'}
-                    <Button
-                      variant="outline"
-                      class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
-                      onclick={() => viewAttachment(attachment.id)}
-                    >
-                      <div class="flex size-8 shrink-0 items-center justify-center bg-muted">
-                        <FileText class="size-4 text-primary" />
-                      </div>
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-[11px] font-medium"
-                          >{attachment.filename}</span
-                        >
-                        <span class="font-mono text-[9px] uppercase text-muted-foreground"
-                          >View</span
-                        >
+                      <span
+                        class="flex size-10 shrink-0 items-center justify-center rounded-none bg-secondary text-secondary-foreground"
+                      >
+                        <FileText class="size-5" />
                       </span>
-                    </Button>
-                  {:else}
-                    <Button
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-medium text-foreground">
+                          {attachment.filename}
+                        </span>
+                        <span class="flex gap-2 text-xs text-muted-foreground">
+                          <span>{fileKind(attachment.filename)}</span>
+                          <span class="tabular-nums">{formatBytes(attachment.size)}</span>
+                        </span>
+                      </span>
+                      {#if viewable}
+                        <span class="shrink-0 pr-1 text-xs font-medium text-primary">View</span>
+                      {/if}
+                    </svelte:element>
+                    <a
                       href={attachment.url}
                       target="_blank"
                       rel="noreferrer"
-                      variant="outline"
-                      class="h-auto min-w-0 justify-start gap-2 p-2 text-left"
+                      class="flex w-11 shrink-0 items-center justify-center rounded-none text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label="Download {attachment.filename}"
+                      title="Download"
                     >
-                      <div class="flex size-9 shrink-0 items-center justify-center bg-muted">
-                        <FileText class="size-4 text-primary" />
-                      </div>
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-xs font-medium">{attachment.filename}</span
-                        >
-                        <span class="font-mono text-[10px] uppercase text-muted-foreground">
-                          {formatBytes(attachment.size)}
-                        </span>
-                      </span>
-                      <Download class="size-3.5 shrink-0 text-muted-foreground" />
-                    </Button>
-                  {/if}
+                      <Download class="size-4" />
+                    </a>
+                  </div>
                 {/each}
               </div>
             {/if}

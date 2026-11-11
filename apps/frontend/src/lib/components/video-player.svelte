@@ -43,18 +43,16 @@
   });
 </script>
 
-<video-player
-  bind:this={player}
-  controls
-  playsinline
-  class="block aspect-video w-full overflow-hidden rounded-lg border border-border bg-black [--media-border-radius:0.5rem]"
->
-  <video-skin>
+<video-player bind:this={player} controls playsinline class="[--media-border-radius:var(--radius)]">
+  <!-- video-player has no box of its own; the skin is what gets sized. It follows the video's
+       shape, capped in height so a portrait clip doesn't take over the chat. -->
+  <video-skin class="min-h-32 w-fit max-w-full min-w-56 overflow-hidden rounded-none bg-black">
     <video
       src={attachment.url}
       poster={attachment.previewUrl}
       preload="metadata"
       aria-label={attachment.filename}
+      class="max-h-96 max-w-full"
     ></video>
     <img slot="poster" src={attachment.previewUrl} alt={attachment.filename} />
   </video-skin>
