@@ -33,6 +33,25 @@
     .media-default-skin.media-default-skin--video .media-surface:after { border-radius: var(--radius); }
     .media-default-skin.media-default-skin--video .media-button { text-shadow: none; }
     .media-default-skin.media-default-skin--video { width: 100%; height: 100%; min-height: 0; }
+    /* The library keeps the controls up for as long as a clip is paused, which in a chat means
+       always. Here they only show while you point at (or tab into) the player; a paused clip
+       shows a plain play mark instead. */
+    :host(:not(:hover):not(:focus-within)) .media-controls {
+      opacity: 0;
+      pointer-events: none;
+    }
+    :host(:not(:hover):not(:focus-within)) .media-default-skin:has(.media-button--play[data-paused])::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      margin: auto;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: var(--radius);
+      background: rgb(0 0 0 / 0.6) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E") center / 1.75rem no-repeat;
+      pointer-events: none;
+    }
   `);
 
   $effect(() => {
