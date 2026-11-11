@@ -2,6 +2,7 @@
   import {
     Bot,
     ChevronRight,
+    Hash,
     LoaderCircle,
     Phone,
     Plus,
@@ -14,6 +15,7 @@
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
+  import { listConversations } from '$lib/conversations.svelte';
   import { sidebarFolds } from '$lib/sidebar-folds.svelte';
   import { tabs } from '$lib/tabs.svelte';
   import Avatar from './avatar.svelte';
@@ -33,6 +35,14 @@
   let { onCall }: { onCall?: (channelId: string) => void } = $props();
 
   let newDmOpen = $state(false);
+
+  const UNREAD_LIMIT = 8;
+  let showAllUnread = $state(false);
+  const unread = $derived(
+    listConversations()
+      .filter((item) => (item.unread || item.mention > 0) && item.id !== chat.activeChannel)
+      .sort((a, b) => b.mention - a.mention)
+  );
 
   // The list shows the most recent few; anything unread or open always stays visible,
   // including while the section is folded.
@@ -75,6 +85,49 @@
       <Bot class="size-4 shrink-0" />
       <span class="flex-1 truncate">Developers</span>
     </button>
+
+    <!-- everything waiting for you, from any server, so nothing hides below the fold -->
+    {#if unread.length}
+      <div class="px-3 pt-3 pb-1 text-xs font-medium text-muted-foreground select-none">Unread</div>
+      {#each showAllUnread ? unread : unread.slice(0, UNREAD_LIMIT) as item (item.id)}
+        <button
+          class="{itemClass(false)} font-semibold text-sidebar-foreground"
+          onclick={() => chat.selectChannel(item.id)}
+        >
+          {#if item.server}
+            <Hash class="size-4 shrink-0" />
+          {:else}
+            <Avatar
+              src={item.avatarUrl}
+              name={item.name}
+              class="size-5 text-[10px]"
+              bgColor={item.avatarColor}
+            />
+          {/if}
+          <span class="truncate">{item.name}</span>
+          <span class="min-w-0 flex-1 truncate text-xs font-normal text-muted-foreground">
+            {item.server?.name}
+          </span>
+          {#if item.mention > 0}
+            <span
+              class="flex h-4.5 min-w-4.5 shrink-0 items-center justify-center rounded-pill bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground"
+            >
+              {item.mention > 99 ? '99+' : item.mention}
+            </span>
+          {:else}
+            <span class="size-2 shrink-0 rounded-pill bg-tertiary"></span>
+          {/if}
+        </button>
+      {/each}
+      {#if unread.length > UNREAD_LIMIT}
+        <button
+          class="w-full cursor-pointer rounded-pill px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-accent"
+          onclick={() => (showAllUnread = !showAllUnread)}
+        >
+          {showAllUnread ? 'Show fewer' : `Show ${unread.length - UNREAD_LIMIT} more`}
+        </button>
+      {/if}
+    {/if}
 
     <div class="flex items-center justify-between px-3 pt-3 pb-1">
       <button

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { ChevronRight } from '@lucide/svelte';
+  import { ChevronRight, Pin, PinOff } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
   import type { Server } from '$lib/types/chat';
+  import { serverColor } from '$lib/server-color';
   import Avatar from './avatar.svelte';
 
   // One server's heading in the sidebar tree: click to fold its channels away or back out.
@@ -10,27 +11,19 @@
     expanded,
     onToggle,
     unread = false,
+    pinned = true,
+    onTogglePin,
     actions,
   }: {
     server: Server;
     expanded: boolean;
     onToggle: () => void;
     unread?: boolean;
+    // an unpinned server only shows while you're in it, like a preview tab
+    pinned?: boolean;
+    onTogglePin?: () => void;
     actions?: Snippet;
   } = $props();
-
-  // servers without a picture get a steady colour of their own, picked from their id
-  const TILES = [
-    'oklch(0.55 0.16 292)',
-    'oklch(0.58 0.15 8)',
-    'oklch(0.58 0.11 200)',
-    'oklch(0.6 0.13 65)',
-    'oklch(0.56 0.13 150)',
-    'oklch(0.55 0.15 255)',
-  ];
-  const tileColor = $derived(
-    TILES[[...server.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % TILES.length]
-  );
 </script>
 
 <!-- sticks to the top of the sidebar while its channels scroll under it -->
@@ -54,9 +47,10 @@
         name={server.name}
         fallback={server.initials.charAt(0)}
         class="size-5 text-[10px]"
-        bgColor={server.avatarUrl ? undefined : tileColor}
+        bgColor={server.avatarUrl ? undefined : serverColor(server.id)}
       />
       <span
+        class:italic={!pinned}
         class="truncate text-sm font-semibold {expanded || unread
           ? 'text-sidebar-foreground'
           : 'text-muted-foreground'}"
@@ -65,6 +59,22 @@
       </span>
     </button>
 
+    {#if onTogglePin}
+      <button
+        type="button"
+        class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-pill hover:bg-muted focus-visible:opacity-100 {pinned
+          ? 'text-muted-foreground opacity-0 group-hover/server:opacity-100 hover:text-foreground'
+          : 'text-primary'}"
+        aria-pressed={pinned}
+        aria-label={pinned
+          ? `Stop keeping ${server.name} in the sidebar`
+          : `Keep ${server.name} in the sidebar`}
+        title={pinned ? 'Stop keeping in sidebar' : 'Keep in sidebar'}
+        onclick={onTogglePin}
+      >
+        {#if pinned}<PinOff class="size-3.5" />{:else}<Pin class="size-3.5" />{/if}
+      </button>
+    {/if}
     {@render actions?.()}
   </div>
 </div>

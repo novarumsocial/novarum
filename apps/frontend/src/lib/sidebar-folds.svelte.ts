@@ -1,5 +1,6 @@
-// Which sidebar sections (servers by id, plus 'dms') the user folded or unfolded by hand.
-// Sections without an entry follow their own default.
+// Sidebar choices the user made by hand: which sections are unfolded (servers by id, plus
+// 'dms') and which servers are kept in the list ('pin:<id>'). Anything without an entry follows
+// its own default.
 import { z } from 'zod';
 
 const KEY = 'novarum:sidebar-folds';

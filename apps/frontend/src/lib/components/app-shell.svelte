@@ -282,14 +282,22 @@
         <ServerSidebar
           servers={chat.servers}
           activeId={chat.activeServer}
+          mentions={guildMentions}
           channels={serverChannels}
+          onSelect={selectServer}
           onCreateServer={(server) => chat.createServer(server)}
           onReorder={async (guilds) => await chat.reorderGuilds(guilds)}
         />
       </div>
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
-    {#snippet serverChannels(server: Server, expanded: boolean, toggle: () => void)}
+    {#snippet serverChannels(
+      server: Server,
+      expanded: boolean,
+      toggle: () => void,
+      pinned: boolean,
+      togglePin: () => void
+    )}
       <ChannelSidebar
         {server}
         categories={chat.channelsByServer[server.id] ?? []}
@@ -304,6 +312,8 @@
           void chat.setOwnerOnly(server.id, channelId, ownerOnly)}
         folded={!expanded}
         onToggleFold={toggle}
+        {pinned}
+        onTogglePin={togglePin}
         canReorder={server.canManageChannels}
         {voice}
         members={chat.members}

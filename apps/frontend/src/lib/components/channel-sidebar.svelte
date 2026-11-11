@@ -54,6 +54,8 @@
     onSetOwnerOnly,
     folded = false,
     onToggleFold,
+    pinned = true,
+    onTogglePin,
     canReorder = false,
     voice,
     members = [],
@@ -69,6 +71,8 @@
     onSetOwnerOnly?: (channelId: string, ownerOnly: boolean) => void;
     folded?: boolean;
     onToggleFold?: () => void;
+    pinned?: boolean;
+    onTogglePin?: () => void;
     canReorder?: boolean;
     voice?: Voice | null;
     members?: Author[];
@@ -293,6 +297,8 @@
         expanded={!folded}
         unread={folded && anyShown}
         onToggle={() => onToggleFold?.()}
+        {pinned}
+        {onTogglePin}
       >
         {#snippet actions()}
           {#if server.canManageChannels && categories.length === 1}
