@@ -1,167 +1,172 @@
 {
   "background": {
-    "light": "#fcf9fc",
-    "dark": "#0c090c",
+    "light": "#ffffff",
+    "dark": "#151515",
     "alpha": 1
   },
   "foreground": {
-    "light": "#0c090c",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "card": {
-    "light": "#f8f3f8",
-    "dark": "#1d161e",
+    "light": "#f6f6f6",
+    "dark": "#1d1d1d",
     "alpha": 1
   },
   "card-foreground": {
-    "light": "#0c090c",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "popover": {
-    "light": "#f8f3f8",
-    "dark": "#1d161e",
+    "light": "#ffffff",
+    "dark": "#202020",
     "alpha": 1
   },
   "popover-foreground": {
-    "light": "#0c090c",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "primary": {
-    "light": "#005f78",
-    "dark": "#005f78",
+    "light": "#161616",
+    "dark": "#ebebeb",
     "alpha": 1
   },
   "primary-foreground": {
-    "light": "#ecfeff",
-    "dark": "#ecfeff",
+    "light": "#fafafa",
+    "dark": "#0f0f0f",
     "alpha": 1
   },
   "secondary": {
-    "light": "#ebebef",
-    "dark": "#27272a",
+    "light": "#e9e9e9",
+    "dark": "#282828",
     "alpha": 1
   },
   "secondary-foreground": {
-    "light": "#171717",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "muted": {
-    "light": "#eee9ef",
-    "dark": "#2a212c",
+    "light": "#eeeeee",
+    "dark": "#232323",
     "alpha": 1
   },
   "muted-foreground": {
-    "light": "#5b525c",
-    "dark": "#a89ea9",
+    "light": "#555555",
+    "dark": "#989898",
     "alpha": 1
   },
   "accent": {
-    "light": "#eee9ef",
-    "dark": "#2a212c",
+    "light": "#e8e8e8",
+    "dark": "#282828",
     "alpha": 1
   },
   "accent-foreground": {
-    "light": "#171717",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "destructive": {
-    "light": "#d33842",
-    "dark": "#ff6467",
+    "light": "#d02b34",
+    "dark": "#fa686a",
     "alpha": 1
   },
   "destructive-foreground": {
-    "light": "#ecfeff",
-    "dark": "#0c090c",
+    "light": "#fff8f6",
+    "dark": "#0d0d0d",
     "alpha": 1
   },
   "border": {
     "light": "#000000",
     "dark": "#ffffff",
-    "alpha": 0.1
+    "alpha": 0.11
   },
   "input": {
     "light": "#000000",
     "dark": "#ffffff",
-    "alpha": 0.15
+    "alpha": 0.18
   },
   "ring": {
-    "light": "#79697b",
-    "dark": "#79697b",
+    "light": "#555555",
+    "dark": "#9e9e9e",
     "alpha": 1
   },
   "chart-1": {
-    "light": "#594c5b",
-    "dark": "#d7d0d7",
+    "light": "#161616",
+    "dark": "#ebebeb",
     "alpha": 1
   },
   "chart-2": {
-    "light": "#79697b",
-    "dark": "#79697b",
+    "light": "#555555",
+    "dark": "#9e9e9e",
     "alpha": 1
   },
   "chart-3": {
-    "light": "#a99fab",
-    "dark": "#594c5b",
+    "light": "#868686",
+    "dark": "#717171",
     "alpha": 1
   },
   "chart-4": {
-    "light": "#c9c1ca",
-    "dark": "#463947",
+    "light": "#b7b7b7",
+    "dark": "#484848",
     "alpha": 1
   },
   "chart-5": {
-    "light": "#e0dce1",
-    "dark": "#2a212c",
+    "light": "#dedede",
+    "dark": "#2e2e2e",
     "alpha": 1
   },
   "sidebar": {
-    "light": "#f8f3f8",
-    "dark": "#1d161e",
+    "light": "#f0f0f0",
+    "dark": "#0a0a0a",
     "alpha": 1
   },
   "sidebar-foreground": {
-    "light": "#0c090c",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "sidebar-primary": {
-    "light": "#006686",
-    "dark": "#00b8db",
+    "light": "#161616",
+    "dark": "#ebebeb",
     "alpha": 1
   },
   "link": {
-    "light": "#006686",
-    "dark": "#4db4cc",
+    "light": "#00579a",
+    "dark": "#86c7ed",
     "alpha": 1
   },
   "sidebar-primary-foreground": {
-    "light": "#ecfeff",
-    "dark": "#053345",
+    "light": "#fafafa",
+    "dark": "#0f0f0f",
     "alpha": 1
   },
   "sidebar-accent": {
-    "light": "#eee9ef",
-    "dark": "#2a212c",
+    "light": "#dedede",
+    "dark": "#1b1b1b",
     "alpha": 1
   },
   "sidebar-accent-foreground": {
-    "light": "#0c090c",
-    "dark": "#fafafa",
+    "light": "#121212",
+    "dark": "#eeeeee",
     "alpha": 1
   },
   "sidebar-border": {
     "light": "#000000",
     "dark": "#ffffff",
-    "alpha": 0.1
+    "alpha": 0.11
   },
   "sidebar-ring": {
-    "light": "#79697b",
-    "dark": "#79697b",
+    "light": "#555555",
+    "dark": "#9e9e9e",
+    "alpha": 1
+  },
+  "online": {
+    "light": "#009b53",
+    "dark": "#4ed589",
     "alpha": 1
   }
 }

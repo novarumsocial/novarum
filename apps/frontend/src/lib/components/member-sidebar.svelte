@@ -1,6 +1,5 @@
 <script lang="ts">
   import BotBadge from './bot-badge.svelte';
-  import { Users } from '@lucide/svelte';
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
@@ -39,22 +38,20 @@
   }
 </script>
 
-<aside class="flex size-full w-56 flex-col bg-sidebar">
-  <div class="h-12 shrink-0 border-b border-border p-2">
-    <!--
-      <Input
-        id="search-in-channel"
-        placeholder="Search {server.name}"
-        autocomplete="off"
-        spellcheck="false"
-      />
--->
-  </div>
-  <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-    <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-      <Users class="size-3.5" />
-      Online - {online.length}
-    </div>
+{#snippet groupLabel(text: string, count: number)}
+  <h2 class="flex items-baseline justify-between px-1 text-xs font-medium text-muted-foreground">
+    {text}
+    <span class="tabular-nums">{count}</span>
+  </h2>
+{/snippet}
+
+<aside class="flex size-full w-56 flex-col border-l border-border bg-background">
+  <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+    <h1 class="text-[15px] font-semibold">Members</h1>
+    <span class="text-xs text-muted-foreground tabular-nums">{members.length}</span>
+  </header>
+  <div class="flex-1 space-y-2 overflow-y-auto px-3 py-4">
+    {@render groupLabel('Online', online.length)}
     <div class="space-y-0.5">
       {#each online as member}
         {@const name = nameFor(member)}
@@ -73,17 +70,20 @@
                   bgColor={member.avatarColor}
                 />
                 <span
-                  class="absolute -bottom-px -right-px size-2.5 border-2 border-sidebar bg-emerald-500"
+                  class="absolute -bottom-px -right-px size-2.5 border-2 border-background bg-online"
                 ></span>
                 {#if settings.value.circleIcons}
                   <span
-                    class="rounded-full absolute -bottom-px -right-px size-2.75 border-2 border-sidebar bg-emerald-500"
+                    class="rounded-full absolute -bottom-px -right-px size-2.75 border-2 border-background bg-online"
                   ></span>
                 {/if}
                 <!-- TODO: fix dependency for user.status -->
               </div>
               <div class="flex min-w-0 flex-1">
-                <span class="block truncate text-sm text-foreground">{name}</span>
+                <span
+                  class="user-ink block truncate text-sm"
+                  style:--user-color={member.avatarColor}>{name}</span
+                >
                 {#if member.isBot}<BotBadge class="mt-0.5 ml-1.5 shrink-0" />{/if}
                 <span
                   class="block min-w-0 shrink-[100] truncate text-[10px] text-muted-foreground ml-1 mt-0.5 opacity-0 transition-opacity group-hover:opacity-100"
@@ -122,9 +122,7 @@
     </div>
 
     {#if offline.length > 0}
-      <div class="mt-4 text-xs font-semibold text-muted-foreground">
-        Offline - {offline.length}
-      </div>
+      <div class="pt-3">{@render groupLabel('Offline', offline.length)}</div>
       <div class="space-y-0.5 opacity-50">
         {#each offline as member}
           {@const name = nameFor(member)}

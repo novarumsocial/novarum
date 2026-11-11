@@ -293,9 +293,9 @@
         {...props}
         id={message.id}
         data-message-id={message.id}
-        class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
+        class="group/row relative -mx-3 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[minmax(0,9rem)_1.5rem_minmax(0,1fr)] px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
           ? 'bg-amber-400/10 hover:bg-amber-400/15'
-          : 'hover:bg-muted/30'}"
+          : 'hover:bg-muted/40'}"
         class:animate-message-flash={chat.activeMessage === message.id}
         onanimationend={() => {
           if (chat.activeMessage === message.id) {
@@ -306,8 +306,7 @@
             });
           }
         }}
-        class:mt-0.5={grouped}
-        class:mt-4={!grouped}
+        class:mt-3={!grouped}
         onmouseenter={() => (hovered = true)}
         onmouseleave={() => (hovered = false)}
         role="group"
@@ -315,47 +314,65 @@
         {#if selfMentioned}
           <span class="absolute inset-y-0 left-0 w-0.5 bg-amber-400" aria-hidden="true"></span>
         {/if}
+        <!-- Narrow: avatar on the left, name and time above the text. Wide (@2xl): a transcript,
+             with the name and a small avatar in a left gutter and the time at the far right. -->
+        {#if message.interaction}
+          <p
+            class="col-start-2 mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground @2xl:col-start-3"
+          >
+            <SquareSlash class="size-3 shrink-0" aria-hidden="true" />
+            <span class="truncate">
+              <span class="font-medium text-foreground/75"
+                >{message.interaction.user.displayName || message.interaction.user.username}</span
+              >
+              used <span class="font-medium text-foreground/75">/{message.interaction.name}</span>
+            </span>
+          </p>
+        {/if}
         {#if !grouped}
-          <ProfileCard user={message.author} onCall={onProfileCall} class="self-start">
+          <div
+            class="col-start-2 flex min-w-0 items-baseline gap-2 self-start @2xl:col-start-1 @2xl:justify-end @2xl:pt-px"
+          >
+            <ProfileCard
+              user={message.author}
+              onCall={onProfileCall}
+              class="min-w-0 truncate text-sm font-semibold"
+            >
+              <span class="user-ink" style:--user-color={message.author.avatarColor}>
+                {authorName}
+              </span>
+            </ProfileCard>
+            {#if message.author.isBot}<BotBadge class="self-center" />{/if}
+            <span class="text-[11px] text-muted-foreground @2xl:hidden">
+              {formatTime(message.timestamp)}
+            </span>
+          </div>
+          <ProfileCard
+            user={message.author}
+            onCall={onProfileCall}
+            class="col-start-1 row-span-3 row-start-1 self-start @2xl:col-start-2 @2xl:row-auto"
+          >
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
-              class="{message.interaction ? 'mt-5' : 'mt-0.5'} size-9 text-xs"
+              class="{message.interaction
+                ? 'mt-5'
+                : 'mt-0.5'} size-9 text-xs @2xl:mt-0 @2xl:size-6 @2xl:text-[10px]"
               bgColor={message.author.avatarColor}
             />
           </ProfileCard>
+          <span class="absolute top-1 right-4 hidden text-[11px] text-muted-foreground @2xl:block">
+            {formatTime(message.timestamp)}
+          </span>
         {:else}
-          <div class="w-9 shrink-0"></div>
+          <span
+            class="invisible col-start-1 hidden self-center text-right text-[11px] text-muted-foreground group-hover/row:visible @2xl:block"
+          >
+            {formatTime(message.timestamp)}
+          </span>
         {/if}
 
-        <div class="min-w-0 flex-1">
-          {#if message.interaction}
-            <p
-              class="mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground"
-            >
-              <SquareSlash class="size-3 shrink-0 text-primary/70" aria-hidden="true" />
-              <span class="truncate">
-                <span class="font-medium text-foreground/75"
-                  >{message.interaction.user.displayName || message.interaction.user.username}</span
-                >
-                used <span class="font-medium text-foreground/75">/{message.interaction.name}</span>
-              </span>
-            </p>
-          {/if}
-          {#if !grouped}
-            <div class="flex items-baseline gap-2">
-              <ProfileCard
-                user={message.author}
-                onCall={onProfileCall}
-                class="text-sm font-semibold text-foreground"
-              >
-                {authorName}
-              </ProfileCard>
-              {#if message.author.isBot}<BotBadge class="self-center" />{/if}
-              <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
-            </div>
-          {/if}
-
+        <div class="col-start-2 min-w-0 @2xl:col-start-3 @2xl:pr-20">
           {#if message.replyTo}
             <a
               href={chat.messagePath(message.replyTo)}
@@ -404,7 +421,7 @@
               </div>
             </div>
           {:else if message.content?.trim() || (message.edited && !message.embeds.length)}
-            <div class="text-sm leading-relaxed text-foreground/90">
+            <div class="text-[15px] leading-normal text-foreground">
               <Markdown content={message.content?.trim() ? message.content : ''} links>
                 {#snippet trailing()}
                   {#if message.edited}
@@ -453,7 +470,7 @@
           {/if}
 
           {#if (hovered || dropdownOpen || contextMenuOpen) && !localOnly}
-            <div class="absolute top-0 right-0">
+            <div class="absolute -top-3 right-3 border border-border bg-popover shadow-md">
               <ButtonGroup.Root>
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
                   ><Reply class="size-3" /></Button

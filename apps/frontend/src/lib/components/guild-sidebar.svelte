@@ -4,12 +4,13 @@
   import { untrack } from 'svelte';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
 
+  import { z } from 'zod';
+  import type { Snippet } from 'svelte';
   import type { Server } from '$lib/types/chat';
-  import { goto } from '$app/navigation';
-  import { dmPath, type DmEntry } from '$lib/dms.svelte';
-  import { settings } from '$lib/settings.svelte';
+  import { chat } from '$lib/chat-state.svelte';
+  import { notificationSettings } from '$lib/notification-settings.svelte';
 
-  import Avatar from './avatar.svelte';
+  import ServerRow from './server-row.svelte';
   import CreateServerDialog from './create-server-dialog.svelte';
   import NotificationMenu from './notification-menu.svelte';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -18,24 +19,51 @@
     servers,
     activeId,
     mentions,
-    unreadDms = [],
-    friendRequests = 0,
-    onSelect,
+    channels,
     onCreateServer,
     onReorder,
   }: {
     servers: Server[];
     activeId: string | null;
     mentions: Record<string, number>;
-    unreadDms?: DmEntry[];
-    friendRequests?: number;
-    onSelect: (id?: string) => void;
+    // renders one unfolded server; the second argument folds it again
+    channels: Snippet<[Server, () => void]>;
     onCreateServer?: (server: Server) => void;
     onReorder?: (serverIds: string[]) => Promise<void>;
   } = $props();
 
   let createOpen = $state(false);
   let reordering = $state(false);
+
+  // Servers the user folded or unfolded by hand. Anything else follows the default below.
+  const FOLD_KEY = 'novarum:server-folds';
+  function loadFolds() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '{}');
+      return z.record(z.string(), z.boolean()).parse(stored);
+    } catch {
+      return {};
+    }
+  }
+  let folds = $state(loadFolds());
+
+  // with a handful of servers everything stays open; with many, only the one you're in
+  const isExpanded = (server: Server) =>
+    !server.down && (folds[server.id] ?? (servers.length <= 5 || server.id === activeId));
+
+  function toggle(server: Server) {
+    folds = { ...folds, [server.id]: !isExpanded(server) };
+    localStorage.setItem(FOLD_KEY, JSON.stringify(folds));
+  }
+
+  const hasUnread = (serverId: string) =>
+    (chat.channelsByServer[serverId] ?? []).some((category) =>
+      category.channels.some(
+        (channel) =>
+          channel.unread &&
+          notificationSettings.showsUnread({ channelId: channel.id, guildId: serverId })
+      )
+    );
 
   const flipDurationMs = 150;
 
@@ -80,130 +108,50 @@
   }
 </script>
 
-<nav class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3">
-  <button
-    onclick={() => onSelect(undefined)}
-    class="relative flex size-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-    class:opacity-70={activeId !== null}
-    class:ring-2={activeId === null}
-    class:ring-primary={activeId === null}
-    class:ring-offset-1={activeId === null}
-    class:ring-offset-background={activeId === null}
-    class:rounded-full={settings.value.circleIcons}
-    aria-label={friendRequests
-      ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
-      : 'Home'}
-  >
-    <svg
-      fill="currentColor"
-      class="size-6.5"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z"
-      />
-    </svg>
-
-    {#if friendRequests > 0}
-      <span
-        class="absolute -right-1.5 -bottom-1 flex h-4.5 min-w-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
-        class:rounded-full={settings.value.circleIcons}
-      >
-        {friendRequests > 99 ? '99+' : friendRequests}
-      </span>
-    {/if}
-  </button>
-
-  {#each unreadDms as dm (dm.id)}
-    {@const other = dm.participants[0]}
-    {@const name = other ? other.displayName || other.username : 'Direct Message'}
-    <button
-      onclick={() => goto(dmPath(dm.id))}
-      class="relative size-10 cursor-pointer transition-opacity hover:opacity-90"
-      aria-label="{name}, unread direct message"
-      title={name}
-    >
-      <Avatar src={other?.avatarUrl} {name} class="size-full" />
-      <span
-        class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
-      ></span>
-    </button>
-  {/each}
-
-  <div class="my-0.5 h-px w-7 bg-border/50"></div>
-
-  <div
-    class={`flex flex-col items-center gap-1.5 ${reordering ? 'opacity-70' : ''}`}
-    use:dndzone={{
-      items: orderedServers,
-      flipDurationMs,
-      dropTargetStyle: {
-        outline: 'none',
-      },
-    }}
-    onconsider={handleConsider}
-    onfinalize={handleFinalize}
-    aria-label="Servers"
-  >
-    {#each orderedServers as server (server.id)}
-      <div animate:flip={{ duration: flipDurationMs }} class="size-10 touch-none">
+<div
+  class={reordering ? 'opacity-70' : ''}
+  use:dndzone={{
+    items: orderedServers,
+    flipDurationMs,
+    type: 'servers',
+    dropTargetStyle: {
+      outline: 'none',
+    },
+  }}
+  onconsider={handleConsider}
+  onfinalize={handleFinalize}
+  aria-label="Servers"
+>
+  {#each orderedServers as server (server.id)}
+    <div animate:flip={{ duration: flipDurationMs }}>
+      {#if isExpanded(server)}
+        {@render channels(server, () => toggle(server))}
+      {:else}
         <ContextMenu.Root>
-          <ContextMenu.Trigger class="block size-full">
-            <button
-              onclick={() => onSelect(server.id)}
-              class="cursor-pointer relative flex size-full items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
-                ? 'bg-destructive'
-                : 'bg-primary'}"
-              class:ring-2={activeId === server.id}
-              class:ring-primary={activeId === server.id}
-              class:ring-offset-1={activeId === server.id}
-              class:ring-offset-background={activeId === server.id}
-              class:opacity-60={activeId !== server.id}
-              class:opacity-40={server.down}
-              class:cursor-not-allowed={server.down}
-              class:rounded-full={settings.value.circleIcons}
-              disabled={server.down}
-              aria-label={mentions[server.id]
-                ? `${server.name}, ${mentions[server.id]} unread mention${mentions[server.id] === 1 ? '' : 's'}`
-                : server.name}
-            >
-              <Avatar
-                src={server.avatarUrl}
-                name={server.name}
-                fallback={server.initials}
-                class="size-full bg-transparent text-xs text-primary-foreground"
-                focused={activeId === server.id}
-              />
-
-              {#if mentions[server.id] > 0}
-                <span
-                  class="absolute -right-1.5 -bottom-1 flex h-4.5 min-w-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
-                  class:rounded-full={settings.value.circleIcons}
-                >
-                  {mentions[server.id] > 99 ? '99+' : mentions[server.id]}
-                </span>
-              {/if}
-            </button>
+          <ContextMenu.Trigger class="block">
+            <ServerRow
+              {server}
+              expanded={false}
+              onToggle={() => toggle(server)}
+              unread={hasUnread(server.id)}
+              mention={mentions[server.id] ?? 0}
+            />
           </ContextMenu.Trigger>
           <ContextMenu.Content class="w-56">
             <NotificationMenu targetId={server.id} noun="Server" />
           </ContextMenu.Content>
         </ContextMenu.Root>
-      </div>
-    {/each}
-  </div>
+      {/if}
+    </div>
+  {/each}
+</div>
 
-  <div class="mt-auto flex flex-col items-center gap-1.5">
-    <button
-      class="flex size-10 items-center justify-center border border-dashed border-muted-foreground/30 text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
-      class:rounded-full={settings.value.circleIcons}
-      aria-label="Add server"
-      onclick={() => (createOpen = true)}
-    >
-      <Plus class="size-4" />
-    </button>
-  </div>
-</nav>
+<button
+  class="mt-1 flex h-9 w-full cursor-pointer items-center gap-2 pl-3 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+  onclick={() => (createOpen = true)}
+>
+  <Plus class="size-3.5 shrink-0" />
+  Add a server
+</button>
 
 <CreateServerDialog bind:open={createOpen} onCreate={onCreateServer} />

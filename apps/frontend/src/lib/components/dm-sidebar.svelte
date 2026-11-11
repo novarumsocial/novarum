@@ -7,8 +7,6 @@
   import { chat } from '$lib/chat-state.svelte';
   import Avatar from './avatar.svelte';
   import NewDmDialog from './new-dm-dialog.svelte';
-  import { Separator } from '$lib/components/ui/separator/index.js';
-  import { device } from '$lib/device.svelte';
   import { notificationSettings } from '$lib/notification-settings.svelte';
   import NotificationMenu from './notification-menu.svelte';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -26,21 +24,28 @@
   let newDmOpen = $state(false);
 
   const itemClass = (active: boolean) =>
-    `flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors ${
+    `flex w-full items-center gap-2 px-2 py-1 text-left text-sm transition-colors ${
       active
-        ? 'bg-primary/10 text-sidebar-foreground'
-        : 'text-muted-foreground hover:text-sidebar-foreground'
+        ? 'bg-sidebar-accent font-medium text-sidebar-foreground'
+        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
     }`;
 </script>
 
-<aside class="flex w-60 flex-col bg-sidebar">
-  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2" class:mt-2={device.isComputer}>
-    {#if device.isComputer}
-      <button class={itemClass(chat.route.kind === 'home')} onclick={() => goto('/guilds')}>
-        <Users class="size-4 shrink-0" />
-        <span class="flex-1 truncate">Friends</span>
-      </button>
-    {/if}
+<section>
+  <div class="space-y-0.5 px-2 py-2">
+    <button class={itemClass(chat.route.kind === 'home')} onclick={() => goto('/guilds')}>
+      <Users class="size-4 shrink-0" />
+      <span class="flex-1 truncate">Friends</span>
+      {#if friends.incoming.length > 0}
+        <span
+          class="flex h-4 min-w-4 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground"
+          class:rounded-full={settings.value.circleIcons}
+          aria-label="{friends.incoming.length} pending friend requests"
+        >
+          {friends.incoming.length > 99 ? '99+' : friends.incoming.length}
+        </span>
+      {/if}
+    </button>
     <button
       class={itemClass(chat.route.kind === 'developers')}
       onclick={() => goto('/guilds/developers')}
@@ -48,16 +53,9 @@
       <Bot class="size-4 shrink-0" />
       <span class="flex-1 truncate">Developers</span>
     </button>
-    {#if device.isComputer}
-      <Separator class="mt-3" />
-    {/if}
 
     <div class="flex items-center justify-between px-2 pt-3 pb-1">
-      <span
-        class="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none"
-      >
-        Direct Messages
-      </span>
+      <span class="text-xs font-medium text-muted-foreground select-none">Direct messages</span>
       <button
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="Start a direct message"
@@ -96,7 +94,7 @@
               />
               {#if other && friends.isOnline(other.userId)}
                 <span
-                  class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
+                  class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-online"
                   class:rounded-full={settings.value.circleIcons}
                 ></span>
               {/if}
@@ -106,7 +104,10 @@
               <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
             {/if}
             {#if unread}
-              <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
+              <span
+                class="size-2 shrink-0 bg-foreground"
+                class:rounded-full={settings.value.circleIcons}
+              ></span>
             {/if}
             <button
               class="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
@@ -182,13 +183,11 @@
     {/each}
 
     {#if entries.length === 0 && dms.pending.length === 0}
-      <p
-        class="pointer-events-none mt-4 flex items-center justify-center px-2 text-center text-xs text-muted-foreground select-none"
-      >
-        No direct messages yet :(
+      <p class="pointer-events-none px-2 py-1 text-xs text-muted-foreground select-none">
+        No conversations yet. Start one with the plus above.
       </p>
     {/if}
   </div>
-</aside>
+</section>
 
 <NewDmDialog bind:open={newDmOpen} />

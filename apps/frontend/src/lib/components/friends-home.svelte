@@ -140,7 +140,7 @@
       >
         <Menu class="size-5" />
       </Button>
-      <div class="flex shrink-0 items-center gap-2 text-sm font-semibold">
+      <div class="flex shrink-0 items-center gap-2 text-[15px] font-semibold">
         <Users class="size-5 text-muted-foreground" />
         <span class="hidden sm:inline">Friends</span>
       </div>
@@ -191,14 +191,14 @@
             )}
           {:else}
             <div class="relative">
-              <Input placeholder="Search" class="h-9 border-0 bg-sidebar pr-9" bind:value={query} />
+              <Input placeholder="Search friends" class="h-10 bg-card pr-9" bind:value={query} />
               <Search
                 class="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
               />
             </div>
 
             {@render sectionLabel(
-              `${tab === 'online' ? 'Online' : 'All friends'} — ${list.length}`
+              `${list.length} ${tab === 'online' ? 'online' : list.length === 1 ? 'friend' : 'friends'}`
             )}
 
             <div>
@@ -264,7 +264,7 @@
               'Requests you send or receive will wait here until they’re answered.'
             )}
           {:else}
-            {@render sectionLabel(`Pending — ${pending.length}`)}
+            {@render sectionLabel(`${pending.length} pending`)}
             <div>
               {#each pending as { entry, incoming } (entry.user.userId)}
                 {@const name = nameFor(entry)}
@@ -356,7 +356,7 @@
       </div>
 
       <aside class="hidden w-80 shrink-0 overflow-y-auto border-l p-4 xl:block">
-        <h2 class="text-lg font-semibold">Active now</h2>
+        <h2 class="text-[15px] font-semibold">Active now</h2>
         {#if online.length === 0}
           <div class="mt-4 text-center">
             <p class="text-sm font-medium">It’s quiet for now…</p>
@@ -369,7 +369,7 @@
             {#each online as entry (entry.user.userId)}
               <button
                 type="button"
-                class="group flex w-full cursor-pointer items-center gap-3 border bg-sidebar p-3 text-left hover:bg-card"
+                class="group flex w-full cursor-pointer items-center gap-3 bg-card p-3 text-left hover:bg-muted"
                 onclick={() => dms.open(entry.user.userId)}
               >
                 {@render person(entry, 'Online', 'size-10')}

@@ -389,7 +389,7 @@
 <svelte:window onkeydown={windowKeyDown} onpaste={handlePaste} />
 
 <div
-  class="relative px-2 pb-2 sm:px-4 sm:pb-4"
+  class="relative px-2 pb-2 sm:px-4 sm:pb-4 @2xl:pl-52"
   role="group"
   aria-label="Message composer"
   ondragenter={handleDragEnter}
@@ -404,7 +404,7 @@
       id="command-search-results"
       role="listbox"
       aria-label="Slash commands"
-      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-72 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[32rem]"
+      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-72 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 @2xl:left-52 sm:w-[32rem]"
     >
       {#each commandResults as result, index (`${result.entry.bot.userId}:${result.command.name}`)}
         <button
@@ -438,7 +438,7 @@
       id="emoji-search-results"
       role="listbox"
       aria-label="Emoji search results"
-      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
+      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 @2xl:left-52 sm:w-[28rem]"
     >
       {#if emojiResults.length}
         <div class="grid grid-cols-1 sm:grid-cols-2">
@@ -469,7 +469,7 @@
       id="mention-search-results"
       role="listbox"
       aria-label="Member search results"
-      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 sm:w-[28rem]"
+      class="absolute right-2 bottom-full left-2 z-30 mb-1.5 max-h-56 overflow-y-auto border border-border bg-popover p-1 shadow-2xl sm:right-auto sm:left-4 @2xl:left-52 sm:w-[28rem]"
     >
       {#if mentionResults.length}
         {#each mentionResults as result, index (result.id)}
@@ -495,8 +495,8 @@
 
   <div
     class={cn(
-      'relative border bg-card transition-colors focus-within:border-primary/60',
-      draggingFiles ? 'border-primary' : 'border-border'
+      'relative border bg-card transition-colors focus-within:border-foreground/40',
+      draggingFiles ? 'border-foreground' : 'border-input'
     )}
   >
     {#if context}
@@ -600,7 +600,7 @@
               ? `emoji-result-${selectedEmoji}`
               : undefined}
         rows="1"
-        class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
+        class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[15px] leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
       ></textarea>
       {#if remaining <= 200}
         <span

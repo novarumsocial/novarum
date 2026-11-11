@@ -89,7 +89,7 @@
   });
 </script>
 
-<div class="w-74 shrink-0 border-t border-border bg-sidebar-accent/30">
+<div class="shrink-0 border-t border-border">
   {#if voice.connected || voice.connecting}
     <div class="border-b border-border/80 px-3 py-2">
       <div class="flex items-center gap-2">

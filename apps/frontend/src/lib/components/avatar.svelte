@@ -1,5 +1,6 @@
 <script lang="ts">
   import { settings } from '$lib/settings.svelte';
+  import { cn } from '$lib/utils';
   import AnimatedImage from './animated-image.svelte';
 
   let {
@@ -29,8 +30,12 @@
 </script>
 
 <div
-  class="flex shrink-0 items-center justify-center overflow-hidden font-bold text-white bg-primary/20 select-none {className}"
-  class:rounded-full={settings.value.circleIcons}
+  class={cn(
+    'flex shrink-0 items-center justify-center overflow-hidden font-bold select-none',
+    bgColor ? 'text-white' : 'bg-secondary text-foreground',
+    settings.value.circleIcons && 'rounded-full',
+    className
+  )}
   style:background-color={bgColor || undefined}
   role="img"
   aria-label={name}

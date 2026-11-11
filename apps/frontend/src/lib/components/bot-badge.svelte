@@ -6,7 +6,7 @@
 
 <span
   class={cn(
-    'inline-flex h-4 shrink-0 items-center bg-primary px-1 text-[10px] leading-none font-semibold text-primary-foreground select-none',
+    'inline-flex h-4 shrink-0 items-center border border-current px-1 text-[10px] leading-none font-semibold text-muted-foreground select-none',
     className
   )}
   title="This account is a bot"

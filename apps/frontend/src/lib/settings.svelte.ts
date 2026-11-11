@@ -15,6 +15,7 @@ type Settings = {
   showOnlineStatus: boolean;
   compactMode: boolean;
   showMemberList: boolean;
+  showSidebar: boolean;
   circleIcons: boolean;
   roundedBorders: boolean;
   darkMode: boolean;
@@ -42,6 +43,7 @@ const defaults: Settings = {
   showOnlineStatus: true,
   compactMode: false,
   showMemberList: true,
+  showSidebar: true,
   circleIcons: false,
   roundedBorders: false,
   darkMode: true,

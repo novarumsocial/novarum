@@ -3,6 +3,7 @@
   import {
     ChevronDown,
     ChevronRight,
+    Ellipsis,
     Hash,
     LogOut,
     MicOff,
@@ -33,6 +34,7 @@
   import InviteDialog from './invite-dialog.svelte';
   import GuildSettingsDialog from './guild-settings-dialog.svelte';
   import Avatar from './avatar.svelte';
+  import ServerRow from './server-row.svelte';
   import ParticipantContextMenu from './participant-context-menu.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -49,6 +51,7 @@
     onReorderChannels,
     onSaveChannelOrder,
     onSetOwnerOnly,
+    onCollapse,
     canReorder = false,
     voice,
     members = [],
@@ -62,6 +65,7 @@
     onReorderChannels: (channelIds: string[]) => void;
     onSaveChannelOrder: (channelIds: string[]) => Promise<void>;
     onSetOwnerOnly?: (channelId: string, ownerOnly: boolean) => void;
+    onCollapse?: () => void;
     canReorder?: boolean;
     voice?: Voice | null;
     members?: Author[];
@@ -267,101 +271,110 @@
   }
 </script>
 
-<aside class="flex w-60 flex-col bg-sidebar">
-  <!-- Server header -->
-  <DropdownMenu.Root>
-    <DropdownMenu.Trigger>
-      <div class="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-        <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
-          {server.name}
-        </span>
-
+<section>
+  <ServerRow {server} expanded onToggle={() => onCollapse?.()}>
+    {#snippet actions()}
+      {#if server.canManageChannels && categories.length === 1}
         <button
-          class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="Server settings"
+          type="button"
+          class="flex size-6 shrink-0 cursor-pointer items-center justify-center text-muted-foreground opacity-0 group-hover/server:opacity-100 hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100"
+          aria-label="Add a channel to {server.name}"
+          title="Add channel"
+          onclick={() => openCreateChannel(categories[0])}
         >
-          <ChevronDown class="size-4" />
+          <Plus class="size-3.5" />
         </button>
-      </div>
-    </DropdownMenu.Trigger>
+      {/if}
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger
+          class="flex size-6 shrink-0 cursor-pointer items-center justify-center text-muted-foreground opacity-0 group-hover/server:opacity-100 hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 aria-expanded:opacity-100"
+          aria-label="{server.name} options"
+        >
+          <Ellipsis class="size-4" />
+        </DropdownMenu.Trigger>
 
-    <DropdownMenu.Content class="w-52" align="center">
-      <DropdownMenu.Group>
-        {#if server.canManageChannels}
-          <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
-            Invite
+        <DropdownMenu.Content class="w-52" align="center">
+          <DropdownMenu.Group>
+            {#if server.canManageChannels}
+              <DropdownMenu.Item onclick={() => (createInviteOpen = true)}>
+                Invite
 
+                <DropdownMenu.Shortcut>
+                  <UserRoundPlus class="size-3" />
+                </DropdownMenu.Shortcut>
+              </DropdownMenu.Item>
+            {/if}
+
+            {#if server.canManageChannels}
+              <DropdownMenu.Item onclick={() => (settingsOpen = true)}>
+                Settings
+
+                <DropdownMenu.Shortcut>
+                  <Settings class="size-3" />
+                </DropdownMenu.Shortcut>
+              </DropdownMenu.Item>
+            {/if}
+          </DropdownMenu.Group>
+
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item>
+            Notification Settings
             <DropdownMenu.Shortcut>
-              <UserRoundPlus class="size-3" />
+              <Bell class="size-3" />
             </DropdownMenu.Shortcut>
           </DropdownMenu.Item>
-        {/if}
-
-        {#if server.canManageChannels}
-          <DropdownMenu.Item onclick={() => (settingsOpen = true)}>
-            Settings
-
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item variant="destructive">
+            Leave Guild
             <DropdownMenu.Shortcut>
-              <Settings class="size-3" />
+              <LogOut class="size-3" style="color: var(--destructive);" />
             </DropdownMenu.Shortcut>
           </DropdownMenu.Item>
-        {/if}
-      </DropdownMenu.Group>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item>
+            Copy Guild ID
+            <DropdownMenu.Shortcut>
+              <IdCardLanyard class="size-3" />
+            </DropdownMenu.Shortcut>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
+    {/snippet}
+  </ServerRow>
 
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item>
-        Notification Settings
-        <DropdownMenu.Shortcut>
-          <Bell class="size-3" />
-        </DropdownMenu.Shortcut>
-      </DropdownMenu.Item>
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item variant="destructive">
-        Leave Guild
-        <DropdownMenu.Shortcut>
-          <LogOut class="size-3" style="color: var(--destructive);" />
-        </DropdownMenu.Shortcut>
-      </DropdownMenu.Item>
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item>
-        Copy Guild ID
-        <DropdownMenu.Shortcut>
-          <IdCardLanyard class="size-3" />
-        </DropdownMenu.Shortcut>
-      </DropdownMenu.Item>
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
-
-  <!-- Channel list -->
-  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+  <!-- Channel list, hung off a guide line under the server's chevron -->
+  <div class="mr-2 mb-2 ml-[1.15rem] space-y-0.5 border-l border-border pl-2">
     {#each categories as cat (cat.id)}
-      <div class="flex w-full items-center gap-1 px-1 py-1">
-        <button
-          onclick={() => openCreateChannel(cat)}
-          aria-label="Add channel"
-          class="peer order-2 cursor-pointer text-muted-foreground opacity-70 transition-opacity hover:text-sidebar-foreground hover:opacity-100"
-        >
-          {#if server.canManageChannels}
-            <Plus class="size-3 shrink-0" />
-          {/if}
-        </button>
+      <!-- a lone category's heading says nothing; its add button moves up to the server row -->
+      {#if categories.length > 1}
+        <div class="flex w-full items-center gap-1 px-1 py-1">
+          <button
+            onclick={() => openCreateChannel(cat)}
+            aria-label="Add channel"
+            class="peer order-2 cursor-pointer text-muted-foreground opacity-70 transition-opacity hover:text-sidebar-foreground hover:opacity-100"
+          >
+            {#if server.canManageChannels}
+              <Plus class="size-3 shrink-0" />
+            {/if}
+          </button>
 
-        <button
-          onclick={() => {
-            collapsed[cat.id] = !collapsed[cat.id];
-            collapsed = { ...collapsed };
-          }}
-          class="order-1 flex flex-1 items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-sidebar-foreground peer-hover:text-sidebar-foreground"
-        >
-          {#if collapsed[cat.id]}
-            <ChevronRight class="size-3 shrink-0" />
-          {:else}
-            <ChevronDown class="size-3 shrink-0" />
-          {/if}
+          <button
+            onclick={() => {
+              collapsed[cat.id] = !collapsed[cat.id];
+              collapsed = { ...collapsed };
+            }}
+            class="order-1 flex flex-1 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-sidebar-foreground peer-hover:text-sidebar-foreground"
+          >
+            {#if collapsed[cat.id]}
+              <ChevronRight class="size-3 shrink-0" />
+            {:else}
+              <ChevronDown class="size-3 shrink-0" />
+            {/if}
 
-          {cat.label}
-        </button>
-      </div>
+            {cat.label}
+          </button>
+        </div>
+      {/if}
 
       {#if !collapsed[cat.id]}
         {@const channels = orderedChannels[cat.id] ?? cat.channels}
@@ -392,22 +405,22 @@
                   <button
                     onclick={() => selectChannel(ch)}
                     class={cn(
-                      'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors cursor-pointer',
-                      activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
+                      'flex w-full cursor-pointer items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors',
+                      activeChannel === ch.id &&
+                        'bg-sidebar-accent font-medium text-sidebar-foreground',
                       activeChannel !== ch.id &&
-                        'text-muted-foreground hover:text-sidebar-foreground',
+                        'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                      (showUnread || showMention) && 'font-semibold text-sidebar-foreground',
                       reorderLoading && 'opacity-70'
                     )}
                   >
                     {#if ch.type === 'VOICE'}
                       <Volume2 class="size-4 shrink-0" />
                     {:else}
-                      <Hash
-                        class={cn('size-4 shrink-0', (showUnread || showMention) && 'text-white')}
-                      />
+                      <Hash class="size-4 shrink-0" />
                     {/if}
 
-                    <span class="flex-1 truncate" class:text-white={showUnread || showMention}>
+                    <span class="flex-1 truncate">
                       {ch.label || ch.name}
                     </span>
 
@@ -425,7 +438,7 @@
                     {#if showUnread && !showMention}
                       <span class="flex size-5 shrink-0 items-center justify-center">
                         <span
-                          class="size-2 bg-foreground/80"
+                          class="size-2 bg-foreground"
                           class:rounded-full={settings.value.circleIcons}
                         ></span>
                       </span>
@@ -573,7 +586,7 @@
       {/if}
     {/each}
   </div>
-</aside>
+</section>
 
 <CreateChannelDialog
   bind:open={createOpen}
