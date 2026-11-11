@@ -26,14 +26,14 @@
   let newDmOpen = $state(false);
 
   const itemClass = (active: boolean) =>
-    `flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors ${
+    `relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm transition-colors ${
       active
-        ? 'bg-primary/10 text-sidebar-foreground'
-        : 'text-muted-foreground hover:text-sidebar-foreground'
+        ? 'bg-sidebar-accent font-medium text-sidebar-foreground before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-beacon'
+        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
     }`;
 </script>
 
-<aside class="flex w-60 flex-col bg-sidebar">
+<aside class="flex min-h-0 flex-1 flex-col">
   <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2" class:mt-2={device.isComputer}>
     {#if device.isComputer}
       <button class={itemClass(chat.route.kind === 'home')} onclick={() => goto('/guilds')}>
@@ -53,11 +53,7 @@
     {/if}
 
     <div class="flex items-center justify-between px-2 pt-3 pb-1">
-      <span
-        class="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none"
-      >
-        Direct Messages
-      </span>
+      <span class="text-xs font-semibold text-muted-foreground select-none"> Direct messages </span>
       <button
         class="text-muted-foreground transition-colors hover:text-sidebar-foreground"
         aria-label="Start a direct message"
@@ -87,26 +83,22 @@
               }
             }}
           >
-            <div class="relative shrink-0">
-              <Avatar
-                src={other?.avatarUrl}
-                {name}
-                class="size-6 text-[10px]"
-                bgColor={other?.avatarColor}
-              />
-              {#if other && friends.isOnline(other.userId)}
-                <span
-                  class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
-                  class:rounded-full={settings.value.circleIcons}
-                ></span>
-              {/if}
-            </div>
+            <Avatar
+              src={other?.avatarUrl}
+              {name}
+              class="size-6 text-[10px]"
+              bgColor={other?.avatarColor}
+              status={other && friends.isOnline(other.userId) ? 'online' : undefined}
+            />
             <span class="flex-1 truncate" class:font-semibold={unread}>{name}</span>
             {#if chat.voiceStates[entry.id]?.length}
               <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
             {/if}
             {#if unread}
-              <span class="size-1.5 shrink-0 rounded-full bg-primary"></span>
+              <span
+                class="size-2 shrink-0 bg-beacon"
+                class:rounded-full={settings.value.circleIcons}
+              ></span>
             {/if}
             <button
               class="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
@@ -185,7 +177,7 @@
       <p
         class="pointer-events-none mt-4 flex items-center justify-center px-2 text-center text-xs text-muted-foreground select-none"
       >
-        No direct messages yet :(
+        No conversations yet. Start one with the plus above.
       </p>
     {/if}
   </div>

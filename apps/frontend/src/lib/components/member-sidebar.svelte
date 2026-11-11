@@ -1,10 +1,8 @@
 <script lang="ts">
   import BotBadge from './bot-badge.svelte';
-  import { Users } from '@lucide/svelte';
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
-  import { settings } from '$lib/settings.svelte';
   import type { Server } from '$lib/types/chat';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
   import { chat } from '$lib/chat-state.svelte';
@@ -39,22 +37,22 @@
   }
 </script>
 
-<aside class="flex size-full w-56 flex-col bg-sidebar">
-  <div class="h-12 shrink-0 border-b border-border p-2">
-    <!--
-      <Input
-        id="search-in-channel"
-        placeholder="Search {server.name}"
-        autocomplete="off"
-        spellcheck="false"
-      />
--->
-  </div>
-  <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-    <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-      <Users class="size-3.5" />
-      Online - {online.length}
-    </div>
+{#snippet groupLabel(text: string, count: number)}
+  <h2 class="flex items-baseline justify-between px-1 text-xs font-semibold text-muted-foreground">
+    {text}
+    <span class="font-normal tabular-nums">{count}</span>
+  </h2>
+{/snippet}
+
+<aside class="flex size-full w-56 flex-col border-l border-border bg-background">
+  <header
+    class="flex h-12 shrink-0 items-baseline gap-2 border-b border-border px-4 leading-[3rem]"
+  >
+    <h1 class="text-[15px] font-bold tracking-tight">Members</h1>
+    <span class="text-xs text-muted-foreground tabular-nums">{members.length}</span>
+  </header>
+  <div class="flex-1 space-y-2 overflow-y-auto px-3 py-4">
+    {@render groupLabel('Online', online.length)}
     <div class="space-y-0.5">
       {#each online as member}
         {@const name = nameFor(member)}
@@ -63,25 +61,16 @@
             <ProfileCard
               user={member}
               {onCall}
-              class="group flex w-full items-center gap-2 px-1 py-1"
+              class="group flex w-full items-center gap-2.5 px-1 py-1 hover:bg-muted/50"
             >
-              <div class="relative">
-                <Avatar
-                  src={member.avatarUrl}
-                  {name}
-                  class="size-7 text-xs"
-                  bgColor={member.avatarColor}
-                />
-                <span
-                  class="absolute -bottom-px -right-px size-2.5 border-2 border-sidebar bg-emerald-500"
-                ></span>
-                {#if settings.value.circleIcons}
-                  <span
-                    class="rounded-full absolute -bottom-px -right-px size-2.75 border-2 border-sidebar bg-emerald-500"
-                  ></span>
-                {/if}
-                <!-- TODO: fix dependency for user.status -->
-              </div>
+              <!-- TODO: fix dependency for user.status -->
+              <Avatar
+                src={member.avatarUrl}
+                {name}
+                class="size-7 text-xs"
+                bgColor={member.avatarColor}
+                status="online"
+              />
               <div class="flex min-w-0 flex-1">
                 <span class="block truncate text-sm text-foreground">{name}</span>
                 {#if member.isBot}<BotBadge class="mt-0.5 ml-1.5 shrink-0" />{/if}
@@ -122,9 +111,7 @@
     </div>
 
     {#if offline.length > 0}
-      <div class="mt-4 text-xs font-semibold text-muted-foreground">
-        Offline - {offline.length}
-      </div>
+      <div class="pt-3">{@render groupLabel('Offline', offline.length)}</div>
       <div class="space-y-0.5 opacity-50">
         {#each offline as member}
           {@const name = nameFor(member)}

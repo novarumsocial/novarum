@@ -495,8 +495,8 @@
 
   <div
     class={cn(
-      'relative border bg-card transition-colors focus-within:border-primary/60',
-      draggingFiles ? 'border-primary' : 'border-border'
+      'relative border bg-card shadow-lg shadow-black/20 transition-colors focus-within:border-beacon/70',
+      draggingFiles ? 'border-beacon' : 'border-input'
     )}
   >
     {#if context}
@@ -600,7 +600,7 @@
               ? `emoji-result-${selectedEmoji}`
               : undefined}
         rows="1"
-        class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
+        class="field-sizing-content max-h-48 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[15px] leading-5 break-words text-foreground outline-none placeholder:text-muted-foreground"
       ></textarea>
       {#if remaining <= 200}
         <span

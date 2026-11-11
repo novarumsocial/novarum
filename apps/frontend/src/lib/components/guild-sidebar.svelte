@@ -80,61 +80,86 @@
   }
 </script>
 
-<nav class="flex w-14 flex-col items-center gap-1.5 border-r border-border bg-background py-3">
-  <button
-    onclick={() => onSelect(undefined)}
-    class="relative flex size-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-    class:opacity-70={activeId !== null}
-    class:ring-2={activeId === null}
-    class:ring-primary={activeId === null}
-    class:ring-offset-1={activeId === null}
-    class:ring-offset-background={activeId === null}
+{#snippet activeBar()}
+  <span class="absolute inset-x-0 -bottom-1.5 h-0.5 bg-beacon" aria-hidden="true"></span>
+{/snippet}
+
+{#snippet badge(count: number)}
+  <span
+    class="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-sidebar"
     class:rounded-full={settings.value.circleIcons}
-    aria-label={friendRequests
-      ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
-      : 'Home'}
   >
-    <svg
-      fill="currentColor"
-      class="size-6.5"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z"
-      />
-    </svg>
+    {count > 99 ? '99+' : count}
+  </span>
+{/snippet}
 
-    {#if friendRequests > 0}
-      <span
-        class="absolute -right-1.5 -bottom-1 flex h-4.5 min-w-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
-        class:rounded-full={settings.value.circleIcons}
-      >
-        {friendRequests > 99 ? '99+' : friendRequests}
-      </span>
-    {/if}
-  </button>
-
-  {#each unreadDms as dm (dm.id)}
-    {@const other = dm.participants[0]}
-    {@const name = other ? other.displayName || other.username : 'Direct Message'}
+<nav class="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2.5">
+  <div class="flex items-center gap-2">
     <button
-      onclick={() => goto(dmPath(dm.id))}
-      class="relative size-10 cursor-pointer transition-opacity hover:opacity-90"
-      aria-label="{name}, unread direct message"
-      title={name}
+      onclick={() => onSelect(undefined)}
+      class="relative flex h-9 cursor-pointer items-center gap-2 bg-sidebar-accent pr-3 pl-2 text-sm font-medium transition-colors {activeId ===
+      null
+        ? 'text-sidebar-foreground'
+        : 'text-muted-foreground hover:text-foreground'}"
+      class:rounded-full={settings.value.circleIcons}
+      aria-label={friendRequests
+        ? `Home, ${friendRequests} pending friend request${friendRequests === 1 ? '' : 's'}`
+        : 'Home'}
     >
-      <Avatar src={other?.avatarUrl} {name} class="size-full" />
-      <span
-        class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
-      ></span>
+      <svg
+        fill="currentColor"
+        class="size-5.5 {activeId === null ? 'text-beacon' : ''}"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z"
+        />
+      </svg>
+      Home
+      {#if activeId === null}{@render activeBar()}{/if}
+      {#if friendRequests > 0}{@render badge(friendRequests)}{/if}
     </button>
-  {/each}
 
-  <div class="my-0.5 h-px w-7 bg-border/50"></div>
+    <div class="flex min-w-0 flex-1 gap-2 overflow-hidden py-1.5 pr-1.5">
+      {#each unreadDms as dm (dm.id)}
+        {@const other = dm.participants[0]}
+        {@const name = other ? other.displayName || other.username : 'Direct Message'}
+        <button
+          onclick={() => goto(dmPath(dm.id))}
+          class="relative size-9 shrink-0 cursor-pointer transition-opacity hover:opacity-90"
+          aria-label="{name}, unread direct message"
+          title={name}
+        >
+          <Avatar
+            src={other?.avatarUrl}
+            {name}
+            class="size-full text-xs"
+            bgColor={other?.avatarColor}
+          />
+          <span
+            class="absolute -top-1 -right-1 size-2.5 bg-destructive ring-2 ring-sidebar"
+            class:rounded-full={settings.value.circleIcons}
+          ></span>
+        </button>
+      {/each}
+    </div>
 
+    <button
+      class="flex size-9 shrink-0 items-center justify-center border border-dashed border-muted-foreground/40 text-muted-foreground transition-colors hover:border-beacon hover:text-beacon"
+      class:rounded-full={settings.value.circleIcons}
+      title="Add server"
+      aria-label="Add server"
+      onclick={() => (createOpen = true)}
+    >
+      <Plus class="size-4" />
+    </button>
+  </div>
+
+  <!-- a plain six-column grid so any number of servers wraps into even rows; past three rows it scrolls.
+       The negative margin + padding keeps badges and the active bar from being clipped. -->
   <div
-    class={`flex flex-col items-center gap-1.5 ${reordering ? 'opacity-70' : ''}`}
+    class={`-m-1.5 grid max-h-34 grid-cols-6 content-start gap-2 overflow-y-auto p-1.5 empty:hidden ${reordering ? 'opacity-70' : ''}`}
     use:dndzone={{
       items: orderedServers,
       flipDurationMs,
@@ -147,23 +172,21 @@
     aria-label="Servers"
   >
     {#each orderedServers as server (server.id)}
-      <div animate:flip={{ duration: flipDurationMs }} class="size-10 touch-none">
+      <div animate:flip={{ duration: flipDurationMs }} class="size-9 touch-none">
         <ContextMenu.Root>
           <ContextMenu.Trigger class="block size-full">
             <button
               onclick={() => onSelect(server.id)}
-              class="cursor-pointer relative flex size-full items-center justify-center text-xs font-bold tracking-tight text-white transition-all hover:opacity-90 {server.down
-                ? 'bg-destructive'
-                : 'bg-primary'}"
-              class:ring-2={activeId === server.id}
-              class:ring-primary={activeId === server.id}
-              class:ring-offset-1={activeId === server.id}
-              class:ring-offset-background={activeId === server.id}
-              class:opacity-60={activeId !== server.id}
+              class="relative flex size-full cursor-pointer items-center justify-center text-xs font-bold transition-colors {server.down
+                ? 'bg-destructive text-destructive-foreground'
+                : activeId === server.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-sidebar-accent text-muted-foreground hover:text-foreground'}"
               class:opacity-40={server.down}
               class:cursor-not-allowed={server.down}
               class:rounded-full={settings.value.circleIcons}
               disabled={server.down}
+              title={server.name}
               aria-label={mentions[server.id]
                 ? `${server.name}, ${mentions[server.id]} unread mention${mentions[server.id] === 1 ? '' : 's'}`
                 : server.name}
@@ -172,18 +195,11 @@
                 src={server.avatarUrl}
                 name={server.name}
                 fallback={server.initials}
-                class="size-full bg-transparent text-xs text-primary-foreground"
+                class="size-full bg-transparent text-xs text-inherit"
                 focused={activeId === server.id}
               />
-
-              {#if mentions[server.id] > 0}
-                <span
-                  class="absolute -right-1.5 -bottom-1 flex h-4.5 min-w-4.5 items-center justify-center bg-destructive px-1 text-[10px] leading-none font-bold text-destructive-foreground ring-2 ring-background"
-                  class:rounded-full={settings.value.circleIcons}
-                >
-                  {mentions[server.id] > 99 ? '99+' : mentions[server.id]}
-                </span>
-              {/if}
+              {#if activeId === server.id}{@render activeBar()}{/if}
+              {#if mentions[server.id] > 0}{@render badge(mentions[server.id])}{/if}
             </button>
           </ContextMenu.Trigger>
           <ContextMenu.Content class="w-56">
@@ -192,17 +208,6 @@
         </ContextMenu.Root>
       </div>
     {/each}
-  </div>
-
-  <div class="mt-auto flex flex-col items-center gap-1.5">
-    <button
-      class="flex size-10 items-center justify-center border border-dashed border-muted-foreground/30 text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
-      class:rounded-full={settings.value.circleIcons}
-      aria-label="Add server"
-      onclick={() => (createOpen = true)}
-    >
-      <Plus class="size-4" />
-    </button>
   </div>
 </nav>
 

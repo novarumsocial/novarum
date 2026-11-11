@@ -295,7 +295,7 @@
         data-message-id={message.id}
         class="relative -mx-3 flex gap-3 px-3 py-0.5 first:mt-0 motion-reduce:animate-none sm:-mx-4 sm:px-4 {selfMentioned
           ? 'bg-amber-400/10 hover:bg-amber-400/15'
-          : 'hover:bg-muted/30'}"
+          : 'hover:bg-muted/40'}"
         class:animate-message-flash={chat.activeMessage === message.id}
         onanimationend={() => {
           if (chat.activeMessage === message.id) {
@@ -306,7 +306,6 @@
             });
           }
         }}
-        class:mt-0.5={grouped}
         class:mt-4={!grouped}
         onmouseenter={() => (hovered = true)}
         onmouseleave={() => (hovered = false)}
@@ -320,12 +319,12 @@
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
-              class="{message.interaction ? 'mt-5' : 'mt-0.5'} size-9 text-xs"
+              class="{message.interaction ? 'mt-5' : 'mt-0.5'} size-10 text-sm"
               bgColor={message.author.avatarColor}
             />
           </ProfileCard>
         {:else}
-          <div class="w-9 shrink-0"></div>
+          <div class="w-10 shrink-0"></div>
         {/if}
 
         <div class="min-w-0 flex-1">
@@ -333,7 +332,7 @@
             <p
               class="mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground"
             >
-              <SquareSlash class="size-3 shrink-0 text-primary/70" aria-hidden="true" />
+              <SquareSlash class="size-3 shrink-0" aria-hidden="true" />
               <span class="truncate">
                 <span class="font-medium text-foreground/75"
                   >{message.interaction.user.displayName || message.interaction.user.username}</span
@@ -347,12 +346,12 @@
               <ProfileCard
                 user={message.author}
                 onCall={onProfileCall}
-                class="text-sm font-semibold text-foreground"
+                class="text-[15px] font-semibold text-foreground"
               >
                 {authorName}
               </ProfileCard>
               {#if message.author.isBot}<BotBadge class="self-center" />{/if}
-              <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
+              <span class="text-xs text-muted-foreground">{formatTime(message.timestamp)}</span>
             </div>
           {/if}
 
@@ -404,7 +403,7 @@
               </div>
             </div>
           {:else if message.content?.trim() || (message.edited && !message.embeds.length)}
-            <div class="text-sm leading-relaxed text-foreground/90">
+            <div class="max-w-4xl text-[15px] leading-normal text-foreground">
               <Markdown content={message.content?.trim() ? message.content : ''} links>
                 {#snippet trailing()}
                   {#if message.edited}
@@ -453,7 +452,7 @@
           {/if}
 
           {#if (hovered || dropdownOpen || contextMenuOpen) && !localOnly}
-            <div class="absolute top-0 right-0">
+            <div class="absolute -top-3 right-3 border border-border bg-popover shadow-md">
               <ButtonGroup.Root>
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
                   ><Reply class="size-3" /></Button

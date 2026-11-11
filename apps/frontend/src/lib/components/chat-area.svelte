@@ -272,7 +272,7 @@
 {#snippet skeletonRows(count: number)}
   {#each Array.from({ length: count }) as _, i}
     <div class="flex gap-3" class:opacity-60={i > 2}>
-      <div class="mt-0.5 size-9 shrink-0 animate-pulse bg-muted"></div>
+      <div class="mt-0.5 size-10 shrink-0 animate-pulse bg-muted"></div>
       <div class="min-w-0 flex-1 space-y-2">
         <div class="flex items-center gap-2">
           <div class="h-3 w-24 animate-pulse bg-muted"></div>
@@ -291,14 +291,14 @@
     <Avatar
       src={session.user?.avatarUrl}
       {name}
-      class="mt-0.5 size-9 text-xs"
+      class="mt-0.5 size-10 text-sm"
       bgColor={session.user?.avatarColor}
     />
     <div class="min-w-0 flex-1">
       <span class="text-sm font-semibold text-foreground">{name}</span>
       <div class:opacity-60={!item.failed}>
         {#if item.content}
-          <div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+          <div class="whitespace-pre-wrap break-words text-[15px] leading-normal text-foreground">
             {item.content}
           </div>
         {/if}
@@ -358,7 +358,7 @@
     {:else}
       <Hash class="size-5 text-muted-foreground" />
     {/if}
-    <span class="text-sm font-semibold text-foreground">{channel.name}</span>
+    <span class="text-[15px] font-bold tracking-tight text-foreground">{channel.name}</span>
     {#if channel.topic}
       <span class="mx-1.5 text-muted-foreground/30">|</span>
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
@@ -510,23 +510,23 @@
                     i === 0}
                   {#if dayDivider}
                     <div
-                      class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/20"
+                      class="mt-5 mb-1 flex items-center gap-3 text-xs font-medium text-muted-foreground"
                       role="separator"
                       aria-label={msg.timestamp.toLocaleDateString()}
                     >
-                      <span class="h-px flex-1 bg-muted-foreground/20"></span>
                       <span>{formatDate(msg.timestamp)}</span>
+                      <span class="h-px flex-1 bg-border"></span>
                     </div>
                   {/if}
                   {#if firstUnread}
                     <div
                       id={`unread-${channel.id}`}
-                      class="my-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-destructive"
+                      class="mt-4 -mb-1 flex items-center gap-3 text-xs font-semibold text-beacon"
                       role="separator"
                       aria-label="New messages"
                     >
-                      <span class="h-px flex-1 bg-destructive"></span>
                       <span>New</span>
+                      <span class="h-px flex-1 bg-beacon"></span>
                     </div>
                   {/if}
                   <MessageComponent

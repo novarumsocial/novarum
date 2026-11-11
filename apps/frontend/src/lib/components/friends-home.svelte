@@ -72,23 +72,15 @@
   ]);
 </script>
 
-{#snippet person(entry: FriendEntry, subtitle: string, avatarClass = 'size-8')}
+{#snippet person(entry: FriendEntry, subtitle: string, avatarClass = 'size-9')}
   {@const name = nameFor(entry)}
-  <div class="relative shrink-0">
-    <Avatar
-      src={entry.user.avatarUrl}
-      {name}
-      class={cn(avatarClass, 'text-xs')}
-      bgColor={entry.user.avatarColor}
-    />
-    <span
-      class={cn(
-        'absolute -right-1 -bottom-1 size-3.5 border-[3px] border-background group-hover:border-card',
-        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-neutral-500'
-      )}
-      class:rounded-full={settings.value.circleIcons}
-    ></span>
-  </div>
+  <Avatar
+    src={entry.user.avatarUrl}
+    {name}
+    class={cn(avatarClass, 'text-xs')}
+    bgColor={entry.user.avatarColor}
+    status={entry.status === 'ONLINE' ? 'online' : 'offline'}
+  />
   <div class="min-w-0 flex-1 leading-tight select-none">
     <p class="truncate text-sm font-semibold">
       {name}
@@ -140,18 +132,18 @@
       >
         <Menu class="size-5" />
       </Button>
-      <div class="flex shrink-0 items-center gap-2 text-sm font-semibold">
+      <div class="flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-tight">
         <Users class="size-5 text-muted-foreground" />
         <span class="hidden sm:inline">Friends</span>
       </div>
       <div class="h-6 w-px shrink-0 bg-border"></div>
       <Tabs.List
-        class="h-auto min-w-0 justify-start gap-2 overflow-x-auto overflow-y-hidden bg-transparent p-0 [scrollbar-width:none]"
+        class="h-12 min-w-0 justify-start gap-3 overflow-x-auto overflow-y-hidden bg-transparent p-0 [scrollbar-width:none]"
       >
         {#each [{ value: 'online', label: 'Online' }, { value: 'all', label: 'All' }, { value: 'pending', label: 'Pending' }] as item (item.value)}
           <Tabs.Trigger
             value={item.value}
-            class="h-7 flex-none gap-1.5 border-transparent! px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground data-active:bg-muted! data-active:text-foreground"
+            class="h-12 flex-none gap-1.5 border-transparent! bg-transparent! px-1.5 text-sm font-medium text-muted-foreground hover:text-foreground data-active:text-foreground data-active:shadow-[inset_0_-2px_0_var(--beacon)]"
           >
             {item.label}
             {#if item.value === 'pending' && friends.incoming.length > 0}
@@ -166,7 +158,7 @@
         {/each}
         <Tabs.Trigger
           value="add"
-          class="h-7 flex-none border-transparent! bg-primary! px-2.5 text-sm font-medium text-primary-foreground! hover:bg-primary/85! data-active:bg-transparent! data-active:text-sidebar-primary!"
+          class="ml-2 h-7 flex-none self-center border-transparent! bg-primary! px-2.5 text-sm font-semibold text-primary-foreground! hover:bg-primary/85! data-active:bg-transparent! data-active:text-sidebar-primary!"
         >
           Add friend
         </Tabs.Trigger>
@@ -191,14 +183,14 @@
             )}
           {:else}
             <div class="relative">
-              <Input placeholder="Search" class="h-9 border-0 bg-sidebar pr-9" bind:value={query} />
+              <Input placeholder="Search friends" class="h-10 bg-card pr-9" bind:value={query} />
               <Search
                 class="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
               />
             </div>
 
             {@render sectionLabel(
-              `${tab === 'online' ? 'Online' : 'All friends'} — ${list.length}`
+              `${list.length} ${tab === 'online' ? 'online' : list.length === 1 ? 'friend' : 'friends'}`
             )}
 
             <div>
@@ -264,7 +256,7 @@
               'Requests you send or receive will wait here until they’re answered.'
             )}
           {:else}
-            {@render sectionLabel(`Pending — ${pending.length}`)}
+            {@render sectionLabel(`${pending.length} pending`)}
             <div>
               {#each pending as { entry, incoming } (entry.user.userId)}
                 {@const name = nameFor(entry)}
@@ -356,7 +348,7 @@
       </div>
 
       <aside class="hidden w-80 shrink-0 overflow-y-auto border-l p-4 xl:block">
-        <h2 class="text-lg font-semibold">Active now</h2>
+        <h2 class="text-[15px] font-bold tracking-tight">Active now</h2>
         {#if online.length === 0}
           <div class="mt-4 text-center">
             <p class="text-sm font-medium">It’s quiet for now…</p>
@@ -369,7 +361,7 @@
             {#each online as entry (entry.user.userId)}
               <button
                 type="button"
-                class="group flex w-full cursor-pointer items-center gap-3 border bg-sidebar p-3 text-left hover:bg-card"
+                class="group flex w-full cursor-pointer items-center gap-3 bg-card p-3 text-left hover:bg-muted"
                 onclick={() => dms.open(entry.user.userId)}
               >
                 {@render person(entry, 'Online', 'size-10')}
