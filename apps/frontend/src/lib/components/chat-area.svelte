@@ -272,7 +272,7 @@
 {#snippet skeletonRows(count: number)}
   {#each Array.from({ length: count }) as _, i}
     <div class="flex gap-3" class:opacity-60={i > 2}>
-      <div class="mt-0.5 size-9 shrink-0 animate-pulse bg-muted"></div>
+      <div class="mt-0.5 size-6 shrink-0 animate-pulse bg-muted"></div>
       <div class="min-w-0 flex-1 space-y-2">
         <div class="flex items-center gap-2">
           <div class="h-3 w-24 animate-pulse bg-muted"></div>
@@ -287,22 +287,18 @@
 
 {#snippet pendingMessage(item: Pending)}
   {@const name = session.user?.displayName || session.user?.username || 'You'}
-  <!-- same narrow/transcript grid as message.svelte -->
-  <div
-    class="mt-3 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[minmax(0,9rem)_1.5rem_minmax(0,1fr)] py-0.5"
-  >
-    <span
-      class="col-start-2 min-w-0 truncate text-sm font-semibold @2xl:col-start-1 @2xl:pt-px @2xl:text-right"
-    >
-      <span class="user-ink" style:--user-color={session.user?.avatarColor}>{name}</span>
-    </span>
+  <!-- same compact row as message.svelte -->
+  <div class="mt-2 flex gap-2.5 py-0.5">
     <Avatar
       src={session.user?.avatarUrl}
       {name}
-      class="col-start-1 row-span-2 row-start-1 mt-0.5 size-9 text-xs @2xl:col-start-2 @2xl:row-auto @2xl:mt-0 @2xl:size-6 @2xl:text-[10px]"
+      class="mt-px size-6 text-[10px]"
       bgColor={session.user?.avatarColor}
     />
-    <div class="col-start-2 min-w-0 @2xl:col-start-3">
+    <div class="min-w-0 flex-1">
+      <span class="float-left mr-2 flex h-[1.40625rem] items-center text-[15px] font-semibold">
+        <span class="user-ink" style:--user-color={session.user?.avatarColor}>{name}</span>
+      </span>
       <div class:opacity-60={!item.failed}>
         {#if item.content}
           <div class="whitespace-pre-wrap break-words text-[15px] leading-normal text-foreground">
@@ -565,7 +561,7 @@
 
       {#if typingText}
         <div
-          class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4 @2xl:pl-52"
+          class="flex h-6 shrink-0 items-center px-3 text-xs text-muted-foreground sm:px-4"
           aria-live="polite"
         >
           <span class="flex items-center gap-0.5 mr-2.5">

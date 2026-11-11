@@ -293,7 +293,7 @@
         {...props}
         id={message.id}
         data-message-id={message.id}
-        class="group/row relative -mx-2 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[minmax(0,9rem)_1.5rem_minmax(0,1fr)] rounded-xl px-2 py-0.5 first:mt-0 motion-reduce:animate-none {selfMentioned
+        class="group/row relative -mx-2 flex gap-2.5 rounded-xl px-2 py-0.5 first:mt-0 motion-reduce:animate-none {selfMentioned
           ? 'bg-tertiary-container/50 hover:bg-tertiary-container/70'
           : 'hover:bg-muted/40'}"
         class:animate-message-flash={chat.activeMessage === message.id}
@@ -306,55 +306,17 @@
             });
           }
         }}
-        class:mt-3={!grouped}
+        class:mt-2={!grouped}
         onmouseenter={() => (hovered = true)}
         onmouseleave={() => (hovered = false)}
         role="group"
       >
-        <!-- Narrow: avatar on the left, name and time above the text. Wide (@2xl): a transcript,
-             with the name and a small avatar in a left gutter and the time at the far right. -->
-        {#if message.interaction}
-          <p
-            class="col-start-2 mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground @2xl:col-start-3"
-          >
-            <SquareSlash class="size-3 shrink-0" aria-hidden="true" />
-            <span class="truncate">
-              <span class="font-medium text-foreground/75"
-                >{message.interaction.user.displayName || message.interaction.user.username}</span
-              >
-              used <span class="font-medium text-foreground/75">/{message.interaction.name}</span>
-            </span>
-          </p>
-        {/if}
         {#if !grouped}
-          <div
-            class="col-start-2 flex min-w-0 items-baseline gap-2 self-start @2xl:col-start-1 @2xl:justify-end @2xl:pt-px"
-          >
-            <ProfileCard
-              user={message.author}
-              onCall={onProfileCall}
-              class="min-w-0 truncate text-sm font-semibold"
-            >
-              <span class="user-ink" style:--user-color={message.author.avatarColor}>
-                {authorName}
-              </span>
-            </ProfileCard>
-            {#if message.author.isBot}<BotBadge class="self-center" />{/if}
-            <span class="text-[11px] text-muted-foreground @2xl:hidden">
-              {formatTime(message.timestamp)}
-            </span>
-          </div>
-          <ProfileCard
-            user={message.author}
-            onCall={onProfileCall}
-            class="col-start-1 row-span-3 row-start-1 self-start @2xl:col-start-2 @2xl:row-auto"
-          >
+          <ProfileCard user={message.author} onCall={onProfileCall} class="self-start">
             <Avatar
               src={message.author.avatarUrl}
               name={authorName}
-              class="{message.interaction
-                ? 'mt-5'
-                : 'mt-0.5'} size-9 text-xs @2xl:mt-0 @2xl:size-6 @2xl:text-[10px]"
+              class="{message.interaction ? 'mt-5' : 'mt-px'} size-6 text-[10px]"
               bgColor={message.author.avatarColor}
             />
           </ProfileCard>
@@ -362,14 +324,42 @@
             {formatTime(message.timestamp)}
           </span>
         {:else}
-          <span
-            class="invisible col-start-1 hidden self-center text-right text-[11px] text-muted-foreground group-hover/row:visible @2xl:block"
-          >
-            {formatTime(message.timestamp)}
-          </span>
+          <div class="w-6 shrink-0"></div>
         {/if}
 
-        <div class="col-start-2 min-w-0 @2xl:col-start-3 @2xl:pr-20">
+        <div class="min-w-0 flex-1 @2xl:pr-20">
+          {#if message.interaction}
+            <p
+              class="mb-0.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-muted-foreground"
+            >
+              <SquareSlash class="size-3 shrink-0" aria-hidden="true" />
+              <span class="truncate">
+                <span class="font-medium text-foreground/75"
+                  >{message.interaction.user.displayName || message.interaction.user.username}</span
+                >
+                used <span class="font-medium text-foreground/75">/{message.interaction.name}</span>
+              </span>
+            </p>
+          {/if}
+          {#if !grouped}
+            <!-- the name floats at the start of the first line, so the author costs no extra row -->
+            <div class="float-left mr-2 flex h-[1.40625rem] items-center gap-1.5">
+              <ProfileCard
+                user={message.author}
+                onCall={onProfileCall}
+                class="max-w-48 truncate text-[15px] font-semibold"
+              >
+                <span class="user-ink" style:--user-color={message.author.avatarColor}>
+                  {authorName}
+                </span>
+              </ProfileCard>
+              {#if message.author.isBot}<BotBadge />{/if}
+              <span class="text-[11px] text-muted-foreground @2xl:hidden">
+                {formatTime(message.timestamp)}
+              </span>
+            </div>
+          {/if}
+
           {#if message.replyTo}
             <a
               href={chat.messagePath(message.replyTo)}
@@ -439,6 +429,8 @@
               </Markdown>
             </div>
           {/if}
+
+          <div class="clear-left"></div>
 
           {#if message.thinking}
             <p class="flex items-center gap-1.5 text-sm text-muted-foreground" aria-live="polite">
