@@ -80,6 +80,7 @@
     class={cn(avatarClass, 'text-xs')}
     bgColor={entry.user.avatarColor}
     status={entry.status === 'ONLINE' ? 'online' : 'offline'}
+    statusBorderClassName="border-background group-hover:border-card"
   />
   <div class="min-w-0 flex-1 leading-tight select-none">
     <p class="truncate text-sm font-semibold">

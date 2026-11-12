@@ -11,6 +11,7 @@
     fallback,
     bgColor,
     status,
+    statusBorderClassName = 'border-sidebar',
   }: {
     src?: string | null;
     name: string;
@@ -19,6 +20,7 @@
     fallback?: string;
     bgColor?: string | null;
     status?: 'online' | 'offline';
+    statusBorderClassName?: string;
   } = $props();
 
   let failed = $state(false);
@@ -67,7 +69,7 @@
     )}
   >
     {@render face('avatar-notch size-full')}
-    <span class="avatar-pip" data-status={status}></span>
+    <span class={cn('avatar-pip', statusBorderClassName)} data-status={status}></span>
   </div>
 {:else}
   {@render face(className)}

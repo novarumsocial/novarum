@@ -71,6 +71,7 @@
                 class="size-7 text-xs"
                 bgColor={member.avatarColor}
                 status="online"
+                statusBorderClassName="border-background"
               />
               <div class="flex min-w-0 flex-1">
                 <span class="block truncate text-sm text-foreground">{name}</span>

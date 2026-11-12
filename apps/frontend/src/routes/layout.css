@@ -200,28 +200,19 @@
   }
 }
 
-/* Avatars with a presence pip get their bottom-right corner cut out so the pip sits in the notch. */
+/* Presence pip: square avatars keep the plain corner dot; rounded ones cut a notch to sit in. */
 .avatar-status {
   --notch: max(8px, 34%);
 }
 
-.avatar-notch {
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - var(--notch)),
-    calc(100% - var(--notch)) calc(100% - var(--notch)),
-    calc(100% - var(--notch)) 100%,
-    0 100%
-  );
-}
-
 .avatar-pip {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: calc(var(--notch) - 2px);
-  height: calc(var(--notch) - 2px);
+  right: -1px;
+  bottom: -1px;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-width: 2px;
+  border-style: solid;
   background: var(--online);
 }
 
@@ -230,7 +221,6 @@
 }
 
 :root[data-rounded='true'] .avatar-notch {
-  clip-path: none;
   mask: radial-gradient(
     circle at calc(100% - var(--notch) / 2) calc(100% - var(--notch) / 2),
     transparent calc(var(--notch) / 2 + 1px),
@@ -241,6 +231,9 @@
 :root[data-rounded='true'] .avatar-pip {
   right: 1px;
   bottom: 1px;
+  width: calc(var(--notch) - 2px);
+  height: calc(var(--notch) - 2px);
+  border-width: 0;
   border-radius: 50%;
 }
 
