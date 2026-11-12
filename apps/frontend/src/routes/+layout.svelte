@@ -20,11 +20,8 @@
   $effect(() => {
     const root = document.documentElement;
     root.classList.toggle('desktop', desktop);
-    if (settings.value.darkMode) {
-      root.classList.toggle('dark', true);
-    } else {
-      root.classList.remove('dark');
-    }
+    root.classList.toggle('dark', settings.value.colorPalette !== 'light');
+    root.dataset.palette = settings.value.colorPalette;
     root.dataset.rounded = String(settings.value.circleIcons);
   });
 </script>

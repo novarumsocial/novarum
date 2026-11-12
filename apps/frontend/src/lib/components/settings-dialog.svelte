@@ -34,6 +34,7 @@
   import {
     noiseModelLabels,
     settings,
+    type ColorPalette,
     type NoiseSuppressionModel,
     type TimeFormat,
   } from '$lib/settings.svelte';
@@ -626,6 +627,12 @@
     { value: '24hr', label: '24-hour', example: 'Example: 15:30' },
   ];
 
+  const colorPalettes: { value: ColorPalette; label: string }[] = [
+    { value: 'light', label: 'Light' },
+    //{ value: 'dark-v2', label: 'Dark (v2)' },
+    { value: 'dark-classic', label: 'Dark' },// (Classic)' },
+  ];
+
   const pages = $derived([
     { id: 'account', group: 'You', title: 'Account', icon: User },
     { id: 'security', group: 'You', title: 'Privacy & security', icon: ShieldCheck },
@@ -1184,11 +1191,26 @@
 
             <SettingsGroup title="Theme">
               <SettingsRow
-                title="Dark mode"
-                description="Use the dark color scheme."
-                id="dark-mode"
+                title="Color palette"
+                description="Choose the app color scheme."
+                stacked
+                id="color-palette"
               >
-                <Switch id="dark-mode" bind:checked={settings.value.darkMode} />
+                <Select.Root
+                  type="single"
+                  value={settings.value.colorPalette}
+                  onValueChange={(value) => (settings.value.colorPalette = value as ColorPalette)}
+                >
+                  <Select.Trigger id="color-palette" class="w-full">
+                    {colorPalettes.find((palette) => palette.value === settings.value.colorPalette)
+                      ?.label ?? 'Color palette'}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each colorPalettes as palette}
+                      <Select.Item value={palette.value}>{palette.label}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </SettingsRow>
               <SettingsRow
                 title="Round icons"

@@ -2,6 +2,7 @@ import { getNotificationPermission, notificationsSupported } from './notificatio
 
 export type TimeFormat = 'auto' | '12hr' | '24hr';
 export type NoiseSuppressionModel = 'deepfilternet' | 'rnnoise';
+export type ColorPalette = 'light' | 'dark-v2' | 'dark-classic';
 
 export const noiseModelLabels: Record<NoiseSuppressionModel, string> = {
   deepfilternet: 'DeepFilterNet 3',
@@ -17,7 +18,7 @@ type Settings = {
   showMemberList: boolean;
   circleIcons: boolean;
   roundedBorders: boolean;
-  darkMode: boolean;
+  colorPalette: ColorPalette;
   noiseCancellation: boolean;
   noiseSuppressionModel: NoiseSuppressionModel;
   noiseSuppressionLevel: number;
@@ -44,7 +45,7 @@ const defaults: Settings = {
   showMemberList: true,
   circleIcons: false,
   roundedBorders: false,
-  darkMode: true,
+  colorPalette: 'dark-classic',
   noiseCancellation: true,
   noiseSuppressionModel: 'deepfilternet',
   noiseSuppressionLevel: 30,
@@ -65,7 +66,11 @@ async function load(): Promise<Settings> {
   if (typeof localStorage === 'undefined') return { ...defaults };
   try {
     const raw = localStorage.getItem('settings');
-    const value = raw ? { ...defaults, ...JSON.parse(raw) } : { ...defaults };
+    const stored: Partial<Settings> & { darkMode?: boolean } = raw ? JSON.parse(raw) : {};
+    if (stored.colorPalette === undefined && stored.darkMode !== undefined) {
+      stored.colorPalette = stored.darkMode ? 'dark-classic' : 'light';
+    }
+    const value = { ...defaults, ...stored };
     return {
       ...value,
       pushNotifications:
