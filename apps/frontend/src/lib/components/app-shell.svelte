@@ -236,7 +236,7 @@
 {#if booting}
   <InitialLoader finished={bootFinished} />
 {:else if currentUser}
-  <div class="flex h-svh overflow-hidden bg-background">
+  <div class="flex h-svh overflow-hidden bg-sidebar">
     {#if mobileNavigationOpen}
       <button
         class="fixed inset-0 z-30 bg-black/60 md:hidden"
@@ -298,81 +298,87 @@
       <UserArea {voice} user={currentUser} {voiceChannelName} onLeaveVoice={leaveVoice} />
     </div>
 
-    {#if chat.route.kind === 'home'}
-      <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-    {:else if chat.route.kind === 'developers'}
-      <DevelopersHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
-    {:else if currentChannel && (currentChannel.type === 'TEXT' || currentChannel.type === 'DM')}
-      <ChatArea
-        channel={currentChannel}
-        messages={currentMessages}
-        loading={currentMessagesLoading}
-        onSend={(content, files, replyTo) =>
-          chat.sendMessage(currentChannel.id, content, files, replyTo)}
-        onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
-        onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
-        onOpenNavigation={() => (mobileNavigationOpen = true)}
-        onToggleMembers={toggleMembers}
-        onCall={() => startCall(currentChannel.id)}
-        onRing={() => realtime.ringCall(currentChannel.id)}
-        onProfileCall={startCall}
-        call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
-          ? dmCall
-          : undefined}
-        {callExpanded}
-      />
-      {#snippet dmCall()}
-        <VoiceArea
-          channel={currentChannel!}
-          {voice}
-          members={callMembers}
-          onJoin={() => startCall(currentChannel!.id)}
-          onLeave={() => {
-            callExpanded = false;
-            leaveVoice();
-          }}
-          embedded
-          expanded={callExpanded}
-          onToggleExpand={() => (callExpanded = !callExpanded)}
+    <!-- the sidebar sits on the app canvas; everything else lives in one inset panel -->
+    <div
+      class="flex min-w-0 flex-1 overflow-hidden bg-background md:my-2 md:mr-2 md:border md:border-border"
+    >
+      {#if chat.route.kind === 'home'}
+        <FriendsHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
+      {:else if chat.route.kind === 'developers'}
+        <DevelopersHome onOpenNavigation={() => (mobileNavigationOpen = true)} />
+      {:else if currentChannel && (currentChannel.type === 'TEXT' || currentChannel.type === 'DM')}
+        <ChatArea
+          channel={currentChannel}
+          messages={currentMessages}
+          loading={currentMessagesLoading}
+          onSend={(content, files, replyTo) =>
+            chat.sendMessage(currentChannel.id, content, files, replyTo)}
+          onDelete={(messageId) => chat.deleteMessage(currentChannel.id, messageId)}
+          onEdit={(messageId, content) => chat.editMessage(currentChannel.id, messageId, content)}
+          onOpenNavigation={() => (mobileNavigationOpen = true)}
+          onToggleMembers={toggleMembers}
+          onCall={() => startCall(currentChannel.id)}
+          onRing={() => realtime.ringCall(currentChannel.id)}
+          onProfileCall={startCall}
+          call={currentChannel.type === 'DM' && voice.channelId === currentChannel.id
+            ? dmCall
+            : undefined}
+          {callExpanded}
         />
-      {/snippet}
-    {:else if currentChannel && currentChannel.type === 'VOICE'}
-      <VoiceArea
-        channel={currentChannel}
-        {voice}
-        members={chat.members}
-        onJoin={() => voice.join(currentChannel.id).catch(() => null)}
-        onLeave={leaveVoice}
-        onOpenNavigation={() => (mobileNavigationOpen = true)}
-      />
-    {:else}
-      <main class="relative flex min-w-0 flex-1 items-center justify-center bg-background px-6">
-        <button
-          class="absolute top-3 left-3 min-h-10 border border-border px-3 text-sm font-medium md:hidden"
-          onclick={() => (mobileNavigationOpen = true)}
+        {#snippet dmCall()}
+          <VoiceArea
+            channel={currentChannel!}
+            {voice}
+            members={callMembers}
+            onJoin={() => startCall(currentChannel!.id)}
+            onLeave={() => {
+              callExpanded = false;
+              leaveVoice();
+            }}
+            embedded
+            expanded={callExpanded}
+            onToggleExpand={() => (callExpanded = !callExpanded)}
+          />
+        {/snippet}
+      {:else if currentChannel && currentChannel.type === 'VOICE'}
+        <VoiceArea
+          channel={currentChannel}
+          {voice}
+          members={chat.members}
+          onJoin={() => voice.join(currentChannel.id).catch(() => null)}
+          onLeave={leaveVoice}
+          onOpenNavigation={() => (mobileNavigationOpen = true)}
+        />
+      {:else}
+        <main class="relative flex min-w-0 flex-1 items-center justify-center bg-background px-6">
+          <button
+            class="absolute top-3 left-3 min-h-10 border border-border px-3 text-sm font-medium md:hidden"
+            onclick={() => (mobileNavigationOpen = true)}
+          >
+            Browse channels
+          </button>
+          <div class="max-w-sm text-center">
+            {#if chat.route.kind === 'dms'}
+              <p class="text-sm font-medium text-foreground">No conversation selected</p>
+              <p class="mt-1 text-sm text-muted-foreground">Pick a direct message to begin.</p>
+            {:else}
+              <p class="text-sm font-medium text-foreground">No channel selected</p>
+              <p class="mt-1 text-sm text-muted-foreground">
+                Pick a server or create one to begin.
+              </p>
+            {/if}
+          </div>
+        </main>
+      {/if}
+      {#if showMembers}
+        <div
+          class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0 {settings
+            .value.showMemberList
+            ? ''
+            : 'lg:hidden'}"
+          class:translate-x-full={!mobileMembersOpen}
         >
-          Browse channels
-        </button>
-        <div class="max-w-sm text-center">
-          {#if chat.route.kind === 'dms'}
-            <p class="text-sm font-medium text-foreground">No conversation selected</p>
-            <p class="mt-1 text-sm text-muted-foreground">Pick a direct message to begin.</p>
-          {:else}
-            <p class="text-sm font-medium text-foreground">No channel selected</p>
-            <p class="mt-1 text-sm text-muted-foreground">Pick a server or create one to begin.</p>
-          {/if}
-        </div>
-      </main>
-    {/if}
-    {#if showMembers}
-      <div
-        class="fixed inset-y-0 right-0 z-40 w-56 transition-transform lg:static lg:z-auto lg:translate-x-0 {settings
-          .value.showMemberList
-          ? ''
-          : 'lg:hidden'}"
-        class:translate-x-full={!mobileMembersOpen}
-      >
-        <!--
+          <!--
         <button
           class="absolute top-1.5 right-2 z-10 flex size-9 items-center justify-center text-muted-foreground hover:text-foreground lg:hidden"
           aria-label="Close member list"
@@ -381,9 +387,10 @@
           <X class="size-5" />
         </button>
         -->
-        <MemberSidebar server={currentServer!} members={chat.members} onCall={startCall} />
-      </div>
-    {/if}
+          <MemberSidebar server={currentServer!} members={chat.members} onCall={startCall} />
+        </div>
+      {/if}
+    </div>
   </div>
   <CallRinging
     {voice}

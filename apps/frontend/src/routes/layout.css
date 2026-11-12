@@ -41,6 +41,8 @@
   --sidebar-accent-foreground: oklch(0.145 0.008 326);
   --sidebar-border: oklch(0 0 0 / 10%);
   --sidebar-ring: oklch(0.542 0.034 322.5);
+  --beacon: oklch(0.45 0.143 215.221);
+  --online: oklch(0.62 0.16 155);
 }
 
 .dark {
@@ -77,6 +79,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.542 0.034 322.5);
+  --beacon: oklch(0.715 0.143 215.221);
+  --online: oklch(0.78 0.16 155);
 }
 
 :root[data-rounded='true'] {
@@ -90,6 +94,8 @@
 @theme inline {
   --font-sans: 'IBM Plex Sans Variable', sans-serif;
   --font-heading: 'IBM Plex Sans Variable', sans-serif;
+  --color-beacon: var(--beacon);
+  --color-online: var(--online);
   --animate-message-flash: message-flash 1.5s ease-out;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -153,6 +159,50 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Avatars with a presence pip get their bottom-right corner cut out so the pip sits in the notch. */
+.avatar-status {
+  --notch: max(8px, 34%);
+}
+
+.avatar-notch {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--notch)),
+    calc(100% - var(--notch)) calc(100% - var(--notch)),
+    calc(100% - var(--notch)) 100%,
+    0 100%
+  );
+}
+
+.avatar-pip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: calc(var(--notch) - 2px);
+  height: calc(var(--notch) - 2px);
+  background: var(--online);
+}
+
+.avatar-pip[data-status='offline'] {
+  background: var(--muted-foreground);
+}
+
+:root[data-rounded='true'] .avatar-notch {
+  clip-path: none;
+  mask: radial-gradient(
+    circle at calc(100% - var(--notch) / 2) calc(100% - var(--notch) / 2),
+    transparent calc(var(--notch) / 2 + 1px),
+    #000 calc(var(--notch) / 2 + 1.5px)
+  );
+}
+
+:root[data-rounded='true'] .avatar-pip {
+  right: 1px;
+  bottom: 1px;
+  border-radius: 50%;
 }
 
 .desktop body {

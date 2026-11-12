@@ -271,8 +271,8 @@
   <!-- Server header -->
   <DropdownMenu.Root>
     <DropdownMenu.Trigger>
-      <div class="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-        <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+      <div class="flex h-12 shrink-0 items-center justify-between px-4 hover:bg-sidebar-accent/50">
+        <span class="truncate text-base font-bold tracking-tight text-sidebar-foreground">
           {server.name}
         </span>
 
@@ -333,7 +333,7 @@
   </DropdownMenu.Root>
 
   <!-- Channel list -->
-  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+  <div class="flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
     {#each categories as cat (cat.id)}
       <div class="flex w-full items-center gap-1 px-1 py-1">
         <button
@@ -351,7 +351,7 @@
             collapsed[cat.id] = !collapsed[cat.id];
             collapsed = { ...collapsed };
           }}
-          class="order-1 flex flex-1 items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-sidebar-foreground peer-hover:text-sidebar-foreground"
+          class="order-1 flex flex-1 items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-sidebar-foreground peer-hover:text-sidebar-foreground"
         >
           {#if collapsed[cat.id]}
             <ChevronRight class="size-3 shrink-0" />
@@ -392,22 +392,25 @@
                   <button
                     onclick={() => selectChannel(ch)}
                     class={cn(
-                      'flex w-full items-center gap-1.5 rounded-none px-2 py-1 text-left text-sm transition-colors cursor-pointer',
-                      activeChannel === ch.id && 'bg-primary/10 text-sidebar-foreground',
+                      'relative flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-sm transition-colors',
+                      settings.value.circleIcons && 'rounded-r-xl',
+                      activeChannel === ch.id &&
+                        'bg-sidebar-accent text-sidebar-foreground before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-beacon',
                       activeChannel !== ch.id &&
-                        'text-muted-foreground hover:text-sidebar-foreground',
+                        'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                      (showUnread || showMention) &&
+                        activeChannel !== ch.id &&
+                        'font-semibold text-sidebar-foreground',
                       reorderLoading && 'opacity-70'
                     )}
                   >
                     {#if ch.type === 'VOICE'}
                       <Volume2 class="size-4 shrink-0" />
                     {:else}
-                      <Hash
-                        class={cn('size-4 shrink-0', (showUnread || showMention) && 'text-white')}
-                      />
+                      <Hash class="size-4 shrink-0" />
                     {/if}
 
-                    <span class="flex-1 truncate" class:text-white={showUnread || showMention}>
+                    <span class="flex-1 truncate">
                       {ch.label || ch.name}
                     </span>
 
@@ -425,7 +428,7 @@
                     {#if showUnread && !showMention}
                       <span class="flex size-5 shrink-0 items-center justify-center">
                         <span
-                          class="size-2 bg-foreground/80"
+                          class="size-2 bg-beacon"
                           class:rounded-full={settings.value.circleIcons}
                         ></span>
                       </span>

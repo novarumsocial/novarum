@@ -74,21 +74,13 @@
 
 {#snippet person(entry: FriendEntry, subtitle: string, avatarClass = 'size-8')}
   {@const name = nameFor(entry)}
-  <div class="relative shrink-0">
-    <Avatar
-      src={entry.user.avatarUrl}
-      {name}
-      class={cn(avatarClass, 'text-xs')}
-      bgColor={entry.user.avatarColor}
-    />
-    <span
-      class={cn(
-        'absolute -right-1 -bottom-1 size-3.5 border-[3px] border-background group-hover:border-card',
-        entry.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-neutral-500'
-      )}
-      class:rounded-full={settings.value.circleIcons}
-    ></span>
-  </div>
+  <Avatar
+    src={entry.user.avatarUrl}
+    {name}
+    class={cn(avatarClass, 'text-xs')}
+    bgColor={entry.user.avatarColor}
+    status={entry.status === 'ONLINE' ? 'online' : 'offline'}
+  />
   <div class="min-w-0 flex-1 leading-tight select-none">
     <p class="truncate text-sm font-semibold">
       {name}

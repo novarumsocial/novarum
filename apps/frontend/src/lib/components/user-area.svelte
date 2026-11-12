@@ -269,22 +269,13 @@
         class="-ml-1.5 flex min-w-0 flex-1 items-center gap-2.5 px-1.5 py-1 text-left transition-colors hover:bg-sidebar-accent"
         aria-label="Switch account"
       >
-        <div class="relative shrink-0">
-          <Avatar
-            src={user.avatarUrl}
-            name={user.displayName || user.username}
-            bgColor={user.avatarColor}
-            class="size-8 text-xs"
-          />
-          <span
-            class="absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500"
-          ></span>
-          {#if settings.value.circleIcons}
-            <span
-              class="rounded-full absolute -right-px -bottom-px size-2.75 border-2 border-sidebar bg-emerald-500"
-            ></span>
-          {/if}
-        </div>
+        <Avatar
+          src={user.avatarUrl}
+          name={user.displayName || user.username}
+          bgColor={user.avatarColor}
+          class="size-8 text-xs"
+          status="online"
+        />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium leading-tight text-sidebar-foreground">
             {user.displayName || user.username}
