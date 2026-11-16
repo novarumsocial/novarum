@@ -1,22 +1,26 @@
 // Port of apps/frontend/src/lib/components/dm-sidebar.svelte
 // Differences: long-press a row for its actions drawer (close, notifications), pull down to refresh.
-// It is the hub's Home column: Friends and every DM open as their own screen.
+// It is the hub's Home column: every DM opens as its own screen (Friends is a tab in the bottom bar). A search
+// field finds DMs and channels in every server, the "new message" button sits in thumb reach at the bottom right,
+// and when two people share a display name their handles tell them apart.
 import * as Haptics from 'expo-haptics';
-import { ChevronRight, LoaderCircle, Phone, Plus, Users, X } from 'lucide-react-native';
+import { Bell, Hash, LoaderCircle, Phone, SquarePen, Volume2, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { Alert, FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { NewDmDialog } from '@/components/new-dm-dialog';
 import { NotificationMenu } from '@/components/notification-menu';
+import { SearchField } from '@/components/search-field';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
-import { useChat } from '@/lib/chat-state';
+import { guildPath, useChat } from '@/lib/chat-state';
 import { dmPath, dms, useDms, type DmEntry } from '@/lib/dms';
-import { formatDate, formatTime } from '@/lib/format-date';
+import { formatShortDate } from '@/lib/format-date';
 import { friends, useFriends } from '@/lib/friends';
+import type { PublicUser } from 'anchor/public-user';
 import { goto } from '@/lib/navigation';
 import { useNotificationSettings } from '@/lib/notification-settings';
 import { useSettings } from '@/lib/settings';
@@ -30,7 +34,9 @@ export function DmSidebar() {
   const loading = useDms((s) => s.loading);
   const voiceStates = useChat((s) => s.voiceStates);
   useFriends((s) => s.accepted); // re-render when someone goes online or offline
-  const requests = useFriends((s) => s.incoming.length);
+  const servers = useChat((s) => s.servers);
+  const channelsByServer = useChat((s) => s.channelsByServer);
+  const [query, setQuery] = useState('');
   useNotificationSettings((s) => s.entries); // re-render when levels change
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [menuEntry, setMenuEntry] = useState<DmEntry | null>(null);
@@ -46,11 +52,54 @@ export function DmSidebar() {
     [list]
   );
 
-  const closeDm = (entry: DmEntry) => void dms().close(entry.id);
+  // display names repeat ("guille" twice), so a repeated one also shows the handle
+  const nameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of list) {
+      const other = entry.participants[0];
+      const name = other ? other.displayName || other.username : '';
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  }, [list]);
+
+  const needle = query.trim().toLowerCase();
+  const nameOf = (other?: PublicUser) =>
+    other ? other.displayName || other.username : 'Direct Message';
+  const handleOf = (other?: PublicUser) => (other ? `@${other.username}:${other.homeserver}` : '');
+  const shownDms = needle
+    ? entries.filter((entry) =>
+        `${nameOf(entry.participants[0])} ${handleOf(entry.participants[0])}`
+          .toLowerCase()
+          .includes(needle)
+      )
+    : entries;
+  const channelResults = needle
+    ? servers.flatMap((server) =>
+        (channelsByServer[server.id] ?? []).flatMap((category) =>
+          category.channels
+            .filter((channel) => (channel.label || channel.name).toLowerCase().includes(needle))
+            .map((channel) => ({ server, channel }))
+        )
+      )
+    : [];
+
+  const closeDm = (entry: DmEntry) => {
+    setMenu(null);
+    Alert.alert(
+      `Close your conversation with ${nameOf(entry.participants[0])}?`,
+      'It leaves your list until one of you sends a new message. Nothing is deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Close', style: 'destructive', onPress: () => void dms().close(entry.id) },
+      ]
+    );
+  };
 
   const row = (entry: DmEntry) => {
     const other = entry.participants[0];
-    const name = other ? other.displayName || other.username : 'Direct Message';
+    const name = nameOf(other);
+    const repeated = (nameCounts.get(name) ?? 0) > 1;
     const unread =
       entry.unread &&
       useNotificationSettings.getState().showsUnread({ channelId: entry.id, guildId: null });
@@ -68,7 +117,7 @@ export function DmSidebar() {
           setMenuEntry(entry);
           setMenu('actions');
         }}
-        className="min-h-14 flex-row items-center gap-3 bg-sidebar px-3 active:bg-accent"
+        className="min-h-16 flex-row items-center gap-3 bg-sidebar px-3 active:bg-accent"
       >
         <View>
           <Avatar
@@ -80,30 +129,39 @@ export function DmSidebar() {
           {other && friends().isOnline(other.userId) && (
             <View
               className={cn(
-                'absolute -right-px -bottom-px size-2.5 border-2 border-sidebar bg-emerald-500',
+                'absolute -right-0.5 -bottom-0.5 size-3.5 border-2 border-sidebar bg-emerald-500',
                 circleIcons && 'rounded-full'
               )}
             />
           )}
         </View>
-        <Text
-          numberOfLines={1}
-          className={cn(
-            'flex-1 text-[15px] text-muted-foreground',
-            unread && 'font-semibold text-sidebar-foreground'
-          )}
-        >
-          {name}
-        </Text>
+        <View className="min-w-0 flex-1">
+          <Text
+            numberOfLines={1}
+            className={cn('text-base text-sidebar-foreground', unread && 'font-semibold')}
+          >
+            {name}
+          </Text>
+          {repeated || needle ? (
+            <Text numberOfLines={1} className="text-sm text-muted-foreground">
+              {handleOf(other)}
+            </Text>
+          ) : null}
+        </View>
         {last && (
-          <Text className={cn('text-xs', unread ? 'text-primary' : 'text-muted-foreground')}>
-            {formatDate(last) === 'Today' ? formatTime(last) : formatDate(last)}
+          <Text
+            className={cn(
+              'text-xs',
+              unread ? 'font-semibold text-sidebar-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {formatShortDate(last)}
           </Text>
         )}
         {voiceStates[entry.id]?.length ? (
           <Icon as={Phone} size={14} className="text-green-500" accessibilityLabel="In a call" />
         ) : null}
-        {unread && <View className="size-2 rounded-full bg-primary" />}
+        {unread && <View className="size-2.5 rounded-full bg-sidebar-primary" />}
       </Pressable>
     );
   };
@@ -111,60 +169,72 @@ export function DmSidebar() {
   return (
     <View className="flex-1 bg-sidebar">
       <View
-        className="shrink-0 flex-row items-center border-b border-border pr-1 pl-4"
-        style={{ minHeight: 52 + insets.top, paddingTop: insets.top }}
+        className="shrink-0 gap-2 border-b border-border px-3 pb-3"
+        style={{ paddingTop: insets.top + 10 }}
       >
-        <Text className="flex-1 text-[15px] font-semibold text-sidebar-foreground">Messages</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Start a direct message"
-          onPress={() => setNewDmOpen(true)}
-          className="size-11 items-center justify-center active:bg-accent"
-        >
-          <Icon as={Plus} size={20} className="text-muted-foreground" />
-        </Pressable>
+        <Text role="heading" className="px-1 text-lg font-bold text-sidebar-foreground">
+          Messages
+        </Text>
+        <SearchField
+          placeholder="Search messages and channels"
+          value={query}
+          onChangeText={setQuery}
+        />
       </View>
       {/* a plain list: FlashList's extra layout passes made switching to Home slow */}
       <FlatList
-        data={entries}
+        data={shownDms}
         keyExtractor={(entry) => entry.id}
         renderItem={({ item }) => row(item)}
         extraData={[voiceStates, circleIcons]}
         refreshing={loading}
         onRefresh={() => void dms().load()}
-        contentContainerStyle={{ paddingVertical: 8 }}
+        contentContainerStyle={{ paddingTop: 4, paddingBottom: 96 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListHeaderComponent={
-          <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={requests ? `Friends, ${requests} pending requests` : 'Friends'}
-              onPress={() => goto('/guilds/friends')}
-              className="min-h-14 flex-row items-center gap-3 px-3 active:bg-accent"
-            >
-              <View
-                className={cn(
-                  'size-10 items-center justify-center bg-muted',
-                  circleIcons && 'rounded-full'
-                )}
-              >
-                <Icon as={Users} size={20} className="text-muted-foreground" />
-              </View>
-              <Text className="flex-1 text-[15px] font-medium">Friends</Text>
-              {requests > 0 && (
-                <View
-                  className={cn('min-w-5 bg-destructive px-1.5', circleIcons && 'rounded-full')}
-                >
-                  <Text className="text-center text-xs leading-5 font-bold text-white">
-                    {requests}
-                  </Text>
-                </View>
+          needle ? (
+            <>
+              {channelResults.length > 0 && (
+                <Text className="px-4 pt-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                  Channels
+                </Text>
               )}
-              <Icon as={ChevronRight} size={18} className="text-muted-foreground" />
-            </Pressable>
-            <Text className="px-4 pt-4 pb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              Direct Messages
-            </Text>
-          </>
+              {channelResults.slice(0, 20).map(({ server, channel }) => (
+                <Pressable
+                  key={channel.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${channel.label || channel.name} in ${server.name}`}
+                  onPress={() => {
+                    setQuery('');
+                    goto(guildPath(server.id, channel.id));
+                  }}
+                  className="min-h-14 flex-row items-center gap-3 px-3 active:bg-accent"
+                >
+                  <View className="size-10 items-center justify-center bg-muted">
+                    <Icon
+                      as={channel.type === 'VOICE' ? Volume2 : Hash}
+                      size={18}
+                      className="text-muted-foreground"
+                    />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text numberOfLines={1} className="text-base">
+                      {channel.label || channel.name}
+                    </Text>
+                    <Text numberOfLines={1} className="text-sm text-muted-foreground">
+                      {server.name}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+              {shownDms.length > 0 && (
+                <Text className="px-4 pt-3 pb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                  Direct messages
+                </Text>
+              )}
+            </>
+          ) : null
         }
         ListFooterComponent={
           <>
@@ -176,28 +246,45 @@ export function DmSidebar() {
                 </Text>
               </View>
             ))}
-            {entries.length === 0 && pending.length === 0 && (
-              <Text className="mt-4 px-4 text-center text-xs text-muted-foreground">
-                No direct messages yet. Start one from a friend's profile.
+            {needle && shownDms.length === 0 && channelResults.length === 0 ? (
+              <Text className="mt-6 px-4 text-center text-sm text-muted-foreground">
+                Nothing matches “{query.trim()}”.
+              </Text>
+            ) : null}
+            {!needle && entries.length === 0 && pending.length === 0 && (
+              <Text className="mt-6 px-6 text-center text-sm text-muted-foreground">
+                No direct messages yet. Tap the pencil to start one.
               </Text>
             )}
           </>
         }
       />
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="New message"
+        onPress={() => setNewDmOpen(true)}
+        className={cn(
+          'absolute right-4 bottom-4 size-14 items-center justify-center bg-primary shadow-lg active:opacity-80',
+          circleIcons && 'rounded-full'
+        )}
+        style={{ elevation: 6 }}
+      >
+        <Icon as={SquarePen} size={22} className="text-primary-foreground" />
+      </Pressable>
+
       <Sheet
         open={menu === 'actions'}
         onClose={() => setMenu((current) => (current === 'actions' ? null : current))}
+        title={menuEntry ? nameOf(menuEntry.participants[0]) : undefined}
+        subtitle={menuEntry ? handleOf(menuEntry.participants[0]) : undefined}
       >
-        <SheetItem label="Notification Settings" onPress={() => setMenu('notify')} />
+        <SheetItem icon={Bell} label="Notification settings" onPress={() => setMenu('notify')} />
         <SheetItem
           icon={X}
-          label="Close Direct Message"
+          label="Close conversation"
           destructive
-          onPress={() => {
-            if (menuEntry) closeDm(menuEntry);
-            setMenu(null);
-          }}
+          onPress={() => menuEntry && closeDm(menuEntry)}
         />
       </Sheet>
       {menuEntry && (

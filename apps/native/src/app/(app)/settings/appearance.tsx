@@ -12,6 +12,7 @@ export default function Appearance() {
   const followSystemTheme = useSettings((s) => s.followSystemTheme);
   const circleIcons = useSettings((s) => s.circleIcons);
   const showMemberList = useSettings((s) => s.showMemberList);
+  const developerMode = useSettings((s) => s.developerMode);
   const update = useSettings((s) => s.update);
   const { width } = useWindowDimensions();
 
@@ -49,6 +50,15 @@ export default function Appearance() {
           />
         </SettingsGroup>
       )}
+
+      <SettingsGroup title="Advanced">
+        <SettingsSwitchRow
+          title="Developer mode"
+          description="Show actions to copy server, channel and message IDs."
+          value={developerMode}
+          onValueChange={(value) => update({ developerMode: value })}
+        />
+      </SettingsGroup>
     </SettingsPage>
   );
 }

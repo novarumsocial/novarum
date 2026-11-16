@@ -17,7 +17,9 @@ export function toast(
   message: string,
   options: { tone?: Toast['tone']; action?: Toast['action'] } = {}
 ) {
-  useToast.setState({ current: { id: ++nextId, message, tone: options.tone ?? 'default', ...options } });
+  useToast.setState({
+    current: { id: ++nextId, message, tone: options.tone ?? 'default', ...options },
+  });
 }
 
 export const dismissToast = () => useToast.setState({ current: null });

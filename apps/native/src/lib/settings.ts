@@ -19,6 +19,8 @@ const settingsSchema = z.object({
   notificationVolume: z.number().default(0.5),
   timeFormat: z.enum(['auto', '12hr', '24hr']).default('auto'),
   language: z.string().default('en'),
+  // native-only: shows the "Copy … ID" actions
+  developerMode: z.boolean().default(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

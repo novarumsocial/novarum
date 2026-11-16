@@ -33,9 +33,7 @@ export function ToastHost() {
         role="alert"
         className={cn(
           'min-h-12 w-full max-w-md flex-row items-center gap-3 border px-4 py-2 shadow-lg',
-          current.tone === 'error'
-            ? 'border-destructive/40 bg-popover'
-            : 'border-border bg-popover'
+          current.tone === 'error' ? 'border-destructive/40 bg-popover' : 'border-border bg-popover'
         )}
       >
         <Text

@@ -23,7 +23,7 @@ const channelSlug = (value: string) =>
 export function CreateChannelDialog({
   open,
   onClose,
-  categoryLabel = 'Text Channels',
+  categoryLabel,
   onCreate,
 }: {
   open: boolean;
@@ -69,12 +69,15 @@ export function CreateChannelDialog({
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <View className="gap-4 px-4 pb-2">
-        <View>
-          <Text className="text-lg font-semibold">Create Channel</Text>
-          <Text className="text-sm text-muted-foreground">Add a channel to {categoryLabel}.</Text>
-        </View>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Create channel"
+      subtitle={
+        categoryLabel ? `Add a channel to ${categoryLabel}.` : 'Add a channel to this server.'
+      }
+    >
+      <View className="gap-4 px-4 pt-3 pb-2">
         <View className="gap-1.5">
           <Text className="text-xs font-medium">Channel Name</Text>
           <Input
@@ -122,7 +125,7 @@ export function CreateChannelDialog({
           </Button>
           <Button disabled={loading || !name.trim()} onPress={submit}>
             {loading ? <Spinner /> : <Icon as={Plus} className="text-primary-foreground" />}
-            <Text>{loading ? 'Creating…' : 'Create Channel'}</Text>
+            <Text>{loading ? 'Creating…' : 'Create channel'}</Text>
           </Button>
         </View>
       </View>
