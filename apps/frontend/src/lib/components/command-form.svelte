@@ -131,12 +131,12 @@
               onValueChange={(value) => (values[option.name] = value)}
             >
               <Select.Trigger class="w-full">
-                {chat.members.find((m) => m.userId === values[option.name])?.displayName ||
-                  chat.members.find((m) => m.userId === values[option.name])?.username ||
+                {chat.channelMembers.find((m) => m.userId === values[option.name])?.displayName ||
+                  chat.channelMembers.find((m) => m.userId === values[option.name])?.username ||
                   'Pick a member'}
               </Select.Trigger>
               <Select.Content>
-                {#each chat.members as member (member.userId)}
+                {#each chat.channelMembers as member (member.userId)}
                   <Select.Item value={member.userId}
                     >{member.displayName || member.username}</Select.Item
                   >

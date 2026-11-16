@@ -6,7 +6,7 @@
 
   import type { Server } from '$lib/types/chat';
   import { goto } from '$app/navigation';
-  import { dmPath, type DmEntry } from '$lib/dms.svelte';
+  import { dmDisplay, dmPath, type DmEntry } from '$lib/dms.svelte';
   import { settings } from '$lib/settings.svelte';
 
   import Avatar from './avatar.svelte';
@@ -116,15 +116,15 @@
   </button>
 
   {#each unreadDms as dm (dm.id)}
-    {@const other = dm.participants[0]}
-    {@const name = other ? other.displayName || other.username : 'Direct Message'}
+    {@const display = dmDisplay(dm)}
+    {@const name = display.name}
     <button
       onclick={() => goto(dmPath(dm.id))}
       class="relative size-10 cursor-pointer transition-opacity hover:opacity-90"
       aria-label="{name}, unread direct message"
       title={name}
     >
-      <Avatar src={other?.avatarUrl} {name} class="size-full" />
+      <Avatar src={display.avatarUrl} {name} class="size-full" />
       <span
         class="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-destructive ring-2 ring-background"
       ></span>
