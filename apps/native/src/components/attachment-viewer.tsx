@@ -103,6 +103,17 @@ async function download(attachment: Attachment) {
   return file.uri;
 }
 
+// a file the app can't show itself: download it and hand it to the phone's "open with" sheet, instead of
+// sending the person off to a browser download
+export async function openFileWith(attachment: Attachment) {
+  toast(`Downloading ${attachment.filename}…`);
+  try {
+    await Sharing.shareAsync(await download(attachment), { mimeType: attachment.contentType });
+  } catch {
+    toast('Could not open the file', { tone: 'error' });
+  }
+}
+
 // pinch, double-tap and (while zoomed) drag the image around; one finger at 1x is left to the pager
 function ZoomableImage({
   attachment,
