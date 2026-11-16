@@ -22,8 +22,7 @@ export function AccountSwitcher({ open, onClose }: { open: boolean; onClose: () 
   };
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <Text className="px-4 pb-1 text-xs font-medium text-muted-foreground">Accounts</Text>
+    <Sheet open={open} onClose={onClose} title="Accounts">
       {accounts.map((account) => {
         const active = account.homeServer === homeServer;
         return (

@@ -41,11 +41,11 @@ export function NewDmDialog({ open, onClose }: { open: boolean; onClose: () => v
         onClose();
         setQuery('');
       }}
+      title="New message"
+      subtitle="Pick a friend to message."
     >
-      <View className="px-4 pt-2 pb-3">
-        <Text className="text-lg font-semibold">New Direct Message</Text>
-        <Text className="text-sm text-muted-foreground">Pick a friend to message.</Text>
-        <View className="mt-3">
+      <View className="px-4 pt-3 pb-3">
+        <View>
           <Input
             sheet
             value={query}
@@ -86,10 +86,10 @@ export function NewDmDialog({ open, onClose }: { open: boolean; onClose: () => v
               className="size-10"
             />
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-medium" numberOfLines={1}>
+              <Text className="text-base font-medium" numberOfLines={1}>
                 {nameFor(entry)}
               </Text>
-              <Text className="font-mono text-[10px] text-muted-foreground" numberOfLines={1}>
+              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
                 {handleFor(entry)}
               </Text>
             </View>
