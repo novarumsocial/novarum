@@ -19,6 +19,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { ActionRow, Command, Embed, MessageInteraction } from '../../utils/botSchemas';
+import type { SystemMessage } from '../../utils/systemMessage';
 
 const date = (name: string) =>
   timestamp(name, {
@@ -191,6 +192,10 @@ export const channels = pgTable(
     // null for guild channels and group DMs.
     dmKey: text('dmKey').unique(),
 
+    // group DMs only: who may rename the group, change its icon, kick and add bots
+    ownerId: text('ownerId').references(() => users.id, { onDelete: 'set null' }),
+    iconUrl: text('iconUrl'),
+
     createdAt: date('createdAt').notNull().defaultNow(),
 
     updatedAt: date('updatedAt')
@@ -292,6 +297,8 @@ export const messages = pgTable(
     components: jsonb('components').$type<ActionRow[]>(),
     // set when a bot sent this in answer to a slash command
     interaction: jsonb('interaction').$type<MessageInteraction>(),
+    // written by the homeserver itself, like "Ana added Leo" or a call
+    system: jsonb('system').$type<SystemMessage>(),
   },
   (table) => [
     unique('message_authorId_nonce_unique').on(table.authorId, table.nonce),
