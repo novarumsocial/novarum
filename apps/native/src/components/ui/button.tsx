@@ -16,7 +16,7 @@ const buttonVariants = cva('flex-row items-center justify-center gap-2 rounded-n
     },
     size: {
       default: 'min-h-11 px-4',
-      sm: 'min-h-9 px-3',
+      sm: 'min-h-10 px-3',
       lg: 'min-h-12 px-6',
       icon: 'min-h-11 min-w-11',
     },
@@ -47,8 +47,8 @@ export function Button({ className, variant, size, disabled, ...props }: ButtonP
         role="button"
         disabled={disabled}
         className={cn(buttonVariants({ variant, size }), disabled && 'opacity-50', className)}
-        // small buttons still take a finger-sized tap
-        hitSlop={size === 'sm' ? 4 : undefined}
+        // small and icon buttons still take a finger-sized (48dp) tap
+        hitSlop={size === 'sm' || size === 'icon' ? 4 : undefined}
         {...props}
       />
     </TextClassContext.Provider>

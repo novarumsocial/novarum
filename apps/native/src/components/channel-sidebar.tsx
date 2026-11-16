@@ -31,7 +31,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CreateChannelDialog } from '@/components/create-channel-dialog';
 import { EditChannelDialog } from '@/components/edit-channel-dialog';
-import { GuildSettingsDialog } from '@/components/guild-settings-dialog';
 import { InviteDialog } from '@/components/invite-dialog';
 import { NotificationMenu } from '@/components/notification-menu';
 import { ProfileCard } from '@/components/profile-card';
@@ -40,6 +39,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, guildPath, lastGuildChannel, useChat } from '@/lib/chat-state';
+import { goto } from '@/lib/navigation';
 import { useNotificationSettings } from '@/lib/notification-settings';
 import { useSettings } from '@/lib/settings';
 import { storage } from '@/lib/storage';
@@ -61,15 +61,7 @@ const loadCollapsed = (serverId: string): Record<string, boolean> =>
 type Row =
   | { kind: 'category'; category: ChannelCategory }
   | { kind: 'channel'; channel: Channel; category: ChannelCategory };
-type Menu =
-  | 'guild'
-  | 'guildNotify'
-  | 'channel'
-  | 'channelNotify'
-  | 'invite'
-  | 'create'
-  | 'edit'
-  | 'settings';
+type Menu = 'guild' | 'guildNotify' | 'channel' | 'channelNotify' | 'invite' | 'create' | 'edit';
 
 // memo: see GuildSidebar
 export const ChannelSidebar = memo(function ChannelSidebar({
@@ -418,7 +410,14 @@ export const ChannelSidebar = memo(function ChannelSidebar({
                 open('create');
               }}
             />
-            <SheetItem icon={Settings} label="Server settings" onPress={() => open('settings')} />
+            <SheetItem
+              icon={Settings}
+              label="Server settings"
+              onPress={() => {
+                setMenu(null);
+                goto(`/guilds/server-settings?id=${encodeURIComponent(server.id)}`);
+              }}
+            />
           </>
         )}
         <SheetItem icon={Bell} label="Notification settings" onPress={() => open('guildNotify')} />
@@ -514,11 +513,6 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         }}
       />
       <InviteDialog open={menu === 'invite'} onClose={closeIf('invite')} guildId={server.id} />
-      <GuildSettingsDialog
-        open={menu === 'settings'}
-        onClose={closeIf('settings')}
-        server={server}
-      />
       <EditChannelDialog open={menu === 'edit'} onClose={closeIf('edit')} channel={channel} />
     </View>
   );
