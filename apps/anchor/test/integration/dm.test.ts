@@ -321,3 +321,147 @@ test('GET /dm/homeserver/:homeserver is empty when no DMs are hosted there; DM r
   expect((await call(anon, 'GET', '/dm')).status).toBe(401);
   expect((await call(anon, 'GET', '/dm/homeserver/other.test')).status).toBe(401);
 });
+
+describe('group DMs', () => {
+  const trio = async () => {
+    const [a, b, c] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
+    await Promise.all([befriend(a, b), befriend(a, c)]);
+    return { a, b, c };
+  };
+  const create = (user: Actor, others: Actor[], name?: string) =>
+    call(user, 'POST', '/dm/group', { userIds: others.map((o) => o.user.id), name });
+  const systemTypes = async (user: Actor, id: string) =>
+    (await list(user, id)).body.messages
+      .filter((m: any) => m.system)
+      .map((m: any) => m.system.type);
+
+  test('the creator owns a new group with their friends, everyone sees it, and the 1:1 DM is untouched', async () => {
+    const { a, b, c } = await trio();
+    const dm = await open(a, b);
+    const ws = await openRealtime(anchor.url, c.cookie);
+    const res = await create(a, [b, c], ' Plans ');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ type: 'GROUP_DM', name: 'Plans', ownerId: a.user.id });
+    expect(res.body.participants.map((p: any) => p.userId).sort()).toEqual(
+      [b.user.id, c.user.id].sort()
+    );
+    const created = await ws.waitFor('dm.created', (e) => e.data.id === res.body.id);
+    expect(created.data.participants.map((p: any) => p.userId).sort()).toEqual(
+      [a.user.id, b.user.id].sort()
+    );
+    ws.close();
+    expect(await dmIds(b)).toContain(res.body.id);
+    expect((await open(a, b)).body.id).toBe(dm.body.id);
+    // the people a group starts with are part of "created", not added one by one
+    expect(await systemTypes(a, res.body.id)).toEqual(['group.created']);
+  });
+
+  test('members chat in the group; a non-friend or unknown user cannot be added', async () => {
+    const { a, b, c } = await trio();
+    const stranger = await signup(anchor.url);
+    expect((await create(a, [b, stranger])).status).toBe(403);
+    expect((await call(a, 'POST', '/dm/group', { userIds: ['nope'] })).status).toBe(403);
+    expect((await call(a, 'POST', '/dm/group', { userIds: [] })).status).toBe(422);
+    const group = (await create(a, [b, c])).body;
+    expect((await send(c, group.id, 'hi all')).status).toBe(200);
+    expect((await list(stranger, group.id)).status).not.toBe(200);
+    // b isn't friends with c, but anyone in the group can still talk to everyone
+    expect((await send(b, group.id, 'hey c')).status).toBe(200);
+  });
+
+  test('any member adds their own friends; only the owner renames and kicks', async () => {
+    const { a, b, c } = await trio();
+    const d = await signup(anchor.url);
+    await befriend(b, d);
+    const group = (await create(a, [b])).body;
+
+    expect(
+      (await call(b, 'POST', `/dm/${group.id}/members`, { userIds: [c.user.id] })).status
+    ).toBe(403);
+    expect(
+      (await call(b, 'POST', `/dm/${group.id}/members`, { userIds: [d.user.id] })).status
+    ).toBe(200);
+    expect(
+      (await call(b, 'POST', `/dm/${group.id}/members`, { userIds: [d.user.id] })).status
+    ).toBe(409);
+    expect(await dmIds(d)).toContain(group.id);
+
+    expect((await call(b, 'PATCH', `/dm/${group.id}`, { name: 'mine' })).status).toBe(403);
+    expect((await call(b, 'DELETE', `/dm/${group.id}/members/${d.user.id}`)).status).toBe(403);
+    expect((await call(a, 'PATCH', `/dm/${group.id}`, { name: 'Trip' })).status).toBe(200);
+    expect((await dms(b)).find((x) => x.id === group.id).name).toBe('Trip');
+
+    const ws = await openRealtime(anchor.url, d.cookie);
+    expect((await call(a, 'DELETE', `/dm/${group.id}/members/${d.user.id}`)).status).toBe(200);
+    await ws.waitFor('dm.removed', (e) => e.data.id === group.id);
+    ws.close();
+    expect(await dmIds(d)).not.toContain(group.id);
+    expect((await send(d, group.id, 'still here?')).status).not.toBe(200);
+    expect(await systemTypes(a, group.id)).toEqual([
+      'group.created',
+      'member.added',
+      'group.renamed',
+      'member.removed',
+    ]);
+  });
+
+  test('ownership moves on transfer and when the owner leaves; the last person leaving deletes the group', async () => {
+    const { a, b, c } = await trio();
+    const group = (await create(a, [b, c])).body;
+    expect((await call(a, 'POST', `/dm/${group.id}/owner`, { userId: a.user.id })).status).toBe(
+      400
+    );
+    expect((await call(b, 'POST', `/dm/${group.id}/owner`, { userId: c.user.id })).status).toBe(
+      403
+    );
+    expect((await call(a, 'POST', `/dm/${group.id}/owner`, { userId: c.user.id })).status).toBe(
+      200
+    );
+    expect((await dms(b)).find((x) => x.id === group.id).ownerId).toBe(c.user.id);
+
+    // c owns it now; when c leaves, the oldest remaining person takes over
+    expect((await call(c, 'POST', `/dm/${group.id}/leave`)).status).toBe(200);
+    const owner = (await dms(a)).find((x) => x.id === group.id).ownerId;
+    expect([a.user.id, b.user.id]).toContain(owner);
+
+    expect((await call(a, 'POST', `/dm/${group.id}/leave`)).status).toBe(200);
+    expect((await call(b, 'POST', `/dm/${group.id}/leave`)).status).toBe(200);
+    expect(await sql`SELECT 1 FROM channel WHERE id = ${group.id}`).toHaveLength(0);
+  });
+
+  test('group routes 404 for 1:1 DMs and for non-members', async () => {
+    const { a, b, c } = await trio();
+    const dm = (await open(a, b)).body;
+    const group = (await create(a, [b])).body;
+    expect((await call(a, 'POST', `/dm/${dm.id}/leave`)).status).toBe(404);
+    expect((await call(a, 'PATCH', `/dm/${dm.id}`, { name: 'x' })).status).toBe(404);
+    expect((await call(c, 'POST', `/dm/${group.id}/leave`)).status).toBe(404);
+    expect((await call(c, 'PATCH', `/dm/${group.id}`, { name: 'x' })).status).toBe(404);
+  });
+});
+
+test('max_group_members caps a group, the creator included', async () => {
+  const small = await spawnAnchor({ name: 'dm-small', config: { dms: { max_group_members: 3 } } });
+  try {
+    const [a, b, c, d] = await Promise.all([
+      signup(small.url),
+      signup(small.url),
+      signup(small.url),
+      signup(small.url),
+    ]);
+    await Promise.all([befriend(a, b), befriend(a, c), befriend(a, d)]);
+    const ids = (users: Actor[]) => users.map((u) => u.user.id);
+    expect((await call(a, 'POST', '/dm/group', { userIds: ids([b, c, d]) })).status).toBe(400);
+    const group = await call(a, 'POST', '/dm/group', { userIds: ids([b, c]) });
+    expect(group.status).toBe(200);
+    expect(
+      (await call(a, 'POST', `/dm/${group.body.id}/members`, { userIds: ids([d]) })).status
+    ).toBe(400);
+  } finally {
+    await small.destroy();
+  }
+});

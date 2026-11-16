@@ -5,7 +5,8 @@ import { requestSession, sessionCookieName, validateSessionToken } from '../auth
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { parseFederatedChannelId, parseFederatedGuildId } from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
-import { guildCommands, startInteraction } from './host';
+import { canAccessChannel } from '../../utils/channelAccess';
+import { groupCommands, guildCommands, startInteraction } from './host';
 import { botRespond, expectEphemerals } from './relay';
 import {
   callbackSchema,
@@ -65,6 +66,35 @@ export const interactions = new Elysia({ tags: ['Bots'] })
     },
     { response: { 200: guildCommandsSchema, ...errors } }
   )
+  .get(
+    '/dm/:id/commands',
+    async ({ params, session, status }) => {
+      const membership = await db.query.channelMembers.findFirst({
+        where: { channelId: params.id, userId: session.userId },
+        with: { channel: true },
+      });
+      if (membership?.channel.type !== 'GROUP_DM') return status(404, { error: 'DM not found' });
+      const federated = parseFederatedChannelId(params.id);
+      if (!federated) return groupCommands(params.id);
+
+      const remote = await callRemote(
+        federated.homeserver,
+        federationChannelPath(federated, 'commands'),
+        session,
+        {},
+        {
+          response: guildCommandsSchema,
+          // an older homeserver without group DM bots has no commands to offer
+          forward: passThrough(403, 404),
+          errors: { failed: 'Remote commands failed', invalid: 'Remote commands were invalid' },
+        }
+      );
+      if (!remote.ok)
+        return remote.status === 502 ? { bots: [] } : status(remote.status, remote.error);
+      return remote.data;
+    },
+    { response: { 200: guildCommandsSchema, ...errors } }
+  )
   .post(
     '/interactions',
     async ({ body, session, server, status }) => {
@@ -79,11 +109,7 @@ export const interactions = new Elysia({ tags: ['Bots'] })
         return started.result;
       }
 
-      if (
-        !(await db.query.guildMembers.findFirst({
-          where: { guildId: channel.guildId ?? '', userId: session.userId },
-        }))
-      ) {
+      if (!(await canAccessChannel(channel, session.userId))) {
         return status(403, { error: 'Forbidden' });
       }
       // the bot's ephemeral answer can arrive before the host answers this request

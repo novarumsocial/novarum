@@ -8,7 +8,7 @@ import { genericResponseErrorSchema } from '../../../utils/genericResponseError'
 import { publicUser } from '../../../utils/publicUser';
 import { publishToChannel } from '../../../utils/publishRealtime';
 import { removeVoicePresence, setVoicePresence } from '../../../utils/services/livekit';
-import { getFederatedChannelAccess, isCallChannel } from '../access';
+import { getFederatedChannelAccess, isCallChannel, isDmChannel } from '../access';
 import { federationAuth } from '../plugin';
 import { federationErrors, okResponseSchema } from '../schemas';
 
@@ -156,7 +156,7 @@ export const channels = new Elysia()
 
       const access = await getFederatedChannelAccess(params.id, remoteUser, true);
       if (!access.ok) return status(access.status, { error: access.error });
-      if (access.channel.type !== 'DM') return status(404, { error: 'Channel not right' });
+      if (!isDmChannel(access.channel)) return status(404, { error: 'Channel not right' });
 
       if (server) {
         await publishToChannel(server, access.channel, {

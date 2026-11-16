@@ -14,6 +14,7 @@ import {
 } from './schema';
 import { publicUserSchema } from '../../utils/publicUser';
 import { componentsSchema, embedsSchema, messageInteractionSchema } from '../../utils/botSchemas';
+import { systemMessageSchema } from '../../utils/systemMessage';
 
 const isoDateSchema = z.iso.datetime();
 
@@ -94,6 +95,7 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     embeds: embedsSchema.default([]).catch([]),
     components: componentsSchema.default([]).catch([]),
     interaction: messageInteractionSchema.nullish().catch(null),
+    system: systemMessageSchema.nullish().catch(null),
   });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {
@@ -139,6 +141,10 @@ export const dmResponseSchema = z.object({
   id: z.string(),
   type: dmChannelTypeSchema,
   participants: z.array(publicUserSchema),
+  // group DMs only; an empty name means the client shows the members' names instead
+  name: z.string().nullable().default(null),
+  iconUrl: z.url().nullable().default(null),
+  ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
   unread: z.boolean(),
   joinedAt: channelMemberResponseSchema.shape.joinedAt,

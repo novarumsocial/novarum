@@ -49,7 +49,7 @@ type HostInteraction = {
   name: string;
   bot: User;
   user: User;
-  channel: Channel & { guildId: string };
+  channel: Channel;
   // the message a button was on
   source?: { id: string; ephemeral: boolean };
   acknowledged: boolean;
@@ -88,20 +88,39 @@ export const findHostInteraction = (id: string) => interactions.get(id);
 const remoteCommandCache = new Map<string, { commands: Command[]; expires: number }>();
 const remoteCommandTtlMs = 60_000;
 
-/** The global commands of a bot in one of our guilds, asked from its homeserver when it is remote. */
-export async function botCommands(bot: User, guildId: string): Promise<Command[]> {
+// guild channels belong to the guild's members, group DMs to their own members
+async function channelMember(channel: Channel, userId: string) {
+  const member = channel.guildId
+    ? await db.query.guildMembers.findFirst({
+        where: { guildId: channel.guildId, userId },
+        with: { user: true },
+      })
+    : await db.query.channelMembers.findFirst({
+        where: { channelId: channel.id, userId },
+        with: { user: true },
+      });
+  return member?.user;
+}
+
+// what a bot is in, as its homeserver knows it: a guild, or a group DM
+const botScope = (channel: Channel) =>
+  channel.guildId ? { guildId: channel.guildId } : { channelId: channel.id };
+
+/** The global commands of a bot in one of our guilds or group DMs, asked from its homeserver when it is remote. */
+export async function botCommands(bot: User, channel: Channel): Promise<Command[]> {
   if (ours(bot.homeserver)) {
     const row = await db.query.bots.findFirst({ where: { userId: bot.id } });
     return row?.commands ?? [];
   }
-  const key = `${bot.id}:${guildId}`;
+  const scope = botScope(channel);
+  const key = `${bot.id}:${'guildId' in scope ? scope.guildId : scope.channelId}`;
   const cached = remoteCommandCache.get(key);
   if (cached && cached.expires > Date.now()) return cached.commands;
 
   const result = await postSignedFederationJson(
     bot.homeserver,
     `/federation/bots/${encodeURIComponent(bot.username)}/commands`,
-    { guildId }
+    scope
   ).catch(() => null);
   const parsed = z.object({ commands: commandListSchema }).safeParse(result?.data);
   const commands = result?.response.ok && parsed.success ? parsed.data.commands : [];
@@ -115,12 +134,28 @@ export async function guildCommands(guildId: string) {
     where: { guildId, user: { isBot: true } },
     with: { user: true },
   });
+  return withCommands(
+    members.map((member) => member.user),
+    { id: '', guildId, type: 'TEXT' }
+  );
+}
+
+/** Every bot of one of our group DMs with its commands. */
+export async function groupCommands(channelId: string) {
+  const members = await db.query.channelMembers.findMany({
+    where: { channelId, user: { isBot: true } },
+    with: { user: true },
+  });
+  return withCommands(
+    members.map((member) => member.user),
+    { id: channelId, guildId: null, type: 'GROUP_DM' }
+  );
+}
+
+async function withCommands(bots: User[], channel: Channel) {
   return {
     bots: await Promise.all(
-      members.map(async ({ user }) => ({
-        bot: publicUser(user),
-        commands: await botCommands(user, guildId),
-      }))
+      bots.map(async (bot) => ({ bot: publicUser(bot), commands: await botCommands(bot, channel) }))
     ),
   };
 }
@@ -131,7 +166,7 @@ type ResolvedOption = NonNullable<InteractionPayload['data']['options']>[number]
 async function resolveOptions(
   command: Command,
   given: { name: string; value: string | number | boolean }[],
-  guildId: string,
+  channel: Channel,
   focused?: string
 ): Promise<{ ok: true; options: ResolvedOption[] } | Failure> {
   const byName = new Map(given.map((option) => [option.name, option.value]));
@@ -157,7 +192,7 @@ async function resolveOptions(
       if (definition.required && !focused) return fail(400, `Missing option ${definition.name}`);
       continue;
     }
-    const resolved = await resolveOption(definition, value, guildId);
+    const resolved = await resolveOption(definition, value, channel);
     if (!resolved) return fail(400, `Invalid value for ${definition.name}`);
     options.push(resolved);
   }
@@ -167,7 +202,7 @@ async function resolveOptions(
 async function resolveOption(
   definition: CommandOption,
   value: string | number | boolean,
-  guildId: string
+  channel: Channel
 ): Promise<ResolvedOption | null> {
   const base = { name: definition.name, type: definition.type };
   const inChoices = (v: string | number) =>
@@ -192,12 +227,9 @@ async function resolveOption(
     case 'user': {
       // the person picks a member by id; the bot gets the handle, which means the same everywhere
       if (typeof value !== 'string') return null;
-      const member = await db.query.guildMembers.findFirst({
-        where: { guildId, userId: value },
-        with: { user: true },
-      });
+      const member = await channelMember(channel, value);
       if (!member) return null;
-      const user = publicUser(member.user);
+      const user = publicUser(member);
       return { ...base, value: `@${user.username}:${user.homeserver}`, user };
     }
   }
@@ -213,8 +245,7 @@ export async function startInteraction(
   input: InteractionInput
 ): Promise<{ ok: true; result: InteractionResult } | Failure> {
   if (!allowInteraction(user.id)) return fail(429, 'Too many interactions, slow down');
-  if (!channel.guildId) return fail(404, 'Channel not found');
-  const guildId = channel.guildId;
+  if (!channel.guildId && channel.type !== 'GROUP_DM') return fail(404, 'Channel not found');
   if (!(await canAccessChannel(channel, user.id, input.type !== 'autocomplete'))) {
     return fail(403, 'Forbidden');
   }
@@ -234,18 +265,15 @@ export async function startInteraction(
     source = { id: input.messageId, ephemeral: found.ephemeral };
     message = { id: input.messageId, ephemeral: found.ephemeral, content: found.content };
   } else {
-    const member = await db.query.guildMembers.findFirst({
-      where: { guildId, userId: input.botId },
-      with: { user: true },
-    });
-    if (!member?.user.isBot) return fail(404, 'Bot not found');
-    bot = member.user;
-    const command = (await botCommands(bot, guildId)).find((c) => c.name === input.name);
+    const member = await channelMember(channel, input.botId);
+    if (!member?.isBot) return fail(404, 'Bot not found');
+    bot = member;
+    const command = (await botCommands(bot, channel)).find((c) => c.name === input.name);
     if (!command) return fail(404, 'Command not found');
     const options = await resolveOptions(
       command,
       input.options,
-      guildId,
+      channel,
       input.type === 'autocomplete' ? input.focused : undefined
     );
     if (!options.ok) return options;
@@ -260,7 +288,7 @@ export async function startInteraction(
     name,
     bot,
     user,
-    channel: { ...channel, guildId },
+    channel,
     source,
     acknowledged: false,
     deferred: false,
@@ -273,7 +301,7 @@ export async function startInteraction(
     id: interaction.id,
     token: interaction.token,
     type: input.type,
-    guildId,
+    guildId: channel.guildId,
     channelId: channel.id,
     user: publicUser(user),
     data,
@@ -323,14 +351,10 @@ async function findButton(messageId: string, channelId: string, userId: string, 
   });
   if (!stored) return fail(404, 'Message not found');
   if (!stored.author.isBot || !hasButton(stored.components)) return fail(404, 'Button not found');
-  // the bot has to still be in the guild to answer
+  // the bot has to still be in the guild (or group DM) to answer
   const channel = await db.query.channels.findFirst({ where: { id: channelId } });
-  const member =
-    channel?.guildId &&
-    (await db.query.guildMembers.findFirst({
-      where: { guildId: channel.guildId, userId: stored.authorId },
-    }));
-  if (!member) return fail(404, 'Bot not found');
+  if (!channel || !(await channelMember(channel, stored.authorId)))
+    return fail(404, 'Bot not found');
   return { ok: true as const, bot: stored.author, ephemeral: false, content: stored.content };
 }
 

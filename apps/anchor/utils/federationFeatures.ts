@@ -8,6 +8,8 @@ export const federationFeatures = [
   'status-batch',
   // bots: adding them to guilds across homeservers, slash commands and interactions
   'bots',
+  // group DMs: the host pushes each change to the members' homeservers (/federation/dms/sync)
+  'group-dms',
 ] as const;
 
 export type FederationFeature = (typeof federationFeatures)[number];

@@ -80,6 +80,7 @@ type Socket = {
   data: { request: Request; query: unknown };
   close(code: number, reason: string): void;
   subscribe(topic: string): void;
+  unsubscribe(topic: string): void;
   isSubscribed(topic: string): boolean;
   subscriptions: string[];
   send(data: string): void;
@@ -88,6 +89,34 @@ type Socket = {
 // 1008 = policy violation: the remote doesn't retry after it, so it must only be used when
 // asking again can't help
 const policyViolation = 1008;
+
+// the open sockets of each following homeserver, so one can be cut off from a DM it has no
+// members in anymore (following is only checked when it starts)
+const socketsByHomeserver = new Map<string, Set<Socket>>();
+
+function track(ws: Socket, homeserver: string) {
+  const sockets = socketsByHomeserver.get(homeserver.toLowerCase()) ?? new Set();
+  sockets.add(ws);
+  socketsByHomeserver.set(homeserver.toLowerCase(), sockets);
+}
+
+function untrack(ws: Socket) {
+  for (const [homeserver, sockets] of socketsByHomeserver) {
+    if (sockets.delete(ws) && !sockets.size) socketsByHomeserver.delete(homeserver);
+  }
+}
+
+/** Stops `homeserver` from following a DM, after its last member there was removed. */
+export function stopFollowingDm(channelId: string, homeserver: string) {
+  for (const ws of socketsByHomeserver.get(homeserver.toLowerCase()) ?? []) {
+    if (ws.isSubscribed(dmSource.topic(channelId))) ws.close(policyViolation, 'Forbidden');
+    const shared = sharedSocketTopic('dm', channelId);
+    if (ws.isSubscribed(shared)) {
+      ws.unsubscribe(shared);
+      ws.send(sharedRefusedFrame('dm', channelId));
+    }
+  }
+}
 
 // checks who is on the other end of a new socket: the signature covers `signedPath`
 async function verifySocket(ws: Socket, signedPath: string) {
@@ -113,11 +142,13 @@ function singleSocket(source: Source) {
       if (!followable.has(id)) return ws.close(policyViolation, 'Forbidden');
 
       ws.subscribe(source.topic(id));
+      track(ws, verification.origin.homeserver);
       for (const event of await snapshotEvents(source, id)) ws.send(event);
     },
     message() {
       // server-to-server realtime is publish-only for now.
     },
+    close: untrack,
   };
 }
 
@@ -134,6 +165,7 @@ const sharedSocket = {
           ws.close(policyViolation, verification.error);
           return null;
         }
+        track(ws, verification.origin.homeserver);
         return verification.origin;
       })
       .catch((error) => {
@@ -175,6 +207,7 @@ const sharedSocket = {
   },
   close(ws: Socket) {
     sharedSocketOrigins.delete(ws.id);
+    untrack(ws);
   },
 };
 

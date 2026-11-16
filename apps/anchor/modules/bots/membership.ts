@@ -51,14 +51,20 @@ const fail = (status: Failure['status'], error: string): Failure => ({
 const grants = new Map<string, { botId: string; host: string; guildId: string; expires: number }>();
 const grantTtlMs = 60_000;
 
-function createGrant(botId: string, host: string, guildId: string) {
+// `guildId` is a group DM's id for group DMs: grants work the same for both
+export function createGrant(botId: string, host: string, guildId: string) {
   const grant = randomString();
   grants.set(grant, { botId, host: host.toLowerCase(), guildId, expires: Date.now() + grantTtlMs });
   setTimeout(() => grants.delete(grant), grantTtlMs).unref?.();
   return grant;
 }
 
-function consumeGrant(grant: string | undefined, botId: string, host: string, guildId: string) {
+export function consumeGrant(
+  grant: string | undefined,
+  botId: string,
+  host: string,
+  guildId: string
+) {
   const found = grant ? grants.get(grant) : undefined;
   if (!found) return false;
   grants.delete(grant!);

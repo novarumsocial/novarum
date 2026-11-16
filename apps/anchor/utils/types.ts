@@ -1,5 +1,6 @@
 import type { PublicUser } from './publicUser';
 import type { ActionRow, Embed, MessageInteraction } from './botSchemas';
+import type { SystemMessage } from './systemMessage';
 import type { EphemeralMessage, InteractionPayload } from '../modules/interactions/schemas';
 
 export type RealtimeEvent =
@@ -37,6 +38,16 @@ export type RealtimeEvent =
   | {
       type: 'dm.created';
       data: DmChannel;
+    }
+  | {
+      // a group DM's name, icon, owner or members changed
+      type: 'dm.updated';
+      data: Pick<DmChannel, 'id' | 'name' | 'iconUrl' | 'ownerId' | 'participants'>;
+    }
+  | {
+      // the user left or was removed from a group DM, or it was deleted
+      type: 'dm.removed';
+      data: { id: string };
     }
   | {
       type: 'user.status.changed';
@@ -178,12 +189,16 @@ export type MessageEventData = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  system?: SystemMessage | null;
 };
 
 export type DmChannel = {
   id: string;
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
+  name: string | null;
+  iconUrl: string | null;
+  ownerId: string | null;
   lastMessageAt: string | null;
   unread: boolean;
   joinedAt: string;

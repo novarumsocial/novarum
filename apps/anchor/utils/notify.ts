@@ -86,7 +86,9 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
     const message = {
       title: payload.guildId
         ? `${name} (#${channel?.name ?? 'channel'} · ${guild?.name ?? 'server'})`
-        : name,
+        : channel?.type === 'GROUP_DM' && channel.name
+          ? `${name} (${channel.name})`
+          : name,
       body:
         preview && payload.snippet
           ? payload.snippet

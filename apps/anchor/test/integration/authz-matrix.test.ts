@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
-import { signup } from '../harness/users';
+import { signup, type TestUser } from '../harness/users';
 import { befriend, unfriend } from '../harness/friends';
 import { anonymous, call, createGuild, join, send } from '../harness/chat';
 import { addBot, createBot } from '../harness/bots';
@@ -446,5 +446,100 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
     expect((await open(anonymous(anchor.url), friend.user.id)).status).toBe(401);
     expect((await open(a, stranger.user.id)).status).toBe(403);
     expect((await open(a, friend.user.id)).status).toBe(200);
+  });
+});
+
+describe('group DM routes', () => {
+  const iconForm = () => {
+    const form = new FormData();
+    form.set('icon', new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' }));
+    return form;
+  };
+  // owner a; members b and e; c is a friend of a and b who isn't in the group yet
+  type GroupFx = { groupId: string; c: TestUser; e: TestUser };
+  const outcomes: {
+    name: string;
+    request: (fx: GroupFx) => { method: string; path: string; body?: unknown };
+    expected: [anonymous: number, outsider: number, member: number, owner: number];
+  }[] = [
+    {
+      name: 'PATCH /dm/{id}',
+      request: (fx) => ({ method: 'PATCH', path: `/dm/${fx.groupId}`, body: { name: 'x' } }),
+      expected: [401, 404, 403, 200],
+    },
+    {
+      name: 'POST /dm/{id}/members',
+      request: (fx) => ({
+        method: 'POST',
+        path: `/dm/${fx.groupId}/members`,
+        body: { userIds: [fx.c.user.id] },
+      }),
+      // the outsider isn't friends with c, which is checked first
+      expected: [401, 403, 200, 200],
+    },
+    {
+      name: 'DELETE /dm/{id}/members/{userId}',
+      request: (fx) => ({ method: 'DELETE', path: `/dm/${fx.groupId}/members/${fx.e.user.id}` }),
+      expected: [401, 404, 403, 200],
+    },
+    {
+      name: 'POST /dm/{id}/owner',
+      request: (fx) => ({
+        method: 'POST',
+        path: `/dm/${fx.groupId}/owner`,
+        body: { userId: fx.e.user.id },
+      }),
+      expected: [401, 404, 403, 200],
+    },
+    {
+      name: 'POST /dm/{id}/leave',
+      request: (fx) => ({ method: 'POST', path: `/dm/${fx.groupId}/leave` }),
+      expected: [401, 404, 200, 200],
+    },
+    {
+      name: 'POST /dm/{id}/icon',
+      request: (fx) => ({ method: 'POST', path: `/dm/${fx.groupId}/icon`, body: iconForm() }),
+      // the owner's file is a JPEG, which is refused after every access check passed
+      expected: [401, 404, 403, 415],
+    },
+  ];
+  const actors = ['anonymous', 'outsider', 'member', 'owner'] as const;
+
+  for (const outcome of outcomes) {
+    actors.forEach((who, i) => {
+      test(`${outcome.name} as ${who} -> ${outcome.expected[i]}`, async () => {
+        const [a, b, c, e, outsider] = await Promise.all([
+          signup(anchor.url),
+          signup(anchor.url),
+          signup(anchor.url),
+          signup(anchor.url),
+          signup(anchor.url),
+        ]);
+        await Promise.all([befriend(a, b), befriend(a, c), befriend(a, e), befriend(b, c)]);
+        const groupId = (await call(a, 'POST', '/dm/group', { userIds: [b.user.id, e.user.id] }))
+          .body.id;
+        const actor = { anonymous: anonymous(anchor.url), outsider, member: b, owner: a }[who];
+        const { method, path, body } = outcome.request({ groupId, c, e });
+        const res = await actor.fetch(path, {
+          method,
+          body: body === undefined || body instanceof FormData ? body : json(body),
+        });
+        expect(res.status, await res.clone().text()).toBe(outcome.expected[i]!);
+      });
+    });
+  }
+
+  test('POST /dm/group: anonymous 401, non-friend 403, friends 200', async () => {
+    const [a, friend, stranger] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
+    await befriend(a, friend);
+    const create = (actor: Actor, userIds: string[]) =>
+      call(actor, 'POST', '/dm/group', { userIds });
+    expect((await create(anonymous(anchor.url), [friend.user.id])).status).toBe(401);
+    expect((await create(a, [stranger.user.id])).status).toBe(403);
+    expect((await create(a, [friend.user.id])).status).toBe(200);
   });
 });

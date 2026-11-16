@@ -1,3 +1,4 @@
+import { isCallChannel, isDmChannel } from '../federation/access';
 import Elysia, { t } from 'elysia';
 import { requestSession, sessionCookieName, type SessionWithUser } from '../auth/provider';
 import {
@@ -297,7 +298,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       const channel = await db.query.channels.findFirst({
         where: { id: message.channelId },
       });
-      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) return;
+      if (!channel || !isCallChannel(channel)) return;
 
       if (!(await canAccessChannel(channel, session.userId, true))) return;
 
@@ -339,7 +340,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       }
 
       const channel = await db.query.channels.findFirst({ where: { id: message.channelId } });
-      if (!channel || channel.type !== 'DM') return;
+      if (!channel || !isDmChannel(channel)) return;
       if (!(await canAccessChannel(channel, session.userId, true))) return;
 
       await publishToChannel(ws, channel, {
