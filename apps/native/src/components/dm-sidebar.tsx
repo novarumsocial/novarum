@@ -17,7 +17,8 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { guildPath, useChat } from '@/lib/chat-state';
-import { dmPath, dms, useDms, type DmEntry } from '@/lib/dms';
+import { dmPath, dmPreviewText, dms, useDms, type DmEntry } from '@/lib/dms';
+import { useSession } from '@/lib/session';
 import { formatShortDate } from '@/lib/format-date';
 import { friends, useFriends } from '@/lib/friends';
 import type { PublicUser } from 'anchor/public-user';
@@ -34,6 +35,7 @@ export function DmSidebar() {
   const loading = useDms((s) => s.loading);
   const voiceStates = useChat((s) => s.voiceStates);
   useFriends((s) => s.accepted); // re-render when someone goes online or offline
+  const selfId = useSession((s) => s.user?.id);
   const servers = useChat((s) => s.servers);
   const channelsByServer = useChat((s) => s.channelsByServer);
   const [query, setQuery] = useState('');
@@ -145,6 +147,17 @@ export function DmSidebar() {
           {repeated || needle ? (
             <Text numberOfLines={1} className="text-sm text-muted-foreground">
               {handleOf(other)}
+            </Text>
+          ) : null}
+          {!needle && dmPreviewText(entry, selfId) ? (
+            <Text
+              numberOfLines={1}
+              className={cn(
+                'text-sm',
+                unread ? 'text-sidebar-foreground' : 'text-muted-foreground'
+              )}
+            >
+              {dmPreviewText(entry, selfId)}
             </Text>
           ) : null}
         </View>
