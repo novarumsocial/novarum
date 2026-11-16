@@ -4,6 +4,7 @@ import { connect } from '../harness/db';
 import { signup } from '../harness/users';
 import { befriend, unfriend } from '../harness/friends';
 import { openRealtime } from '../harness/ws';
+import { eventually } from '../harness/wait';
 import { anonymous, call, list, send } from '../harness/chat';
 
 let anchor: RunningAnchor;
@@ -464,4 +465,49 @@ test('max_group_members caps a group, the creator included', async () => {
   } finally {
     await small.destroy();
   }
+});
+
+describe('call messages', () => {
+  const calls = async (user: Actor, id: string) =>
+    (await list(user, id)).body.messages
+      .filter((m: any) => m.system?.type === 'call')
+      .map((m: any) => m.system);
+
+  test('a call nobody answers is missed; an answered one gets its duration once everyone left', async () => {
+    const { a, b } = await friends();
+    const dm = (await open(a, b)).body;
+    const [wa, wb] = await Promise.all([
+      openRealtime(anchor.url, a.cookie),
+      openRealtime(anchor.url, b.cookie),
+    ]);
+
+    wa.send({ type: 'voice.join', channelId: dm.id });
+    const started = await wb.waitFor('message.created', (e) => e.data.system?.type === 'call');
+    expect(started.data.system).toEqual({ type: 'call', durationSeconds: null, missed: false });
+    expect(started.data.author.userId).toBe(a.user.id);
+    wa.send({ type: 'voice.leave' });
+    const missed = await wb.waitFor('message.updated', (e) => e.data.id === started.data.id);
+    expect(missed.data.system).toMatchObject({ type: 'call', missed: true });
+    expect(missed.data.edited).toBe(false);
+
+    wa.send({ type: 'voice.join', channelId: dm.id });
+    await wb.waitFor('message.created', (e) => e.data.system && e.data.id !== started.data.id);
+    wb.send({ type: 'voice.join', channelId: dm.id });
+    await wa.waitFor('voice.state.changed', (e) => e.data.userId === b.user.id);
+    // the call goes on while anyone is still in it
+    wa.send({ type: 'voice.leave' });
+    await wb.waitFor(
+      'voice.state.changed',
+      (e) => e.data.userId === a.user.id && !e.data.connected
+    );
+    expect((await calls(a, dm.id)).at(-1)).toMatchObject({ durationSeconds: null });
+    wb.send({ type: 'voice.leave' });
+    await eventually(async () => (await calls(a, dm.id)).at(-1).durationSeconds !== null);
+    expect(await calls(a, dm.id)).toEqual([
+      { type: 'call', durationSeconds: expect.any(Number), missed: true },
+      { type: 'call', durationSeconds: expect.any(Number), missed: false },
+    ]);
+    wa.close();
+    wb.close();
+  });
 });
