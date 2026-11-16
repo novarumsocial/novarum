@@ -6,7 +6,6 @@ import {
   Check,
   EllipsisVertical,
   MessageSquare,
-  Search,
   UserRoundMinus,
   UserRoundPlus,
   Users,
@@ -30,6 +29,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
@@ -381,27 +381,12 @@ export function FriendsHome() {
             contentContainerClassName="pb-6"
             ListHeaderComponent={
               <>
-                <View className="mx-3 mt-3 min-h-11 flex-row items-center gap-2 bg-muted px-3">
-                  <Icon as={Search} size={16} className="text-muted-foreground" />
-                  <Input
-                    placeholder="Search friends"
-                    value={query}
-                    onChangeText={setQuery}
-                    className="min-w-0 flex-1 border-0 bg-transparent px-0"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  {query ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Clear search"
-                      hitSlop={10}
-                      onPress={() => setQuery('')}
-                    >
-                      <Icon as={X} size={16} className="text-muted-foreground" />
-                    </Pressable>
-                  ) : null}
-                </View>
+                <SearchField
+                  placeholder="Search friends"
+                  value={query}
+                  onChangeText={setQuery}
+                  className="mx-3 mt-3"
+                />
                 {sectionLabel(`${tab === 'online' ? 'Online' : 'All friends'} — ${list.length}`)}
               </>
             }

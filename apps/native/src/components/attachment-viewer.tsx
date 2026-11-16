@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { Download, FileText, Music, Share2, Video, X } from 'lucide-react-native';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, View, useWindowDimensions } from 'react-native';
+import { FlatList, Linking, Platform, Pressable, View, useWindowDimensions } from 'react-native';
 import {
   Gesture,
   GestureDetector,
@@ -29,12 +29,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
 import { AudioPlayer } from '@/components/audio-player';
+import { ToastHost } from '@/components/toast-host';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VideoPlayer } from '@/components/video-player';
 import { formatDate, formatTime } from '@/lib/format-date';
+import { toast } from '@/lib/toast';
 import type { Attachment, Author } from '@/lib/types/chat';
 import { cn, formatBytes } from '@/lib/utils';
 
@@ -346,13 +348,21 @@ export function AttachmentViewer({
         await Sharing.shareAsync(uri);
       } else {
         const permission = await MediaLibrary.requestPermissionsAsync(true);
-        if (!permission.granted) return Alert.alert('Allow photo access in Settings to save.');
+        if (!permission.granted) {
+          toast('Allow photo access to save.', {
+            tone: 'error',
+            action: { label: 'Settings', onPress: () => void Linking.openSettings() },
+          });
+          return;
+        }
         await MediaLibrary.Asset.create(uri);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Saved to your photos');
+        toast('Saved to your photos');
       }
     } catch {
-      Alert.alert(kind === 'save' ? 'Could not save the file' : 'Could not share the file');
+      toast(kind === 'save' ? 'Could not save the file' : 'Could not share the file', {
+        tone: 'error',
+      });
     } finally {
       setBusy(null);
     }
@@ -364,7 +374,7 @@ export function AttachmentViewer({
   // the viewer is a native modal, which needs its own gesture root
   return (
     <GestureHandlerRootView className="flex-1">
-      <Animated.View style={backdropStyle} className="absolute inset-0 bg-black/95" />
+      <Animated.View style={backdropStyle} className="absolute inset-0 bg-black" />
       <GestureDetector gesture={dismiss}>
         <Animated.View style={contentStyle} className="flex-1">
           {/* the bars float over the pager, so toggling them doesn't resize the image */}
@@ -380,12 +390,12 @@ export function AttachmentViewer({
                     {authorName}
                   </Text>
                   {timestamp && (
-                    <Text className="shrink-0 text-[11px] text-white/60">
+                    <Text className="shrink-0 text-xs text-white/70">
                       {formatDate(timestamp)} at {formatTime(timestamp)}
                     </Text>
                   )}
                 </View>
-                <Text className="text-[11px] text-white/60" numberOfLines={1}>
+                <Text className="text-xs text-white/70" numberOfLines={1}>
                   {attachment.filename}, {formatBytes(attachment.size)}
                 </Text>
               </View>
@@ -502,6 +512,8 @@ export function AttachmentViewer({
           )}
         </Animated.View>
       </GestureDetector>
+      {/* iOS presents the viewer above the app's root, so the root's toasts would draw under it */}
+      {Platform.OS === 'ios' && <ToastHost />}
     </GestureHandlerRootView>
   );
 }

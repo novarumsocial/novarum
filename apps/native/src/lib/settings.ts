@@ -11,6 +11,7 @@ const settingsSchema = z.object({
   showMemberList: z.boolean().default(true),
   circleIcons: z.boolean().default(false),
   darkMode: z.boolean().default(true),
+  followSystemTheme: z.boolean().default(false),
   noiseCancellation: z.boolean().default(true),
   voiceEchoCancellation: z.boolean().default(true),
   voiceAutoGainControl: z.boolean().default(true),

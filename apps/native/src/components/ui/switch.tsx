@@ -8,7 +8,8 @@ export function Switch({ value, ...props }: SwitchProps) {
     <RNSwitch
       value={value}
       trackColor={{ false: colors.input, true: colors.primary }}
-      thumbColor="#ffffff"
+      // a white thumb on a pale off-track looked broken; off is a muted thumb instead
+      thumbColor={value ? '#ffffff' : colors['muted-foreground']}
       {...props}
     />
   );
