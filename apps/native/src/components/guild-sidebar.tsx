@@ -14,7 +14,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, useChat } from '@/lib/chat-state';
-import { dmPath, type DmEntry } from '@/lib/dms';
+import { dmDisplay, dmPath, type DmEntry } from '@/lib/dms';
 import { goto } from '@/lib/navigation';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
@@ -104,8 +104,7 @@ export const GuildSidebar = memo(function GuildSidebar({
       </View>
 
       {unreadDms.map((dm) => {
-        const other = dm.participants[0];
-        const name = other ? other.displayName || other.username : 'Direct Message';
+        const { name, avatarUrl } = dmDisplay(dm);
         return (
           <View key={dm.id} className="w-full items-center">
             <Pressable
@@ -117,7 +116,7 @@ export const GuildSidebar = memo(function GuildSidebar({
                 circleIcons && 'rounded-full'
               )}
             >
-              <Avatar src={other?.avatarUrl} name={name} className="size-full" />
+              <Avatar src={avatarUrl} name={name} className="size-full" />
             </Pressable>
             <View
               pointerEvents="none"

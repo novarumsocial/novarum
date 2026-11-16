@@ -5,6 +5,7 @@ import type { Command } from 'anchor/bot-schemas';
 import type { PublicUser } from 'anchor/public-user';
 import { anchor } from './anchor';
 import { chat } from './chat-state';
+import { dms } from './dms';
 
 const apiErrorSchema = z.object({ error: z.string() });
 // eden puts the error body in `value`; validation errors only have a message
@@ -40,10 +41,13 @@ export const useInteractions = create<InteractionsState>((set, get) => ({
   commandsByGuild: {},
   pressing: null,
 
+  // `guildId` is a group DM's id in group DMs
   async loadCommands(guildId, force = false) {
     const cached = get().commandsByGuild[guildId];
     if (!force && cached && Date.now() - cached.at < commandCacheMs) return cached.bots;
-    const { data } = await anchor().client.guilds({ id: guildId }).commands.get();
+    const { data } = dms().get(guildId)
+      ? await anchor().client.dm({ id: guildId }).commands.get()
+      : await anchor().client.guilds({ id: guildId }).commands.get();
     const bots = data?.bots ?? [];
     set({ commandsByGuild: { ...get().commandsByGuild, [guildId]: { bots, at: Date.now() } } });
     return bots;

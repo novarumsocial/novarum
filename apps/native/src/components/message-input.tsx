@@ -32,7 +32,7 @@ import { useAnchor } from '@/lib/anchor';
 import {
   maxMessageLength,
   selectActiveChannel,
-  selectActiveServer,
+  selectCommandScope,
   useChat,
   type PickedFile,
 } from '@/lib/chat-state';
@@ -119,9 +119,9 @@ export function MessageInput({
   const members = useChat((s) => s.members);
   const inGuild = useChat((s) => s.route.kind === 'guild');
   const uploadProgress = useChat((s) => s.uploadProgress);
-  const activeServer = useChat((s) => selectActiveServer(s));
+  const commandScope = useChat((s) => selectCommandScope(s));
   const activeChannel = useChat((s) => selectActiveChannel(s));
-  const guildCommands = useGuildCommands(activeServer);
+  const guildCommands = useGuildCommands(commandScope);
   const [activeCommand, setActiveCommand] = useState<{
     entry: GuildBotCommands;
     command: Command;
@@ -169,8 +169,8 @@ export function MessageInput({
   );
   const pickingCommand = commandQuery !== null;
   useEffect(() => {
-    if (pickingCommand && activeServer) void interactions().loadCommands(activeServer);
-  }, [pickingCommand, activeServer]);
+    if (pickingCommand && commandScope) void interactions().loadCommands(commandScope);
+  }, [pickingCommand, commandScope]);
 
   async function pickCommand(result: { entry: GuildBotCommands; command: Command }) {
     setContent('');

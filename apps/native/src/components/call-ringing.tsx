@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { useChat } from '@/lib/chat-state';
-import { RING_TIMEOUT, useDms } from '@/lib/dms';
+import { dmDisplay, RING_TIMEOUT, useDms } from '@/lib/dms';
 import { notificationSound } from '@/lib/notifications';
 import { realtime } from '@/lib/realtime';
 import { useSettings } from '@/lib/settings';
@@ -50,6 +50,8 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
   const callerSeen = useRef(false);
 
   const name = call ? call.user.displayName || call.user.username : '';
+  const group = useDms((s) => (call ? s.get(call.channelId) : null));
+  const groupName = group?.type === 'GROUP_DM' ? dmDisplay(group).name : null;
 
   useEffect(() => {
     if (call && voiceChannelId === call.channelId) setIncomingCall(null);
@@ -94,7 +96,9 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
         <Text numberOfLines={1} className="text-sm font-semibold">
           {name}
         </Text>
-        <Text className="text-xs text-muted-foreground">Incoming call…</Text>
+        <Text numberOfLines={1} className="text-xs text-muted-foreground">
+          {groupName ? `Calling ${groupName}…` : 'Incoming call…'}
+        </Text>
       </View>
       <Button
         variant="destructive"
@@ -102,7 +106,8 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
         accessibilityLabel="Decline"
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          realtime().ringCall(call.channelId, false);
+          // in a group, one person saying no shouldn't stop it ringing for the others
+          if (!groupName) realtime().ringCall(call.channelId, false);
           setIncomingCall(null);
         }}
       >

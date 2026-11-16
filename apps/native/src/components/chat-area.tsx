@@ -13,6 +13,7 @@ import {
   Phone,
   Reply,
   RotateCw,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react-native';
@@ -40,6 +41,8 @@ import { Avatar } from '@/components/avatar';
 import { CanvasPanel } from '@/components/canvas-panel';
 import { Message } from '@/components/message';
 import { MessageInput } from '@/components/message-input';
+import { NewDmDialog } from '@/components/new-dm-dialog';
+import { SystemMessage } from '@/components/system-message';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -235,6 +238,8 @@ export function ChatArea({
     channel.type === 'DM' ? (s.voiceStates[channel.id] ?? noCallers) : noCallers
   );
   const ringing = useDms((s) => !!call && s.outgoingCall === channel.id);
+  const dmEntry = useDms((s) => (channel.type === 'DM' ? s.get(channel.id) : null));
+  const [addPeopleOpen, setAddPeopleOpen] = useState(false);
 
   const list = useRef<FlatList<Row>>(null);
   const lastMessageId = useRef<string | null>(null);
@@ -298,6 +303,8 @@ export function ChatArea({
         prev !== undefined &&
         !message.interaction &&
         !message.ephemeral &&
+        !message.system &&
+        !prev.system &&
         prev.author.username === message.author.username &&
         prev.author.server === message.author.server &&
         message.timestamp.getTime() - prev.timestamp.getTime() < GROUP_WINDOW;
@@ -413,6 +420,10 @@ export function ChatArea({
         return <PendingMessage pending={item.pending} onRetry={send} onDiscard={discard} />;
       }
 
+      if (item.message.system) {
+        return <SystemMessage message={{ ...item.message, system: item.message.system }} />;
+      }
+
       return (
         <Message
           message={item.message}
@@ -447,8 +458,18 @@ export function ChatArea({
                 <Icon as={NotebookPen} size={20} />
               </Button>
             )}
-            {channel.type === 'DM' ? (
-              !call ? (
+            {dmEntry && (
+              <Button
+                variant="ghost"
+                size="icon"
+                accessibilityLabel={channel.group ? 'Add people' : 'Start a group with them'}
+                onPress={() => setAddPeopleOpen(true)}
+              >
+                <Icon as={UserPlus} size={20} />
+              </Button>
+            )}
+            {channel.type === 'DM' &&
+              (!call ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -461,18 +482,16 @@ export function ChatArea({
                 <Button variant="ghost" size="icon" accessibilityLabel="Ring" onPress={onRing}>
                   <Icon as={BellRing} size={20} />
                 </Button>
-              ) : null
-            ) : (
-              onOpenMembers && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  accessibilityLabel="Open members"
-                  onPress={onOpenMembers}
-                >
-                  <Icon as={Users} size={20} />
-                </Button>
-              )
+              ) : null)}
+            {onOpenMembers && (
+              <Button
+                variant="ghost"
+                size="icon"
+                accessibilityLabel="Open members"
+                onPress={onOpenMembers}
+              >
+                <Icon as={Users} size={20} />
+              </Button>
             )}
           </>
         }
@@ -580,9 +599,11 @@ export function ChatArea({
               )}
               <View className="border border-dashed border-border p-4">
                 <Text className="text-sm font-medium">
-                  {channel.type === 'DM'
-                    ? `This is the beginning of your conversation with ${channel.name}.`
-                    : 'No messages yet'}
+                  {channel.group
+                    ? `This is the beginning of the ${channel.name} group.`
+                    : channel.type === 'DM'
+                      ? `This is the beginning of your conversation with ${channel.name}.`
+                      : 'No messages yet'}
                 </Text>
                 {channel.type !== 'DM' && (
                   <Text className="mt-1 text-sm text-muted-foreground">
@@ -672,7 +693,11 @@ export function ChatArea({
         {canSend ? (
           <MessageInput
             placeholder={
-              channel.type === 'DM' ? `Message @${channel.name}` : `Message #${channel.name}`
+              channel.group
+                ? `Message ${channel.name}`
+                : channel.type === 'DM'
+                  ? `Message @${channel.name}`
+                  : `Message #${channel.name}`
             }
             onSend={sendMessage}
             onTyping={() => void chat().onTyping()}
@@ -714,6 +739,9 @@ export function ChatArea({
           </View>
         )}
       </KeyboardAvoidingView>
+      {dmEntry && (
+        <NewDmDialog open={addPeopleOpen} onClose={() => setAddPeopleOpen(false)} addTo={dmEntry} />
+      )}
     </View>
   );
 }

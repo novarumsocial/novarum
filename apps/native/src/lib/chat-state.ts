@@ -1,16 +1,18 @@
 // Port of apps/frontend/src/lib/chat-state.svelte.ts
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { z } from 'zod';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import type { PublicUser } from 'anchor/public-user';
 import { anchor } from './anchor';
-import { dms, dmPath, useDms, type DmEntry } from './dms';
+import { dms, dmDisplay, dmPath, useDms, type DmEntry } from './dms';
 import { goHome, goto } from './navigation';
-import { session } from './session';
+import { session, useSession } from './session';
 import { storage } from './storage';
 import { mentionsEveryone } from './utils';
 import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
+import type { SystemMessage } from 'anchor/system-message';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
 
 function initialsFor(name: string) {
@@ -60,6 +62,7 @@ type AddMessageInput = {
   }[];
   embeds?: Embed[];
   components?: ActionRow[];
+  system?: SystemMessage | null;
   interaction?: MessageInteraction | null;
   ephemeral?: boolean;
   thinking?: boolean;
@@ -128,6 +131,7 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    system: message.system ?? null,
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
@@ -160,16 +164,17 @@ function dmChannel(entry: DmEntry | null): Channel | null {
   const cached = dmChannels.get(entry);
   if (cached) return cached;
 
-  const other = entry.participants[0];
+  const display = dmDisplay(entry);
   const channel: Channel = {
     id: entry.id,
-    name: other ? other.displayName || other.username : 'Direct Message',
+    name: display.name,
     unread: entry.unread,
     lastReadMessageId: null,
     mention: 0,
     type: 'DM',
-    avatarUrl: other?.avatarUrl ?? null,
-    avatarColor: other?.avatarColor ?? null,
+    group: entry.type === 'GROUP_DM',
+    avatarUrl: display.avatarUrl,
+    avatarColor: display.avatarColor,
   };
   dmChannels.set(entry, channel);
   return channel;
@@ -243,6 +248,15 @@ export const selectActiveServer = (state: Pick<ChatState, 'route'>) =>
 
 export const selectActiveChannel = (state: Pick<ChatState, 'route'>) =>
   state.route.kind === 'guild' || state.route.kind === 'dms' ? state.route.channelId : null;
+
+// where slash commands come from: the guild, or the group DM (1:1 DMs have no bots)
+export const selectCommandScope = (state: Pick<ChatState, 'route'>) => {
+  const channelId = state.route.kind === 'dms' ? state.route.channelId : null;
+  return (
+    selectActiveServer(state) ??
+    (channelId && dms().get(channelId)?.type === 'GROUP_DM' ? channelId : null)
+  );
+};
 
 export const selectActiveMessage = (state: Pick<ChatState, 'route'>) =>
   state.route.kind === 'guild' || state.route.kind === 'dms'
@@ -1243,8 +1257,26 @@ export function useChannelName(id: string | null) {
       : undefined
   );
   const dmName = useDms((s) => {
-    const other = id ? s.list.find((dm) => dm.id === id)?.participants[0] : undefined;
-    return other ? other.displayName || other.username : undefined;
+    const dm = id ? s.list.find((entry) => entry.id === id) : undefined;
+    return dm ? dmDisplay(dm).name : undefined;
   });
   return id ? (channelName ?? dmName ?? null) : null;
+}
+
+/** Who is in the current channel: the guild's members, or everyone in the group DM. */
+export function useChannelMembers(): Author[] {
+  const route = useChat((s) => s.route);
+  const members = useChat((s) => s.members);
+  const group = useDms((s) =>
+    route.kind === 'dms' ? s.list.find((dm) => dm.id === route.channelId) : undefined
+  );
+  const me = useSession((s) => s.user);
+  return useMemo(() => {
+    if (route.kind !== 'dms') return members;
+    if (group?.type !== 'GROUP_DM') return [];
+    return [
+      ...(me ? [{ ...me, userId: me.id, server: me.homeserver } as Author] : []),
+      ...group.participants.map(authorFromInput),
+    ];
+  }, [route.kind, members, group, me]);
 }

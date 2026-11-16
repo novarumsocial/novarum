@@ -14,7 +14,7 @@ import { Spinner } from './ui/spinner';
 import { Switch } from './ui/switch';
 import { Text } from './ui/text';
 import { interactions, type GuildBotCommands, type OptionValue } from '@/lib/bots';
-import { useChat } from '@/lib/chat-state';
+import { useChannelMembers, useChat } from '@/lib/chat-state';
 
 type Choice = { name: string; value: string | number };
 
@@ -52,7 +52,7 @@ export function CommandForm({
   });
   const [picking, setPicking] = useState<CommandOption | null>(null);
   const autocompleteTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const members = useChat((s) => s.members);
+  const members = useChannelMembers();
 
   const botName = entry.bot.displayName || entry.bot.username;
   const options = command.options ?? [];
