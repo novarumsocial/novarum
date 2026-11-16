@@ -91,9 +91,10 @@ export interface APIEphemeralMessage extends Omit<APIMessage, 'nonce' | 'replyTo
 
 export interface APIChannel {
   id: string;
-  guildId: string;
+  /** null for group DMs */
+  guildId: string | null;
   name: string;
-  type: 'TEXT' | 'VOICE';
+  type: 'TEXT' | 'VOICE' | 'GROUP_DM';
   position: number;
   ownerOnly: boolean;
 }
@@ -105,6 +106,17 @@ export interface APIGuild {
   description: string | null;
   canManageChannels?: boolean;
   channels: APIChannel[];
+}
+
+/** A group DM the bot was added to. Participants are everyone in it but the bot. */
+export interface APIGroupDM {
+  id: string;
+  type: 'GROUP_DM';
+  /** empty when the group has no name; clients show the members' names instead */
+  name: string | null;
+  iconUrl: string | null;
+  ownerId: string | null;
+  participants: APIUser[];
 }
 
 export interface APIMember extends APIUser {
@@ -146,7 +158,8 @@ export interface APIInteraction {
   id: string;
   token: string;
   type: 'command' | 'autocomplete' | 'button';
-  guildId: string;
+  /** null when the interaction happened in a group DM */
+  guildId: string | null;
   channelId: string;
   user: APIUser;
   data: { name: string; options?: APIResolvedOption[]; customId?: string };
@@ -189,6 +202,12 @@ export type APIRealtimeEvent =
       };
     }
   | { type: 'interaction.created'; data: APIInteraction }
+  | { type: 'dm.created'; data: APIGroupDM | { type: 'DM' } }
+  | {
+      type: 'dm.updated';
+      data: Pick<APIGroupDM, 'id' | 'name' | 'iconUrl' | 'ownerId' | 'participants'>;
+    }
+  | { type: 'dm.removed'; data: { id: string } }
   | { type: 'voice.states.snapshot'; data: { guildIds: string[]; states: unknown[] } }
   | { type: 'misc.ping' }
   | { type: string; data?: unknown };

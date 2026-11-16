@@ -21,6 +21,7 @@ export {
   Channel,
   CommandInteraction,
   CommandOptions,
+  GroupDM,
   Guild,
   Message,
   User,

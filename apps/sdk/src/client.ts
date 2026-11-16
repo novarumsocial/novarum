@@ -5,6 +5,7 @@ import { REST } from './rest.js';
 import {
   Channel,
   createInteraction,
+  GroupDM,
   Guild,
   Message,
   resolveMessage,
@@ -16,6 +17,7 @@ import type {
   APIBot,
   APIChannel,
   APICommand,
+  APIGroupDM,
   APIGuild,
   APIInteraction,
   APIMessage,
@@ -46,6 +48,12 @@ export interface ClientEvents {
   guildMemberRemove: [member: { guildId: string; userId: string }];
   channelCreate: [channel: Channel];
   channelUpdate: [channel: Channel];
+  /** the bot was added to a group DM */
+  groupCreate: [group: GroupDM];
+  /** a group DM's name, icon, owner or members changed */
+  groupUpdate: [group: GroupDM];
+  /** the bot left or was removed from a group DM, or it was deleted */
+  groupDelete: [group: { id: string }];
   typingStart: [
     typing: { channelId: string; user: { userId: string; username: string; homeserver: string } },
   ];
@@ -75,6 +83,7 @@ const deadAfterMs = 75_000;
 export class Client extends EventEmitter<ClientEvents> {
   readonly rest: REST;
   readonly guilds = new Map<string, Guild>();
+  readonly groups = new Map<string, GroupDM>();
   /** the bot itself, once logged in */
   user: User | null = null;
   application: APIBot | null = null;
@@ -108,13 +117,13 @@ export class Client extends EventEmitter<ClientEvents> {
       (await this.rest.get<{ commands: APICommand[] }>('/bots/@me/commands')).commands,
   };
 
-  /** Finds a channel in any guild the bot is in. */
+  /** Finds a channel in any guild or group DM the bot is in. */
   channel(id: string) {
     for (const guild of this.guilds.values()) {
       const channel = guild.channels.get(id);
       if (channel) return channel;
     }
-    return undefined;
+    return this.groups.get(id)?.channel;
   }
 
   async sendMessage(channelId: string, options: MessageOptions, replyTo?: string) {
@@ -128,7 +137,7 @@ export class Client extends EventEmitter<ClientEvents> {
     const { bot } = await this.rest.get<{ bot: APIBot }>('/bots/@me');
     this.application = bot;
     this.user = new User(bot);
-    await this.#loadGuilds();
+    await Promise.all([this.#loadGuilds(), this.#loadGroups()]);
     const ready = new Promise<void>((resolve, reject) => {
       this.once('ready', () => resolve());
       this.once('disconnect', (code, reason) => {
@@ -154,6 +163,12 @@ export class Client extends EventEmitter<ClientEvents> {
     this.guilds.clear();
     for (const { channels, ...guild } of guilds)
       this.guilds.set(guild.id, new Guild(this, guild, channels));
+  }
+
+  async #loadGroups() {
+    const { dms } = await this.rest.get<{ dms: APIGroupDM[] }>('/bots/@me/dms');
+    this.groups.clear();
+    for (const dm of dms) this.groups.set(dm.id, new GroupDM(this, dm));
   }
 
   #connect() {
@@ -190,7 +205,7 @@ export class Client extends EventEmitter<ClientEvents> {
       this.emit('debug', `reconnecting in ${delay}ms`);
       setTimeout(() => {
         // guilds may have changed while we were away
-        this.#loadGuilds()
+        Promise.all([this.#loadGuilds(), this.#loadGroups()])
           .then(() => this.#connect())
           .catch((error) => {
             this.emit('error', error);
@@ -234,7 +249,7 @@ export class Client extends EventEmitter<ClientEvents> {
       case 'channel.created':
       case 'channel.updated': {
         const channel = new Channel(this, data as APIChannel);
-        const guild = this.guilds.get(channel.data.guildId);
+        const guild = channel.data.guildId ? this.guilds.get(channel.data.guildId) : undefined;
         if (!guild) return;
         guild.channels.set(channel.id, channel);
         this.emit(event.type === 'channel.created' ? 'channelCreate' : 'channelUpdate', channel);
@@ -269,6 +284,24 @@ export class Client extends EventEmitter<ClientEvents> {
       }
       case 'channel.typing':
         this.emit('typingStart', { channelId: data.channelId, user: data });
+        return;
+      case 'dm.created': {
+        if (data.type !== 'GROUP_DM') return;
+        const group = new GroupDM(this, data as APIGroupDM);
+        this.groups.set(group.id, group);
+        this.emit('groupCreate', group);
+        return;
+      }
+      case 'dm.updated': {
+        const known = this.groups.get(data.id);
+        if (!known) return;
+        const group = new GroupDM(this, { ...known.data, ...data });
+        this.groups.set(group.id, group);
+        this.emit('groupUpdate', group);
+        return;
+      }
+      case 'dm.removed':
+        if (this.groups.delete(data.id)) this.emit('groupDelete', { id: data.id });
         return;
       case 'interaction.created':
         this.emit('interactionCreate', createInteraction(this, data as APIInteraction));
