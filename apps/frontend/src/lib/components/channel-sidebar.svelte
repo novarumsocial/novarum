@@ -451,7 +451,12 @@
                     <Pin class="size-4" />
                     Pin Channel to Top
                   </ContextMenu.Item>
-                  <ContextMenu.Item onclick={() => navigator.clipboard.writeText(ch.id)}>
+                  <ContextMenu.Item
+                    onclick={() =>
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/guilds/${encodeURIComponent(server.id)}/${encodeURIComponent(ch.id)}`
+                      )}
+                  >
                     <Link class="size-4" />
                     Copy Link
                   </ContextMenu.Item>

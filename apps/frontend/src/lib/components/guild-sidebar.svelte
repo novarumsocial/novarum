@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Plus } from '@lucide/svelte';
+  import { Eye, IdCardLanyard, LogOut, Plus, Settings, UserRoundPlus } from '@lucide/svelte';
   import { flip } from 'svelte/animate';
   import { untrack } from 'svelte';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
@@ -187,7 +187,42 @@
             </button>
           </ContextMenu.Trigger>
           <ContextMenu.Content class="w-56">
+            <ContextMenu.Item>
+              <Eye class="size-4" />
+              Mark as Read
+            </ContextMenu.Item>
+            <ContextMenu.Item>
+              <UserRoundPlus class="size-4" />
+              Invite People
+            </ContextMenu.Item>
+
+            <ContextMenu.Separator />
+
             <NotificationMenu targetId={server.id} noun="Server" />
+
+            {#if server.canManageChannels}
+              <ContextMenu.Separator />
+
+              <ContextMenu.Item>
+                <Plus class="size-4" />
+                Create Channel
+              </ContextMenu.Item>
+              <ContextMenu.Item>
+                <Settings class="size-4" />
+                Server Settings
+              </ContextMenu.Item>
+            {/if}
+
+            <ContextMenu.Separator />
+
+            <ContextMenu.Item onclick={() => navigator.clipboard.writeText(server.id)}>
+              <IdCardLanyard class="size-3" />
+              Copy Server ID
+            </ContextMenu.Item>
+            <ContextMenu.Item variant="destructive">
+              <LogOut class="size-4" />
+              Leave Server
+            </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Root>
       </div>

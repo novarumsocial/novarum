@@ -1,5 +1,17 @@
 <script lang="ts">
-  import { Bot, LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
+  import {
+    Bot,
+    Eye,
+    IdCardLanyard,
+    LoaderCircle,
+    Phone,
+    Plus,
+    UserMinus,
+    UserPlus,
+    UserRound,
+    Users,
+    X,
+  } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { dms, dmPath } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
@@ -72,6 +84,7 @@
 
     {#each entries as entry (entry.id)}
       {@const other = entry.participants[0]}
+      {@const friendStatus = other ? friends.statusFor(other.username, other.homeserver) : 'NONE'}
       {@const name = other ? other.displayName || other.username : 'Direct Message'}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
       {@const unread =
@@ -126,33 +139,47 @@
 
           <ContextMenu.Separator />
 
-          <ContextMenu.Item class="gap-2" onclick={() => dms.markRead(entry.id)}>
-            Mark as read
+          <ContextMenu.Item onclick={() => dms.markRead(entry.id)}>
+            <Eye class="size-4" />
+            Mark as Read
           </ContextMenu.Item>
 
           <ContextMenu.Separator />
 
-          <ContextMenu.Item onclick={() => console.log('not done')}>Profile</ContextMenu.Item>
+          <ContextMenu.Item>
+            <UserRound class="size-4" />
+            Profile
+          </ContextMenu.Item>
           <ContextMenu.Item
             onclick={() => {
               void goto(dmPath(entry.id));
               onCall?.(entry.id);
             }}
           >
+            <Phone class="size-4" />
             Start a Call
           </ContextMenu.Item>
-          <ContextMenu.Item
-            onclick={() => {
-              void dms.close(entry.id);
-              if (active) void goto('/guilds/dms');
-            }}
-          >
-            Close DM
+          <ContextMenu.Item>
+            <Plus class="size-4" />
+            Pin Conversation to Top
           </ContextMenu.Item>
 
-          {#if other && friends.isFriend?.(other.userId)}
-            <ContextMenu.Item onclick={() => void friends.remove?.(other.userId)}>
+          {#if other && friendStatus === 'FRIEND'}
+            <ContextMenu.Item onclick={() => void friends.remove(other.userId)}>
+              <UserMinus class="size-4" />
               Remove Friend
+            </ContextMenu.Item>
+          {:else if other && friendStatus === 'INCOMING'}
+            <ContextMenu.Item onclick={() => void friends.accept(other.userId)}>
+              <UserPlus class="size-4" />
+              Accept Friend Request
+            </ContextMenu.Item>
+          {:else if other && friendStatus === 'NONE'}
+            <ContextMenu.Item
+              onclick={() => void friends.request(other.userId, other.username, other.homeserver)}
+            >
+              <UserPlus class="size-4" />
+              Add Friend
             </ContextMenu.Item>
           {/if}
 
@@ -163,12 +190,24 @@
             disabled={!other}
             onclick={() => other && navigator.clipboard.writeText(other.userId)}
           >
-            <IdCardLanyard />
+            <IdCardLanyard class="size-3" />
             Copy User ID
           </ContextMenu.Item>
           <ContextMenu.Item class="gap-2" onclick={() => navigator.clipboard.writeText(entry.id)}>
-            <IdCardLanyard />
+            <IdCardLanyard class="size-3" />
             Copy Channel ID
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator />
+
+          <ContextMenu.Item
+            onclick={() => {
+              void dms.close(entry.id);
+              if (active) void goto('/guilds/dms');
+            }}
+          >
+            <X class="size-4" />
+            Close DM
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Root>

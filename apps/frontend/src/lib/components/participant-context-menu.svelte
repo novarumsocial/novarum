@@ -3,6 +3,7 @@
   import type { Voice } from '$lib/voice.svelte';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
   import { Slider } from '$lib/components/ui/slider/index.js';
+  import { IdCardLanyard, UserRound } from '@lucide/svelte';
 
   let {
     voice,
@@ -25,6 +26,17 @@
       {@render children()}
     </ContextMenu.Trigger>
     <ContextMenu.Content class="overflow-y-hidden">
+      <ContextMenu.Item>
+        <UserRound class="size-4" />
+        Profile
+      </ContextMenu.Item>
+      <ContextMenu.Item onclick={() => navigator.clipboard.writeText(identity)}>
+        <IdCardLanyard class="size-3" />
+        Copy User ID
+      </ContextMenu.Item>
+
+      <ContextMenu.Separator />
+
       {#if identity === voice?.localIdentity}
         <ContextMenu.CheckboxItem
           closeOnSelect={false}

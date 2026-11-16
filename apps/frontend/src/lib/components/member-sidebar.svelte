@@ -1,6 +1,20 @@
 <script lang="ts">
   import BotBadge from './bot-badge.svelte';
-  import { Users } from '@lucide/svelte';
+  import {
+    AtSign,
+    Ban,
+    BellOff,
+    Copy,
+    IdCardLanyard,
+    MessageSquare,
+    Phone,
+    Shield,
+    UserCheck,
+    UserMinus,
+    UserPlus,
+    UserRound,
+    Users,
+  } from '@lucide/svelte';
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
@@ -9,6 +23,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { dms } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { isSelf } from '$lib/session.svelte';
 
   let {
     server,
@@ -32,10 +47,6 @@
     if (!userId) return;
     return await dms.open(userId);
   }
-
-  function isFriend(member: Author) {
-    return friends.statusFor(member.username, member.server) === 'FRIEND';
-  }
 </script>
 
 {#snippet groupLabel(text: string, count: number, icon = false)}
@@ -43,6 +54,107 @@
     {#if icon}<Users class="size-3.5" />{/if}
     {text} — {count}
   </div>
+{/snippet}
+
+{#snippet memberMenu(member: Author)}
+  {@const status = friends.statusFor(member.username, member.server)}
+  {@const friendshipId = friends.userIdFor(member.username, member.server)}
+  <ContextMenu.Content>
+    <ContextMenu.Item>
+      <UserRound class="size-4" />
+      Profile
+    </ContextMenu.Item>
+    <ContextMenu.Item onclick={() => chat.requestMention(member)}>
+      <AtSign class="size-4" />
+      Mention
+    </ContextMenu.Item>
+
+    {#if !isSelf(member)}
+      {#if status === 'FRIEND'}
+        <ContextMenu.Item onclick={() => void openDm(member)}>
+          <MessageSquare class="size-4" />
+          Message
+        </ContextMenu.Item>
+        <ContextMenu.Item
+          onclick={() =>
+            void openDm(member).then((channelId) => {
+              if (channelId && onCall) onCall(channelId);
+            })}
+        >
+          <Phone class="size-4" />
+          Start a Call
+        </ContextMenu.Item>
+        <ContextMenu.Item onclick={() => friendshipId && void friends.remove(friendshipId)}>
+          <UserMinus class="size-4" />
+          Remove Friend
+        </ContextMenu.Item>
+      {:else if status === 'INCOMING'}
+        <ContextMenu.Item onclick={() => friendshipId && void friends.accept(friendshipId)}>
+          <UserCheck class="size-4" />
+          Accept Friend Request
+        </ContextMenu.Item>
+      {:else if status === 'OUTGOING'}
+        <ContextMenu.Item onclick={() => friendshipId && void friends.remove(friendshipId)}>
+          <UserMinus class="size-4" />
+          Cancel Friend Request
+        </ContextMenu.Item>
+      {:else}
+        <ContextMenu.Item
+          onclick={() => void friends.request(member.userId, member.username, member.server)}
+        >
+          <UserPlus class="size-4" />
+          Add Friend
+        </ContextMenu.Item>
+      {/if}
+    {/if}
+
+    <ContextMenu.Separator />
+
+    <ContextMenu.Item onclick={() => navigator.clipboard.writeText(member.username)}>
+      <Copy class="size-3" />
+      Copy Username
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      onclick={() => navigator.clipboard.writeText(member.userId)}
+      disabled={!member.userId}
+    >
+      <IdCardLanyard class="size-3" />
+      Copy User ID
+    </ContextMenu.Item>
+
+    {#if !isSelf(member)}
+      <ContextMenu.Separator />
+
+      <ContextMenu.Item>
+        <BellOff class="size-4" />
+        Mute
+      </ContextMenu.Item>
+      <ContextMenu.Item variant="destructive">
+        <Ban class="size-4" />
+        Block
+      </ContextMenu.Item>
+
+      {#if server.canManageChannels}
+        <ContextMenu.Separator />
+
+        <ContextMenu.Item>
+          <Shield class="size-4" />
+          Roles
+        </ContextMenu.Item>
+
+        <ContextMenu.Separator />
+
+        <ContextMenu.Item variant="destructive">
+          <UserMinus class="size-4" />
+          Kick {member.username}
+        </ContextMenu.Item>
+        <ContextMenu.Item variant="destructive">
+          <Ban class="size-4" />
+          Ban {member.username}
+        </ContextMenu.Item>
+      {/if}
+    {/if}
+  </ContextMenu.Content>
 {/snippet}
 
 <aside class="flex size-full w-56 flex-col border-l border-border bg-background">
@@ -84,30 +196,7 @@
               </div>
             </ProfileCard>
           </ContextMenu.Trigger>
-          <ContextMenu.Content>
-            <ContextMenu.Item>Profile</ContextMenu.Item>
-            <ContextMenu.Item onclick={() => chat.requestMention(member)}>Mention</ContextMenu.Item>
-            {#if isFriend(member)}
-              <ContextMenu.Item onclick={() => void openDm(member)}>Message</ContextMenu.Item>
-              <!-- intentionally left out incase we wanna add personal notes like on signal -->
-              <ContextMenu.Item
-                onclick={() =>
-                  void openDm(member).then((channelId) => {
-                    if (channelId && onCall) onCall(channelId);
-                  })}>Start a Call</ContextMenu.Item
-              >
-            {/if}
-            <ContextMenu.Separator />
-            <ContextMenu.Item>Mute</ContextMenu.Item>
-            <ContextMenu.Item variant="destructive">Block</ContextMenu.Item>
-            {#if server.canManageChannels}
-              <ContextMenu.Separator />
-              <ContextMenu.Item>Roles</ContextMenu.Item>
-              <ContextMenu.Separator />
-              <ContextMenu.Item variant="destructive">Kick {member.username}</ContextMenu.Item>
-              <ContextMenu.Item variant="destructive">Ban {member.username}</ContextMenu.Item>
-            {/if}
-          </ContextMenu.Content>
+          {@render memberMenu(member)}
         </ContextMenu.Root>
       {/each}
     </div>
@@ -143,32 +232,7 @@
                 <!-- TODO: when hide online status is available => highlight user's profile with grey offline status circle -->
               </ProfileCard>
             </ContextMenu.Trigger>
-            <ContextMenu.Content>
-              <ContextMenu.Item>Profile</ContextMenu.Item>
-              <ContextMenu.Item onclick={() => chat.requestMention(member)}
-                >Mention</ContextMenu.Item
-              >
-              {#if isFriend(member)}
-                <ContextMenu.Item onclick={() => void openDm(member)}>Message</ContextMenu.Item>
-                <!-- intentionally left out Message from !isSelf incase we wanna add personal notes like on signal -->
-                <ContextMenu.Item
-                  onclick={() =>
-                    void openDm(member).then((channelId) => {
-                      if (channelId && onCall) onCall(channelId);
-                    })}>Start a Call</ContextMenu.Item
-                >
-              {/if}
-              <ContextMenu.Separator />
-              <ContextMenu.Item>Mute</ContextMenu.Item>
-              <ContextMenu.Item variant="destructive">Block</ContextMenu.Item>
-              {#if server.canManageChannels}
-                <ContextMenu.Separator />
-                <ContextMenu.Item>Roles</ContextMenu.Item>
-                <ContextMenu.Separator />
-                <ContextMenu.Item variant="destructive">Kick {member.username}</ContextMenu.Item>
-                <ContextMenu.Item variant="destructive">Ban {member.username}</ContextMenu.Item>
-              {/if}
-            </ContextMenu.Content>
+            {@render memberMenu(member)}
           </ContextMenu.Root>
         {/each}
       </div>

@@ -6,6 +6,8 @@
   import {
     Download,
     FileText,
+    Flag,
+    Pin,
     Reply,
     Ellipsis,
     Trash2,
@@ -16,6 +18,7 @@
     LoaderCircle,
     SquareSlash,
     EyeOff,
+    UserRound,
   } from '@lucide/svelte';
   import BotBadge from './bot-badge.svelte';
   import MessageEmbed from './message-embed.svelte';
@@ -121,36 +124,61 @@
               navigator.clipboard.writeText(message.content ?? '');
             },
           },
-          // TODO: separator here
           {
             label: () => 'Copy Message Link',
             icon: Link,
             variant: 'default',
+            separatorBefore: true,
             onclick: () => {
               const url = chat.messagePath(message.id);
               navigator.clipboard.writeText(`${window.location.origin}${url}`);
             },
           },
-          // TODO: separator here
-          ...(isSelf(message.author)
-            ? [
-                {
-                  label: () => deleteText,
-                  icon: Trash2,
-                  variant: 'destructive' as const,
-                  onclick: deleteMessage,
-                  disabled: () => deleting,
-                  closeOnSelect: false,
-                },
-              ]
-            : []),
-          // TODO: separator here
           {
             label: () => 'Copy Message ID',
             icon: IdCardLanyard,
             variant: 'default',
             onclick: () => navigator.clipboard.writeText(message.id),
           },
+          {
+            label: () => 'Copy Author ID',
+            icon: UserRound,
+            variant: 'default',
+            onclick: () => navigator.clipboard.writeText(message.author.userId),
+          },
+          {
+            label: () => 'Pin Message',
+            icon: Pin,
+            variant: 'default',
+            separatorBefore: true,
+          },
+          {
+            label: () => 'Mark Unread',
+            icon: EyeOff,
+            variant: 'default',
+          },
+          ...(!isSelf(message.author)
+            ? [
+                {
+                  label: () => 'Report Message',
+                  icon: Flag,
+                  variant: 'destructive' as const,
+                },
+              ]
+            : []),
+          ...(isSelf(message.author)
+            ? [
+                {
+                  label: () => deleteText,
+                  icon: Trash2,
+                  variant: 'destructive' as const,
+                  separatorBefore: true,
+                  onclick: deleteMessage,
+                  disabled: () => deleting,
+                  closeOnSelect: false,
+                },
+              ]
+            : []),
         ]
   );
 
@@ -278,11 +306,12 @@
   interface DropdownItems {
     label: () => string;
     icon: Component<LucideProps, {}, ''>;
-    onclick: () => void | Promise<void>;
+    onclick?: () => void | Promise<void>;
     variant?: 'default' | 'destructive';
     disabled?: () => boolean;
     closeOnSelect?: boolean;
     hideFromShift?: boolean;
+    separatorBefore?: boolean;
   }
 </script>
 
@@ -498,6 +527,7 @@
                     <DropdownMenu.Content>
                       <DropdownMenu.Group>
                         {#each dropdownItems as item (item.label)}
+                          {#if item.separatorBefore}<DropdownMenu.Separator />{/if}
                           <DropdownMenu.Item
                             onclick={item.onclick}
                             disabled={item.disabled?.()}
@@ -608,6 +638,7 @@
   <ContextMenu.Content>
     <ContextMenu.Group>
       {#each dropdownItems as item (item.label)}
+        {#if item.separatorBefore}<ContextMenu.Separator />{/if}
         <ContextMenu.Item
           onclick={item.onclick}
           disabled={item.disabled?.()}
