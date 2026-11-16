@@ -8,6 +8,7 @@ import { makeFederatedChannelId } from '../../../utils/federationIds';
 import { federationUserSchema, upsertFederatedUser } from '../../../utils/federationPayload';
 import { ensureFederatedDmRealtimeBridge } from '../../../utils/federationRealtime';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
+import { messagePreview } from '../../../utils/messagePreview';
 import { publicUser } from '../../../utils/publicUser';
 import { publishRealtime } from '../../../utils/publishRealtime';
 import { dmResponse, latestMessages, openLocalDm, upsertDmShadow } from '../../dm/services';
@@ -181,6 +182,8 @@ export const dms = new Elysia()
           id: message.id,
           createdAt: message.createdAt.toISOString(),
           own: message.authorId === user.id,
+          content: messagePreview(message.content),
+          attachmentCount: message.attachmentCount,
         })),
       };
     },

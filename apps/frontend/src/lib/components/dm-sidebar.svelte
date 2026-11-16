@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Bot, LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
   import { goto } from '$app/navigation';
-  import { dms, dmPath } from '$lib/dms.svelte';
+  import { dms, dmPath, dmPreviewText } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -70,6 +70,7 @@
     {#each entries as entry (entry.id)}
       {@const other = entry.participants[0]}
       {@const name = other ? other.displayName || other.username : 'Direct Message'}
+      {@const preview = dmPreviewText(entry)}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
       {@const unread =
         entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
@@ -101,7 +102,19 @@
                 ></span>
               {/if}
             </div>
-            <span class="flex-1 truncate" class:font-semibold={unread}>{name}</span>
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate" class:font-semibold={unread}>{name}</span>
+              {#if preview}
+                <span
+                  class={[
+                    'truncate text-xs',
+                    unread ? 'text-sidebar-foreground' : 'text-muted-foreground',
+                  ]}
+                >
+                  {preview}
+                </span>
+              {/if}
+            </span>
             {#if chat.voiceStates[entry.id]?.length}
               <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
             {/if}

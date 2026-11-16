@@ -185,6 +185,12 @@ export type DmChannel = {
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
   lastMessageAt: string | null;
+  lastMessage: {
+    id: string;
+    authorId: string;
+    content: string | null;
+    attachmentCount: number;
+  } | null;
   unread: boolean;
   joinedAt: string;
 };
