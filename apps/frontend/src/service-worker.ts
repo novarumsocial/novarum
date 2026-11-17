@@ -38,6 +38,8 @@ sw.addEventListener('push', (event) => {
       // one notification per channel: a newer message replaces the old one and still alerts
       tag,
       renotify: !!tag,
+      // a ring stays until it's answered or dismissed, like a phone's
+      requireInteraction: !!tag?.startsWith('call:'),
       data: { url },
     } as NotificationOptions)
   );

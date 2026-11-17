@@ -13,6 +13,7 @@ import { startPendingUploadReaper } from '../utils/uploadQuota';
 import { createApp } from './app';
 import { setListeningServer } from '../utils/clientIp';
 import { trackCalls } from '../modules/dm/calls';
+import { trackRings } from '../modules/dm/ringing';
 
 if (argv[2] === 'cli') {
   await import('./cli/index.ts');
@@ -39,6 +40,7 @@ startPendingUploadReaper();
 const app = createApp().listen(getConfig().server.listen_port);
 setListeningServer(app.server);
 trackCalls(app.server!);
+trackRings(app.server!);
 
 const federatedDms = await db
   .select({ id: channels.id })

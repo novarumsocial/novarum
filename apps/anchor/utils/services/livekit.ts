@@ -15,10 +15,14 @@ export const livekitWebhookReceiver = new WebhookReceiver(
 
 const voicePresenceByUser = new Map<string, VoicePresence>();
 
-// told about every channel whose callers changed, so DM calls can be logged (modules/dm/calls.ts)
-let onPresenceChange: (channelId: string) => void = () => {};
-export const watchVoicePresence = (listener: typeof onPresenceChange) => {
-  onPresenceChange = listener;
+// told about every channel whose callers changed: DM calls are logged (modules/dm/calls.ts) and
+// rings stop once answered (modules/dm/ringing.ts)
+const presenceListeners = new Set<(channelId: string) => void>();
+const onPresenceChange = (channelId: string) => {
+  for (const listener of presenceListeners) listener(channelId);
+};
+export const watchVoicePresence = (listener: (channelId: string) => void) => {
+  presenceListeners.add(listener);
 };
 
 export function setVoicePresence(state: VoicePresence) {

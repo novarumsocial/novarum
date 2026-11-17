@@ -34,6 +34,7 @@ import { z } from 'zod';
 import { getConfig } from '../../utils/config';
 import type { VoicePresence } from '../../utils/types';
 import { publicUser } from '../../utils/publicUser';
+import { activeRings, ring, stopRingingFor } from '../dm/ringing';
 
 const activeRealtimeConnections = new Map<string, number>();
 // whether each open socket's window is focused. a socket that is connected but backgrounded
@@ -231,6 +232,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       })
     );
 
+    for (const event of activeRings(session.userId, dmIds)) ws.send(JSON.stringify(event));
+
     pingIntervals.set(
       ws.id,
       setInterval(() => ws.send(JSON.stringify({ type: 'misc.ping' })), 30_000)
@@ -289,6 +292,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
           await publishVoiceState(ws, previous, false);
         leaveFederatedVoice(session, message.channelId);
         federatedVoiceChannelsByUser.set(session.userId, message.channelId);
+        // the host only stops a 1:1 from ringing; in a group our other devices stop here
+        void stopRingingFor(message.channelId, [session.userId]).catch(() => null);
         voiceSocketByUser.set(session.userId, ws.id);
         return;
       }
@@ -343,10 +348,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       if (!channel || !isDmChannel(channel)) return;
       if (!(await canAccessChannel(channel, session.userId, true))) return;
 
-      await publishToChannel(ws, channel, {
-        type: 'call.ringing',
-        data: { channelId: channel.id, user: publicUser(session.user), ringing: message.ringing },
-      });
+      await ring(channel, publicUser(session.user), message.ringing);
       return;
     }
 

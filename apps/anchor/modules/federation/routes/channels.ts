@@ -1,3 +1,4 @@
+import { ring } from '../../dm/ringing';
 import Elysia from 'elysia';
 import { AccessToken } from 'livekit-server-sdk';
 import { z } from 'zod';
@@ -150,7 +151,7 @@ export const channels = new Elysia()
   // the remote user starts or stops ringing the other people in a DM
   .post(
     '/channels/:id/ring',
-    async ({ params, payload, remoteUser, server, status }) => {
+    async ({ params, payload, remoteUser, status }) => {
       const ringing = z.boolean().safeParse(payload.ringing);
       if (!ringing.success) return status(400, { error: 'Invalid ring state' });
 
@@ -158,16 +159,7 @@ export const channels = new Elysia()
       if (!access.ok) return status(access.status, { error: access.error });
       if (!isDmChannel(access.channel)) return status(404, { error: 'Channel not right' });
 
-      if (server) {
-        await publishToChannel(server, access.channel, {
-          type: 'call.ringing',
-          data: {
-            channelId: access.channel.id,
-            user: publicUser(access.user),
-            ringing: ringing.data,
-          },
-        });
-      }
+      await ring(access.channel, publicUser(access.user), ringing.data);
 
       return { ok: true };
     },
