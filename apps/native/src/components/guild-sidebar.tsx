@@ -3,18 +3,10 @@
 // unread DMs light up Home (with a count) instead of being added to the rail, so the rail never reshuffles;
 // "Add a server" offers create or join with an invite link; a server whose homeserver is down says so on tap.
 import * as Haptics from 'expo-haptics';
-import {
-  ArrowDown,
-  ArrowDownUp,
-  ArrowUp,
-  Bell,
-  Link,
-  MessageCircle,
-  Plus,
-  WifiOff,
-} from 'lucide-react-native';
+import { ArrowDown, ArrowDownUp, ArrowUp, Bell, Link, Plus, WifiOff } from 'lucide-react-native';
 import { memo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CreateServerDialog } from '@/components/create-server-dialog';
@@ -27,10 +19,15 @@ import { Text } from '@/components/ui/text';
 import { chat, useChat } from '@/lib/chat-state';
 import type { DmEntry } from '@/lib/dms';
 import { useSettings } from '@/lib/settings';
+import { useThemeColors } from '@/lib/theme';
 import { toast } from '@/lib/toast';
 import type { Server } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
 import { fallbackAvatarBg } from '@/lib/voice-layout';
+
+// the Novarum logo, for Home (your DMs)
+const homePath =
+  'M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z';
 
 // the bar at the rail's edge: tall for the open server, a short one for unread
 function Pill({ active, unread }: { active: boolean; unread: boolean }) {
@@ -80,6 +77,7 @@ export const GuildSidebar = memo(function GuildSidebar({
   onSelect: (id?: string) => void;
 }) {
   const circleIcons = useSettings((s) => s.circleIcons);
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [menuServer, setMenuServer] = useState<Server | null>(null);
   const [menu, setMenu] = useState<
@@ -121,11 +119,14 @@ export const GuildSidebar = memo(function GuildSidebar({
             circleIcons && 'rounded-full'
           )}
         >
-          <Icon
-            as={MessageCircle}
-            size={24}
-            className={homeActive ? 'text-primary-foreground' : 'text-muted-foreground'}
-          />
+          <Svg
+            width={26}
+            height={26}
+            viewBox="0 0 24 24"
+            fill={homeActive ? colors['primary-foreground'] : colors['muted-foreground']}
+          >
+            <Path d={homePath} />
+          </Svg>
         </Pressable>
         {unreadDms.length > 0 && <Badge count={unreadDms.length} />}
       </View>
