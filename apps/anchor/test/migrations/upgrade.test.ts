@@ -317,6 +317,28 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
     },
   },
+  '20261118222746_guild_bans': {
+    check: async (url) => {
+      // nobody starts banned, memberships and bots survive, and a ban can be stored
+      expect(await rows(url, `SELECT 1 FROM guild_ban`)).toHaveLength(0);
+      expect(await rows(url, `SELECT 1 FROM bot WHERE "userId" = 'b1'`)).toHaveLength(1);
+      await query(
+        url,
+        `INSERT INTO guild_ban ("guildId", "userId", reason, "bannedById") VALUES ('g1', 'u3', 'spam', 'u1')`
+      );
+      expect(
+        await rows(
+          url,
+          `SELECT 1 FROM guild_ban WHERE "guildId" = 'g1' AND "userId" = 'u3' AND reason = 'spam' AND "createdAt" IS NOT NULL`
+        )
+      ).toHaveLength(1);
+      // the banner going away keeps the ban
+      await query(url, `UPDATE guild_ban SET "bannedById" = NULL`);
+      // deleting the guild drops its bans
+      await query(url, `DELETE FROM guild WHERE id = 'g1'`);
+      expect(await rows(url, `SELECT 1 FROM guild_ban`)).toHaveLength(0);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {
