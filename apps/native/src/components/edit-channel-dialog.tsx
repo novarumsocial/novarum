@@ -33,14 +33,13 @@ export function EditChannelDialog({
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <View className="gap-4 px-4 pb-2">
-        <View>
-          <Text className="text-lg font-semibold">Edit Channel</Text>
-          <Text className="text-sm text-muted-foreground">
-            Rename #{channel?.label || channel?.name || 'channel'}.
-          </Text>
-        </View>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Edit channel"
+      subtitle={`Rename #${channel?.label || channel?.name || 'channel'}.`}
+    >
+      <View className="gap-4 px-4 pt-3 pb-2">
         <View className="gap-1.5">
           <Text className="text-xs font-medium">Channel Name</Text>
           <Input

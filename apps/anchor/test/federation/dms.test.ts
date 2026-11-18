@@ -237,6 +237,54 @@ describe('messages', () => {
     );
     rt.close();
   });
+
+  test('/dms/latest: B gets a preview of the hosted DM, with authors mapped to its own user ids', async () => {
+    const { a, b, hostId, shadowId, rt } = await setup('host');
+    const previewOnB = async () => (await dmsFrom(b)).find((d) => d.id === shadowId)?.lastMessage;
+    expect(await previewOnB()).toBeNull();
+
+    const fromA = (await send(a, hostId, `${'long '.repeat(60)}end`)).body.message;
+    const preview = await eventually(
+      async () => {
+        const current = await previewOnB();
+        return current?.id === fromA.id && current;
+      },
+      { message: 'preview of a message from a' }
+    );
+    expect(preview).toEqual({
+      id: fromA.id,
+      authorId: await idOf(b, a),
+      content: `${'long '.repeat(27)}long…`,
+      attachmentCount: 0,
+    });
+    expect(Array.from(preview.content)).toHaveLength(140);
+
+    const fromB = (await send(b, shadowId, 'own reply')).body.message;
+    await eventually(async () => (await previewOnB())?.content === 'own reply', {
+      message: "preview of b's own message",
+    });
+    expect(await previewOnB()).toMatchObject({ id: fromB.id, authorId: b.user.id });
+    rt.close();
+  });
+
+  test("/dms/latest never hands a DM's preview to a remote user who is not in it", async () => {
+    const { a, hostId, rt } = await setup('host');
+    await send(a, hostId, 'between a and b only');
+    const c = await signup('b');
+    await makeFriends(a, c); // c is a known user on A, just not in this DM
+    const latest = await (
+      await signerFor('b')
+    ).send('a', 'POST', '/federation/dms/latest', {
+      user: userPayload(c.user),
+      channelIds: [hostId],
+    });
+    expect(latest.status).toBe(200);
+    expect(latest.json).toEqual({ channels: [] });
+    expect((await dmsFrom(c)).some((d) => JSON.stringify(d).includes('between a and b only'))).toBe(
+      false
+    );
+    rt.close();
+  });
 });
 
 describe('calls', () => {

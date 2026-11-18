@@ -5,9 +5,8 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { MicLevelMeter } from '@/components/mic-level-meter';
 import { SettingsGroup, SettingsPage } from '@/components/settings-group';
-import { SettingsRow } from '@/components/settings-row';
+import { SettingsRow, SettingsSwitchRow } from '@/components/settings-row';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSettings } from '@/lib/settings';
 import { MicModes } from '../../../../modules/mic-modes';
@@ -111,24 +110,24 @@ export default function VoiceSettings() {
       </SettingsGroup>
 
       <SettingsGroup title="Voice processing">
-        <SettingsRow
+        <SettingsSwitchRow
           title="Echo cancellation"
           description="Turn off if it interferes with noise suppression."
-        >
-          <Switch value={echo} onValueChange={(value) => void voice().setEchoCancellation(value)} />
-        </SettingsRow>
-        <SettingsRow
+          value={echo}
+          onValueChange={(value) => void voice().setEchoCancellation(value)}
+        />
+        <SettingsSwitchRow
           title="Automatic gain control"
           description="Keep your microphone volume steady."
-        >
-          <Switch value={gain} onValueChange={(value) => void voice().setAutoGainControl(value)} />
-        </SettingsRow>
-        <SettingsRow title="Noise suppression" description="Reduce background noise.">
-          <Switch
-            value={noise}
-            onValueChange={(value) => void voice().setNoiseCancellation(value)}
-          />
-        </SettingsRow>
+          value={gain}
+          onValueChange={(value) => void voice().setAutoGainControl(value)}
+        />
+        <SettingsSwitchRow
+          title="Noise suppression"
+          description="Reduce background noise."
+          value={noise}
+          onValueChange={(value) => void voice().setNoiseCancellation(value)}
+        />
         {MicModes ? (
           <SettingsRow
             title="Voice Isolation"
@@ -149,15 +148,12 @@ export default function VoiceSettings() {
       </SettingsGroup>
 
       <SettingsGroup title="Sound effects">
-        <SettingsRow
+        <SettingsSwitchRow
           title="Others' sound effects"
           description="Play a sound when others join, leave, mute, or turn on their camera or screen."
-        >
-          <Switch
-            value={othersCallSounds}
-            onValueChange={(value) => update({ othersCallSounds: value })}
-          />
-        </SettingsRow>
+          value={othersCallSounds}
+          onValueChange={(value) => update({ othersCallSounds: value })}
+        />
       </SettingsGroup>
 
       <SettingsGroup

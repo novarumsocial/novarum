@@ -2,12 +2,13 @@
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera } from 'lucide-react-native';
+import { Camera, ChevronRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { z } from 'zod';
 import { AvatarCrop } from '@/components/avatar-crop';
 import { Avatar } from '@/components/avatar';
+import { Markdown } from '@/components/markdown';
 import { SettingsGroup, SettingsPage } from '@/components/settings-group';
 import { SettingsRow } from '@/components/settings-row';
 import { Button } from '@/components/ui/button';
@@ -216,19 +217,19 @@ export default function Account() {
     hexSchema.safeParse(value.toUpperCase()).success ? value : fallback;
 
   const colorButton = (label: string, color: string, which: 'avatar' | 'ring') => (
-    <Button
-      variant="outline"
-      size="sm"
-      className="gap-2"
+    <Pressable
+      accessibilityRole="button"
       accessibilityLabel={label}
       onPress={() => setEditingColor(which)}
+      hitSlop={6}
+      className="flex-row items-center gap-1 active:opacity-70"
     >
       <View
-        className="size-4 border border-black/15"
+        className={cn('size-9 border border-border', circleIcons && 'rounded-full')}
         style={{ backgroundColor: validColor(color, '#000000') }}
       />
-      <Text className="font-mono text-xs">{color.toUpperCase()}</Text>
-    </Button>
+      <Icon as={ChevronRight} size={18} className="text-muted-foreground" />
+    </Pressable>
   );
 
   const mediaDisabled = mediaLoading !== null;
@@ -307,18 +308,31 @@ export default function Account() {
             }}
             maxLength={512}
             placeholder="What should people know about you?"
-            className="border-0 bg-transparent px-4 py-3.5 text-sm"
+            accessibilityLabel="About me"
+            className="border-0 bg-transparent px-4 py-3.5 text-base"
           />
           <View className="flex-row items-center justify-between gap-3 px-4 pb-3">
             {aboutError ? (
-              <Text className="text-xs text-destructive">{aboutError}</Text>
+              <Text className="text-sm text-destructive">{aboutError}</Text>
             ) : (
-              <Text className="text-xs text-muted-foreground">{about.length}/512</Text>
+              <Text className="text-sm text-muted-foreground">
+                {aboutSaved ? 'Saved' : `${about.length}/512`}
+              </Text>
             )}
-            <Button size="sm" disabled={aboutLoading} onPress={saveAbout}>
-              <Text>{aboutLoading ? 'Saving…' : aboutSaved ? 'Saved' : 'Save about'}</Text>
-            </Button>
           </View>
+          {about.trim() && /[*_`~>#\[]|@\S+:\S+/.test(about) ? (
+            <View className="mx-4 mb-3 border-l-2 border-border pl-3">
+              <Text className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                Preview
+              </Text>
+              <Markdown content={about} links className="text-sm leading-5 text-foreground/80" />
+            </View>
+          ) : null}
+          {about !== (user?.about ?? '') && !aboutSaved ? (
+            <Button className="mx-4 mb-4" disabled={aboutLoading} onPress={saveAbout}>
+              <Text>{aboutLoading ? 'Saving…' : 'Save'}</Text>
+            </Button>
+          ) : null}
         </View>
       </SettingsGroup>
 
@@ -335,23 +349,29 @@ export default function Account() {
       </SettingsGroup>
 
       <SettingsGroup title="Sign-in details">
-        <SettingsRow title="Display name">
-          <Text className="max-w-48 text-sm text-muted-foreground" numberOfLines={1}>
-            {user?.displayName ?? ''}
+        <SettingsRow title="Display name" description="Can't be changed in the app yet." stacked>
+          <Text selectable className="text-base" numberOfLines={1}>
+            {user?.displayName || user?.username || ''}
           </Text>
         </SettingsRow>
-        <SettingsRow title="Email address" description="Only visible to you.">
-          <Text className="max-w-48 text-sm text-muted-foreground" numberOfLines={1}>
+        <SettingsRow
+          title="Email address"
+          description="Only visible to you. Can't be changed in the app yet."
+          stacked
+        >
+          <Text selectable className="text-base" numberOfLines={1}>
             {user?.email ?? ''}
           </Text>
         </SettingsRow>
       </SettingsGroup>
 
-      <Sheet open={editingColor !== null} onClose={closeColors}>
-        <View className="gap-4 px-4 pb-2">
-          <Text className="text-base font-semibold">
-            {editingColor === 'ring' ? 'Speaking ring' : 'Avatar color'}
-          </Text>
+      <Sheet
+        open={editingColor !== null}
+        onClose={closeColors}
+        title={editingColor === 'ring' ? 'Speaking ring' : 'Avatar color'}
+        subtitle="Pick a color, or type one in."
+      >
+        <View className="gap-4 px-4 pt-3 pb-2">
           <View className="flex-row flex-wrap gap-2">
             {presets.map((preset) => (
               <Pressable

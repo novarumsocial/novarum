@@ -57,12 +57,13 @@ export function CreateServerDialog({ open, onClose }: { open: boolean; onClose: 
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <View className="gap-4 px-4 pb-2">
-        <View>
-          <Text className="text-lg font-semibold">Create Server</Text>
-          <Text className="text-sm text-muted-foreground">Give your server a name.</Text>
-        </View>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Create a server"
+      subtitle="Give your server a name."
+    >
+      <View className="gap-4 px-4 pt-3 pb-2">
         <View className="items-center gap-3">
           <View
             className={cn(

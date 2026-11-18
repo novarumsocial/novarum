@@ -1,15 +1,67 @@
 import { anchor } from '$lib/anchor.svelte';
 import { goto } from '$app/navigation';
 import type { PublicUser } from 'anchor/public-user';
+import { useSession } from '$lib/session.svelte';
 
 export type DmEntry = {
   id: string;
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
   lastMessageAt: string | null;
+  lastMessage: DmPreview | null;
   unread: boolean;
   joinedAt: string;
 };
+
+export type DmPreview = {
+  id: string;
+  authorId: string;
+  content: string | null;
+  attachmentCount: number;
+};
+
+type PreviewMessage = {
+  id: string;
+  channelId: string;
+  createdAt: string;
+  content: string | null;
+  attachments: unknown[];
+  author: Pick<PublicUser, 'userId' | 'username' | 'homeserver'>;
+};
+
+const sameUser = (a: { username: string; homeserver: string }, b: typeof a) =>
+  a.username.toLowerCase() === b.username.toLowerCase() &&
+  a.homeserver.toLowerCase() === b.homeserver.toLowerCase();
+
+// relayed federated messages carry the host's user ids, so authors are matched by handle to ours
+function toPreview(dm: DmEntry, message: PreviewMessage): DmPreview {
+  const self = useSession().user;
+  const authorId =
+    self && sameUser(self, message.author)
+      ? self.id
+      : (dm.participants.find((user) => sameUser(user, message.author))?.userId ??
+        message.author.userId);
+  return {
+    id: message.id,
+    authorId,
+    content: message.content,
+    attachmentCount: message.attachments.length,
+  };
+}
+
+export function dmPreviewText({ lastMessage }: DmEntry) {
+  if (!lastMessage) return null;
+  const { content, attachmentCount } = lastMessage;
+  const text =
+    content ??
+    (attachmentCount > 1
+      ? `Sent ${attachmentCount} attachments`
+      : attachmentCount
+        ? 'Sent an attachment'
+        : null);
+  if (!text) return null;
+  return lastMessage.authorId === useSession().user?.id ? `You: ${text}` : text;
+}
 
 export const RING_TIMEOUT = 30_000;
 
@@ -119,21 +171,29 @@ class DmsState {
       : [dm, ...this.list];
   }
 
-  handleMessage(
-    channelId: string,
-    createdAt: string,
-    { active, fromSelf }: { active: boolean; fromSelf: boolean }
-  ) {
-    if (!this.get(channelId)) {
+  handleMessage(message: PreviewMessage, active: boolean) {
+    if (!this.get(message.channelId)) {
       void this.load();
       return;
     }
 
+    this.list = this.list.map((dm) => {
+      if (dm.id !== message.channelId) return dm;
+      const lastMessage = toPreview(dm, message);
+      const fromSelf = lastMessage.authorId === useSession().user?.id;
+      return { ...dm, lastMessageAt: message.createdAt, lastMessage, unread: !active && !fromSelf };
+    });
+  }
+
+  handleMessageEdit(message: PreviewMessage) {
     this.list = this.list.map((dm) =>
-      dm.id === channelId
-        ? { ...dm, lastMessageAt: createdAt, unread: active || fromSelf ? false : true }
-        : dm
+      dm.lastMessage?.id === message.id ? { ...dm, lastMessage: toPreview(dm, message) } : dm
     );
+  }
+
+  // the preview before a deleted newest message isn't known here, so the server picks it again
+  handleMessageDelete(messageId: string) {
+    if (this.list.some((dm) => dm.lastMessage?.id === messageId)) void this.load();
   }
 
   markRead(channelId: string) {

@@ -9,9 +9,32 @@ export type DmEntry = {
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
   lastMessageAt: string | null;
+  lastMessage: DmLastMessage | null;
   unread: boolean;
   joinedAt: string;
 };
+
+export type DmLastMessage = {
+  id: string;
+  authorId: string;
+  content: string | null;
+  attachmentCount: number;
+};
+
+// the DM list's second line: "You: hi", "Sent 2 attachments"
+export function dmPreviewText({ lastMessage }: DmEntry, selfId: string | undefined) {
+  if (!lastMessage) return null;
+  const { content, attachmentCount } = lastMessage;
+  const text =
+    content ??
+    (attachmentCount > 1
+      ? `Sent ${attachmentCount} attachments`
+      : attachmentCount
+        ? 'Sent an attachment'
+        : null);
+  if (!text) return null;
+  return lastMessage.authorId === selfId ? `You: ${text}` : text;
+}
 
 export const RING_TIMEOUT = 30_000;
 
@@ -46,8 +69,11 @@ type DmsState = {
   handleMessage: (
     channelId: string,
     createdAt: string,
-    options: { active: boolean; fromSelf: boolean }
+    options: { active: boolean; fromSelf: boolean; lastMessage: DmLastMessage }
   ) => void;
+  // an edit or delete of the message the list previews
+  handleMessageEdit: (channelId: string, messageId: string, content: string | null) => void;
+  handleMessageDelete: (channelId: string, messageId: string) => void;
   markRead: (channelId: string) => void;
   // native-only: the web reloads the page when the account changes
   reset: () => void;
@@ -150,7 +176,7 @@ export const useDms = create<DmsState>((set, get) => {
       });
     },
 
-    handleMessage(channelId, createdAt, { active, fromSelf }) {
+    handleMessage(channelId, createdAt, { active, fromSelf, lastMessage }) {
       if (!get().get(channelId)) {
         void get().load();
         return;
@@ -159,10 +185,29 @@ export const useDms = create<DmsState>((set, get) => {
       set({
         list: get().list.map((dm) =>
           dm.id === channelId
-            ? { ...dm, lastMessageAt: createdAt, unread: active || fromSelf ? false : true }
+            ? {
+                ...dm,
+                lastMessageAt: createdAt,
+                lastMessage,
+                unread: active || fromSelf ? false : true,
+              }
             : dm
         ),
       });
+    },
+
+    handleMessageEdit(channelId, messageId, content) {
+      set({
+        list: get().list.map((dm) =>
+          dm.id === channelId && dm.lastMessage?.id === messageId
+            ? { ...dm, lastMessage: { ...dm.lastMessage, content: content?.trim() || null } }
+            : dm
+        ),
+      });
+    },
+
+    handleMessageDelete(channelId, messageId) {
+      if (get().get(channelId)?.lastMessage?.id === messageId) void get().load();
     },
 
     markRead: (channelId) =>

@@ -1,12 +1,13 @@
 // Port of apps/frontend/src/lib/components/friends-home.svelte
-// Same tabs and actions as the web, with "Add friend" as a sheet from the header. Rows open the DM when
-// tapped (long-press for more), pull down to refresh.
+// Same tabs and actions as the web, with "Add friend" as a sheet from the header (which also shares your own
+// handle). Rows open the DM when tapped (long-press or ⋮ for more), pull down to refresh. Opens on Pending when
+// someone is waiting on you, else Online if anyone is, else All; Pending splits received and sent requests.
 import * as Haptics from 'expo-haptics';
 import {
   Check,
   EllipsisVertical,
   MessageSquare,
-  Search,
+  Share2,
   UserRoundMinus,
   UserRoundPlus,
   Users,
@@ -20,6 +21,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   View,
   type TextInput,
 } from 'react-native';
@@ -30,11 +32,13 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { dms } from '@/lib/dms';
 import { friends, useFriends, type FriendEntry } from '@/lib/friends';
+import { useSession } from '@/lib/session';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -77,10 +81,10 @@ function Person({ entry, subtitle }: { entry: FriendEntry; subtitle: string }) {
         />
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="text-[15px] font-semibold" numberOfLines={1}>
+        <Text className="text-base font-semibold" numberOfLines={1}>
           {nameFor(entry)}
         </Text>
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
           {subtitle}
         </Text>
       </View>
@@ -136,6 +140,8 @@ function Empty({ title, body, children }: { title: string; body: string; childre
 // the web's "Add friend" tab, as a sheet opened from the header
 function AddFriendSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const error = useFriends((s) => s.error);
+  const self = useSession((s) => s.user);
+  const ownHandle = self ? `@${self.username}:${self.homeserver}` : null;
   const [handle, setHandle] = useState('');
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const input = useRef<TextInput>(null);
@@ -166,12 +172,13 @@ function AddFriendSheet({ open, onClose }: { open: boolean; onClose: () => void 
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <View className="px-4 pt-2 pb-4">
-        <Text className="text-lg font-semibold">Add friend</Text>
-        <Text className="mt-1 text-sm text-muted-foreground">
-          Enter their Novarum handle. It’s on their profile.
-        </Text>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Add friend"
+      subtitle="Enter their Novarum handle. It’s on their profile."
+    >
+      <View className="px-4 pt-1 pb-4">
         <View
           className={cn(
             'mt-4 flex-row items-center gap-2 border bg-background p-1.5 pl-3',
@@ -201,11 +208,30 @@ function AddFriendSheet({ open, onClose }: { open: boolean; onClose: () => void 
         {result || error ? (
           <Text
             accessibilityLiveRegion="polite"
-            className={cn('mt-2 text-xs', result?.ok ? 'text-emerald-500' : 'text-destructive')}
+            className={cn('mt-2 text-sm', result?.ok ? 'text-emerald-500' : 'text-destructive')}
           >
             {result?.message ?? error}
           </Text>
         ) : null}
+        {ownHandle && (
+          <View className="mt-5 flex-row items-center gap-3 border-t border-border pt-4">
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm text-muted-foreground">Your handle</Text>
+              <Text selectable className="text-base font-medium" numberOfLines={1}>
+                {ownHandle}
+              </Text>
+            </View>
+            <Button
+              variant="secondary"
+              onPress={() =>
+                void Share.share({ message: `Add me on Novarum: ${ownHandle}` }).catch(() => null)
+              }
+            >
+              <Icon as={Share2} size={16} className="text-secondary-foreground" />
+              <Text>Share</Text>
+            </Button>
+          </View>
+        )}
       </View>
     </Sheet>
   );
@@ -222,8 +248,14 @@ export function FriendsHome() {
   const error = useFriends((s) => s.error);
   const busyUserIds = useFriends((s) => s.busyUserIds);
 
-  // requests waiting on you are the first thing to see
-  const [tab, setTab] = useState<Tab>(() => (incoming.length ? 'pending' : 'online'));
+  // requests waiting on you are the first thing to see, then whoever is online, else everyone
+  const [tab, setTab] = useState<Tab>(() =>
+    incoming.length
+      ? 'pending'
+      : accepted.some((entry) => entry.status === 'ONLINE')
+        ? 'online'
+        : 'all'
+  );
   const [query, setQuery] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -256,6 +288,8 @@ export function FriendsHome() {
     ],
     [incoming, outgoing]
   );
+  const tabCount = (value: Tab) =>
+    value === 'online' ? online.length : value === 'all' ? accepted.length : pending.length;
 
   async function refresh() {
     setRefreshing(true);
@@ -283,7 +317,7 @@ export function FriendsHome() {
   );
 
   const sectionLabel = (text: string) => (
-    <Text className="px-4 pt-5 pb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+    <Text className="px-4 pt-5 pb-2 text-xs font-bold tracking-wider text-muted-foreground uppercase">
       {text}
     </Text>
   );
@@ -315,35 +349,47 @@ export function FriendsHome() {
           </Button>
         }
       >
-        <Text className="text-[15px] font-semibold">Friends</Text>
+        <Text role="heading" className="text-base font-semibold">
+          Friends
+        </Text>
       </ScreenHeader>
 
-      <View accessibilityRole="tablist" className="mx-3 mt-3 flex-row bg-muted p-1">
+      <View
+        accessibilityRole="tablist"
+        className={cn('mx-3 mt-3 flex-row bg-muted p-1', circleIcons && 'rounded-full')}
+      >
         {tabs.map((item) => (
           <Pressable
             key={item.value}
             accessibilityRole="tab"
+            accessibilityLabel={`${item.label}, ${tabCount(item.value)}`}
             accessibilityState={{ selected: tab === item.value }}
             onPress={() => {
               void Haptics.selectionAsync();
               setTab(item.value);
             }}
             className={cn(
-              'min-h-9 flex-1 flex-row items-center justify-center gap-1.5',
-              tab === item.value && 'bg-background'
+              'min-h-11 flex-1 flex-row items-center justify-center gap-1.5',
+              tab === item.value && 'bg-primary',
+              circleIcons && 'rounded-full'
             )}
           >
             <Text
               className={cn(
                 'text-sm font-medium',
-                tab === item.value ? 'text-foreground' : 'text-muted-foreground'
+                tab === item.value ? 'text-primary-foreground' : 'text-muted-foreground'
               )}
             >
               {item.label}
             </Text>
             {item.value === 'pending' && incoming.length > 0 && (
-              <View className={cn('min-w-4 bg-destructive px-1', circleIcons && 'rounded-full')}>
-                <Text className="text-center text-[11px] leading-4 font-bold text-white">
+              <View
+                className={cn(
+                  'h-5 min-w-5 items-center justify-center bg-sidebar-primary px-1',
+                  circleIcons && 'rounded-full'
+                )}
+              >
+                <Text className="text-xs leading-none font-bold text-sidebar-primary-foreground">
                   {incoming.length > 99 ? '99+' : incoming.length}
                 </Text>
               </View>
@@ -381,27 +427,12 @@ export function FriendsHome() {
             contentContainerClassName="pb-6"
             ListHeaderComponent={
               <>
-                <View className="mx-3 mt-3 min-h-11 flex-row items-center gap-2 bg-muted px-3">
-                  <Icon as={Search} size={16} className="text-muted-foreground" />
-                  <Input
-                    placeholder="Search friends"
-                    value={query}
-                    onChangeText={setQuery}
-                    className="min-w-0 flex-1 border-0 bg-transparent px-0"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  {query ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Clear search"
-                      hitSlop={10}
-                      onPress={() => setQuery('')}
-                    >
-                      <Icon as={X} size={16} className="text-muted-foreground" />
-                    </Pressable>
-                  ) : null}
-                </View>
+                <SearchField
+                  placeholder="Search friends"
+                  value={query}
+                  onChangeText={setQuery}
+                  className="mx-3 mt-3"
+                />
                 {sectionLabel(`${tab === 'online' ? 'Online' : 'All friends'} — ${list.length}`)}
               </>
             }
@@ -422,12 +453,7 @@ export function FriendsHome() {
               >
                 <Person
                   entry={entry}
-                  subtitle={entry.status === 'ONLINE' ? 'Online' : handleFor(entry)}
-                />
-                <ActionButton
-                  label={`Message ${nameFor(entry)}`}
-                  icon={MessageSquare}
-                  onPress={() => void dms().open(entry.user.userId)}
+                  subtitle={`${entry.status === 'ONLINE' ? 'Online · ' : ''}${handleFor(entry)}`}
                 />
                 <ActionButton
                   label={`More options for ${nameFor(entry)}`}
@@ -450,44 +476,43 @@ export function FriendsHome() {
         </ScrollView>
       ) : (
         <ScrollView refreshControl={refreshControl} contentContainerClassName="pb-6">
-          {sectionLabel(`Pending — ${pending.length}`)}
-          {pending.map(({ entry, incoming: isIncoming }) => (
-            <View
-              key={entry.user.userId}
-              className="min-h-16 flex-row items-center gap-3 px-4 py-2"
-            >
-              <Person
-                entry={entry}
-                subtitle={isIncoming ? 'Wants to be your friend' : 'Request sent'}
-              />
-              {isIncoming ? (
-                <>
+          {pending.map(({ entry, incoming: isIncoming }, index) => (
+            <View key={entry.user.userId}>
+              {index === 0 && isIncoming && sectionLabel(`Received — ${incoming.length}`)}
+              {!isIncoming &&
+                index === incoming.length &&
+                sectionLabel(`Sent — ${outgoing.length}`)}
+              <View className="min-h-16 flex-row items-center gap-3 px-4 py-2">
+                <Person entry={entry} subtitle={handleFor(entry)} />
+                {isIncoming ? (
+                  <>
+                    <ActionButton
+                      label={`Accept ${nameFor(entry)}`}
+                      icon={Check}
+                      tone="text-emerald-500"
+                      className="bg-emerald-500/15"
+                      disabled={busy(entry.user.userId)}
+                      onPress={() => void friends().accept(entry.user.userId)}
+                    />
+                    <ActionButton
+                      label={`Ignore ${nameFor(entry)}`}
+                      icon={X}
+                      tone="text-destructive"
+                      className="bg-destructive/15"
+                      disabled={busy(entry.user.userId)}
+                      onPress={() => void friends().decline(entry.user.userId)}
+                    />
+                  </>
+                ) : (
                   <ActionButton
-                    label={`Accept ${nameFor(entry)}`}
-                    icon={Check}
-                    tone="text-emerald-500"
-                    className="bg-emerald-500/15"
-                    disabled={busy(entry.user.userId)}
-                    onPress={() => void friends().accept(entry.user.userId)}
-                  />
-                  <ActionButton
-                    label={`Ignore ${nameFor(entry)}`}
+                    label={`Cancel request to ${nameFor(entry)}`}
                     icon={X}
-                    tone="text-destructive"
-                    className="bg-destructive/15"
+                    tone="text-muted-foreground"
                     disabled={busy(entry.user.userId)}
-                    onPress={() => void friends().decline(entry.user.userId)}
+                    onPress={() => void friends().remove(entry.user.userId)}
                   />
-                </>
-              ) : (
-                <ActionButton
-                  label={`Cancel request to ${nameFor(entry)}`}
-                  icon={X}
-                  tone="text-muted-foreground"
-                  disabled={busy(entry.user.userId)}
-                  onPress={() => void friends().remove(entry.user.userId)}
-                />
-              )}
+                )}
+              </View>
             </View>
           ))}
           {errorText}
@@ -496,12 +521,14 @@ export function FriendsHome() {
 
       {addOpen && <AddFriendSheet open onClose={() => setAddOpen(false)} />}
 
-      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)}>
+      <Sheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title={menuFor ? nameFor(menuFor) : undefined}
+        subtitle={menuFor ? handleFor(menuFor) : undefined}
+      >
         {menuFor && (
           <>
-            <Text className="px-4 pt-2 pb-1 text-sm font-medium" numberOfLines={1}>
-              {nameFor(menuFor)}
-            </Text>
             <SheetItem
               icon={MessageSquare}
               label="Message"

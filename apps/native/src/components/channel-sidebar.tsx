@@ -1,6 +1,8 @@
 // Port of apps/frontend/src/lib/components/channel-sidebar.svelte
 // Differences: long-press a channel for a sheet (the web's right-click menu); channels move with "Move up /
 // Move down" instead of drag and drop; web stubs (leave guild, delete, pin, duplicate, mark as read) are hidden.
+// Every server action lives in the sheet under the server name (only Invite gets a shortcut); "Copy … ID" needs
+// developer mode; collapsed categories are remembered per server.
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import {
@@ -10,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Hash,
+  Lock,
   HeadphoneOff,
   IdCardLanyard,
   Link,
@@ -22,14 +25,12 @@ import {
   Video,
   Volume2,
 } from 'lucide-react-native';
-import { memo, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import { Alert, FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
-import { Button } from '@/components/ui/button';
 import { CreateChannelDialog } from '@/components/create-channel-dialog';
 import { EditChannelDialog } from '@/components/edit-channel-dialog';
-import { GuildSettingsDialog } from '@/components/guild-settings-dialog';
 import { InviteDialog } from '@/components/invite-dialog';
 import { NotificationMenu } from '@/components/notification-menu';
 import { ProfileCard } from '@/components/profile-card';
@@ -38,25 +39,29 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, guildPath, lastGuildChannel, useChat } from '@/lib/chat-state';
+import { goto } from '@/lib/navigation';
 import { useNotificationSettings } from '@/lib/notification-settings';
 import { useSettings } from '@/lib/settings';
+import { storage } from '@/lib/storage';
+import { toast } from '@/lib/toast';
 import type { Author, Channel, ChannelCategory, Server } from '@/lib/types/chat';
 import { fallbackAvatarBg, initialsFor } from '@/lib/voice-layout';
 import { useVoice } from '@/lib/voice';
 import { cn } from '@/lib/utils';
 
+const collapsedKey = (serverId: string) => `collapsed-categories:${serverId}`;
+const loadCollapsed = (serverId: string): Record<string, boolean> =>
+  Object.fromEntries(
+    (storage.getString(collapsedKey(serverId)) ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map((id) => [id, true])
+  );
+
 type Row =
   | { kind: 'category'; category: ChannelCategory }
   | { kind: 'channel'; channel: Channel; category: ChannelCategory };
-type Menu =
-  | 'guild'
-  | 'guildNotify'
-  | 'channel'
-  | 'channelNotify'
-  | 'invite'
-  | 'create'
-  | 'edit'
-  | 'settings';
+type Menu = 'guild' | 'guildNotify' | 'channel' | 'channelNotify' | 'invite' | 'create' | 'edit';
 
 // memo: see GuildSidebar
 export const ChannelSidebar = memo(function ChannelSidebar({
@@ -74,12 +79,21 @@ export const ChannelSidebar = memo(function ChannelSidebar({
 }) {
   const insets = useSafeAreaInsets();
   const circleIcons = useSettings((s) => s.circleIcons);
+  const developerMode = useSettings((s) => s.developerMode);
   const voiceChannelId = useVoice((s) => s.channelId);
   const voiceUserStates = useVoice((s) => s.voiceStates);
   const levels = useNotificationSettings((s) => s.entries); // re-render when levels change
   useChat((s) => s.route); // re-render when you come back from a channel, to mark it as the last one
   const lastChannel = lastGuildChannel(server.id);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState(() => loadCollapsed(server.id));
+  useEffect(() => setCollapsed(loadCollapsed(server.id)), [server.id]);
+  const toggleCategory = (id: string) =>
+    setCollapsed((current) => {
+      const next = { ...current, [id]: !current[id] };
+      const ids = Object.keys(next).filter((key) => next[key]);
+      storage.set(collapsedKey(server.id), ids.join(','));
+      return next;
+    });
   const [menu, setMenu] = useState<Menu | null>(null);
   const [category, setCategory] = useState<ChannelCategory | null>(null);
   const [channel, setChannel] = useState<Channel | null>(null);
@@ -131,10 +145,31 @@ export const ChannelSidebar = memo(function ChannelSidebar({
     setMenu(null);
   }
 
-  const copy = (text: string) => {
+  const copy = (text: string, what: string) => {
     void Clipboard.setStringAsync(text);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast(`${what} copied`);
     setMenu(null);
+  };
+
+  // locks or unlocks the channel for everyone, so it asks first
+  const toggleOwnerOnly = (target: Channel) => {
+    setMenu(null);
+    const lock = !target.ownerOnly;
+    Alert.alert(
+      lock ? `Lock #${target.label || target.name}?` : `Unlock #${target.label || target.name}?`,
+      lock
+        ? 'Only the owner will be able to send messages.'
+        : 'Everyone will be able to send messages again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: lock ? 'Lock' : 'Unlock',
+          style: lock ? 'destructive' : 'default',
+          onPress: () => void chat().setOwnerOnly(server.id, target.id, lock),
+        },
+      ]
+    );
   };
 
   const siblings = category?.channels ?? [];
@@ -189,14 +224,22 @@ export const ChannelSidebar = memo(function ChannelSidebar({
           >
             {ch.label || ch.name}
           </Text>
+          {ch.ownerOnly && (
+            <Icon
+              as={Lock}
+              size={14}
+              className="text-muted-foreground"
+              accessibilityLabel="Locked"
+            />
+          )}
           {showMention ? (
             <View
               className={cn(
-                'size-5 items-center justify-center bg-destructive',
+                'h-5 min-w-5 items-center justify-center bg-sidebar-primary px-1',
                 circleIcons && 'rounded-full'
               )}
             >
-              <Text className="text-[11px] font-bold text-destructive-foreground">
+              <Text className="text-xs font-bold text-sidebar-primary-foreground">
                 {ch.mention > 99 ? '99+' : ch.mention}
               </Text>
             </View>
@@ -274,12 +317,15 @@ export const ChannelSidebar = memo(function ChannelSidebar({
 
   return (
     <View className="flex-1 bg-sidebar">
-      <View className="shrink-0 border-b border-border" style={{ paddingTop: insets.top }}>
+      <View
+        className="shrink-0 flex-row items-center border-b border-border pr-1"
+        style={{ paddingTop: insets.top }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${server.name}, server options`}
           onPress={() => open('guild')}
-          className="min-h-14 flex-row items-center gap-1 px-4 active:opacity-70"
+          className="min-h-14 min-w-0 flex-1 flex-row items-center gap-1 pl-4 active:opacity-70"
         >
           <Text
             numberOfLines={1}
@@ -287,36 +333,18 @@ export const ChannelSidebar = memo(function ChannelSidebar({
           >
             {server.name}
           </Text>
-          <Icon as={ChevronRight} size={18} className="text-muted-foreground" />
+          <Icon as={ChevronDown} size={18} className="text-muted-foreground" />
         </Pressable>
-        <View className="flex-row gap-2 px-3 pb-3">
-          {server.canManageChannels && (
-            <Button variant="secondary" size="sm" className="flex-1" onPress={() => open('invite')}>
-              <Icon as={UserRoundPlus} size={16} className="text-secondary-foreground" />
-              <Text>Invite</Text>
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            className={server.canManageChannels ? undefined : 'flex-1'}
-            accessibilityLabel="Notification settings"
-            onPress={() => open('guildNotify')}
+        {server.canManageChannels && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Invite people"
+            onPress={() => open('invite')}
+            className="size-12 items-center justify-center active:bg-accent"
           >
-            <Icon as={Bell} size={16} className="text-secondary-foreground" />
-            {!server.canManageChannels && <Text>Notifications</Text>}
-          </Button>
-          {server.canManageChannels && (
-            <Button
-              variant="secondary"
-              size="sm"
-              accessibilityLabel="Server settings"
-              onPress={() => open('settings')}
-            >
-              <Icon as={Settings} size={16} className="text-secondary-foreground" />
-            </Button>
-          )}
-        </View>
+            <Icon as={UserRoundPlus} size={20} className="text-muted-foreground" />
+          </Pressable>
+        )}
       </View>
 
       {/* a plain list: a server's channels are few, and FlashList's extra layout passes made switching slow */}
@@ -337,36 +365,31 @@ export const ChannelSidebar = memo(function ChannelSidebar({
           item.kind === 'channel' ? (
             renderChannel(item)
           ) : (
-            <View className="mt-3 min-h-9 flex-row items-center pr-1 pl-3">
+            <View className="mt-3 min-h-11 flex-row items-center pr-1 pl-3">
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={item.category.label}
                 accessibilityState={{ expanded: !collapsed[item.category.id] }}
-                onPress={() =>
-                  setCollapsed((current) => ({
-                    ...current,
-                    [item.category.id]: !current[item.category.id],
-                  }))
-                }
-                className="min-h-9 flex-1 flex-row items-center gap-1"
+                onPress={() => toggleCategory(item.category.id)}
+                className="min-h-11 flex-1 flex-row items-center gap-1"
               >
                 <Icon
                   as={collapsed[item.category.id] ? ChevronRight : ChevronDown}
                   size={12}
                   className="text-muted-foreground"
                 />
-                <Text className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                <Text className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                   {item.category.label}
                 </Text>
               </Pressable>
               {server.canManageChannels && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Add channel"
+                  accessibilityLabel={`Add channel to ${item.category.label}`}
                   onPress={() => open('create', { category: item.category })}
-                  className="size-11 items-center justify-center"
+                  className="size-12 items-center justify-center active:bg-accent"
                 >
-                  <Icon as={Plus} size={14} className="text-muted-foreground" />
+                  <Icon as={Plus} size={18} className="text-muted-foreground" />
                 </Pressable>
               )}
             </View>
@@ -374,24 +397,37 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         }
       />
 
-      <Sheet open={menu === 'guild'} onClose={closeIf('guild')}>
-        <Text className="px-4 pt-2 pb-1 text-sm font-medium" numberOfLines={1}>
-          {server.name}
-        </Text>
+      <Sheet open={menu === 'guild'} onClose={closeIf('guild')} title={server.name}>
         {server.canManageChannels && (
           <>
-            <SheetItem icon={UserRoundPlus} label="Invite" onPress={() => open('invite')} />
+            <SheetItem icon={UserRoundPlus} label="Invite people" onPress={() => open('invite')} />
             <SheetItem
               icon={Plus}
-              label="Create Channel"
+              label="Create channel"
               disabled={categories.length === 0}
-              onPress={() => open('create', { category: categories[0] })}
+              onPress={() => {
+                setCategory(null);
+                open('create');
+              }}
             />
-            <SheetItem icon={Settings} label="Settings" onPress={() => open('settings')} />
+            <SheetItem
+              icon={Settings}
+              label="Server settings"
+              onPress={() => {
+                setMenu(null);
+                goto(`/guilds/server-settings?id=${encodeURIComponent(server.id)}`);
+              }}
+            />
           </>
         )}
-        <SheetItem icon={Bell} label="Notification Settings" onPress={() => open('guildNotify')} />
-        <SheetItem icon={IdCardLanyard} label="Copy Guild ID" onPress={() => copy(server.id)} />
+        <SheetItem icon={Bell} label="Notification settings" onPress={() => open('guildNotify')} />
+        {developerMode && (
+          <SheetItem
+            icon={IdCardLanyard}
+            label="Copy server ID"
+            onPress={() => copy(server.id, 'Server ID')}
+          />
+        )}
       </Sheet>
       <NotificationMenu
         open={menu === 'guildNotify'}
@@ -400,25 +436,30 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         noun="Server"
       />
 
-      <Sheet open={menu === 'channel'} onClose={closeIf('channel')}>
-        <Text className="px-4 pt-2 pb-1 text-sm font-medium" numberOfLines={1}>
-          {channel?.label || channel?.name}
-        </Text>
+      <Sheet
+        open={menu === 'channel'}
+        onClose={closeIf('channel')}
+        title={
+          channel
+            ? `${channel.type === 'VOICE' ? '' : '#'}${channel.label || channel.name}`
+            : undefined
+        }
+      >
         <SheetItem
           icon={Link}
-          label="Copy Link"
+          label="Copy link"
           onPress={() =>
-            channel && copy(`https://app.novarum.me${guildPath(server.id, channel.id)}`)
+            channel && copy(`https://app.novarum.me${guildPath(server.id, channel.id)}`, 'Link')
           }
         />
         <SheetItem
           icon={Bell}
-          label="Notification Settings"
+          label="Notification settings"
           onPress={() => open('channelNotify')}
         />
-        <SheetItem icon={Pencil} label="Edit Channel" onPress={() => open('edit')} />
         {server.canManageChannels && (
           <>
+            <SheetItem icon={Pencil} label="Edit channel" onPress={() => open('edit')} />
             <SheetItem
               icon={ArrowUp}
               label="Move up"
@@ -433,21 +474,20 @@ export const ChannelSidebar = memo(function ChannelSidebar({
             />
             {channel?.type === 'TEXT' && (
               <SheetItem
-                icon={Megaphone}
-                label={channel.ownerOnly ? 'Let Everyone Send' : 'Only Owner Can Send'}
-                onPress={() => {
-                  void chat().setOwnerOnly(server.id, channel.id, !channel.ownerOnly);
-                  setMenu(null);
-                }}
+                icon={channel.ownerOnly ? Megaphone : Lock}
+                label={channel.ownerOnly ? 'Let everyone send' : 'Only owner can send'}
+                onPress={() => toggleOwnerOnly(channel)}
               />
             )}
           </>
         )}
-        <SheetItem
-          icon={IdCardLanyard}
-          label="Copy Channel ID"
-          onPress={() => channel && copy(channel.id)}
-        />
+        {developerMode && (
+          <SheetItem
+            icon={IdCardLanyard}
+            label="Copy channel ID"
+            onPress={() => channel && copy(channel.id, 'Channel ID')}
+          />
+        )}
       </Sheet>
       {channel && (
         <NotificationMenu
@@ -473,11 +513,6 @@ export const ChannelSidebar = memo(function ChannelSidebar({
         }}
       />
       <InviteDialog open={menu === 'invite'} onClose={closeIf('invite')} guildId={server.id} />
-      <GuildSettingsDialog
-        open={menu === 'settings'}
-        onClose={closeIf('settings')}
-        server={server}
-      />
       <EditChannelDialog open={menu === 'edit'} onClose={closeIf('edit')} channel={channel} />
     </View>
   );

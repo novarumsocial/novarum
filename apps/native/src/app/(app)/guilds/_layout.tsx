@@ -2,18 +2,15 @@
 // friends list pushed on top. It is the JS stack, not the native one, so the screen below stays drawn and
 // <SwipeBack> can drag the top one away to show it (Android's native stack has no swipe back at all).
 // An incoming call sits above every screen (the bar of the call you are in is part of ScreenHeader).
-import {
-  CardStyleInterpolators,
-  Stack,
-  type StackCardStyleInterpolator,
-} from 'expo-router/js-stack';
+import { Stack, type StackCardStyleInterpolator } from 'expo-router/js-stack';
+import { useIsFocused } from 'expo-router';
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { CallRinging } from '@/components/call-ringing';
 import { SwipeBack } from '@/components/swipe-back';
 import { pathSegments } from '@/lib/chat-state';
 import { dmPath } from '@/lib/dms';
 import { goto } from '@/lib/navigation';
-import { useThemeColors } from '@/lib/theme';
 import { startCall } from '@/lib/voice';
 
 // a pushed screen slides in over the one below, which stays put (so a swipe back shows it where it was)
@@ -44,19 +41,29 @@ const singularChannel = {
   dangerouslySingular: (_name: string, params: Record<string, unknown>) => channelKey(params),
 };
 
-export default function GuildsLayout() {
-  const colors = useThemeColors();
+// the screens below the top one stay drawn, so screen readers would read through to them
+function OnlyWhenFocused({ children }: { children: ReactNode }) {
+  const focused = useIsFocused();
+  return (
+    <View
+      style={{ flex: 1 }}
+      importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
+      accessibilityElementsHidden={!focused}
+    >
+      {children}
+    </View>
+  );
+}
 
+export default function GuildsLayout() {
   return (
     <View className="flex-1 bg-background">
       <Stack
-        screenLayout={({ route, children }) =>
-          route.name === 'index' || route.name === 'members' ? (
-            children
-          ) : (
-            <SwipeBack>{children}</SwipeBack>
-          )
-        }
+        screenLayout={({ route, children }) => (
+          <OnlyWhenFocused>
+            {route.name === 'index' ? children : <SwipeBack>{children}</SwipeBack>}
+          </OnlyWhenFocused>
+        )}
         screenOptions={{
           headerShown: false,
           // the stack's own swipe grabs drags in every direction; <SwipeBack> replaces it
@@ -73,21 +80,7 @@ export default function GuildsLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="[server]/[...rest]" {...singularChannel} />
-        <Stack.Screen
-          name="members"
-          options={{
-            presentation: 'modal',
-            cardStyleInterpolator: CardStyleInterpolators.forModalPresentationIOS,
-            gestureEnabled: true,
-            headerShown: true,
-            title: 'Members',
-            // the same color as the list under it
-            headerStyle: { backgroundColor: colors.sidebar },
-            headerTintColor: colors.foreground,
-            headerTitleStyle: { fontFamily: 'IBMPlexSans_600SemiBold', color: colors.foreground },
-            headerShadowVisible: false,
-          }}
-        />
+        <Stack.Screen name="members" />
       </Stack>
       <CallRinging
         onAccept={(id) => {

@@ -1,6 +1,7 @@
 // Port of apps/frontend/src/lib/components/message-input.svelte
-// A multiline composer with a send button, attachments from the camera / gallery / files, and mention and
-// emoji suggestions shown as a strip above the keyboard.
+// A multiline composer with a send button, attachments from the camera / gallery / files, an emoji button, and
+// mention and emoji suggestions listed above it. Native additions: the draft (text and files) is kept per
+// channel, and editing a message happens here (`editing`), with the edit bar in `context`.
 import { File } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
@@ -8,20 +9,23 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Camera,
+  Check,
   FileText,
   Files,
   ImageIcon,
   Paperclip,
   SendHorizontal,
+  Smile,
   X,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
 import { CommandForm } from '@/components/command-form';
+import { EmojiPicker } from '@/components/emoji-picker';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Textarea } from '@/components/ui/input';
@@ -38,7 +42,9 @@ import {
 } from '@/lib/chat-state';
 import { interactions, useGuildCommands, type GuildBotCommands } from '@/lib/bots';
 import type { Command } from 'anchor/bot-schemas';
+import { drafts } from '@/lib/drafts';
 import { realtime, useRealtime } from '@/lib/realtime';
+import { toast } from '@/lib/toast';
 import type { Author } from '@/lib/types/chat';
 import { cn, formatBytes } from '@/lib/utils';
 
@@ -90,23 +96,53 @@ function findSearch(text: string, cursor: number) {
 type EmojiResult = ReturnType<typeof useRealtime.getState>['emojiResults'][number];
 
 export function MessageInput({
+  channelId,
   placeholder = 'Send a message',
   onSend = () => {},
   onTyping = () => {},
   focusOn = null,
   context,
+  editing = null,
+  onSaveEdit,
+  onCancelEdit,
 }: {
+  // whose draft this is
+  channelId: string;
   placeholder?: string;
   // the chat shows the message as "sending" right away; this only throws when it could not even take it
   onSend?: (content: string | null, files: PickedFile[]) => void | Promise<void>;
   onTyping?: () => void;
   // focus the input whenever this changes to something (chat-area passes the id of the message being replied to)
   focusOn?: string | null;
-  // a row above the text, inside the composer (what you are replying to)
+  // a row above the text, inside the composer (what you are replying to, or editing)
   context?: ReactNode;
+  // the message being edited: its text replaces the draft until the edit is saved or cancelled
+  editing?: { id: string; content: string } | null;
+  onSaveEdit?: (content: string | null) => Promise<void>;
+  onCancelEdit?: () => void;
 }) {
-  const [content, setContent] = useState('');
-  const [files, setFiles] = useState<PickedFile[]>([]);
+  const [content, setContentState] = useState(() => drafts.text(channelId));
+  const [files, setFilesState] = useState<PickedFile[]>(() => drafts.files(channelId));
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  // the edit's text is not a draft
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const setContent = (text: string) => {
+    setContentState(text);
+    if (!editingRef.current) drafts.setText(channelId, text);
+  };
+  const setFiles = (list: PickedFile[]) => {
+    setFilesState(list);
+    drafts.setFiles(channelId, list);
+  };
+
+  // starting an edit puts the message's text in the box; finishing it brings the draft back
+  const editingId = editing?.id ?? null;
+  useEffect(() => {
+    const current = editingRef.current;
+    setContentState(current ? current.content : drafts.text(channelId));
+    if (current) setTimeout(() => input.current?.focus(), 50);
+  }, [editingId, channelId]);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -205,6 +241,19 @@ export function MessageInput({
 
   async function handleSend() {
     const trimmed = content.trim() || null;
+    if (editing) {
+      if (sending) return;
+      setSending(true);
+      try {
+        if (trimmed !== editing.content.trim()) await onSaveEdit?.(trimmed);
+        onCancelEdit?.();
+      } catch {
+        toast('Could not edit the message', { tone: 'error' });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
     if ((!trimmed && files.length === 0) || sending) return;
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -225,23 +274,24 @@ export function MessageInput({
     }
   }
 
+  // adds the files that fit and says which ones didn't, instead of dropping the whole pick
   function addFiles(next: PickedFile[]) {
     setSendError('');
     const existing = new Set(files.map((file) => `${file.name}:${file.size}`));
     const unique = next.filter((file) => !existing.has(`${file.name}:${file.size}`));
-    const oversized = unique.find((file) => file.size > maxFileSize);
+    const oversized = unique.filter((file) => file.size > maxFileSize);
+    const fitting = unique.filter((file) => file.size <= maxFileSize);
+    const room = Math.max(0, maxFiles - files.length);
+    const added = fitting.slice(0, room);
 
-    if (oversized) {
-      setSendError(`${oversized.name} exceeds the ${useAnchor.getState().maxFileSize} MB limit.`);
-      return;
-    }
+    const problems = [
+      oversized.length &&
+        `${oversized.length === 1 ? oversized[0]!.name : `${oversized.length} files`} ${oversized.length === 1 ? 'is' : 'are'} over the ${useAnchor.getState().maxFileSize} MB limit`,
+      fitting.length > room && `only ${maxFiles} files fit in one message`,
+    ].filter(Boolean);
+    if (problems.length) toast(`Not added: ${problems.join('; ')}.`, { tone: 'error' });
 
-    if (files.length + unique.length > maxFiles) {
-      setSendError(`You can attach up to ${maxFiles} files at once.`);
-      return;
-    }
-
-    setFiles([...files, ...unique]);
+    if (added.length) setFiles([...files, ...added]);
   }
 
   async function pick(source: 'camera' | 'library' | 'files') {
@@ -258,8 +308,13 @@ export function MessageInput({
 
       if (source === 'camera') {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted)
-          return setSendError('Allow camera access in Settings to take photos.');
+        if (!permission.granted) {
+          toast('Allow camera access to take photos.', {
+            tone: 'error',
+            action: { label: 'Settings', onPress: () => void Linking.openSettings() },
+          });
+          return;
+        }
       }
 
       const result =
@@ -295,8 +350,15 @@ export function MessageInput({
     replaceSearch(
       String.fromCodePoint(...emoji.unicode.split('-').map((part) => parseInt(part, 16)))
     );
+  // the emoji button's pick goes where the cursor is
+  const insertAtCursor = (text: string) => {
+    const cursor = Math.min(selection.start, content.length);
+    setContent(`${content.slice(0, cursor)}${text}${content.slice(cursor)}`);
+    setSelection({ start: cursor + text.length, end: cursor + text.length });
+    input.current?.focus();
+  };
 
-  const canSend = (content.trim().length > 0 || files.length > 0) && !sending;
+  const canSend = editing ? !sending : (content.trim().length > 0 || files.length > 0) && !sending;
   // only shown once the limit is close, so it never competes with the message itself
   const remaining = maxMessageLength - content.length;
 
@@ -339,43 +401,45 @@ export function MessageInput({
 
       {(mentionResults.length > 0 || emojiMatches.length > 0) && (
         <ScrollView
-          horizontal
           keyboardShouldPersistTaps="always"
-          showsHorizontalScrollIndicator={false}
-          className="mb-2 max-h-11 border border-border bg-popover"
+          className="mb-2 max-h-56 border border-border bg-popover"
         >
           {mentionResults.map((result) => (
             <Pressable
               accessibilityRole="button"
               key={result.id}
               onPress={() => insertMention(result.handle)}
-              className="h-11 flex-row items-center gap-2 px-3 active:bg-accent"
+              className="min-h-12 flex-row items-center gap-2.5 px-3 active:bg-accent"
             >
               {result.member && (
                 <Avatar
                   src={result.member.avatarUrl}
                   name={result.name}
                   bgColor={result.member.avatarColor}
-                  className="size-6"
+                  className="size-7"
                 />
               )}
-              <Text className="text-xs font-medium">{result.name}</Text>
-              <Text className="font-mono text-[10px] text-muted-foreground">@{result.handle}</Text>
+              <Text className="shrink text-sm font-medium" numberOfLines={1}>
+                {result.name}
+              </Text>
+              <Text className="min-w-0 flex-1 text-sm text-muted-foreground" numberOfLines={1}>
+                @{result.handle}
+              </Text>
             </Pressable>
           ))}
-          {emojiMatches.map((emoji) => (
+          {emojiMatches.slice(0, 8).map((emoji) => (
             <Pressable
               accessibilityRole="button"
               key={emoji.unicode}
               onPress={() => insertEmoji(emoji)}
-              className="h-11 flex-row items-center gap-2 px-3 active:bg-accent"
+              className="min-h-12 flex-row items-center gap-2.5 px-3 active:bg-accent"
             >
               <Image
                 source={{ uri: emoji.url }}
                 contentFit="contain"
-                style={{ width: 22, height: 22 }}
+                style={{ width: 24, height: 24 }}
               />
-              <Text className="text-xs">:{emoji.name.toLowerCase().replaceAll(' ', '_')}:</Text>
+              <Text className="text-sm">:{emoji.name.toLowerCase().replaceAll(' ', '_')}:</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -411,16 +475,13 @@ export function MessageInput({
                     ) : (
                       <View className="flex-1 items-center justify-center gap-1.5 px-2 pb-4">
                         <Icon as={FileText} size={20} className="text-primary" />
-                        <Text
-                          className="w-full text-center text-[11px] font-medium"
-                          numberOfLines={1}
-                        >
+                        <Text className="w-full text-center text-xs font-medium" numberOfLines={1}>
                           {file.name}
                         </Text>
                       </View>
                     )}
                     <View className="absolute bottom-1 left-1 bg-background/80 px-1 py-px">
-                      <Text className="text-[10px] text-muted-foreground">
+                      <Text className="text-xs text-muted-foreground">
                         {formatBytes(file.size)}
                       </Text>
                     </View>
@@ -431,7 +492,7 @@ export function MessageInput({
                       hitSlop={10}
                       onPress={() => setFiles(files.filter((item) => item !== file))}
                       className={cn(
-                        'absolute top-1 right-1 size-7 items-center justify-center bg-background/80',
+                        'absolute top-0 right-0 size-8 items-center justify-center bg-background/80',
                         sending && 'opacity-40'
                       )}
                     >
@@ -462,15 +523,17 @@ export function MessageInput({
             onClose={() => setActiveCommand(null)}
           />
         )}
-        <View className={cn('flex-row items-end gap-1 p-1', activeCommand && 'hidden')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="Add attachments"
-            onPress={() => setAttachOpen(true)}
-          >
-            <Icon as={Paperclip} size={18} className="text-muted-foreground" />
-          </Button>
+        <View className={cn('flex-row items-end gap-0.5 p-1', activeCommand && 'hidden')}>
+          {!editing && (
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="Add attachments"
+              onPress={() => setAttachOpen(true)}
+            >
+              <Icon as={Paperclip} size={20} className="text-muted-foreground" />
+            </Button>
+          )}
           <Textarea
             ref={input}
             value={content}
@@ -484,8 +547,16 @@ export function MessageInput({
             onBlur={() => setFocused(false)}
             placeholder={placeholder}
             accessibilityLabel={placeholder}
-            className="max-h-40 min-h-11 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px]"
+            className="max-h-40 min-h-11 flex-1 border-0 bg-transparent px-1 py-2.5 text-base"
           />
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel="Add emoji"
+            onPress={() => setEmojiOpen(true)}
+          >
+            <Icon as={Smile} size={20} className="text-muted-foreground" />
+          </Button>
           {remaining <= 200 && (
             <Text
               className={cn(
@@ -505,21 +576,25 @@ export function MessageInput({
             size="icon"
             variant={canSend ? 'default' : 'ghost'}
             disabled={!canSend}
-            accessibilityLabel="Send message"
+            accessibilityLabel={editing ? 'Save edit' : 'Send message'}
             onPress={handleSend}
           >
             <Icon
-              as={SendHorizontal}
-              size={18}
+              as={editing ? Check : SendHorizontal}
+              size={20}
               className={canSend ? 'text-primary-foreground' : 'text-muted-foreground'}
             />
           </Button>
         </View>
       </View>
 
+      {emojiOpen && (
+        <EmojiPicker open onClose={() => setEmojiOpen(false)} onPick={insertAtCursor} />
+      )}
+
       {/* mounted only while open: an always-mounted sheet in the composer never presented */}
       {attachOpen && (
-        <Sheet open onClose={() => setAttachOpen(false)}>
+        <Sheet open onClose={() => setAttachOpen(false)} title="Attach">
           <SheetItem icon={Camera} label="Camera" onPress={() => void pick('camera')} />
           <SheetItem icon={ImageIcon} label="Photo library" onPress={() => void pick('library')} />
           <SheetItem icon={Files} label="Files" onPress={() => void pick('files')} />

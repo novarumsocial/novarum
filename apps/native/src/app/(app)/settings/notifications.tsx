@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SettingsGroup, SettingsPage } from '@/components/settings-group';
-import { SettingsRow } from '@/components/settings-row';
-import { Switch } from '@/components/ui/switch';
+import { SettingsRow, SettingsSwitchRow } from '@/components/settings-row';
 import { Text } from '@/components/ui/text';
 import { notificationSettings } from '@/lib/notification-settings';
 import {
@@ -111,15 +110,18 @@ export default function Notifications() {
   return (
     <SettingsPage description="Choose how Novarum gets your attention.">
       <SettingsGroup title="Alerts">
-        <SettingsRow
+        <SettingsSwitchRow
           title="Push notifications"
           description="Get notified about mentions and replies."
-        >
-          <Switch value={pushNotifications} onValueChange={setPushNotifications} />
-        </SettingsRow>
-        <SettingsRow title="Message preview" description="Show the message text in notifications.">
-          <Switch value={messagePreview} onValueChange={setMessagePreview} />
-        </SettingsRow>
+          value={pushNotifications}
+          onValueChange={setPushNotifications}
+        />
+        <SettingsSwitchRow
+          title="Message preview"
+          description="Show the message text in notifications."
+          value={messagePreview}
+          onValueChange={setMessagePreview}
+        />
         {pushError ? (
           <Text className="px-4 py-2 text-xs text-destructive" accessibilityLiveRegion="polite">
             {pushError}
@@ -128,9 +130,12 @@ export default function Notifications() {
       </SettingsGroup>
 
       <SettingsGroup title="Sound">
-        <SettingsRow title="Mention sound" description="Play a sound when someone mentions you.">
-          <Switch value={mentionSound} onValueChange={(value) => update({ mentionSound: value })} />
-        </SettingsRow>
+        <SettingsSwitchRow
+          title="Mention sound"
+          description="Play a sound when someone mentions you."
+          value={mentionSound}
+          onValueChange={(value) => update({ mentionSound: value })}
+        />
         <SettingsRow title="Volume" stacked>
           <Slider
             value={notificationVolume}

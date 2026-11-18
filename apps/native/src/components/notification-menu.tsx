@@ -1,5 +1,5 @@
 // Port of apps/frontend/src/lib/components/notification-menu.svelte
-import { BellOff, Check } from 'lucide-react-native';
+import { AtSign, Bell, BellOff, Clock, RotateCcw } from 'lucide-react-native';
 import { View } from 'react-native';
 import type { NotificationLevel } from 'anchor/notification-level';
 import { Separator } from '@/components/ui/separator';
@@ -9,16 +9,16 @@ import { Text } from '@/components/ui/text';
 import { useNotificationSettings } from '@/lib/notification-settings';
 
 const mutes: [string, number | null][] = [
-  ['For 1 Hour', 1],
-  ['For 8 Hours', 8],
-  ['For 24 Hours', 24],
+  ['For 1 hour', 1],
+  ['For 8 hours', 8],
+  ['For 24 hours', 24],
   ['Until I turn it back on', null],
 ];
 
-const levels: [string, NotificationLevel][] = [
-  ['All Messages', 'ALL'],
-  ['Only Mentions', 'MENTIONS'],
-  ['Nothing', 'NONE'],
+const levels: [string, NotificationLevel, typeof Bell][] = [
+  ['All messages', 'ALL', Bell],
+  ['Only mentions', 'MENTIONS', AtSign],
+  ['Nothing', 'NONE', BellOff],
 ];
 
 // the "Mute" and "Notify" entries of a long-press menu, for a guild, channel or DM.
@@ -50,29 +50,37 @@ export function NotificationMenu({
   };
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <Text className="px-4 pt-2 pb-1 text-sm text-muted-foreground">
-        {muted ? `Muted ${noun}` : `Mute ${noun}`}
+    <Sheet open={open} onClose={onClose} title="Notification settings">
+      <Text className="px-4 pt-3 pb-1 text-sm text-muted-foreground">
+        {muted ? `This ${noun.toLowerCase()} is muted` : `Mute this ${noun.toLowerCase()}`}
       </Text>
       {muted && (
         <SheetItem icon={BellOff} label="Unmute" onPress={then(() => unmute(targetId, level))} />
       )}
       {mutes.map(([label, hours]) => (
-        <SheetItem key={label} label={label} onPress={then(() => mute(targetId, hours, level))} />
+        <SheetItem
+          key={label}
+          icon={Clock}
+          label={label}
+          onPress={then(() => mute(targetId, hours, level))}
+        />
       ))}
       <View className="py-1">
         <Separator />
       </View>
       <Text className="px-4 pt-2 pb-1 text-sm text-muted-foreground">Notify</Text>
-      {levels.map(([label, value]) => (
+      {levels.map(([label, value, icon]) => (
         <SheetItem
           key={value}
-          icon={value === level ? Check : undefined}
+          icon={icon}
+          selected={value === level}
           label={label}
           onPress={then(() => set(targetId, { level: value }, level))}
         />
       ))}
-      {hasSetting && <SheetItem label="Use Default" onPress={then(() => reset(targetId))} />}
+      {hasSetting && (
+        <SheetItem icon={RotateCcw} label="Use default" onPress={then(() => reset(targetId))} />
+      )}
     </Sheet>
   );
 }
