@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- the lock screen ringer; Android 14+ grants it to calling apps -->
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <application>
+    <!-- expo-unified-push hands every decrypted push to this class instead of showing it itself -->
+    <meta-data
+      android:name="dev.djara.expounifiedpush.PAYLOAD_RENDERER"
+      android:value="me.novarum.incomingcall.CallPushRenderer" />
+    <receiver android:name="me.novarum.incomingcall.DeclineReceiver" android:exported="false" />
+  </application>
+</manifest>
