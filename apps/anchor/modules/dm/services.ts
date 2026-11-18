@@ -37,6 +37,8 @@ import {
   type GroupResult,
 } from './groups';
 import { messagePreview } from '../../utils/messagePreview';
+import { isValidDeclineSignature } from '../../utils/notify';
+import { ringAs } from '../realtime/services';
 
 const successResponseSchema = z.object({ success: z.boolean() });
 const dmListResponseSchema = z.object({ dms: z.array(dmResponseSchema) });
@@ -117,6 +119,22 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
       );
     },
     { response: { 302: t.Void(), 404: genericResponseErrorSchema } }
+  )
+  // the phone's Decline on a ringing notification: the signed link from the push is the credential
+  .post(
+    '/:id/ring/decline',
+    async ({ params, query, status }) => {
+      const user = isValidDeclineSignature(params.id, query.user, query.exp, query.sig)
+        ? await db.query.users.findFirst({ where: { id: query.user } })
+        : undefined;
+      if (!user) return status(403, { error: 'Invalid or expired link' });
+      await ringAs(user, params.id, false);
+      return { success: true };
+    },
+    {
+      query: t.Object({ user: t.String(), exp: t.Numeric(), sig: t.String() }),
+      response: { 200: successResponseSchema, 403: genericResponseErrorSchema },
+    }
   )
   .resolve(async ({ cookie, status }) => {
     const session = await validateSessionToken(

@@ -35,7 +35,14 @@ object IncomingCallNotification {
   /** Same id the homeserver puts in the push: a hash of `call:<channelId>`. */
   fun idFor(channelId: String) = "call:$channelId".hashCode() and 0x7fffffff
 
-  fun show(context: Context, channelId: String, caller: String, label: String, avatarUrl: String?) {
+  fun show(
+    context: Context,
+    channelId: String,
+    caller: String,
+    label: String,
+    avatarUrl: String?,
+    declineUrl: String?,
+  ) {
     if (
       Build.VERSION.SDK_INT >= 33 &&
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -56,7 +63,9 @@ object IncomingCallNotification {
       PendingIntent.getBroadcast(
         context,
         id,
-        Intent(context, DeclineReceiver::class.java).putExtra("channelId", channelId),
+        Intent(context, DeclineReceiver::class.java)
+          .putExtra("channelId", channelId)
+          .putExtra("declineUrl", declineUrl),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
       )
 

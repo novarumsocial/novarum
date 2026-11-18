@@ -194,4 +194,37 @@ describe('a group spread over three homeservers', () => {
     expect(stop).toMatchObject({ ringing: false, tag: `call:${shadowId}` });
     for (const socket of [ra, rb, rc]) socket.close();
   });
+
+  test("declining from the notification stops that member's phone and devices on their own homeserver, and nobody else's", async () => {
+    const [a, b, c] = [await signup('a'), await signup('b'), await signup('c')];
+    await makeFriends(a, b);
+    await makeFriends(a, c);
+    const res = await call(a, 'POST', '/dm/group', {
+      userIds: [await idOf(a, b), await idOf(a, c)],
+    });
+    expect(res.status).toBe(200);
+    const hostId = res.body.id as string;
+    const shadowId = fedChannelId(hostA, hostId);
+    const rb = await followed(a, hostId, b, shadowId);
+    const rc = await followed(a, hostId, c, shadowId);
+    const phones = {
+      b: await sink.subscribe(b, undefined, 'UNIFIEDPUSH'),
+      c: await sink.subscribe(c, undefined, 'UNIFIEDPUSH'),
+    };
+
+    const ra = await connect(a);
+    await callFrom(ra, hostId);
+    await pushes(phones.b.label, 1, 'group ring on B');
+    const [ringC] = await pushes(phones.c.label, 1, 'group ring on C');
+    expect(new URL(ringC.decline).origin).toBe(anchors.c.baseUrl);
+
+    expect((await fetch(ringC.decline, { method: 'POST' })).status).toBe(200);
+    await rc.waitFor('call.ringing', (e) => !e.data.ringing && e.data.channelId === shadowId);
+    const [, stop] = await pushes(phones.c.label, 2, "c's phone stops");
+    expect(stop).toMatchObject({ ringing: false, tag: `call:${shadowId}` });
+    await sink.settle();
+    expect(sink.for(phones.b.label)).toHaveLength(1);
+    expect(ra.events.some((e) => e.type === 'call.ringing' && !e.data.ringing)).toBe(false);
+    for (const socket of [ra, rb, rc]) socket.close();
+  });
 });

@@ -192,8 +192,8 @@ export function CallRinging({ onAccept }: { onAccept: (channelId: string) => voi
 
   const decline = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // in a group, one person saying no shouldn't stop it ringing for the others
-    if (!group) realtime().ringCall(channelId, false);
+    // stops my other devices; the homeserver only ends the whole ring for a 1:1
+    realtime().ringCall(channelId, false);
     finish(false);
   };
   const accept = () => {

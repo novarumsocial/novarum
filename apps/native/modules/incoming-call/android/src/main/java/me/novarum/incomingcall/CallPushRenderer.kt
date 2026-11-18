@@ -24,6 +24,7 @@ class CallPushRenderer : PushPayloadRenderer {
           caller = data.text("title") ?: "Novarum",
           label = data.text("body") ?: "Is calling you",
           avatarUrl = data.text("icon"),
+          declineUrl = data.text("decline"),
         )
       } else {
         IncomingCallNotification.cancel(context, channelId)

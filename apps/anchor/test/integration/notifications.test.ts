@@ -533,6 +533,60 @@ describe('calls', () => {
     rb.close();
   });
 
+  // the link in the push names the homeserver's base_url; the test anchor listens elsewhere
+  const declineVia = (link: string, edit: (url: URL) => void = () => {}) => {
+    const url = new URL(link);
+    edit(url);
+    return fetch(new URL(`${url.pathname}${url.search}`, anchor.url), { method: 'POST' });
+  };
+
+  test("the notification's Decline link ends a 1:1 ring without a session, and only as signed", async () => {
+    const { a, dm, phoneB, ra, ring } = await ringingDm();
+    for (const tamper of [
+      (url: URL) => url.searchParams.set('user', a.user.id),
+      (url: URL) => url.searchParams.set('exp', String(Number(url.searchParams.get('exp')) + 1)),
+      (url: URL) => (url.pathname = url.pathname.replace(dm, 'someotherdm')),
+      (url: URL) => url.searchParams.delete('sig'),
+    ]) {
+      expect([403, 422]).toContain((await declineVia(ring.decline, tamper)).status);
+    }
+    await sink.settle();
+    expect(sink.for(phoneB.label)).toHaveLength(1);
+
+    const res = await declineVia(ring.decline);
+    expect(res.status).toBe(200);
+    await ra.waitFor('call.ringing', (e) => !e.data.ringing);
+    const [, stop] = await pushesFor(phoneB.label, 2, 'declined from the notification');
+    expect(stop).toMatchObject({ type: 'call', ringing: false, tag: `call:${dm}` });
+    ra.close();
+  });
+
+  test('declining a group call from the notification silences only that person', async () => {
+    const [a, b, c] = await Promise.all([user(), user(), user()]);
+    await Promise.all([befriend(a, b), befriend(a, c)]);
+    const group = (await call(a, 'POST', '/dm/group', { userIds: [b.user.id, c.user.id] })).body
+      .id as string;
+    const phoneB = await sink.subscribe(b, undefined, 'UNIFIEDPUSH');
+    const phoneC = await sink.subscribe(c, undefined, 'UNIFIEDPUSH');
+    const ra = await openRealtime(anchor.url, a.cookie);
+    ra.send({ type: 'voice.join', channelId: group });
+    await ra.waitFor('voice.state.changed', (e) => e.data.connected);
+    ra.send({ type: 'call.ring', channelId: group, ringing: true });
+    const [ring] = await pushesFor(phoneB.label, 1, 'group ring');
+    await pushesFor(phoneC.label, 1, 'group ring for c');
+    const tabletB = await openRealtime(anchor.url, b.cookie);
+    await tabletB.waitFor('call.ringing', (e) => e.data.ringing);
+
+    expect((await declineVia(ring.decline)).status).toBe(200);
+    await tabletB.waitFor('call.ringing', (e) => !e.data.ringing);
+    await pushesFor(phoneB.label, 2, "b's phone stops");
+    await sink.settle();
+    expect(sink.for(phoneC.label)).toHaveLength(1);
+    expect(ra.events.some((e) => e.type === 'call.ringing' && !e.data.ringing)).toBe(false);
+    ra.close();
+    tabletB.close();
+  });
+
   test('in a group, whoever answers stops ringing and the others keep going', async () => {
     const [a, b, c] = await Promise.all([user(), user(), user()]);
     await Promise.all([befriend(a, b), befriend(a, c)]);

@@ -58,11 +58,7 @@ export async function ring(
   const declined = !ringing && current && !sameUser(current.caller, user);
 
   // one person in a group saying no doesn't stop it for the others, only on their own devices
-  if (declined && channel.type === 'GROUP_DM') {
-    if (server)
-      publishRealtime(server, `userEvents:${user.userId}`, ringEvent(channel.id, user, false));
-    return stopRingingFor(channel.id, [user.userId]);
-  }
+  if (declined && channel.type === 'GROUP_DM') return declinedBy(channel.id, user);
 
   await publishTo(channel.id, ringEvent(channel.id, user, ringing));
   await followRing(channel.id, channel.type === 'GROUP_DM', user, ringing, true);
@@ -127,6 +123,15 @@ async function endRing(channelId: string) {
   if (!ring) return;
   await publishTo(channelId, ringEvent(channelId, ring.caller, false));
   await followRing(channelId, ring.group, ring.caller, false, true);
+}
+
+/** `user` said no to someone else's ring: their own devices stop, it keeps ringing for the rest. */
+export async function declinedBy(channelId: string, user: PublicUser) {
+  const ring = rings.get(channelId);
+  if (!ring || sameUser(ring.caller, user)) return;
+  if (server)
+    publishRealtime(server, `userEvents:${user.userId}`, ringEvent(channelId, user, false));
+  await stopRingingFor(channelId, [user.userId]);
 }
 
 /** These people answered or declined somewhere: their phones stop ringing. */

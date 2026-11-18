@@ -68,8 +68,8 @@
 
   function decline() {
     if (!call) return;
-    // in a group, one person saying no shouldn't stop it ringing for the others
-    if (!groupName) realtime.ringCall(call.channelId, false);
+    // stops my other devices; the homeserver only ends the whole ring for a 1:1
+    realtime.ringCall(call.channelId, false);
     dms.incomingCall = null;
   }
 </script>

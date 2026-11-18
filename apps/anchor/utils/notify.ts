@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import webpush from 'web-push';
 import { eq } from 'drizzle-orm';
 import { db, pushSubscriptions } from '../src/db';
@@ -137,6 +138,43 @@ export async function notifyLocal(userIds: string[], payload: PushPayload) {
 // a ring is over after 30 seconds, so a phone that comes back later must not start ringing
 const ringTtl = 30;
 
+// the notification's Decline runs without the app, so the push carries a link that declines this
+// one ring for this one person; it expires shortly after the ring would have
+const declineSignature = (channelId: string, userId: string, exp: number) =>
+  crypto
+    .createHmac('sha256', `ring-decline:${getConfig().files.s3_secret_key}`)
+    .update(`${channelId}:${userId}:${exp}`)
+    .digest('base64url');
+
+function declineUrl(channelId: string, userId: string) {
+  const exp = Math.floor(Date.now() / 1000) + ringTtl * 2;
+  const url = new URL(
+    `/dm/${encodeURIComponent(channelId)}/ring/decline`,
+    getConfig().server.base_url
+  );
+  url.search = new URLSearchParams({
+    user: userId,
+    exp: String(exp),
+    sig: declineSignature(channelId, userId, exp),
+  }).toString();
+  return url.toString();
+}
+
+export function isValidDeclineSignature(
+  channelId: string,
+  userId: string,
+  exp: number,
+  sig: string
+) {
+  const expected = Buffer.from(declineSignature(channelId, userId, exp));
+  const given = Buffer.from(sig);
+  return (
+    exp > Date.now() / 1000 &&
+    expected.length === given.length &&
+    crypto.timingSafeEqual(expected, given)
+  );
+}
+
 export type CallPush = {
   channelId: string;
   caller: {
@@ -182,9 +220,10 @@ export async function notifyCall(userIds: string[], { channelId, caller, ringing
     channelId,
   };
   await Promise.all(
-    targets.flatMap(({ devices }) =>
-      devices.map((device) => sendPush(device, forDevice(device, message), ringTtl))
-    )
+    targets.flatMap(({ userId, devices }) => {
+      const push = { ...message, decline: declineUrl(channelId, userId) };
+      return devices.map((device) => sendPush(device, forDevice(device, push), ringTtl));
+    })
   );
 }
 

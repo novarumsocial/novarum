@@ -32,6 +32,7 @@ const otherCredential: Record<string, string> = {
   'GET /attachment/{id}': 'signed URL (exp + sig)',
   'GET /attachment/{id}/preview': 'signed URL (exp + sig)',
   'POST /channel/livekit/webhook': 'LiveKit JWT in the Authorization header',
+  'POST /dm/{id}/ring/decline': 'signed link from the call push (user + exp + sig)',
 };
 /** not plain HTTP: the WebSocket upgrade's cookie check belongs to the realtime suite */
 const websocketRoutes = new Set(['WS /realtime/']);
