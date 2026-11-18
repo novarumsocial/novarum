@@ -17,12 +17,15 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { colorScheme } from 'nativewind';
-import { useEffect } from 'react';
+import { colorScheme, useColorScheme } from 'nativewind';
+import { useEffect, type ReactNode } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { InAppBanner } from '@/components/in-app-banner';
+import { ToastHost } from '@/components/toast-host';
+import { useOpenSheets } from '@/components/ui/sheet';
 import '@/lib/notifications'; // sets up the notification handler and tap routing
 import { checkForUpdates } from '@/lib/ota';
 import { useSettings } from '@/lib/settings';
@@ -30,8 +33,24 @@ import { useThemeColors } from '@/lib/theme';
 
 void SplashScreen.preventAutoHideAsync();
 
+// with a sheet up, screen readers only read the sheet, not the screen behind it
+function HiddenBehindSheets({ children }: { children: ReactNode }) {
+  const covered = useOpenSheets((s) => s.count > 0);
+  return (
+    <View
+      style={{ flex: 1 }}
+      importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={covered}
+    >
+      {children}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const darkMode = useSettings((s) => s.darkMode);
+  const followSystemTheme = useSettings((s) => s.followSystemTheme);
+  const scheme = useColorScheme().colorScheme;
   const colors = useThemeColors();
   const [fontsLoaded] = useFonts({
     IBMPlexSans_400Regular,
@@ -45,7 +64,10 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
 
-  useEffect(() => colorScheme.set(darkMode ? 'dark' : 'light'), [darkMode]);
+  useEffect(
+    () => colorScheme.set(followSystemTheme ? 'system' : darkMode ? 'dark' : 'light'),
+    [darkMode, followSystemTheme]
+  );
   useEffect(() => void checkForUpdates(), []);
   useEffect(() => {
     if (fontsLoaded) void SplashScreen.hideAsync();
@@ -58,15 +80,18 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <BottomSheetModalProvider>
-            <InAppBanner />
-            <StatusBar style={darkMode ? 'light' : 'dark'} />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            />
+            <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
+            <HiddenBehindSheets>
+              <InAppBanner />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.background },
+                }}
+              />
+            </HiddenBehindSheets>
           </BottomSheetModalProvider>
+          <ToastHost />
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

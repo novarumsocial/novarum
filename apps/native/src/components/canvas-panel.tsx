@@ -186,7 +186,8 @@ export function CanvasPanel({ channelId, onClose }: { channelId: string; onClose
           id: self?.id ?? '',
           name: self?.displayName || self?.username || 'Someone',
           avatarUrl: self?.avatarUrl ?? null,
-          avatarColor: self?.avatarColor === DEFAULT_AVATAR_COLOR ? null : (self?.avatarColor ?? null),
+          avatarColor:
+            self?.avatarColor === DEFAULT_AVATAR_COLOR ? null : (self?.avatarColor ?? null),
         },
         colors: latest.current.colors,
       });

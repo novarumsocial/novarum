@@ -137,6 +137,15 @@ const channelMemberResponseSchema = createSelectSchema(channelMembers, {
   joinedAt: isoDateSchema,
 }).pick({ joinedAt: true });
 
+export const dmLastMessageSchema = z.object({
+  id: z.string(),
+  authorId: z.string(),
+  content: z.string().nullable(),
+  attachmentCount: z.number().int().nonnegative(),
+  // "Ana added Leo", a missed call...: the client writes the text
+  system: systemMessageSchema.nullable().default(null),
+});
+
 export const dmResponseSchema = z.object({
   id: z.string(),
   type: dmChannelTypeSchema,
@@ -146,6 +155,7 @@ export const dmResponseSchema = z.object({
   iconUrl: z.url().nullable().default(null),
   ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
+  lastMessage: dmLastMessageSchema.nullable(),
   unread: z.boolean(),
   joinedAt: channelMemberResponseSchema.shape.joinedAt,
 });
@@ -157,6 +167,17 @@ export const dmOpenResponseSchema = dmResponseSchema.pick({ id: true, type: true
 
 export const dmLatestResponseSchema = z.object({
   channels: z.array(
-    z.object({ channelId: z.string(), id: z.string(), createdAt: isoDateSchema, own: z.boolean() })
+    z.object({
+      channelId: z.string(),
+      id: z.string(),
+      createdAt: isoDateSchema,
+      own: z.boolean(),
+      // older homeservers don't send these, so their DMs just get no preview
+      content: z.string().nullable().optional(),
+      attachmentCount: z.number().int().nonnegative().optional(),
+      system: systemMessageSchema.nullish().catch(null),
+      // who wrote it, so a group's preview names them; older homeservers only send `own`
+      author: z.object({ username: z.string(), homeserver: z.string() }).optional(),
+    })
   ),
 });

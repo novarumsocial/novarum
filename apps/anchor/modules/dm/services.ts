@@ -2,13 +2,18 @@ import Elysia, { t } from 'elysia';
 import { z } from 'zod';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
-import { db, channels, channelMembers, messages } from '../../src/db';
+import { db, attachments, channels, channelMembers, messages, users } from '../../src/db';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { publicUser } from '../../utils/publicUser';
 import { findFriendship, friendAuthority } from '../friends/model';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { dmLatestResponseSchema, dmOpenResponseSchema, dmResponseSchema } from '../../src/db/zod';
+import {
+  dmLastMessageSchema,
+  dmLatestResponseSchema,
+  dmOpenResponseSchema,
+  dmResponseSchema,
+} from '../../src/db/zod';
 import { getConfig } from '../../utils/config';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload, upsertFederatedUser } from '../../utils/federationPayload';
@@ -31,6 +36,7 @@ import {
   userRef,
   type GroupResult,
 } from './groups';
+import { messagePreview } from '../../utils/messagePreview';
 
 const successResponseSchema = z.object({ success: z.boolean() });
 const dmListResponseSchema = z.object({ dms: z.array(dmResponseSchema) });
@@ -465,6 +471,7 @@ export function dmResponse(
     iconUrl: group ? (channel.iconUrl ?? null) : null,
     ownerId: group ? (channel.ownerId ?? null) : null,
     lastMessageAt: null,
+    lastMessage: null as z.infer<typeof dmLastMessageSchema> | null,
     unread: false,
     joinedAt: joinedAt.toISOString(),
   };
@@ -540,8 +547,18 @@ async function reopenDm(channelId: string, userId: string) {
 export async function latestMessages(channelIds: string[]) {
   if (!channelIds.length) return [];
   return db
-    .selectDistinctOn([messages.channelId])
+    .selectDistinctOn([messages.channelId], {
+      id: messages.id,
+      channelId: messages.channelId,
+      authorId: messages.authorId,
+      author: { username: users.username, homeserver: users.homeserver },
+      content: messages.content,
+      system: messages.system,
+      createdAt: messages.createdAt,
+      attachmentCount: db.$count(attachments, eq(attachments.messageId, messages.id)),
+    })
     .from(messages)
+    .innerJoin(users, eq(users.id, messages.authorId))
     .where(inArray(messages.channelId, channelIds))
     .orderBy(messages.channelId, desc(messages.createdAt), desc(messages.id));
 }
@@ -568,7 +585,15 @@ async function buildDms(
   });
   const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
 
-  const latestByChannel = new Map<string, { createdAt: Date; id: string; own: boolean }>();
+  const latestByChannel = new Map<
+    string,
+    {
+      createdAt: Date;
+      id: string;
+      own: boolean;
+      preview: z.infer<typeof dmLastMessageSchema> | null;
+    }
+  >();
   if (homeserver) {
     const result = await postSignedFederationJson(homeserver, '/federation/dms/latest', {
       user: federationUserPayload(session),
@@ -576,10 +601,38 @@ async function buildDms(
     }).catch(() => null);
     const latest = dmLatestResponseSchema.safeParse(result?.data);
     for (const message of result?.response.ok && latest.success ? latest.data.channels : []) {
-      latestByChannel.set(makeFederatedChannelId(homeserver, message.channelId), {
+      const channelId = makeFederatedChannelId(homeserver, message.channelId);
+      const others =
+        memberships
+          .find((m) => m.channelId === channelId)
+          ?.channel.members.filter((m) => m.userId !== session.userId) ?? [];
+      // the host names the author; an older one only says whether it was us, which is enough in a 1:1
+      const { author } = message;
+      const authorId = message.own
+        ? session.userId
+        : author
+          ? others.find(
+              ({ user }) =>
+                user.username === author.username &&
+                user.homeserver.toLowerCase() === author.homeserver.toLowerCase()
+            )?.userId
+          : others.length === 1
+            ? others[0]!.userId
+            : undefined;
+      latestByChannel.set(channelId, {
         createdAt: new Date(message.createdAt),
         id: message.id,
         own: message.own,
+        preview:
+          message.content !== undefined && authorId
+            ? {
+                id: message.id,
+                authorId,
+                content: messagePreview(message.content),
+                attachmentCount: message.attachmentCount ?? 0,
+                system: message.system ?? null,
+              }
+            : null,
       });
     }
   } else {
@@ -588,6 +641,13 @@ async function buildDms(
         createdAt: message.createdAt,
         id: message.id,
         own: message.authorId === session.userId,
+        preview: {
+          id: message.id,
+          authorId: message.authorId,
+          content: messagePreview(message.content),
+          attachmentCount: message.attachmentCount,
+          system: message.system,
+        },
       });
     }
   }
@@ -603,6 +663,7 @@ async function buildDms(
           channel.members.filter((m) => m.userId !== session.userId).map((m) => m.user)
         ),
         lastMessageAt: latest ? latest.createdAt.toISOString() : null,
+        lastMessage: latest?.preview ?? null,
         unread: Boolean(
           latest &&
           !latest.own &&

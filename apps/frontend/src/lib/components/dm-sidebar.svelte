@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Bot, LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
   import { goto } from '$app/navigation';
-  import { dms, dmDisplay, dmPath } from '$lib/dms.svelte';
+  import { dms, dmDisplay, dmPath, dmPreviewText } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -72,6 +72,8 @@
       {@const other = display.other}
       {@const name = display.name}
       {@const group = entry.type === 'GROUP_DM'}
+      {@const preview =
+        dmPreviewText(entry) ?? (group ? `${entry.participants.length + 1} members` : null)}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
       {@const unread =
         entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
@@ -103,11 +105,16 @@
                 ></span>
               {/if}
             </div>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate" class:font-semibold={unread}>{name}</span>
-              {#if group}
-                <span class="block truncate text-[10px] text-muted-foreground">
-                  {entry.participants.length + 1} members
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate" class:font-semibold={unread}>{name}</span>
+              {#if preview}
+                <span
+                  class={[
+                    'truncate text-xs',
+                    unread ? 'text-sidebar-foreground' : 'text-muted-foreground',
+                  ]}
+                >
+                  {preview}
                 </span>
               {/if}
             </span>

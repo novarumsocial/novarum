@@ -75,6 +75,16 @@ const dmChannelSchema = z.object({
   iconUrl: z.string().nullable().default(null),
   ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
+  lastMessage: z
+    .object({
+      id: z.string(),
+      authorId: z.string(),
+      content: z.string().nullable(),
+      attachmentCount: z.number(),
+      system: systemMessageSchema.nullable().catch(null),
+    })
+    .nullable()
+    .default(null),
   unread: z.boolean(),
   joinedAt: isoDateSchema,
 });
@@ -500,17 +510,16 @@ class RealtimeState {
         chat.clearTyping(event.data.channelId, event.data.author.userId);
 
         if (isDm) {
-          dms.handleMessage(event.data.channelId, event.data.createdAt, {
-            active: isActive,
-            fromSelf: user ? event.data.author.userId === user.id : false,
-          });
+          dms.handleMessage(event.data, isActive);
         }
       }
       if (event.type === 'message.updated') {
         chat.updateMessage(event.data.channelId, { ...event.data, edited: true });
+        dms.handleMessageEdit(event.data);
       }
       if (event.type === 'message.deleted') {
         chat.removeMessage(event.data.channelId, event.data.id);
+        dms.handleMessageDelete(event.data.id);
       }
       if (event.type === 'user.status.changed') {
         chat.updateMemberStatus(event.data.userId, event.data.status);

@@ -82,21 +82,24 @@ export function NewDmDialog({
 
   const action =
     addTo?.type === 'GROUP_DM'
-      ? 'Add to Group'
+      ? 'Add to group'
       : addTo || selected.length > 1
-        ? 'Create Group'
+        ? 'Create group'
         : 'Open DM';
 
   return (
-    <Sheet open={open} onClose={close}>
-      <View className="px-4 pt-2 pb-3">
-        <Text className="text-lg font-semibold">{addTo ? 'Add People' : 'New Message'}</Text>
-        <Text className="text-sm text-muted-foreground">
-          {addTo
-            ? `Pick friends to add. ${room} more can join.`
-            : `Pick a friend, or several to start a group of up to ${limit}.`}
-        </Text>
-        <View className="mt-3">
+    <Sheet
+      open={open}
+      onClose={close}
+      title={addTo ? 'Add people' : 'New message'}
+      subtitle={
+        addTo
+          ? `Pick friends to add. ${room} more can join.`
+          : `Pick a friend, or several to start a group of up to ${limit}.`
+      }
+    >
+      <View className="px-4 pt-3 pb-3">
+        <View>
           <Input
             sheet
             value={query}
@@ -141,10 +144,10 @@ export function NewDmDialog({
                 className="size-10"
               />
               <View className="min-w-0 flex-1">
-                <Text className="text-sm font-medium" numberOfLines={1}>
+                <Text className="text-base font-medium" numberOfLines={1}>
                   {nameFor(entry)}
                 </Text>
-                <Text className="font-mono text-[10px] text-muted-foreground" numberOfLines={1}>
+                <Text className="text-sm text-muted-foreground" numberOfLines={1}>
                   {handleFor(entry)}
                 </Text>
               </View>

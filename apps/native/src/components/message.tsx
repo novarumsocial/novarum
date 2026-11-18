@@ -1,5 +1,6 @@
 // Port of apps/frontend/src/lib/components/message.svelte
-// The hover toolbar and right-click menu become a long-press sheet, and swiping a row left replies.
+// The hover toolbar and right-click menu become a long-press sheet, and swiping a row left replies. Editing
+// happens in the composer (chat-area), like the reply bar, not inside the scrolling list.
 // Rows stay cheap to mount (a channel opens with ~20 of them at once): the swipe is a JS PanResponder with a
 // core Animated value instead of a native gesture handler and Reanimated hooks per row.
 import * as Clipboard from 'expo-clipboard';
@@ -18,7 +19,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Linking, PanResponder, Pressable, View } from 'react-native';
+import { Alert, Animated, PanResponder, Pressable, View } from 'react-native';
 import Reanimated, {
   runOnJS,
   useAnimatedStyle,
@@ -31,22 +32,22 @@ import { AudioPlayer } from '@/components/audio-player';
 import { BotBadge } from '@/components/bot-badge';
 import { MessageComponents } from '@/components/message-components';
 import { MessageEmbed } from '@/components/message-embed';
-import { openAttachmentViewer } from '@/components/attachment-viewer';
+import { openAttachmentViewer, openFileWith } from '@/components/attachment-viewer';
 import { handlePattern } from '@/components/emoji-text';
 import { Markdown } from '@/components/markdown';
 import { ProfileCard } from '@/components/profile-card';
-import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { SheetItem } from '@/components/ui/sheet-item';
-import { Textarea } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { VideoPlayer } from '@/components/video-player';
-import { chat, maxMessageLength, selectActiveChannel, useChat } from '@/lib/chat-state';
+import { chat, selectActiveChannel, useChat } from '@/lib/chat-state';
 import { formatDate, formatTime } from '@/lib/format-date';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
+import { useSettings } from '@/lib/settings';
+import { toast } from '@/lib/toast';
 import type { Attachment, Message as ChatMessage } from '@/lib/types/chat';
 import { cn, formatBytes, mentionsEveryone } from '@/lib/utils';
 
@@ -54,10 +55,16 @@ import { cn, formatBytes, mentionsEveryone } from '@/lib/utils';
 const webOrigin = 'https://app.novarum.me';
 const SWIPE_THRESHOLD = 56;
 const SWIPE_MAX = 80;
-// your own messages swipe further, to edit them
-const EDIT_THRESHOLD = 120;
-const EDIT_MAX = 150;
-const bodyClass = 'text-[15px] leading-[22px] text-foreground/90';
+const bodyClass = 'text-base leading-6 text-foreground/90';
+
+// "14:05" today, "Yesterday 14:05", "12 Nov 2026 14:05" before: grouped rows hide the day divider's context
+const stamp = (date: Date) => {
+  const day = formatDate(date);
+  return day === 'Today' ? formatTime(date) : `${day} ${formatTime(date)}`;
+};
+
+export const startEditing = (message: ChatMessage) =>
+  useChat.setState({ editingMessage: true, editingMessageId: message.id });
 
 // the server doesn't send image sizes, so remember them once an image has loaded (keeps list rows from jumping)
 const imageSizes = new Map<string, { width: number; height: number }>();
@@ -149,74 +156,23 @@ function FileTile({ attachment, onPress }: { attachment: Attachment; onPress: ()
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${pdf ? 'View' : 'Download'} ${attachment.filename}`}
+      accessibilityLabel={`${pdf ? 'View' : 'Open'} ${attachment.filename}`}
       onPress={onPress}
-      className="min-h-11 w-full flex-row items-center gap-2 border border-input bg-background p-2 active:bg-accent"
+      className="min-h-14 w-full flex-row items-center gap-3 border border-input bg-background p-2 active:bg-accent"
     >
-      <View className="size-9 items-center justify-center bg-muted">
-        <Icon as={FileText} size={16} className="text-primary" />
+      <View className="size-10 items-center justify-center bg-muted">
+        <Icon as={FileText} size={18} className="text-primary" />
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="text-xs font-medium" numberOfLines={1}>
+        <Text className="text-sm font-medium" numberOfLines={2}>
           {attachment.filename}
         </Text>
-        <Text className="font-mono text-[10px] uppercase text-muted-foreground">
-          {pdf ? 'View' : formatBytes(attachment.size)}
+        <Text className="text-xs text-muted-foreground">
+          {pdf ? 'PDF · tap to view' : formatBytes(attachment.size)}
         </Text>
       </View>
-      {!pdf && <Icon as={Download} size={14} className="text-muted-foreground" />}
+      {!pdf && <Icon as={Download} size={18} className="text-muted-foreground" />}
     </Pressable>
-  );
-}
-
-// the inline editor the web shows in place of the message text
-function EditBox({
-  message,
-  onEdit,
-}: {
-  message: ChatMessage;
-  onEdit: (messageId: string, content: string | null) => void | Promise<void>;
-}) {
-  const [value, setValue] = useState(message.content);
-  const [saving, setSaving] = useState(false);
-  const close = () => useChat.setState({ editingMessage: false });
-
-  async function save() {
-    if (saving) return;
-
-    const next = value.trim();
-    if (next === message.content) return close();
-
-    setSaving(true);
-    try {
-      await onEdit(message.id, next || null);
-      close();
-    } catch {
-      Alert.alert('Could not edit the message');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <View className="mt-1 gap-2">
-      <Textarea
-        autoFocus
-        value={value}
-        onChangeText={setValue}
-        maxLength={maxMessageLength}
-        className="min-h-20"
-        accessibilityLabel="Edit message"
-      />
-      <View className="flex-row gap-2">
-        <Button onPress={save} disabled={saving}>
-          <Text>{saving ? 'Saving...' : 'Save'}</Text>
-        </Button>
-        <Button variant="ghost" onPress={close}>
-          <Text>Cancel</Text>
-        </Button>
-      </View>
-    </View>
   );
 }
 
@@ -235,55 +191,61 @@ function MessageMenu({
   onReply: () => void;
   onDelete: () => void;
 }) {
+  const developerMode = useSettings((s) => s.developerMode);
   // run the action once the sheet has started closing
   const then = (action: () => void) => () => {
     onClose();
     action();
   };
+  const copy = (text: string, what: string) =>
+    then(() => {
+      void Clipboard.setStringAsync(text);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast(`${what} copied`);
+    });
   const localOnly = !!message.ephemeral || !!message.thinking;
+  const text = message.content?.trim() ?? '';
+  const attachments = message.attachments.length;
+  const edited = message.edited && message.editedTime ? new Date(message.editedTime) : null;
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      {/* grouped messages hide their time, so the sheet always says who sent it and when */}
-      <Text className="px-4 pt-2 pb-1 text-xs text-muted-foreground" numberOfLines={1}>
-        <Text className="text-xs font-medium">
-          {message.author.displayName || message.author.username}
-        </Text>
-        {` · ${formatDate(message.timestamp)} at ${formatTime(message.timestamp)}`}
-      </Text>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      // grouped messages hide their time, so the sheet always says who sent it, when, and what it said
+      title={`${message.author.displayName || message.author.username} · ${stamp(message.timestamp)}`}
+      subtitle={
+        (text || `${attachments} attachment${attachments === 1 ? '' : 's'}`) +
+        (edited ? `\nEdited ${stamp(edited)}` : '')
+      }
+    >
       {/* ephemeral answers and "thinking…" only exist on this screen: nothing to reply to, link or delete */}
       {!localOnly && <SheetItem icon={Reply} label="Reply" onPress={then(onReply)} />}
-      {own && (
-        <SheetItem
-          icon={Pencil}
-          label="Edit Message"
-          onPress={then(() =>
-            useChat.setState({ editingMessage: true, editingMessageId: message.id })
-          )}
-        />
+      {own && text && !localOnly && (
+        <SheetItem icon={Pencil} label="Edit message" onPress={then(() => startEditing(message))} />
       )}
-      <SheetItem
-        icon={Copy}
-        label="Copy Text"
-        onPress={then(() => void Clipboard.setStringAsync(message.content ?? ''))}
-      />
+      {text ? (
+        <SheetItem icon={Copy} label="Copy text" onPress={copy(message.content, 'Text')} />
+      ) : null}
       {!localOnly && (
         <SheetItem
           icon={Link}
-          label="Copy Message Link"
-          onPress={then(
-            () => void Clipboard.setStringAsync(`${webOrigin}${chat().messagePath(message.id)}`)
-          )}
+          label="Copy message link"
+          onPress={copy(`${webOrigin}${chat().messagePath(message.id)}`, 'Link')}
         />
       )}
-      {!localOnly && (
+      {!localOnly && developerMode && (
         <SheetItem
           icon={IdCardLanyard}
-          label="Copy Message ID"
-          onPress={then(() => void Clipboard.setStringAsync(message.id))}
+          label="Copy message ID"
+          onPress={copy(message.id, 'Message ID')}
         />
       )}
-      {own && <SheetItem icon={Trash2} label="Delete" destructive onPress={then(onDelete)} />}
+      {own && (
+        <View className="mt-2 border-t border-border pt-2">
+          <SheetItem icon={Trash2} label="Delete message" destructive onPress={then(onDelete)} />
+        </View>
+      )}
     </Sheet>
   );
 }
@@ -295,7 +257,6 @@ type MessageProps = {
   onDelete: (messageId: string) => void | Promise<void>;
   // takes the message (the web closes over it) so rows can share one stable callback
   onReply: (message: ChatMessage) => void;
-  onEdit: (messageId: string, content: string | null) => void | Promise<void>;
   // flash highlight when this is the message the route points at
   flash?: boolean;
   onFlashEnd?: () => void;
@@ -307,7 +268,6 @@ export const Message = memo(function Message({
   grouped,
   onDelete,
   onReply,
-  onEdit,
   flash = false,
   onFlashEnd,
 }: MessageProps) {
@@ -359,7 +319,7 @@ export const Message = memo(function Message({
           try {
             await onDelete(message.id);
           } catch {
-            Alert.alert('Could not delete the message');
+            toast('Could not delete the message', { tone: 'error' });
           }
         },
       },
@@ -371,18 +331,17 @@ export const Message = memo(function Message({
     setMenuOpen(true);
   };
 
-  // swipe left a bit to reply, or further on your own message to edit it. Right swipes are left alone so the
-  // stack's swipe back keeps working.
-  const latest = useRef({ message, onReply, own, localOnly });
-  latest.current = { message, onReply, own, localOnly };
+  // swipe left to reply (editing is in the long-press sheet: a second, further stage was too easy to hit by
+  // accident). Right swipes are left alone so the stack's swipe back keeps working.
+  const latest = useRef({ message, onReply, localOnly });
+  latest.current = { message, onReply, localOnly };
   const reply = () => latest.current.onReply(latest.current.message);
   const translateX = useRef(new Animated.Value(0)).current;
   // the reply icon behind the row is an SVG, only worth mounting while a swipe is happening
   const [swiping, setSwiping] = useState(false);
-  const [swipeEdits, setSwipeEdits] = useState(false);
   const swipe = useMemo(() => {
-    // how far the swipe has gone: 0 nothing, 1 reply, 2 edit
-    let stage = 0;
+    // whether the swipe has gone far enough to reply
+    let armed = false;
     const settle = () =>
       Animated.spring(translateX, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start(() =>
         setSwiping(false)
@@ -392,23 +351,20 @@ export const Message = memo(function Message({
         !latest.current.localOnly && dx < -10 && Math.abs(dx) > Math.abs(dy) * 2,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        stage = 0;
+        armed = false;
         setSwiping(true);
-        setSwipeEdits(false);
       },
       onPanResponderMove: (_event, { dx }) => {
-        const x = Math.max(-(latest.current.own ? EDIT_MAX : SWIPE_MAX), Math.min(0, dx));
+        const x = Math.max(-SWIPE_MAX, Math.min(0, dx));
         translateX.setValue(x);
-        const next = x <= -EDIT_THRESHOLD ? 2 : x <= -SWIPE_THRESHOLD ? 1 : 0;
-        if (next === stage) return;
-        if (next > stage) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        stage = next;
-        setSwipeEdits(stage === 2);
+        const next = x <= -SWIPE_THRESHOLD;
+        if (next === armed) return;
+        if (next) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        armed = next;
       },
       onPanResponderRelease: () => {
         const { message, onReply } = latest.current;
-        if (stage === 2) useChat.setState({ editingMessage: true, editingMessageId: message.id });
-        else if (stage === 1) onReply(message);
+        if (armed) onReply(message);
         settle();
       },
       onPanResponderTerminate: settle,
@@ -428,7 +384,9 @@ export const Message = memo(function Message({
           className="absolute inset-y-0 right-4 justify-center"
           pointerEvents="none"
         >
-          <Icon as={swipeEdits ? Pencil : Reply} size={20} className="text-muted-foreground" />
+          <View className="size-9 items-center justify-center rounded-full bg-muted">
+            <Icon as={Reply} size={20} className="text-foreground" />
+          </View>
         </Animated.View>
       )}
 
@@ -448,8 +406,8 @@ export const Message = memo(function Message({
           className={cn(
             'flex-row gap-3 px-3 py-0.5',
             selfMentioned && 'bg-amber-400/10',
-            // the row stays lit while its action sheet is up, so it's clear which message it's for
-            menuOpen && 'bg-muted/60'
+            // the row stays lit while its action sheet is up or it is being edited, so it's clear which one it is
+            (menuOpen || editing) && 'bg-muted/60'
           )}
         >
           {selfMentioned && (
@@ -491,14 +449,12 @@ export const Message = memo(function Message({
             {!grouped && (
               <View className="flex-row items-baseline gap-2">
                 <ProfileCard user={message.author} className="shrink">
-                  <Text className="text-sm font-semibold" numberOfLines={1}>
+                  <Text className="text-base font-semibold" numberOfLines={1}>
                     {authorName}
                   </Text>
                 </ProfileCard>
                 {message.author.isBot && <BotBadge className="self-center" />}
-                <Text className="text-[11px] text-muted-foreground">
-                  {formatTime(message.timestamp)}
-                </Text>
+                <Text className="text-xs text-muted-foreground">{stamp(message.timestamp)}</Text>
               </View>
             )}
 
@@ -507,24 +463,24 @@ export const Message = memo(function Message({
                 accessibilityRole="button"
                 accessibilityLabel="Go to the replied message"
                 onPress={() => goto(chat().messagePath(message.replyTo!))}
-                className="mt-0.5 min-h-5 flex-row items-start gap-1 self-start border-l-2 border-primary/40 pl-1.5 active:bg-muted/40"
+                hitSlop={{ top: 6, bottom: 6 }}
+                className="mt-1 mb-0.5 min-h-8 max-w-full flex-row items-center gap-1.5 self-start border-l-2 border-primary/60 py-1 pr-2 pl-2 active:bg-muted/40"
               >
-                <Icon as={Reply} size={12} className="mt-0.5 text-primary/60" />
+                <Icon as={Reply} size={14} className="text-muted-foreground" />
                 {repliedMessage ? (
                   <>
-                    <Text className="text-[11px] font-medium leading-4 text-foreground/75">
+                    <Text className="text-sm leading-5 font-medium text-foreground/90">
                       {repliedMessage.author.displayName || repliedMessage.author.username}
                     </Text>
-                    <Text className="text-[11px] leading-4 text-muted-foreground/40">·</Text>
                     <View className="min-w-0 shrink">
                       {repliedMessage.content ? (
                         <Markdown
                           content={repliedMessage.content}
                           inline
-                          className="text-[11px] leading-4 text-muted-foreground"
+                          className="text-sm leading-5 text-muted-foreground"
                         />
                       ) : (
-                        <Text className="text-[11px] leading-4 text-muted-foreground">
+                        <Text className="text-sm leading-5 text-muted-foreground">
                           {repliedMessage.attachments.length} attachment
                           {repliedMessage.attachments.length === 1 ? '' : 's'}
                         </Text>
@@ -532,31 +488,20 @@ export const Message = memo(function Message({
                     </View>
                   </>
                 ) : (
-                  <Text className="text-[11px] italic leading-4 text-muted-foreground/70">
+                  <Text className="text-sm leading-5 text-muted-foreground italic">
                     Original message unavailable
                   </Text>
                 )}
               </Pressable>
             )}
 
-            {editing ? (
-              <EditBox message={message} onEdit={onEdit} />
-            ) : message.content?.trim() || (message.edited && !message.embeds.length) ? (
+            {message.content?.trim() || (message.edited && !message.embeds.length) ? (
               <Markdown
                 content={message.content?.trim() ? message.content : ''}
                 links
                 className={bodyClass}
               >
-                {message.edited && (
-                  <Text className="text-[11px] text-muted-foreground/60">
-                    {' '}
-                    (edited
-                    {message.editedTime
-                      ? ` ${formatDate(new Date(message.editedTime))} at ${formatTime(new Date(message.editedTime))}`
-                      : ''}
-                    )
-                  </Text>
-                )}
+                {message.edited && <Text className="text-xs text-muted-foreground"> (edited)</Text>}
               </Markdown>
             ) : null}
 
@@ -579,13 +524,13 @@ export const Message = memo(function Message({
             {message.ephemeral && !message.thinking && (
               <View className="mt-1 flex-row items-center gap-1.5">
                 <Icon as={EyeOff} size={12} className="text-muted-foreground" />
-                <Text className="text-[11px] text-muted-foreground">Only you can see this</Text>
+                <Text className="text-xs text-muted-foreground">Only you can see this</Text>
                 <Pressable
                   accessibilityRole="button"
-                  hitSlop={8}
+                  hitSlop={12}
                   onPress={() => chat().removeMessage(channelId, message.id)}
                 >
-                  <Text className="text-[11px] text-link">Dismiss</Text>
+                  <Text className="text-xs text-link">Dismiss</Text>
                 </Pressable>
               </View>
             )}
@@ -611,7 +556,11 @@ export const Message = memo(function Message({
                 {grid.map((attachment) => (
                   <View
                     key={attachment.id}
-                    className={cn('p-0.5', singleImage ? 'w-full' : 'w-1/2')}
+                    // files get the full width so their names fit; images share rows of two
+                    className={cn(
+                      'p-0.5',
+                      singleImage || !isImage(attachment) ? 'w-full' : 'w-1/2'
+                    )}
                   >
                     {isImage(attachment) ? (
                       <ImageTile
@@ -623,9 +572,7 @@ export const Message = memo(function Message({
                       <FileTile
                         attachment={attachment}
                         onPress={() =>
-                          isPdf(attachment)
-                            ? view(attachment)
-                            : void Linking.openURL(attachment.url)
+                          isPdf(attachment) ? view(attachment) : void openFileWith(attachment)
                         }
                       />
                     )}

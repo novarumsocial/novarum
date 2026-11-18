@@ -1,7 +1,9 @@
 // Port of apps/frontend/src/lib/components/chat-area.svelte
 // The message list is an inverted FlatList: offset 0 is the latest message, so it paints at the bottom on the
 // first frame, older pages append at its end without moving what you're reading, and new messages show up
-// in place while you're at the bottom.
+// in place while you're at the bottom. Native additions: editing a message happens in the composer (with an
+// "Editing" bar, like the reply bar), the jump-to-latest button counts what arrived while you were scrolled up,
+// the channel topic and a DM's person open from the header, and a one-time tip points out swipe to reply.
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import {
@@ -10,6 +12,7 @@ import {
   Hash,
   Megaphone,
   NotebookPen,
+  Pencil,
   Phone,
   Reply,
   RotateCw,
@@ -40,6 +43,8 @@ import Animated, {
 import { Avatar } from '@/components/avatar';
 import { CanvasPanel } from '@/components/canvas-panel';
 import { Message } from '@/components/message';
+import { ProfileSheet } from '@/components/profile-card';
+import { Sheet } from '@/components/ui/sheet';
 import { MessageInput } from '@/components/message-input';
 import { NewDmDialog } from '@/components/new-dm-dialog';
 import { SystemMessage } from '@/components/system-message';
@@ -59,6 +64,8 @@ import { useDms } from '@/lib/dms';
 import { formatDate } from '@/lib/format-date';
 import { useSession } from '@/lib/session';
 import { useSettings } from '@/lib/settings';
+import { storage } from '@/lib/storage';
+import { toast } from '@/lib/toast';
 import type { Channel, Message as ChatMessage } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
 
@@ -182,11 +189,19 @@ function PendingMessage({
   );
 }
 
-function Divider({ label, className }: { label: string; className: string }) {
+function Divider({
+  label,
+  className,
+  labelClassName = 'text-muted-foreground',
+}: {
+  label: string;
+  className: string;
+  labelClassName?: string;
+}) {
   return (
     <View accessibilityRole="header" className="my-3 flex-row items-center gap-2 px-3">
       <View className={cn('h-px flex-1', className)} />
-      <Text className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+      <Text className={cn('text-xs font-bold tracking-wider uppercase', labelClassName)}>
         {label}
       </Text>
       <View className={cn('h-px flex-1', className)} />
@@ -244,6 +259,8 @@ export function ChatArea({
   const list = useRef<FlatList<Row>>(null);
   const lastMessageId = useRef<string | null>(null);
   const [away, setAway] = useState(false);
+  const awayRef = useRef(false);
+  awayRef.current = away;
   const [unreadBoundary, setUnreadBoundary] = useState<{
     channelId: string;
     lastReadMessageId: string | null;
@@ -251,6 +268,22 @@ export function ChatArea({
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [canvasOpen, setCanvasOpen] = useState(false);
+  const [topicOpen, setTopicOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  // messages that arrived while you were scrolled up, for the jump button
+  const [missed, setMissed] = useState(0);
+  const editingId = useChat((s) => (s.editingMessage ? s.editingMessageId : null));
+  const editing = editingId ? (messages.find((message) => message.id === editingId) ?? null) : null;
+  const stopEditing = useCallback(
+    () => useChat.setState({ editingMessage: false, editingMessageId: null }),
+    []
+  );
+  // a group has no one person to show, so its title opens the members instead
+  const dmUser = useDms((s) =>
+    channel.type === 'DM' && !channel.group
+      ? s.list.find((item) => item.id === channel.id)?.participants[0]
+      : undefined
+  );
   const closeCanvas = useCallback(() => setCanvasOpen(false), []);
   // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
   const canvasSupported = channel.type !== 'VOICE' && !channel.id.startsWith('fed:');
@@ -280,6 +313,7 @@ export function ChatArea({
     setReplyingTo(null);
     lastMessageId.current = null;
     setAway(false);
+    setMissed(0);
     // only when the channel changes, not on every unread update
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
@@ -356,7 +390,15 @@ export function ChatArea({
     lastMessageId.current = last.id;
     const handle = `@${last.author.username}:${last.author.server}`.toLowerCase();
     if (!first && handle === selfHandle) scrollToLatest();
+    else if (!first && awayRef.current) setMissed((count) => count + 1);
   }, [messages, selfHandle]);
+
+  // a one-time tip, the first time a chat with messages opens
+  useEffect(() => {
+    if (loading || messages.length === 0 || storage.getBoolean('tip:swipe-reply')) return;
+    storage.set('tip:swipe-reply', true);
+    toast('Tip: swipe a message left to reply, or long-press it for more.');
+  }, [loading, messages.length]);
 
   // the shell may pass new functions on every render; rows get stable ones
   const handlers = useRef({ onDelete, onEdit, onSend });
@@ -407,15 +449,25 @@ export function ChatArea({
 
   // inverted: the offset is the distance from the latest message
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    setAway(event.nativeEvent.contentOffset.y > 400);
+    const next = event.nativeEvent.contentOffset.y > 400;
+    setAway(next);
+    if (!next) setMissed(0);
   }
 
   const renderItem = useCallback(
     ({ item }: { item: Row }) => {
       if (item.kind === 'day') {
-        return <Divider label={formatDate(item.date)} className="bg-muted-foreground/20" />;
+        return <Divider label={formatDate(item.date)} className="bg-border" />;
       }
-      if (item.kind === 'new') return <Divider label="New" className="bg-destructive" />;
+      if (item.kind === 'new') {
+        return (
+          <Divider
+            label="New messages"
+            className="bg-sidebar-primary"
+            labelClassName="text-sidebar-primary"
+          />
+        );
+      }
       if (item.kind === 'pending') {
         return <PendingMessage pending={item.pending} onRetry={send} onDiscard={discard} />;
       }
@@ -430,14 +482,13 @@ export function ChatArea({
           repliedMessage={item.replied}
           grouped={item.grouped}
           onDelete={deleteMessage}
-          onEdit={editMessage}
           onReply={setReplyingTo}
           flash={item.message.id === activeMessage}
           onFlashEnd={flashEnd}
         />
       );
     },
-    [activeMessage, deleteMessage, editMessage, flashEnd, send, discard]
+    [activeMessage, deleteMessage, flashEnd, send, discard]
   );
 
   const callerNames = callers.map((state) => state.name ?? 'Someone').join(', ');
@@ -451,7 +502,7 @@ export function ChatArea({
               <Button
                 variant={canvasOpen ? 'secondary' : 'ghost'}
                 size="icon"
-                accessibilityLabel={canvasOpen ? 'Close canvas' : 'Open canvas'}
+                accessibilityLabel={canvasOpen ? 'Close notes' : 'Open notes'}
                 accessibilityState={{ selected: canvasOpen }}
                 onPress={() => setCanvasOpen((open) => !open)}
               >
@@ -496,27 +547,64 @@ export function ChatArea({
           </>
         }
       >
-        {channel.type === 'DM' ? (
-          <Avatar
-            src={channel.avatarUrl}
-            name={channel.name}
-            className="size-7"
-            bgColor={channel.avatarColor}
-          />
-        ) : (
-          <Icon as={Hash} size={20} className="text-muted-foreground" />
-        )}
-        <View className="min-w-0 flex-1">
-          <Text className="text-[15px] font-semibold" numberOfLines={1}>
-            {channel.name}
-          </Text>
-          {channel.topic ? (
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              {channel.topic}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            channel.group
+              ? `${channel.name}, show members`
+              : channel.type === 'DM'
+                ? `${channel.name}, open profile`
+                : `${channel.name}${channel.topic ? ', show topic' : ''}`
+          }
+          disabled={
+            channel.group ? !onOpenMembers : channel.type === 'DM' ? !dmUser : !channel.topic
+          }
+          onPress={() =>
+            channel.group
+              ? onOpenMembers?.()
+              : channel.type === 'DM'
+                ? setProfileOpen(true)
+                : setTopicOpen(true)
+          }
+          className="min-h-11 min-w-0 flex-1 flex-row items-center gap-2 active:opacity-70"
+        >
+          {channel.type === 'DM' ? (
+            <Avatar
+              src={channel.avatarUrl}
+              name={channel.name}
+              className="size-8"
+              bgColor={channel.avatarColor}
+            />
+          ) : (
+            <Icon as={Hash} size={20} className="text-muted-foreground" />
+          )}
+          <View className="min-w-0 flex-1">
+            <Text className="text-base font-semibold" numberOfLines={1}>
+              {channel.name}
             </Text>
-          ) : null}
-        </View>
+            {channel.topic ? (
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                {channel.topic}
+              </Text>
+            ) : null}
+          </View>
+        </Pressable>
       </ScreenHeader>
+
+      {channel.topic ? (
+        <Sheet open={topicOpen} onClose={() => setTopicOpen(false)} title={`#${channel.name}`}>
+          <Text selectable className="px-4 pt-3 pb-2 text-base leading-6">
+            {channel.topic}
+          </Text>
+        </Sheet>
+      ) : null}
+      {dmUser && (
+        <ProfileSheet
+          user={{ ...dmUser, server: dmUser.homeserver }}
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
 
       {!call && callers.length > 0 && (
         <View className="flex-row items-center gap-2 border-b border-border bg-primary/5 px-4 py-2">
@@ -561,9 +649,10 @@ export function ChatArea({
               <View
                 accessibilityRole="adjustable"
                 accessibilityLabel="Resize call"
-                className="absolute inset-x-0 -bottom-3 z-10 h-6 items-center justify-center"
+                hitSlop={{ top: 8, bottom: 8 }}
+                className="absolute inset-x-0 -bottom-5 z-10 h-10 items-center justify-center"
               >
-                <View className="h-1 w-10 bg-muted-foreground/50" />
+                <View className="h-1.5 w-14 rounded-full bg-muted-foreground/60" />
               </View>
             </GestureDetector>
           )}
@@ -658,17 +747,31 @@ export function ChatArea({
           {away && !loading && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Jump to latest"
+              accessibilityLabel={
+                missed
+                  ? `${missed} new message${missed === 1 ? '' : 's'}. Jump to latest`
+                  : 'Jump to latest'
+              }
               onPress={() => {
                 void Haptics.selectionAsync();
                 scrollToLatest();
               }}
               className={cn(
-                'absolute right-3 bottom-8 size-11 items-center justify-center border border-border bg-card active:bg-accent',
+                'absolute right-3 bottom-8 min-h-12 min-w-12 flex-row items-center justify-center gap-1.5 border px-3 active:opacity-80',
+                missed ? 'border-sidebar-primary bg-sidebar-primary' : 'border-border bg-card',
                 circleIcons && 'rounded-full'
               )}
             >
-              <Icon as={ChevronDown} size={20} />
+              {missed ? (
+                <Text className="text-sm font-semibold text-sidebar-primary-foreground">
+                  {missed > 99 ? '99+' : missed} new
+                </Text>
+              ) : null}
+              <Icon
+                as={ChevronDown}
+                size={20}
+                className={missed ? 'text-sidebar-primary-foreground' : 'text-foreground'}
+              />
             </Pressable>
           )}
 
@@ -692,6 +795,12 @@ export function ChatArea({
 
         {canSend ? (
           <MessageInput
+            channelId={channel.id}
+            editing={editing ? { id: editing.id, content: editing.content ?? '' } : null}
+            onSaveEdit={async (content) => {
+              if (editing) await editMessage(editing.id, content);
+            }}
+            onCancelEdit={stopEditing}
             placeholder={
               channel.group
                 ? `Message ${channel.name}`
@@ -703,17 +812,35 @@ export function ChatArea({
             onTyping={() => void chat().onTyping()}
             focusOn={replyingTo?.id ?? null}
             context={
-              replyingTo ? (
+              editing ? (
                 <View className="flex-row items-center gap-2 pl-3">
-                  <Icon as={Reply} size={16} className="text-primary" />
-                  <View className="min-w-0 flex-1 border-l-2 border-primary/50 py-1.5 pl-2">
-                    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                  <Icon as={Pencil} size={16} className="text-link" />
+                  <View className="min-w-0 flex-1 border-l-2 border-link/50 py-1.5 pl-2">
+                    <Text className="text-sm font-semibold">Editing message</Text>
+                    <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                      {editing.content}
+                    </Text>
+                  </View>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    accessibilityLabel="Cancel edit"
+                    onPress={stopEditing}
+                  >
+                    <Icon as={X} size={18} />
+                  </Button>
+                </View>
+              ) : replyingTo ? (
+                <View className="flex-row items-center gap-2 pl-3">
+                  <Icon as={Reply} size={16} className="text-link" />
+                  <View className="min-w-0 flex-1 border-l-2 border-link/50 py-1.5 pl-2">
+                    <Text className="text-sm text-muted-foreground" numberOfLines={1}>
                       Replying to{' '}
-                      <Text className="text-xs font-semibold text-foreground">
+                      <Text className="text-sm font-semibold text-foreground">
                         {replyingTo.author.displayName || replyingTo.author.username}
                       </Text>
                     </Text>
-                    <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                    <Text className="text-sm text-muted-foreground" numberOfLines={1}>
                       {replyingTo.content ||
                         `${replyingTo.attachments.length} attachment${replyingTo.attachments.length === 1 ? '' : 's'}`}
                     </Text>

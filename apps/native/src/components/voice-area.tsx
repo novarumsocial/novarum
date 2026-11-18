@@ -1,7 +1,9 @@
 // Port of apps/frontend/src/lib/components/voice-area.svelte
 // Differences: reads the single `voice` store instead of taking it as a prop; no fullscreen button (the app
-// is already full screen); the web's hover-driven controls fade after a few seconds without touches.
-// Screen share is Android only (iOS needs a broadcast extension), so the button is hidden on iOS.
+// is already full screen). The controls are a thumb-sized bar: mute, deafen, camera and "more" (output, screen
+// share, flip camera, stream volume), then hang up, set apart. They only fade out while there is video on the
+// stage, so an audio call never needs a tap just to wake them. The lobby shows who is already in the channel and
+// lets you pick your mic before joining. Screen share is Android only (iOS needs a broadcast extension).
 import { router } from 'expo-router';
 import { ConnectionState } from 'livekit-client';
 import {
@@ -12,6 +14,7 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  MoreHorizontal,
   MonitorOff,
   MonitorUp,
   PhoneOff,
@@ -24,7 +27,8 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import { Avatar } from '@/components/avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VolumeSlider } from '@/components/participant-sheet';
 import { ScreenHeader } from '@/components/screen-header';
@@ -35,10 +39,11 @@ import { SheetItem } from '@/components/ui/sheet-item';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VoiceStage } from '@/components/voice-stage';
+import { useChat } from '@/lib/chat-state';
 import { useSettings } from '@/lib/settings';
 import type { Author, Channel } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
-import type { VoiceTile } from '@/lib/voice-layout';
+import { fallbackAvatarBg, type VoiceTile } from '@/lib/voice-layout';
 import {
   selectConnected,
   selectConnecting,
@@ -56,6 +61,59 @@ const outputs: Record<AudioOutput, { label: string; icon: LucideIcon }> = {
 };
 
 const CONTROLS_IDLE_MS = 4000;
+
+function ControlButton({
+  label,
+  icon,
+  onPress,
+  tone = 'default',
+  selected,
+  large,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onPress: () => void;
+  tone?: 'default' | 'on' | 'off' | 'danger';
+  selected?: boolean;
+  large?: boolean;
+}) {
+  const circleIcons = useSettings((s) => s.circleIcons);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={selected === undefined ? undefined : { selected }}
+      onPress={onPress}
+      hitSlop={4}
+      className={cn(
+        'items-center justify-center active:opacity-70',
+        large ? 'size-14' : 'size-12',
+        tone === 'danger'
+          ? 'bg-rose-600'
+          : tone === 'off'
+            ? 'bg-foreground'
+            : tone === 'on'
+              ? 'bg-primary'
+              : 'bg-secondary',
+        circleIcons && 'rounded-full'
+      )}
+    >
+      <Icon
+        as={icon}
+        size={large ? 24 : 20}
+        className={
+          tone === 'danger'
+            ? 'text-white'
+            : tone === 'off'
+              ? 'text-background'
+              : tone === 'on'
+                ? 'text-primary-foreground'
+                : 'text-secondary-foreground'
+        }
+      />
+    </Pressable>
+  );
+}
 
 export function VoiceArea({
   channel,
@@ -128,6 +186,9 @@ export function VoiceArea({
   const [manualGrid, setManualGrid] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [outputOpen, setOutputOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  // who is in the channel before you join (the channel list's voice presence)
+  const lobby = useChat((s) => s.voiceStates[channel.id]) ?? [];
 
   // only streams that are actually playing take over the stage; unwatched ones wait for a tap
   const autoSpotlightKey =
@@ -197,11 +258,12 @@ export function VoiceArea({
     setManualGrid(true);
   };
 
-  // Controls fade out after a few seconds without touches; while hidden, a tap only brings them
-  // back instead of also spotlighting whatever tile was under the finger.
+  // With video on the stage, controls fade out after a few seconds without touches; while hidden, a tap only
+  // brings them back instead of also spotlighting whatever tile was under the finger. Audio-only calls keep them.
+  const hasVideo = tiles.some((tile) => tile.state.camera || tile.state.screenShare);
   const [controlsVisible, setControlsVisible] = useState(true);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const showControls = controlsVisible || volumeOpen || outputOpen;
+  const showControls = !hasVideo || controlsVisible || volumeOpen || outputOpen || moreOpen;
 
   const wakeControls = useCallback(() => {
     setControlsVisible(true);
@@ -213,8 +275,12 @@ export function VoiceArea({
     return () => clearTimeout(idleTimer.current);
   }, [wakeControls, active]);
 
-  const controlClass = cn('size-10', circleIcons && 'rounded-full');
-  const micLabel = selfDeafened ? 'Undeafen' : selfMuted ? 'Unmute' : 'Mute';
+  // deafened also mutes, so the mic button says what tapping it does
+  const micLabel = selfDeafened ? 'Unmute (also undeafens)' : selfMuted ? 'Unmute' : 'Mute';
+  const then = (action: () => unknown) => () => {
+    setMoreOpen(false);
+    void action();
+  };
   const available = audioOutputs.includes(audioOutput)
     ? audioOutputs
     : [...audioOutputs, audioOutput];
@@ -235,11 +301,11 @@ export function VoiceArea({
           }
         >
           <Icon as={Volume2} size={20} className="text-muted-foreground" />
-          <Text numberOfLines={1} className="shrink text-sm font-semibold">
+          <Text numberOfLines={1} className="shrink text-base font-semibold">
             {channel.name}
           </Text>
           {active && !connecting && (
-            <Text className="text-xs text-muted-foreground">{participantCount}</Text>
+            <Text className="text-sm text-muted-foreground">{participantCount}</Text>
           )}
         </ScreenHeader>
       )}
@@ -260,22 +326,57 @@ export function VoiceArea({
             accessibilityRole="alert"
           >
             <Spinner />
-            <Text className="text-xs text-amber-400">Reconnecting to voice...</Text>
+            <Text className="text-sm text-amber-400">Reconnecting to voice…</Text>
           </View>
         )}
 
         {!active ? (
-          <View className="min-h-0 flex-1 items-center justify-center gap-4 p-6">
+          <View className="min-h-0 flex-1 items-center justify-center gap-5 p-6">
             <View className="items-center">
-              <Text className="text-sm font-medium">Join {channel.name}</Text>
+              <Text className="text-lg font-semibold">{channel.name}</Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                Connect when you are ready.
+                {lobby.length === 0
+                  ? 'No one is here yet.'
+                  : `${lobby.length} ${lobby.length === 1 ? 'person is' : 'people are'} here`}
               </Text>
             </View>
-            <Button onPress={onJoin}>
-              <Icon as={Volume2} size={16} className="text-primary-foreground" />
-              <Text>Join Voice</Text>
-            </Button>
+            {lobby.length > 0 && (
+              <View className="max-w-full flex-row flex-wrap justify-center gap-3">
+                {lobby.slice(0, 8).map((state) => {
+                  const member = memberById.get(state.userId);
+                  const name = member?.displayName || member?.username || state.name || '?';
+                  return (
+                    <View key={state.userId} className="w-16 items-center gap-1">
+                      <Avatar
+                        src={member?.avatarUrl}
+                        name={name}
+                        bgColor={member?.avatarColor ?? fallbackAvatarBg(state.userId)}
+                        className="size-12"
+                      />
+                      <Text numberOfLines={1} className="text-xs text-muted-foreground">
+                        {name}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+            <View className="flex-row items-center gap-3">
+              <ControlButton
+                label={selfMuted ? 'Join muted. Tap to unmute' : 'Join with mic on. Tap to mute'}
+                icon={selfMuted ? MicOff : Mic}
+                tone={selfMuted ? 'off' : 'default'}
+                selected={selfMuted}
+                onPress={() => void voice().setMuted(!selfMuted)}
+              />
+              <Button size="lg" onPress={onJoin}>
+                <Icon as={Volume2} size={18} className="text-primary-foreground" />
+                <Text>Join voice</Text>
+              </Button>
+            </View>
+            <Text className="text-sm text-muted-foreground">
+              {selfMuted ? 'You will join muted.' : 'Your mic will be on.'}
+            </Text>
           </View>
         ) : connecting ? (
           <View className="min-h-0 flex-1 items-center justify-center gap-3">
@@ -309,143 +410,47 @@ export function VoiceArea({
               <View
                 accessibilityLabel="Call controls"
                 className={cn(
-                  'max-w-full flex-row flex-wrap items-center justify-center gap-1.5 border border-border bg-sidebar/80 p-2',
+                  'flex-row items-center gap-3 border border-border bg-sidebar/90 px-3 py-2',
                   circleIcons && 'rounded-full'
                 )}
               >
-                <Button
-                  variant={selfMuted ? 'destructive' : 'secondary'}
-                  size="icon"
-                  className={controlClass}
-                  accessibilityLabel={micLabel}
-                  accessibilityState={{ selected: selfMuted }}
+                <ControlButton
+                  large
+                  label={micLabel}
+                  icon={selfMuted || selfDeafened ? MicOff : Mic}
+                  tone={selfMuted || selfDeafened ? 'off' : 'default'}
+                  selected={selfMuted}
                   onPress={() =>
-                    selfDeafened ? voice().setDeafened(false) : voice().setMuted(!selfMuted)
+                    void (selfDeafened ? voice().setDeafened(false) : voice().setMuted(!selfMuted))
                   }
-                >
-                  <Icon
-                    as={selfMuted ? MicOff : Mic}
-                    size={14}
-                    className={
-                      selfMuted ? 'text-destructive-foreground' : 'text-secondary-foreground'
-                    }
-                  />
-                </Button>
-
-                <Button
-                  variant={selfDeafened ? 'destructive' : 'secondary'}
-                  size="icon"
-                  className={controlClass}
-                  accessibilityLabel={selfDeafened ? 'Undeafen' : 'Deafen'}
-                  accessibilityState={{ selected: selfDeafened }}
-                  onPress={() => voice().setDeafened(!selfDeafened)}
-                >
-                  <Icon
-                    as={selfDeafened ? HeadphoneOff : Headphones}
-                    size={14}
-                    className={
-                      selfDeafened ? 'text-destructive-foreground' : 'text-secondary-foreground'
-                    }
-                  />
-                </Button>
-
-                <Button
-                  variant={selfCamera ? 'default' : 'secondary'}
-                  size="icon"
-                  className={controlClass}
-                  accessibilityLabel={selfCamera ? 'Turn camera off' : 'Turn camera on'}
-                  accessibilityState={{ selected: selfCamera }}
-                  onPress={() => voice().setCamera(!selfCamera)}
-                >
-                  <Icon
-                    as={selfCamera ? Video : VideoOff}
-                    size={14}
-                    className={selfCamera ? 'text-primary-foreground' : 'text-secondary-foreground'}
-                  />
-                </Button>
-
-                {Platform.OS !== 'ios' && (
-                  <Button
-                    variant={selfScreenShare ? 'default' : 'secondary'}
-                    size="icon"
-                    className={controlClass}
-                    accessibilityLabel={selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
-                    accessibilityState={{ selected: selfScreenShare }}
-                    onPress={() => voice().setScreenShare(!selfScreenShare)}
-                  >
-                    <Icon
-                      as={selfScreenShare ? MonitorOff : MonitorUp}
-                      size={14}
-                      className={
-                        selfScreenShare ? 'text-primary-foreground' : 'text-secondary-foreground'
-                      }
-                    />
-                  </Button>
-                )}
-
-                {selfCamera && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className={controlClass}
-                    accessibilityLabel="Flip camera"
-                    onPress={() =>
-                      voice().setCameraFacing(cameraFacing === 'user' ? 'environment' : 'user')
-                    }
-                  >
-                    <Icon as={SwitchCamera} size={14} className="text-secondary-foreground" />
-                  </Button>
-                )}
-
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className={controlClass}
-                  accessibilityLabel="Audio output"
-                  onPress={() => setOutputOpen(true)}
-                >
-                  <Icon
-                    as={outputs[audioOutput].icon}
-                    size={14}
-                    className="text-secondary-foreground"
-                  />
-                </Button>
-
-                {spotlightScreenShare && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className={controlClass}
-                      accessibilityLabel={`Stream volume for ${spotlightScreenShare.name}`}
-                      onPress={() => setVolumeOpen(true)}
-                    >
-                      <Icon as={Volume2} size={14} className="text-secondary-foreground" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className={controlClass}
-                      accessibilityLabel={`Stop watching ${spotlightScreenShare.name}`}
-                      onPress={() => {
-                        voice().stopWatchingStream(spotlightScreenShare.identity);
-                        showGrid();
-                      }}
-                    >
-                      <Icon as={MonitorOff} size={14} className="text-secondary-foreground" />
-                    </Button>
-                  </>
-                )}
-
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className={controlClass}
-                  accessibilityLabel="Leave call"
+                />
+                <ControlButton
+                  label={selfDeafened ? 'Undeafen' : 'Deafen'}
+                  icon={selfDeafened ? HeadphoneOff : Headphones}
+                  tone={selfDeafened ? 'off' : 'default'}
+                  selected={selfDeafened}
+                  onPress={() => void voice().setDeafened(!selfDeafened)}
+                />
+                <ControlButton
+                  label={selfCamera ? 'Turn camera off' : 'Turn camera on'}
+                  icon={selfCamera ? Video : VideoOff}
+                  tone={selfCamera ? 'on' : 'default'}
+                  selected={selfCamera}
+                  onPress={() => void voice().setCamera(!selfCamera)}
+                />
+                <ControlButton
+                  label="More call options"
+                  icon={MoreHorizontal}
+                  onPress={() => setMoreOpen(true)}
+                />
+                <View className="w-3" />
+                <ControlButton
+                  large
+                  label="Leave call"
+                  icon={PhoneOff}
+                  tone="danger"
                   onPress={onLeave}
-                >
-                  <Icon as={PhoneOff} size={14} className="text-destructive-foreground" />
-                </Button>
+                />
               </View>
             </View>
 
@@ -454,27 +459,69 @@ export function VoiceArea({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  controlClass,
-                  'absolute right-3 z-10 transition-opacity duration-300',
+                  'absolute top-3 right-3 z-10 bg-sidebar/80 transition-opacity duration-300',
+                  circleIcons && 'rounded-full',
                   !showControls && 'opacity-0'
                 )}
-                style={{ bottom: bottomInset + 20 }}
                 pointerEvents={showControls ? 'auto' : 'none'}
                 accessibilityLabel={expanded ? 'Show messages' : 'Expand call'}
                 onPress={onToggleExpand}
               >
-                <Icon
-                  as={expanded ? Minimize2 : Maximize2}
-                  size={16}
-                  className="text-muted-foreground"
-                />
+                <Icon as={expanded ? Minimize2 : Maximize2} size={20} className="text-foreground" />
               </Button>
             )}
           </>
         )}
       </View>
 
-      <Sheet open={outputOpen} onClose={() => setOutputOpen(false)}>
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Call options">
+        <SheetItem
+          icon={outputs[audioOutput].icon}
+          label={`Audio output: ${outputs[audioOutput].label}`}
+          onPress={() => {
+            setMoreOpen(false);
+            setOutputOpen(true);
+          }}
+        />
+        {Platform.OS !== 'ios' && (
+          <SheetItem
+            icon={selfScreenShare ? MonitorOff : MonitorUp}
+            label={selfScreenShare ? 'Stop sharing screen' : 'Share screen'}
+            onPress={then(() => voice().setScreenShare(!selfScreenShare))}
+          />
+        )}
+        {selfCamera && (
+          <SheetItem
+            icon={SwitchCamera}
+            label="Flip camera"
+            onPress={then(() =>
+              voice().setCameraFacing(cameraFacing === 'user' ? 'environment' : 'user')
+            )}
+          />
+        )}
+        {spotlightScreenShare && (
+          <>
+            <SheetItem
+              icon={Volume2}
+              label={`Stream volume for ${spotlightScreenShare.name}`}
+              onPress={() => {
+                setMoreOpen(false);
+                setVolumeOpen(true);
+              }}
+            />
+            <SheetItem
+              icon={MonitorOff}
+              label={`Stop watching ${spotlightScreenShare.name}`}
+              onPress={then(() => {
+                voice().stopWatchingStream(spotlightScreenShare.identity);
+                showGrid();
+              })}
+            />
+          </>
+        )}
+      </Sheet>
+
+      <Sheet open={outputOpen} onClose={() => setOutputOpen(false)} title="Audio output">
         {available.map((output) => (
           <SheetItem
             key={output}
@@ -488,7 +535,7 @@ export function VoiceArea({
         ))}
       </Sheet>
 
-      <Sheet open={volumeOpen} onClose={() => setVolumeOpen(false)}>
+      <Sheet open={volumeOpen} onClose={() => setVolumeOpen(false)} title="Stream volume">
         {spotlightScreenShare && (
           <VolumeSlider
             label="Stream volume"

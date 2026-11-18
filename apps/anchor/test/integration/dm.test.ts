@@ -39,7 +39,12 @@ describe('open', () => {
     const { a, b } = await friends();
     const res = await open(a, b);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ type: 'DM', lastMessageAt: null, unread: false });
+    expect(res.body).toMatchObject({
+      type: 'DM',
+      lastMessageAt: null,
+      lastMessage: null,
+      unread: false,
+    });
     expect(res.body.participants.map((p: any) => p.userId)).toEqual([b.user.id]);
     expect((await dms(a))[0].participants.map((p: any) => p.userId)).toEqual([b.user.id]);
     expect((await dms(b))[0]).toMatchObject({ id: res.body.id });
@@ -110,7 +115,8 @@ describe('open', () => {
     try {
       await Bun.sleep(200);
       const opened = await open(a, b);
-      await ws.waitFor('dm.created', (e) => e.data?.id === opened.body.id);
+      const created = await ws.waitFor('dm.created', (e) => e.data?.id === opened.body.id);
+      expect(created.data.lastMessage).toBeNull();
       await open(a, b);
       await Bun.sleep(300);
       expect(ws.events.filter((e) => e.type === 'dm.created')).toHaveLength(1);
@@ -126,6 +132,9 @@ describe('open', () => {
     const dm = (await open(a, b)).body;
     const msg = (await send(a, dm.id, 'secret')).body.message;
     expect(await dmIds(c)).toEqual([]);
+    for (const path of ['/dm', '/dm/homeserver/localhost']) {
+      expect(JSON.stringify((await call(c, 'GET', path)).body)).not.toContain('secret');
+    }
     expect((await list(c, dm.id)).status).toBe(403);
     expect((await send(c, dm.id, 'hi')).status).toBe(403);
     expect((await call(c, 'POST', `/channel/${dm.id}/typing`)).status).toBe(401);
@@ -165,6 +174,72 @@ describe('messages and unread', () => {
     expect(top.id).toBe(first.id);
     expect(top.lastMessageAt).toBe((await list(a, first.id)).body.messages[0].createdAt);
     expect((await list(a, first.id)).body.messages.map((m: any) => m.content)).toEqual(['ping']);
+  });
+
+  test('lastMessage previews the newest message with its author, for both participants', async () => {
+    const { a, b } = await friends();
+    const dm = (await open(a, b)).body;
+    await send(a, dm.id, 'first');
+    const msg = (await send(b, dm.id, 'second\n  line')).body.message;
+    const preview = {
+      id: msg.id,
+      authorId: b.user.id,
+      content: 'second line',
+      attachmentCount: 0,
+      system: null,
+    };
+    expect((await dms(a))[0].lastMessage).toEqual(preview);
+    expect((await dms(b))[0].lastMessage).toEqual(preview);
+
+    const own = (await send(a, dm.id, 'mine')).body.message;
+    expect((await dms(a))[0].lastMessage).toMatchObject({ id: own.id, authorId: a.user.id });
+  });
+
+  test('lastMessage content is cut to 140 characters without splitting emoji', async () => {
+    const { a, b } = await friends();
+    const dm = (await open(a, b)).body;
+    await send(a, dm.id, '😀'.repeat(300));
+    const { content } = (await dms(b))[0].lastMessage;
+    expect(Array.from(content)).toHaveLength(140);
+    expect(content).toBe(`${'😀'.repeat(139)}…`);
+    await send(a, dm.id, 'x'.repeat(140));
+    expect((await dms(b))[0].lastMessage.content).toBe('x'.repeat(140));
+  });
+
+  test('an attachment-only message previews with null content and its attachment count', async () => {
+    const { a, b } = await friends();
+    const dm = (await open(a, b)).body;
+    const attachmentIds = [];
+    for (const filename of ['one.txt', 'two.txt']) {
+      const presign = await call(a, 'POST', '/upload/presign', {
+        channelId: dm.id,
+        filename,
+        contentType: 'text/plain',
+        size: 2,
+      });
+      expect(presign.status).toBe(200);
+      const { uploadUrl, headers, attachmentId } = presign.body;
+      expect((await fetch(uploadUrl, { method: 'PUT', headers, body: 'hi' })).status).toBe(200);
+      attachmentIds.push(attachmentId);
+    }
+    const msg = await send(a, dm.id, null, { attachmentIds });
+    expect(msg.status).toBe(200);
+    expect((await dms(b))[0].lastMessage).toEqual({
+      id: msg.body.message.id,
+      authorId: a.user.id,
+      content: null,
+      attachmentCount: 2,
+      system: null,
+    });
+  });
+
+  test('deleting the newest message moves the preview back to the one before it', async () => {
+    const { a, b } = await friends();
+    const dm = (await open(a, b)).body;
+    await send(a, dm.id, 'kept');
+    const gone = (await send(a, dm.id, 'oops')).body.message;
+    await call(a, 'POST', '/message/delete', { channelId: dm.id, messageId: gone.id });
+    expect((await dms(b))[0].lastMessage.content).toBe('kept');
   });
 
   test('unread: set for the recipient only, cleared by reading', async () => {
@@ -339,6 +414,27 @@ describe('group DMs', () => {
     (await list(user, id)).body.messages
       .filter((m: any) => m.system)
       .map((m: any) => m.system.type);
+
+  test('the preview names who wrote the last message, and shows system messages too', async () => {
+    const { a, b, c } = await trio();
+    const group = (await create(a, [b, c])).body.id as string;
+    const preview = async (user: Actor) =>
+      (await dms(user)).find((d: any) => d.id === group).lastMessage;
+    // nobody has written yet: "a created the group"
+    expect(await preview(b)).toMatchObject({
+      authorId: a.user.id,
+      content: null,
+      system: { type: 'group.created' },
+    });
+    const msg = (await send(c, group, 'hi all')).body.message;
+    expect(await preview(b)).toEqual({
+      id: msg.id,
+      authorId: c.user.id,
+      content: 'hi all',
+      attachmentCount: 0,
+      system: null,
+    });
+  });
 
   test('the creator owns a new group with their friends, everyone sees it, and the 1:1 DM is untouched', async () => {
     const { a, b, c } = await trio();

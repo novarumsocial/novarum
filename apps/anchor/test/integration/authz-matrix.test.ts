@@ -447,6 +447,25 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
     expect((await open(a, stranger.user.id)).status).toBe(403);
     expect((await open(a, friend.user.id)).status).toBe(200);
   });
+
+  test('GET /dm: the lastMessage preview reaches participants (ex-friends too) and nobody else', async () => {
+    const [a, b, outsider] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
+    await befriend(a, b);
+    await befriend(a, outsider);
+    const dmId = (await call(a, 'POST', '/dm', { userId: b.user.id })).body.id;
+    await send(b, dmId, 'private preview');
+    const preview = async (actor: Actor) =>
+      (await call(actor, 'GET', '/dm')).body.dms?.find((dm: any) => dm.id === dmId)?.lastMessage;
+    expect((await call(anonymous(anchor.url), 'GET', '/dm')).status).toBe(401);
+    expect(await preview(outsider)).toBeUndefined();
+    expect(await preview(a)).toMatchObject({ content: 'private preview' });
+    await unfriend(a, b);
+    expect(await preview(a)).toMatchObject({ content: 'private preview' });
+  });
 });
 
 describe('group DM routes', () => {

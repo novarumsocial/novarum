@@ -1,5 +1,5 @@
 // Native-only: one tappable row inside a <Sheet>, like a dropdown-menu item on the web
-import type { LucideIcon } from 'lucide-react-native';
+import { Check, type LucideIcon } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 import { cn } from '@/lib/utils';
 import { Icon } from './icon';
@@ -11,15 +11,20 @@ export function SheetItem({
   onPress,
   destructive,
   disabled,
+  selected,
 }: {
   icon?: LucideIcon;
   label: string;
   onPress: () => void;
   destructive?: boolean;
   disabled?: boolean;
+  // a choice in a list of options: shows a check on the right when it is the current one
+  selected?: boolean;
 }) {
   return (
     <Pressable
+      accessibilityRole={selected === undefined ? 'button' : 'radio'}
+      accessibilityState={{ disabled, checked: selected }}
       onPress={onPress}
       disabled={disabled}
       className={cn(
@@ -34,7 +39,8 @@ export function SheetItem({
           className={destructive ? 'text-destructive' : 'text-muted-foreground'}
         />
       )}
-      <Text className={cn('text-base', destructive && 'text-destructive')}>{label}</Text>
+      <Text className={cn('flex-1 text-base', destructive && 'text-destructive')}>{label}</Text>
+      {selected && <Icon as={Check} size={18} className="text-link" />}
     </Pressable>
   );
 }

@@ -200,6 +200,13 @@ export type DmChannel = {
   iconUrl: string | null;
   ownerId: string | null;
   lastMessageAt: string | null;
+  lastMessage: {
+    id: string;
+    authorId: string;
+    content: string | null;
+    attachmentCount: number;
+    system: SystemMessage | null;
+  } | null;
   unread: boolean;
   joinedAt: string;
 };

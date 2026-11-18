@@ -19,3 +19,17 @@ export function formatDate(date: Date): string {
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+// Native-only: the short time of a list row, like phone chat apps: "14:05" today, "Yesterday", "Tue" this week,
+// "12 Nov" this year, "12 Nov 2025" before that
+export function formatShortDate(date: Date, now = new Date()): string {
+  const formatted = formatDate(date);
+  if (formatted === 'Today') return formatTime(date);
+  if (formatted === 'Yesterday') return formatted;
+  const days = (now.getTime() - date.getTime()) / 86_400_000;
+  if (days < 7) return date.toLocaleDateString(undefined, { weekday: 'short' });
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
