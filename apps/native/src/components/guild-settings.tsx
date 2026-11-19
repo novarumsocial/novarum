@@ -1,10 +1,10 @@
 // Port of apps/frontend/src/lib/components/guild-settings-dialog.svelte, as its own screen (guilds/server-settings)
-// Differences: no Roles tab and no Kick/Ban buttons (web stubs stay hidden); the picture comes from the photo library;
-// the web's Bots tab is a section here. Name and description can't be changed yet, so they show as plain text, and
-// the member list lives on the Members screen only.
+// Differences: no Roles tab (a web stub stays hidden); the picture comes from the photo library; the web's Bots
+// and Bans tabs are sections here. Name and description can't be changed yet, so they show as plain text, and
+// the member list (with Kick and Ban on long-press) lives on the Members screen only.
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { z } from 'zod';
 import { Avatar } from '@/components/avatar';
@@ -20,6 +20,7 @@ import { Text } from '@/components/ui/text';
 import { anchor } from '@/lib/anchor';
 import { chat, useChat } from '@/lib/chat-state';
 import { addBotToGuild, parseBotHandle, removeBotFromGuild } from '@/lib/bots';
+import { listBans, unban, type GuildBan } from '@/lib/moderation';
 import { useSettings } from '@/lib/settings';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,31 @@ export function GuildSettings({ server }: { server: Server }) {
     const error = await removeBotFromGuild(server.id, userId);
     setBotBusy(false);
     setBotMessage(error ? { ok: false, text: error } : null);
+  }
+
+  const [bans, setBans] = useState<GuildBan[]>([]);
+  const [bansError, setBansError] = useState<string | null>(null);
+  const [bansBusy, setBansBusy] = useState(false);
+
+  const loadBans = useCallback(async () => {
+    setBansBusy(true);
+    const result = await listBans(server.id);
+    setBansBusy(false);
+    if (typeof result === 'string') return setBansError(result);
+    setBans(result);
+    setBansError(null);
+  }, [server.id]);
+
+  useEffect(() => {
+    if (server.canManageChannels) void loadBans();
+  }, [server.canManageChannels, loadBans]);
+
+  async function liftBan(userId: string) {
+    setBansBusy(true);
+    const error = await unban(server.id, userId);
+    setBansBusy(false);
+    setBansError(error);
+    if (!error) setBans((list) => list.filter((ban) => ban.user.userId !== userId));
   }
 
   const [crop, setCrop] = useState<Picture | null>(null);
@@ -211,6 +237,41 @@ export function GuildSettings({ server }: { server: Server }) {
                   onPress={() => void removeBot(member.userId)}
                 >
                   <Text className="text-destructive">Remove</Text>
+                </Button>
+              </View>
+            ))}
+          </View>
+        </SettingsGroup>
+
+        <SettingsGroup title="Bans">
+          <View className="gap-2 p-4">
+            {bansError ? <Text className="text-sm text-destructive">{bansError}</Text> : null}
+            {bans.length === 0 && !bansBusy && !bansError && (
+              <Text className="text-sm text-muted-foreground">Nobody is banned.</Text>
+            )}
+            {bans.map((ban) => (
+              <View key={ban.user.userId} className="min-h-11 flex-row items-center gap-3">
+                <Avatar
+                  src={ban.user.avatarUrl}
+                  name={ban.user.displayName || ban.user.username}
+                  bgColor={ban.user.avatarColor}
+                  className="size-8"
+                />
+                <View className="flex-1">
+                  <Text className="text-sm font-medium" numberOfLines={1}>
+                    {ban.user.displayName || ban.user.username}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+                    @{ban.user.username}:{ban.user.homeserver} · {ban.reason || 'No reason given'}
+                  </Text>
+                </View>
+                <Button
+                  variant="ghost"
+                  disabled={bansBusy}
+                  accessibilityLabel={`Unban ${ban.user.displayName || ban.user.username}`}
+                  onPress={() => void liftBan(ban.user.userId)}
+                >
+                  <Text>Unban</Text>
                 </Button>
               </View>
             ))}

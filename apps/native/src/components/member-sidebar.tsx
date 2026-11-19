@@ -1,7 +1,9 @@
 // Port of apps/frontend/src/lib/components/member-sidebar.svelte
-// Differences: a search field filters by name or handle, and each row shows the handle (display names repeat)
+// Differences: a search field filters by name or handle, and each row shows the handle (display names repeat);
+// the web's right-click menu is a long-press sheet with just Kick and Ban, shown to those who may use them
 import { FlashList } from '@shopify/flash-list';
-import { Users } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { Ban, UserRoundX, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,8 +11,12 @@ import { Avatar } from '@/components/avatar';
 import { ProfileCard } from '@/components/profile-card';
 import { SearchField } from '@/components/search-field';
 import { Icon } from '@/components/ui/icon';
+import { Sheet } from '@/components/ui/sheet';
+import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { BotBadge } from '@/components/bot-badge';
+import { selectCurrentServer, useChat } from '@/lib/chat-state';
+import { canModerate, moderation } from '@/lib/moderation';
 import { useSettings } from '@/lib/settings';
 import type { Author } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
@@ -24,6 +30,12 @@ export function MemberSidebar({ members }: { members: Author[] }) {
   const circleIcons = useSettings((s) => s.circleIcons);
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const server = useChat(selectCurrentServer);
+  const [target, setTarget] = useState<Author | null>(null);
+  const act = (kind: 'kick' | 'ban') => {
+    if (server && target) moderation().ask({ kind, server, member: target });
+    setTarget(null);
+  };
 
   const needle = query.trim().toLowerCase();
   const matching = needle
@@ -76,7 +88,17 @@ export function MemberSidebar({ members }: { members: Author[] }) {
           const name = member.displayName || member.username;
           const offline = member.status === 'OFFLINE';
           return (
-            <ProfileCard user={member}>
+            <ProfileCard
+              user={member}
+              onLongPress={
+                server && canModerate(server, member)
+                  ? () => {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setTarget(member);
+                    }
+                  : undefined
+              }
+            >
               <View className="min-h-14 flex-row items-center gap-3 px-1">
                 <View className={cn(offline && 'opacity-60')}>
                   <Avatar
@@ -113,6 +135,14 @@ export function MemberSidebar({ members }: { members: Author[] }) {
           );
         }}
       />
+      <Sheet
+        open={!!target}
+        onClose={() => setTarget(null)}
+        title={target ? target.displayName || target.username : undefined}
+      >
+        <SheetItem icon={UserRoundX} label="Kick" destructive onPress={() => act('kick')} />
+        <SheetItem icon={Ban} label="Ban" destructive onPress={() => act('ban')} />
+      </Sheet>
     </View>
   );
 }

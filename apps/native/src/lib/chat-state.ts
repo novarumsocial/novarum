@@ -67,6 +67,7 @@ type AddMessageInput = {
 
 type ChannelMemberInput = PublicUser & {
   status: 'ONLINE' | 'OFFLINE';
+  role?: 'OWNER' | 'ADMIN' | 'MEMBER';
 };
 
 type VoicePresenceInput = {
@@ -327,16 +328,19 @@ type ChatState = {
     name: string;
     down?: boolean;
     ownerId?: string;
+    owner?: boolean;
     canManageChannels?: boolean;
     avatarUrl?: string | null;
     description?: string | null;
   }) => void;
+  /** we left the guild or were removed from it */
+  removeGuild: (guildId: string) => void;
   setGuildCategories: (guildId: string, categories: ChannelCategory[]) => void;
   addChannel: (channel: AddChannelInput) => Channel;
   setMessages: (channelId: string, messages: AddMessageInput[]) => void;
   addMessage: (message: AddMessageInput) => void;
   addEphemeral: (message: AddMessageInput) => void;
-  removeMember: (userId: string) => void;
+  removeMember: (guildId: string, userId: string) => void;
   removeMessage: (channelId: string, messageId: string) => void;
   updateMessage: (channelId: string, message: AddMessageInput) => void;
   updateMemberStatus: (userId: string, status: 'ONLINE' | 'OFFLINE') => void;
@@ -528,6 +532,10 @@ export const useChat = create<ChatState>((set, get) => {
 
     if (result.error || !result.data || count !== resetCount) return;
 
+    // guilds we left or were removed from while disconnected
+    const ids = new Set(result.data.guilds.map((guild) => guild.id));
+    for (const server of get().servers) if (!ids.has(server.id)) get().removeGuild(server.id);
+
     for (const guild of result.data.guilds) {
       get().addGuild(guild);
 
@@ -659,7 +667,10 @@ export const useChat = create<ChatState>((set, get) => {
 
     addGuild(guild) {
       const down = guild.down ?? false;
-      const canManageChannels = guild.canManageChannels ?? guild.ownerId === session().user?.id;
+      // our copy of a remote guild names whoever joined first as its owner
+      const owner =
+        guild.owner ?? (!guild.id.startsWith('fed:') && guild.ownerId === session().user?.id);
+      const canManageChannels = guild.canManageChannels ?? owner;
 
       if (get().servers.some((server) => server.id === guild.id)) {
         set({
@@ -670,6 +681,7 @@ export const useChat = create<ChatState>((set, get) => {
                   name: guild.name,
                   initials: initialsFor(guild.name),
                   down,
+                  owner,
                   canManageChannels,
                   avatarUrl: guild.avatarUrl ?? null,
                   description: guild.description ?? null,
@@ -688,6 +700,7 @@ export const useChat = create<ChatState>((set, get) => {
             name: guild.name,
             initials: initialsFor(guild.name),
             down,
+            owner,
             canManageChannels,
             avatarUrl: guild.avatarUrl ?? null,
             description: guild.description ?? null,
@@ -809,8 +822,16 @@ export const useChat = create<ChatState>((set, get) => {
       );
     },
 
-    removeMember: (userId) =>
-      set({ members: get().members.filter((member) => member.userId !== userId) }),
+    removeMember(guildId, userId) {
+      if (selectActiveServer(get()) !== guildId) return;
+      set({ members: get().members.filter((member) => member.userId !== userId) });
+    },
+
+    removeGuild(guildId) {
+      const { [guildId]: _, ...channelsByServer } = get().channelsByServer;
+      set({ servers: get().servers.filter((server) => server.id !== guildId), channelsByServer });
+      if (selectActiveServer(get()) === guildId) goHome();
+    },
 
     removeMessage(channelId, messageId) {
       const messages = get().messagesByChannel[channelId];

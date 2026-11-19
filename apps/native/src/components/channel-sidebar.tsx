@@ -24,6 +24,7 @@ import {
   UserRoundPlus,
   Video,
   Volume2,
+  LogOut,
 } from 'lucide-react-native';
 import { memo, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, View } from 'react-native';
@@ -39,6 +40,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, guildPath, lastGuildChannel, useChat } from '@/lib/chat-state';
+import { moderation } from '@/lib/moderation';
 import { goto } from '@/lib/navigation';
 import { useNotificationSettings } from '@/lib/notification-settings';
 import { useSettings } from '@/lib/settings';
@@ -426,6 +428,17 @@ export const ChannelSidebar = memo(function ChannelSidebar({
             icon={IdCardLanyard}
             label="Copy server ID"
             onPress={() => copy(server.id, 'Server ID')}
+          />
+        )}
+        {!server.owner && (
+          <SheetItem
+            icon={LogOut}
+            label="Leave server"
+            destructive
+            onPress={() => {
+              setMenu(null);
+              moderation().ask({ kind: 'leave', server });
+            }}
           />
         )}
       </Sheet>
