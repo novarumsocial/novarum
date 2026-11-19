@@ -8,7 +8,6 @@
     NotebookPen,
     Phone,
     RotateCw,
-    Search,
     Users,
     Volume2,
     X,
@@ -28,7 +27,8 @@
   import { Progress } from '$lib/components/ui/progress/index.js';
   import CanvasPanel from './canvas-panel.svelte';
   import SearchPanel from './search-panel.svelte';
-  import * as InputGroup from '$lib/components/ui/input-group/index.js';
+  import SearchBox from './search-box.svelte';
+  import { messageSearch } from '$lib/search.svelte';
 
   // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
   type Pending = {
@@ -76,26 +76,9 @@
 
   let callHeight = $state(320);
   let canvasOpen = $state(false);
-  let searchInput = $state<HTMLInputElement | null>(null);
-  let searchText = $state('');
-  // what the results panel shows; it only changes on Enter, not on every keystroke
-  let searchQuery = $state<string | null>(null);
-
-  function submitSearch() {
-    if (!searchText.trim()) return;
-    searchQuery = searchText.trim();
-    canvasOpen = false;
-  }
-
-  function onWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') unreadBoundary = null;
-    // Ctrl/Cmd+K, as the browser's own Ctrl+F stays find-in-page
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      searchInput?.focus();
-      searchInput?.select();
-    }
-  }
+  $effect(() => {
+    if (messageSearch.query) canvasOpen = false;
+  });
   // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
   const canvasSupported = $derived(channel.type !== 'VOICE' && !channel.id.startsWith('fed:'));
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
@@ -290,7 +273,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} />
+<svelte:window onkeydown={(event) => event.key === 'Escape' && (unreadBoundary = null)} />
 
 {#snippet skeletonRows(count: number)}
   {#each Array.from({ length: count }) as _, i}
@@ -388,32 +371,14 @@
     {/if}
     <div class="flex-1"></div>
     {#if channel.type !== 'VOICE'}
-      <form
-        class="w-32 transition-[width] focus-within:w-56 sm:w-44 sm:focus-within:w-64"
-        onsubmit={(event) => {
-          event.preventDefault();
-          submitSearch();
-        }}
-      >
-        <InputGroup.Root class="h-8">
-          <InputGroup.Input
-            bind:ref={searchInput}
-            bind:value={searchText}
-            type="search"
-            placeholder={chat.activeServer ? 'Search server' : 'Search'}
-            aria-label="Search messages"
-            title="Search messages (Ctrl+K)"
-            onkeydown={(event) => {
-              if (event.key !== 'Escape') return;
-              searchQuery = null;
-              searchInput?.blur();
-            }}
-          />
-          <InputGroup.Addon>
-            <Search />
-          </InputGroup.Addon>
-        </InputGroup.Root>
-      </form>
+      <!-- with the member list open on a wide screen, the box sits above it instead -->
+      <SearchBox
+        placeholder={chat.activeServer ? 'Search server' : 'Search'}
+        class={cn(
+          'w-32 transition-[width] focus-within:w-56 sm:w-44 sm:focus-within:w-64',
+          chat.route.kind === 'guild' && settings.value.showMemberList && 'lg:hidden'
+        )}
+      />
     {/if}
     {#if canvasSupported}
       <Button
@@ -421,7 +386,7 @@
         size="icon-lg"
         onclick={() => {
           canvasOpen = !canvasOpen;
-          if (canvasOpen) searchQuery = null;
+          if (canvasOpen) messageSearch.query = null;
         }}
         aria-label={canvasOpen ? 'Close canvas' : 'Open canvas'}
         aria-pressed={canvasOpen}
@@ -667,12 +632,12 @@
       {#key channel.id}
         <CanvasPanel channelId={channel.id} onClose={() => (canvasOpen = false)} />
       {/key}
-    {:else if searchQuery}
+    {:else if messageSearch.query}
       <SearchPanel
-        query={searchQuery}
+        query={messageSearch.query}
         guildId={chat.activeServer}
         {channel}
-        onClose={() => (searchQuery = null)}
+        onClose={() => (messageSearch.query = null)}
       />
     {/if}
   </div>
