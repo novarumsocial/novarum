@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { highlightMatches, parseSearchQuery, searchWords } from '../../utils/messageSearch';
+import {
+  applySearchSuggestion,
+  highlightMatches,
+  parseSearchQuery,
+  searchSuggestions,
+  searchWords,
+} from '../../utils/messageSearch';
 
 describe('parseSearchQuery', () => {
   test('splits filters from the text', () => {
@@ -61,4 +67,41 @@ test('highlightMatches marks word starts only, case-insensitively, and treats wo
     { text: 'c)', match: false },
   ]);
   expect(highlightMatches('plain', [])).toEqual([{ text: 'plain', match: false }]);
+});
+
+describe('searchSuggestions', () => {
+  const members = [
+    { username: 'alice', server: 'a.test', displayName: 'Alice' },
+    { username: 'bob', server: 'a.test', displayName: 'Robert' },
+    { username: 'bob', server: 'b.test', displayName: null },
+  ];
+  const values = (raw: string) =>
+    searchSuggestions(raw, members, new Date('2026-03-10T12:00:00Z')).map((s) => s.value);
+
+  test('offers the filters for an empty or partial last word, and nothing for plain text', () => {
+    expect(values('')).toEqual(['from:', 'has:', 'before:', 'after:']);
+    expect(values('deploy ')).toEqual(['from:', 'has:', 'before:', 'after:']);
+    expect(values('deploy B')).toEqual(['before:']);
+    expect(values('deploy')).toEqual([]);
+  });
+
+  test('from: matches usernames and display names, with the full handle when a username repeats', () => {
+    expect(values('from:')).toEqual(['from:alice ', 'from:@bob:a.test ', 'from:@bob:b.test ']);
+    expect(values('x from:rob')).toEqual(['from:@bob:a.test ']);
+    expect(values('from:@AL')).toEqual(['from:alice ']);
+  });
+
+  test('has: values and dates', () => {
+    expect(values('has:i')).toEqual(['has:image ']);
+    expect(values('before:')).toEqual(['before:2026-03-10 ', 'before:2026-03-03 ']);
+    expect(values('after:2026-03-0')).toEqual(['after:2026-03-03 ']);
+    expect(values('after:2026-03-03')).toEqual([]);
+  });
+
+  test('applying a suggestion swaps only the last word', () => {
+    expect(applySearchSuggestion('deploy fr', { label: '', detail: '', value: 'from:' })).toBe(
+      'deploy from:'
+    );
+    expect(applySearchSuggestion('a ', { label: '', detail: '', value: 'has:' })).toBe('a has:');
+  });
 });

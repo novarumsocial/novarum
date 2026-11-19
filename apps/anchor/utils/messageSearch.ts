@@ -53,6 +53,75 @@ export function parseSearchQuery(raw: string) {
   return { ok: true as const, query };
 }
 
+export type SearchSuggestion = { label: string; detail: string; value: string };
+
+const filterHints: SearchSuggestion[] = [
+  { label: 'from:', detail: 'user', value: 'from:' },
+  { label: 'has:', detail: 'link, image or attachment', value: 'has:' },
+  { label: 'before:', detail: 'date', value: 'before:' },
+  { label: 'after:', detail: 'date', value: 'after:' },
+];
+const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+
+/**
+ * What the search box offers for the word being typed (the last one): the filters, then once one is
+ * picked, matching members, `has:` values or dates. `value` replaces that word; values ending in a
+ * space are complete, the bare filters keep suggesting.
+ */
+export function searchSuggestions(
+  raw: string,
+  members: { username: string; server: string; displayName?: string | null }[],
+  today = new Date()
+): SearchSuggestion[] {
+  const word = raw.split(/\s/).at(-1)!.toLowerCase();
+  const [, key, value = ''] = /^(from|has|before|after):(.*)$/.exec(word) ?? [];
+  if (key === 'from') {
+    const typed = value.replace(/^@/, '');
+    return members
+      .filter((member) =>
+        [member.username, member.displayName ?? ''].some((name) =>
+          name.toLowerCase().startsWith(typed)
+        )
+      )
+      .slice(0, 8)
+      .map((member) => {
+        // a username that is on more than one homeserver needs the full handle to pick one
+        const shared = members.some(
+          (other) => other.username === member.username && other.server !== member.server
+        );
+        const handle = shared ? `@${member.username}:${member.server}` : member.username;
+        return {
+          label: member.displayName || member.username,
+          detail: handle,
+          value: `from:${handle} `,
+        };
+      });
+  }
+  if (key === 'has') {
+    return hasValues
+      .filter((has) => has.startsWith(value))
+      .map((has) => ({ label: has, detail: '', value: `has:${has} ` }));
+  }
+  if (key === 'before' || key === 'after') {
+    const days = [
+      { detail: 'today', date: today },
+      { detail: 'a week ago', date: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) },
+    ];
+    return days
+      .map(({ detail, date }) => ({
+        label: isoDay(date),
+        detail,
+        value: `${key}:${isoDay(date)} `,
+      }))
+      .filter((day) => day.label.startsWith(value) && day.label !== value);
+  }
+  return filterHints.filter((hint) => hint.value.startsWith(word) && hint.value !== word);
+}
+
+/** `raw` with its last word swapped for a picked suggestion. */
+export const applySearchSuggestion = (raw: string, suggestion: SearchSuggestion) =>
+  raw.replace(/\S*$/, suggestion.value);
+
 /** The words a result is highlighted with: what's left of the query after its filters. */
 export const searchWords = (raw: string) =>
   raw

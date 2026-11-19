@@ -2,7 +2,12 @@
 // Native: the query is typed in the panel itself (the header has no room for a search box), and it takes the
 // place of the chat like the canvas does; Android's back closes it.
 import { Hash, Paperclip } from 'lucide-react-native';
-import { highlightMatches, searchWords } from 'anchor/message-search';
+import {
+  applySearchSuggestion,
+  highlightMatches,
+  searchSuggestions,
+  searchWords,
+} from 'anchor/message-search';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, FlatList, Pressable, View } from 'react-native';
 import { Avatar } from '@/components/avatar';
@@ -11,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
-import { chat } from '@/lib/chat-state';
+import { chat, useChat } from '@/lib/chat-state';
 import { formatDate } from '@/lib/format-date';
 
 type Result = NonNullable<
@@ -38,6 +43,9 @@ export function SearchPanel({
   const request = useRef(0);
   const scope = guildId && wholeGuild ? { guildId } : { channelId: channel.id };
   const words = searchWords(searched);
+  const members = useChat((s) => s.members);
+  // hints for the word being typed, hidden once that text has been searched
+  const suggestions = text === query ? [] : searchSuggestions(text, guildId ? members : []);
 
   // a new query or scope starts over; older answers arriving late are dropped
   async function run(cursor: string | null = null) {
@@ -87,6 +95,24 @@ export function SearchPanel({
           onSubmitEditing={() => setQuery(text.trim())}
           autoFocus
         />
+        {suggestions.length ? (
+          <View className="border border-border bg-popover">
+            {suggestions.map((suggestion) => (
+              <Pressable
+                key={suggestion.value}
+                accessibilityRole="button"
+                accessibilityLabel={`${suggestion.label} ${suggestion.detail}`}
+                onPress={() => setText(applySearchSuggestion(text, suggestion))}
+                className="min-h-11 flex-row items-center gap-2 px-3 active:bg-accent"
+              >
+                <Text className="font-medium">{suggestion.label}</Text>
+                <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+                  {suggestion.detail}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         {guildId ? (
           <View className="flex-row gap-1" accessibilityRole="radiogroup">
             <Button
