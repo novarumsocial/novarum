@@ -7,6 +7,7 @@ import type { PublicUser } from 'anchor/public-user';
 import { dms, dmPath } from './dms.svelte';
 import { mentionsEveryone } from './utils';
 import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
+import { z } from 'zod';
 
 function initialsFor(name: string) {
   const initials = name
@@ -54,6 +55,8 @@ type AddMessageInput = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  pinned?: boolean;
+  pinnedAt?: string | Date | null;
   ephemeral?: boolean;
   thinking?: boolean;
 };
@@ -75,6 +78,7 @@ type TypingInput = {
   expiresAt: number;
 };
 
+const apiErrorSchema = z.object({ error: z.string() });
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
@@ -121,6 +125,8 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    pinned: message.pinned ?? false,
+    pinnedAt: message.pinnedAt ? new Date(message.pinnedAt) : null,
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
@@ -210,6 +216,8 @@ class ChatState {
   voiceStates = $state<Record<string, VoicePresenceInput[]>>({});
   typingByChannel = $state<Record<string, TypingInput[]>>({});
   loadingOlderByChannel = $state<Record<string, boolean>>({});
+  // newest pin first; only channels whose pins were opened
+  pinsByChannel = $state<Record<string, Message[]>>({});
   private loadedChannel: string | null = null;
   private lastTypingByChannel = new Map<string, number>();
   private nextCursorByChannel = new Map<string, number>();
@@ -254,6 +262,11 @@ class ChatState {
   // owner-only channels only take messages from the guild owner, the one who can manage channels
   get canSendInCurrentChannel() {
     return !this.currentChannel?.ownerOnly || !!this.currentServer?.canManageChannels;
+  }
+
+  // guild owners and admins pin (the same people who manage channels); in DMs everyone does
+  get canPinInCurrentChannel() {
+    return this.route.kind === 'dms' || !!this.currentServer?.canManageChannels;
   }
 
   get currentMessages() {
@@ -457,6 +470,7 @@ class ChatState {
   }
 
   removeMessage(channelId: string, messageId: string) {
+    this.removePin(channelId, messageId);
     const messages = this.messagesByChannel[channelId];
     if (!messages?.some((message) => message.id === messageId)) return;
 
@@ -474,6 +488,61 @@ class ChatState {
       channelId,
       messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
     );
+  }
+
+  /** a message was pinned: mark it and put it on top of the pins */
+  addPin(message: AddMessageInput) {
+    this.updateMessage(message.channelId, message);
+    const pins = this.pinsByChannel[message.channelId];
+    if (!pins) return;
+    this.pinsByChannel = {
+      ...this.pinsByChannel,
+      [message.channelId]: [messageFromInput(message), ...pins.filter((p) => p.id !== message.id)],
+    };
+  }
+
+  removePin(channelId: string, messageId: string) {
+    const messages = this.messagesByChannel[channelId];
+    if (messages?.some((item) => item.id === messageId && item.pinned)) {
+      this.setChannelMessages(
+        channelId,
+        messages.map((item) =>
+          item.id === messageId ? { ...item, pinned: false, pinnedAt: null } : item
+        )
+      );
+    }
+    const pins = this.pinsByChannel[channelId];
+    if (!pins?.some((item) => item.id === messageId)) return;
+    this.pinsByChannel = {
+      ...this.pinsByChannel,
+      [channelId]: pins.filter((item) => item.id !== messageId),
+    };
+  }
+
+  async loadPins(channelId: string) {
+    const result = await anchor.client.message.pins.get({ query: { channelId } });
+    if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+      console.error('Failed to load pinned messages', result.error ?? result.data);
+      throw new Error('Failed to load pinned messages');
+    }
+    this.pinsByChannel = {
+      ...this.pinsByChannel,
+      [channelId]: result.data.messages.map(messageFromInput),
+    };
+  }
+
+  async setPinned(channelId: string, messageId: string, pinned: boolean) {
+    const result = await anchor.client.message.pin.post({ channelId, messageId, pinned });
+    if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+      throw new Error(
+        apiErrorSchema.safeParse(result.error?.value).data?.error ??
+          `Failed to ${pinned ? 'pin' : 'unpin'} message`
+      );
+    }
+    if (pinned) this.addPin(result.data.message);
+    else this.removePin(channelId, messageId);
   }
 
   updateMemberStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {

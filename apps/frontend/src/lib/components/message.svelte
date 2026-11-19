@@ -16,6 +16,8 @@
     LoaderCircle,
     SquareSlash,
     EyeOff,
+    Pin,
+    PinOff,
   } from '@lucide/svelte';
   import BotBadge from './bot-badge.svelte';
   import MessageEmbed from './message-embed.svelte';
@@ -121,6 +123,20 @@
               navigator.clipboard.writeText(message.content ?? '');
             },
           },
+          ...(chat.canPinInCurrentChannel
+            ? [
+                {
+                  label: () => (message.pinned ? 'Unpin Message' : 'Pin Message'),
+                  icon: message.pinned ? PinOff : Pin,
+                  variant: 'default' as const,
+                  hideFromShift: true,
+                  onclick: () =>
+                    chat
+                      .setPinned(channelId, message.id, !message.pinned)
+                      .catch((error) => window.alert(error.message)),
+                },
+              ]
+            : []),
           // TODO: separator here
           {
             label: () => 'Copy Message Link',
@@ -325,7 +341,11 @@
             />
           </ProfileCard>
         {:else}
-          <div class="w-9 shrink-0"></div>
+          <div class="flex w-9 shrink-0 justify-center pt-1">
+            {#if message.pinned}
+              <Pin class="size-3 text-primary/70" aria-label="Pinned" />
+            {/if}
+          </div>
         {/if}
 
         <div class="min-w-0 flex-1">
@@ -353,6 +373,9 @@
               </ProfileCard>
               {#if message.author.isBot}<BotBadge class="self-center" />{/if}
               <span class="text-[11px] text-muted-foreground">{formatTime(message.timestamp)}</span>
+              {#if message.pinned}
+                <Pin class="size-3 self-center text-primary/70" aria-label="Pinned" />
+              {/if}
             </div>
           {/if}
 
