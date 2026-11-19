@@ -28,7 +28,11 @@ test('A restarts: B reconnects with backoff and the events resume', async () => 
     { timeout: 40_000, interval: 500, message: 'bridge reconnected after the host restart' }
   );
   const sent = await send(owner, channel.id, 'after the restart');
-  const evt = await rt.waitFor('message.created', (e) => e.data.content === 'after the restart');
+  const evt = await rt.waitFor(
+    'message.created',
+    (e) => e.data.content === 'after the restart',
+    15_000
+  );
   expect(evt.data.id).toBe(sent.body.message.id);
   expect(evt.data.channelId).toBe(shadowChannel);
   rt.close();

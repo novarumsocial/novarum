@@ -21,7 +21,7 @@ class IncomingCallModule : Module() {
 
     // answered on the lock screen: ask to unlock, and stop showing over the lock screen either way
     Function("unlock") {
-      val activity = appContext.currentActivity ?: return@Function
+      val activity = appContext.currentActivity ?: return@Function null
       activity.runOnUiThread {
         val keyguard = activity.getSystemService(KeyguardManager::class.java)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -43,7 +43,7 @@ class IncomingCallModule : Module() {
 
     // declined or missed: the lock screen comes back, with the app behind it
     Function("release") {
-      val activity = appContext.currentActivity ?: return@Function
+      val activity = appContext.currentActivity ?: return@Function null
       activity.runOnUiThread {
         val locked = activity.getSystemService(KeyguardManager::class.java).isKeyguardLocked
         LockScreen.showOverLockScreen(activity, false)
