@@ -76,6 +76,27 @@ export const attachmentResponseSchema = createSelectSchema(attachments, { size: 
     height: z.number().int().nullish(),
   });
 
+export const maxReactionsPerMessage = 20;
+// a reaction names the first few people who used it; the count says how many there are
+export const maxListedReactors = 10;
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+// one emoji, skin tones, flags and ZWJ sequences included, and nothing else
+export const reactionEmojiSchema = z
+  .string()
+  .max(64)
+  .regex(
+    /^(?=.*(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3))(?:\p{Extended_Pictographic}|\p{Emoji_Component})+$/u
+  )
+  .refine((emoji) => [...graphemes.segment(emoji)].length === 1, 'Must be a single emoji');
+
+export const messageReactionSchema = z.object({
+  emoji: reactionEmojiSchema,
+  count: z.number().int().positive(),
+  me: z.boolean(),
+  users: z.array(publicUserSchema).max(maxListedReactors),
+});
+
 export const messageResponseBaseSchema = createSelectSchema(messages, {
   createdAt: isoDateSchema,
 })
@@ -94,6 +115,8 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     embeds: embedsSchema.default([]).catch([]),
     components: componentsSchema.default([]).catch([]),
     interaction: messageInteractionSchema.nullish().catch(null),
+    // `me` is about whoever asked, so realtime events leave reactions out
+    reactions: z.array(messageReactionSchema).max(maxReactionsPerMessage).default([]).catch([]),
   });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {

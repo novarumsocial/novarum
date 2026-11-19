@@ -34,6 +34,8 @@ import {
 } from '../../../utils/botSchemas';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
 import { uploadQuotaExceeded } from '../../../utils/uploadQuota';
+import { reactionsFor, setReaction } from '../../message/reactions';
+import { messageReactionSchema, reactionEmojiSchema } from '../../../src/db/zod';
 
 const defaultPageSize = 50;
 const maxPageSize = 100;
@@ -51,6 +53,11 @@ const editBodySchema = z.object({
   content: z.string().max(maxMessageLength).nullable(),
   embeds: embedsSchema.optional(),
   components: componentsSchema.optional(),
+});
+const reactBodySchema = z.object({
+  messageId: z.string(),
+  emoji: reactionEmojiSchema,
+  add: z.boolean(),
 });
 const attachmentIdsSchema = z
   .array(z.string())
@@ -164,7 +171,13 @@ export const messageRoutes = new Elysia()
         ) {
           return status(409, { error: 'Nonce already used for a different message' });
         }
-        return { message: federatedMessageResponse(prior, access.channel, access.user) };
+        const reactions = await reactionsFor([prior.id], access.user.id);
+        return {
+          message: {
+            ...federatedMessageResponse(prior, access.channel, access.user),
+            reactions: reactions.get(prior.id) ?? [],
+          },
+        };
       }
 
       const attachments = await verifyPendingAttachments(
@@ -207,7 +220,7 @@ export const messageRoutes = new Elysia()
         access.channel.guildId ? pingRecipients : dmRecipients(access.channel.id)
       );
 
-      return { message: response };
+      return { message: { ...response, reactions: [] } };
     },
     {
       federatedUser: true,
@@ -286,7 +299,8 @@ export const messageRoutes = new Elysia()
         pingRecipients.filter((recipient) => !alreadyPinged.has(recipient.userId))
       );
 
-      return { message: response };
+      const reactions = await reactionsFor([updated.id], access.user.id);
+      return { message: { ...response, reactions: reactions.get(updated.id) ?? [] } };
     },
     {
       federatedUser: true,
@@ -335,6 +349,34 @@ export const messageRoutes = new Elysia()
       },
     }
   )
+  .post(
+    '/channels/:id/messages/react',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const body = reactBodySchema.safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid reaction' });
+
+      const access = await getFederatedChannelAccess(params.id, remoteUser, true);
+      if (!access.ok) return status(access.status, { error: access.error });
+
+      const reacted = await setReaction({
+        ...body.data,
+        channel: access.channel,
+        user: access.user,
+        server,
+      });
+      if (!reacted.ok) return status(reacted.status, { error: reacted.error });
+      return { reactions: reacted.reactions };
+    },
+    {
+      federatedUser: true,
+      response: {
+        200: z.object({ reactions: z.array(messageReactionSchema) }),
+        ...federationErrors,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
   // one page of a channel's messages, oldest first; keep asking with `nextCursor` for the rest
   .post(
     '/channels/:id/messages',
@@ -364,11 +406,16 @@ export const messageRoutes = new Elysia()
       });
       const page = found.slice(0, limit.data);
       const lastMessage = page.at(-1);
+      const reactions = await reactionsFor(
+        page.map((message) => message.id),
+        access.user.id
+      );
 
       return {
-        messages: page.map((message) =>
-          federatedMessageResponse(message, access.channel, message.author)
-        ),
+        messages: page.map((message) => ({
+          ...federatedMessageResponse(message, access.channel, message.author),
+          reactions: reactions.get(message.id) ?? [],
+        })),
         nextCursor:
           found.length > limit.data && lastMessage ? encodeMessageCursor(lastMessage) : null,
       };

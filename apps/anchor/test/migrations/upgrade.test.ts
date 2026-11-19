@@ -317,6 +317,30 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
     },
   },
+  '20261118222719_message_reactions': {
+    check: async (url) => {
+      // existing messages start without reactions and can get them, once per user and emoji
+      expect(await rows(url, `SELECT 1 FROM message_reaction`)).toHaveLength(0);
+      await query(
+        url,
+        `INSERT INTO "user" (id, username, "homeserverName", "isBot", "createdAt", "updatedAt") VALUES ('u5', 'erin', 'localhost', false, now(), now())`
+      );
+      await query(
+        url,
+        `INSERT INTO message_reaction ("messageId", "userId", emoji) VALUES ('m1', 'u2', '👍'), ('m1', 'u5', '👍'), ('m5', 'u1', '🎉')`
+      );
+      expect(
+        await fails(
+          url,
+          `INSERT INTO message_reaction ("messageId", "userId", emoji) VALUES ('m1', 'u2', '👍')`
+        )
+      ).toBe(true);
+      // reactions go with their message and their user
+      await query(url, `DELETE FROM message WHERE id = 'm5'`);
+      await query(url, `DELETE FROM "user" WHERE id = 'u5'`);
+      expect(await rows(url, `SELECT "userId" FROM message_reaction`)).toEqual([{ userId: 'u2' }]);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

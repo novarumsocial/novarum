@@ -329,6 +329,35 @@ export const messagePings = pgTable(
   ]
 );
 
+export const messageReactions = pgTable(
+  'message_reaction',
+  {
+    messageId: text('messageId')
+      .notNull()
+      .references(() => messages.id, {
+        onDelete: 'cascade',
+      }),
+
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, {
+        onDelete: 'cascade',
+      }),
+
+    emoji: text('emoji').notNull(),
+
+    createdAt: date('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'message_reaction_pkey',
+      columns: [table.messageId, table.emoji, table.userId],
+    }),
+
+    index('message_reaction_userId_idx').on(table.userId),
+  ]
+);
+
 export const channelReadStates = pgTable(
   'channel_read_state',
   {

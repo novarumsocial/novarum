@@ -78,9 +78,10 @@ function sample(schema: any): any {
       if (schema.format === 'uri') return 'https://example.test/';
       if (schema.format === 'binary')
         return new File([new Uint8Array([1, 2, 3])], 'a.png', { type: 'image/png' });
-      const text = ['abcdef', '123456', '#aabbcc', 'ab'.repeat(12)].find(
+      // patterns can use unicode property escapes (\p{...}), like the one a reaction emoji has
+      const text = ['abcdef', '123456', '#aabbcc', 'ab'.repeat(12), '👍'].find(
         (s) =>
-          (!schema.pattern || new RegExp(schema.pattern).test(s)) &&
+          (!schema.pattern || new RegExp(schema.pattern, 'u').test(s)) &&
           s.length >= (schema.minLength ?? 0) &&
           s.length <= (schema.maxLength ?? 1e9)
       );
