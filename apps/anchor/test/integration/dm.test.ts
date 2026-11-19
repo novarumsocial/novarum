@@ -539,6 +539,17 @@ describe('group DMs', () => {
     expect((await call(c, 'POST', `/dm/${group.id}/leave`)).status).toBe(404);
     expect((await call(c, 'PATCH', `/dm/${group.id}`, { name: 'x' })).status).toBe(404);
   });
+
+  test('creating groups and adding members is rate limited per user', async () => {
+    const { a, b, c } = await trio();
+    const group = (await create(a, [b])).body;
+    const addB = (user: Actor) =>
+      call(user, 'POST', `/dm/${group.id}/members`, { userIds: [b.user.id] });
+    for (let i = 1; i < 20; i++) expect((await addB(a)).status).toBe(409);
+    expect((await addB(a)).status).toBe(429);
+    expect((await create(a, [c])).status).toBe(429);
+    expect((await create(b, [a])).status).toBe(200);
+  });
 });
 
 test('max_group_members caps a group, the creator included', async () => {
