@@ -110,7 +110,8 @@
               placeholder="Members' names"
               autocomplete="off"
             />
-            <Button type="submit" disabled={busy || name.trim() === (group.name ?? '')}>Save</Button>
+            <Button type="submit" disabled={busy || name.trim() === (group.name ?? '')}>Save</Button
+            >
           </div>
         </div>
       </form>
@@ -152,7 +153,11 @@
       </div>
 
       {#if message}
-        <p class="text-xs" class:text-destructive={!message.ok} class:text-muted-foreground={message.ok}>
+        <p
+          class="text-xs"
+          class:text-destructive={!message.ok}
+          class:text-muted-foreground={message.ok}
+        >
           {message.text}
         </p>
       {/if}

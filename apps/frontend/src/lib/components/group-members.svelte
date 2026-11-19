@@ -52,7 +52,13 @@
       </Button>
     {/if}
     <span class="flex-1"></span>
-    <Button variant="ghost" size="icon" aria-label="Leave group" title="Leave group" onclick={leave}>
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Leave group"
+      title="Leave group"
+      onclick={leave}
+    >
       <LogOut class="size-4" />
     </Button>
   </div>
@@ -68,7 +74,11 @@
         {@const self = member.userId === me?.id}
         <ContextMenu.Root>
           <ContextMenu.Trigger>
-            <ProfileCard user={member} {onCall} class="group flex w-full items-center gap-2 px-1 py-1">
+            <ProfileCard
+              user={member}
+              {onCall}
+              class="group flex w-full items-center gap-2 px-1 py-1"
+            >
               <div class="relative">
                 <Avatar
                   src={member.avatarUrl}
