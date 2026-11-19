@@ -260,8 +260,8 @@ function configureAutoUpdater() {
 }
 
 // checks for an update before the main window opens and installs it right away,
-// returns true when the app is about to restart into the new version. the splash stays
-// open until the main window is ready, so there's never a moment with nothing on screen
+// returns true when the app is about to restart into the new version. otherwise the splash
+// stays up while the main window boots hidden, skipping the frontend's own loading screen
 async function updateOnLaunch() {
   splash = new BrowserWindow({
     width: 300,
@@ -293,6 +293,13 @@ async function updateOnLaunch() {
     console.error('Launch update failed', error);
   }
   return false;
+}
+
+function handOffFromSplash() {
+  if (!splash) return;
+  mainWindow?.show();
+  splash.destroy();
+  splash = undefined;
 }
 
 function createWindow() {
@@ -334,9 +341,7 @@ function createWindow() {
   });
 
   window.once('ready-to-show', () => {
-    if (!launchHidden()) window.show();
-    splash?.destroy();
-    splash = undefined;
+    if (!launchHidden() && !splash) window.show();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInternalUrl(url)) openExternalUrl(url);
@@ -393,6 +398,7 @@ app.whenReady().then(async () => {
     if (update.status === 'downloaded') installUpdate();
   });
 
+  ipcMain.on('app:ready', handOffFromSplash);
   ipcMain.handle('version:get', () => app.getVersion());
   ipcMain.handle('badge:set', (_event, count: number) => {
     app.setBadgeCount(Math.max(0, Math.floor(Number(count)) || 0));
@@ -413,6 +419,8 @@ app.whenReady().then(async () => {
 
   const window = (mainWindow = createWindow());
   createTray(window);
+  // in case the frontend never reports ready, don't leave the user staring at the splash
+  if (splash) setTimeout(handOffFromSplash, 10_000);
 
   app.on('activate', () => {
     const window = BrowserWindow.getAllWindows()[0] ?? createWindow();

@@ -31,6 +31,8 @@ export interface ElectronAPI {
   installUpdate(): Promise<void>;
   /** Subscribes to update status changes; returns an unsubscribe function. */
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
+  /** Tells the main process the app has booted, so it can swap the launch updater for this window. */
+  appReady(): void;
   getVersion(): Promise<string>;
   /** Sets the dock / launcher unread badge; 0 clears it. */
   setBadgeCount(count: number): Promise<void>;

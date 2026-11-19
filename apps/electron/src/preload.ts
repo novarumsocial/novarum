@@ -50,6 +50,7 @@ const api: ElectronAPI = {
     ipcRenderer.on('update:status', listener);
     return () => ipcRenderer.off('update:status', listener);
   },
+  appReady: () => ipcRenderer.send('app:ready'),
   getVersion: () => ipcRenderer.invoke('version:get'),
   setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
   platform: process.platform,
