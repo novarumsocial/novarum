@@ -260,11 +260,12 @@ function configureAutoUpdater() {
 }
 
 // checks for an update before the main window opens and installs it right away,
-// returns true when the app is about to restart into the new version
+// returns true when the app is about to restart into the new version. the splash stays
+// open until the main window is ready, so there's never a moment with nothing on screen
 async function updateOnLaunch() {
   splash = new BrowserWindow({
     width: 300,
-    height: 340,
+    height: 320,
     frame: false,
     resizable: false,
     maximizable: false,
@@ -278,7 +279,6 @@ async function updateOnLaunch() {
       sandbox: true,
     },
   });
-  splash.once('ready-to-show', () => splash?.show());
   void splash.loadURL(`${appOrigin}/updater`).catch(() => {});
 
   try {
@@ -292,8 +292,6 @@ async function updateOnLaunch() {
   } catch (error) {
     console.error('Launch update failed', error);
   }
-  splash.destroy();
-  splash = undefined;
   return false;
 }
 
@@ -337,6 +335,8 @@ function createWindow() {
 
   window.once('ready-to-show', () => {
     if (!launchHidden()) window.show();
+    splash?.destroy();
+    splash = undefined;
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInternalUrl(url)) openExternalUrl(url);
@@ -377,7 +377,11 @@ app.whenReady().then(async () => {
     return next;
   });
 
-  ipcMain.handle('update:status', () => update);
+  ipcMain.handle('update:status', (event) => {
+    // the splash asks once it has painted in the user's theme, which avoids a flash on first paint
+    if (event.sender === splash?.webContents) splash.show();
+    return update;
+  });
   ipcMain.handle('update:check', async () => {
     if (app.isPackaged) await checkForUpdates();
     return update;
