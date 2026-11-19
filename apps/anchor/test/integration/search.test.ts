@@ -36,7 +36,7 @@ const search = (user: Pick<Actor, 'fetch'>, params: Record<string, string | numb
   call(
     user,
     'GET',
-    `/message/search?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, `${v}`]))}`
+    `/message/search?${new URLSearchParams(Object.entries(params).map(([k, v]): [string, string] => [k, `${v}`]))}`
   );
 const contents = (res: { body: any }) => res.body.messages.map((m: any) => m.content);
 

@@ -375,7 +375,7 @@ describe('upgrade by booting anchor', () => {
       const anchor = await spawnAnchor({ name: 'upgrade', db: url });
       try {
         expect(await recordedMigrations(url)).toHaveLength(migrationNames.length);
-        expect(await query(url, `SELECT 1 FROM message`)).toHaveLength(6);
+        expect(await query(url, `SELECT 1 FROM message`)).toHaveLength(7);
       } finally {
         await anchor.destroy();
       }
