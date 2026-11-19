@@ -10,8 +10,8 @@ import {
   hostAddBot,
   hostRemoveBot,
   publicBotProfile,
-  removeMember,
 } from '../../bots/membership';
+import { hostRemoveMember } from '../../guilds/membership';
 import { getFederatedGuildAccess } from '../access';
 import { federationAuth } from '../plugin';
 import { federationErrors, successResponseSchema } from '../schemas';
@@ -111,7 +111,7 @@ export const bots = new Elysia()
       if (!access.ok) return status(access.status, { error: access.error });
       if (!access.user.isBot) return status(403, { error: 'Only bots can leave this way' });
 
-      await removeMember(server, params.id, access.user);
+      await hostRemoveMember(server, params.id, access.user, undefined, false);
       return { success: true };
     },
     { federatedUser: true, response: { 200: successResponseSchema, ...errors } }

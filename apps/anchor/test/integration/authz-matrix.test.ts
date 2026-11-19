@@ -39,6 +39,13 @@ async function guildFixture() {
     memberBot,
     // removed by the owner cell of DELETE /guilds/{id}/bots/{userId}, so re-added before every cell
     removableBot: memberBot.bot,
+    // a fresh member (or banned user) for every cell of the kick, ban and unban routes
+    victimId: '',
+    newVictim: async () => {
+      const victim = await signup(anchor.url);
+      await join(owner, guild.id, victim);
+      return (fx.victimId = victim.user.id);
+    },
     refreshCode,
     owner,
     guild,
@@ -231,6 +238,46 @@ const guildRoutes: Route[] = [
     path: () => '/message/delete',
     body: async (fx) => ({ channelId: fx.channel.id, messageId: (await fx.ownerMessage()).id }),
     expected: [401, 403, 403, 200],
+  },
+  {
+    key: 'DELETE /guilds/{id}/members/{userId}',
+    method: 'DELETE',
+    path: (fx) => `/guilds/${fx.guild.id}/members/${fx.victimId}`,
+    body: async (fx) => void (await fx.newVictim()),
+    expected: [401, 404, 403, 200],
+  },
+  {
+    key: 'GET /guilds/{id}/bans',
+    method: 'GET',
+    path: (fx) => `/guilds/${fx.guild.id}/bans`,
+    expected: [401, 404, 403, 200],
+  },
+  {
+    key: 'PUT /guilds/{id}/bans/{userId}',
+    method: 'PUT',
+    path: (fx) => `/guilds/${fx.guild.id}/bans/${fx.victimId}`,
+    body: async (fx) => {
+      await fx.newVictim();
+      return { reason: 'spam' };
+    },
+    expected: [401, 404, 403, 200],
+  },
+  {
+    key: 'DELETE /guilds/{id}/bans/{userId}',
+    method: 'DELETE',
+    path: (fx) => `/guilds/${fx.guild.id}/bans/${fx.victimId}`,
+    body: async (fx) => {
+      await call(fx.owner, 'PUT', `/guilds/${fx.guild.id}/bans/${await fx.newVictim()}`, {});
+      return undefined;
+    },
+    expected: [401, 404, 403, 200],
+  },
+  // last: as the MEMBER bot this takes the bot out of the guild
+  {
+    key: 'POST /guilds/{id}/leave',
+    method: 'POST',
+    path: (fx) => `/guilds/${fx.guild.id}/leave`,
+    expected: [401, 404, 200, 400],
   },
 ];
 

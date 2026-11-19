@@ -7,6 +7,7 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { ensureFederatedGuildRealtimeBridge } from '../../utils/federationRealtime';
 import { db, guildMembers, guilds, channels as dbChannels } from '../../src/db';
+import { isBanned } from '../guilds/membership';
 import { and, eq, sql } from 'drizzle-orm';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { z } from 'zod';
@@ -122,8 +123,8 @@ export const invite = new Elysia({ prefix: '/invite', tags: ['Invite'] })
 
         if (!response.ok) {
           const remoteError = remoteErrorSchema.safeParse(data);
-          const remoteStatus = [400, 401, 404, 500].includes(response.status)
-            ? (response.status as 400 | 401 | 404 | 500)
+          const remoteStatus = [400, 401, 403, 404, 500].includes(response.status)
+            ? (response.status as 400 | 401 | 403 | 404 | 500)
             : 502;
           return status(
             remoteStatus,
@@ -173,6 +174,10 @@ export const invite = new Elysia({ prefix: '/invite', tags: ['Invite'] })
       });
       if (!guild) {
         return status(404, { error: 'Guild not found' });
+      }
+
+      if (await isBanned(guild.id, session.userId)) {
+        return status(403, { error: 'You are banned from this guild' });
       }
 
       const membership = await db.query.guildMembers.findFirst({
@@ -231,6 +236,7 @@ export const invite = new Elysia({ prefix: '/invite', tags: ['Invite'] })
         200: acceptedInviteResponseSchema,
         400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
         500: genericResponseErrorSchema,
         502: genericResponseErrorSchema,

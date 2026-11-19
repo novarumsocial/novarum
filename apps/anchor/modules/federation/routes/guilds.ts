@@ -1,10 +1,14 @@
 import Elysia from 'elysia';
 import { z } from 'zod';
 import { db } from '../../../src/db';
+import { getConfig } from '../../../utils/config';
+import { makeFederatedGuildId } from '../../../utils/federationIds';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { isMessageAfter } from '../../../utils/messageCursor';
+import { hostRemoveMember, removeMember } from '../../guilds/membership';
+import { getFederatedGuildAccess } from '../access';
 import { federationAuth } from '../plugin';
-import { federationErrors } from '../schemas';
+import { federationErrors, successResponseSchema } from '../schemas';
 
 // for each channel: where the user stopped reading (null = never read anything)
 const unreadMentionsBodySchema = z.object({
@@ -18,8 +22,64 @@ const unreadMentionsBodySchema = z.object({
     .max(1000),
 });
 
+const removedBodySchema = z.object({
+  guildId: z.string().min(1),
+  reason: z.enum(['kicked', 'banned']).optional(),
+});
+
 export const guilds = new Elysia()
   .use(federationAuth)
+  // a user of the remote homeserver leaves one of our guilds
+  .post(
+    '/guilds/:id/leave',
+    async ({ params, remoteUser, server, status }) => {
+      const access = await getFederatedGuildAccess(params.id, remoteUser);
+      if (!access.ok) return status(access.status, { error: access.error });
+      // owners are always local, but don't take that on trust
+      if (access.guild.ownerId === access.user.id) {
+        return status(400, { error: "The owner can't leave the guild" });
+      }
+
+      await hostRemoveMember(server, params.id, access.user, undefined, false);
+      return { success: true };
+    },
+    {
+      federatedUser: true,
+      response: {
+        200: successResponseSchema,
+        ...federationErrors,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  // the host of a guild kicked or banned one of our users: we drop our copy of it for them.
+  // The origin can only do that for guilds it hosts itself.
+  .post(
+    '/members/:username/removed',
+    async ({ params, origin, payload, server, status }) => {
+      const body = removedBodySchema.safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid guild' });
+      const user = await db.query.users.findFirst({
+        where: { username: params.username, homeserver: getConfig().server.homeserver },
+      });
+      if (!user) return status(404, { error: 'User not found' });
+
+      const guildId = makeFederatedGuildId(origin.homeserver, body.data.guildId);
+      if (await db.query.guildMembers.findFirst({ where: { guildId, userId: user.id } })) {
+        await removeMember(server, guildId, user, body.data.reason);
+      }
+      return { success: true };
+    },
+    {
+      federated: true,
+      response: {
+        200: successResponseSchema,
+        ...federationErrors,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
   // how many unread mentions the user has in channels of our guilds
   .post(
     '/unread-mentions',

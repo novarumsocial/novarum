@@ -24,7 +24,7 @@ import { publishRealtime } from '../../utils/publishRealtime';
 import { randomString } from '../../utils/randomString';
 import { rateLimiter } from '../../utils/rateLimit';
 import { guildChannels, persistFederatedInviteSnapshot } from '../invite/services';
-import { unsubscribeUserFromGuild } from '../realtime/services';
+import { hostRemoveMember, isBanned, removeMember } from '../guilds/membership';
 
 // Adding bots to guilds and taking them out again. The guild's host decides who may add a bot;
 // the bot's homeserver decides whether the bot may join (public, or asked for by its owner).
@@ -171,6 +171,7 @@ export async function hostAddBot(
       return fail(403, 'This bot is private');
     }
     botUser = local.user;
+    if (await isBanned(guild.id, botUser.id)) return fail(403, 'This bot is banned from the guild');
     if (await isMember(guild.id, botUser.id)) return fail(409, 'This bot is already in the guild');
     await addMember(guild.id, botUser.id, role);
   } else {
@@ -181,6 +182,9 @@ export async function hostAddBot(
     // if the bot's homeserver refuses.
     const placeholder = await remoteUserRow({ ...bot, homeserver: remote.homeserver });
     if (!placeholder.ok) return placeholder;
+    if (await isBanned(guild.id, placeholder.user.id)) {
+      return fail(403, 'This bot is banned from the guild');
+    }
     if (await isMember(guild.id, placeholder.user.id)) {
       return fail(409, 'This bot is already in the guild');
     }
@@ -390,46 +394,8 @@ export async function hostRemoveBot(
     return fail(403, 'Forbidden');
   }
 
-  await removeMember(server, guild.id, member.user);
-  if (!ours(member.user.homeserver)) {
-    // the bot's homeserver drops its copy of the guild; it can't refuse, so don't wait on it
-    void postSignedFederationJson(
-      member.user.homeserver,
-      `/federation/bots/${encodeURIComponent(member.user.username)}/leave`,
-      { guildId: guild.id }
-    ).catch(() => null);
-  }
+  await hostRemoveMember(server, guild.id, member.user);
   return { ok: true };
-}
-
-/** Deletes a membership and tells everyone: the guild that the member left, the member that it is gone. */
-export async function removeMember(server: Server | null, guildId: string, user: User) {
-  await db
-    .delete(guildMembers)
-    .where(and(eq(guildMembers.guildId, guildId), eq(guildMembers.userId, user.id)));
-  unsubscribeUserFromGuild(user.id, guildId);
-  if (!server) return;
-  if (!parseFederatedGuildId(guildId)) {
-    publishRealtime(server, `guildEvents:${guildId}`, {
-      type: 'member.left',
-      data: { guildId, userId: user.id },
-    });
-  }
-  publishRealtime(server, `userEvents:${user.id}`, { type: 'guild.deleted', data: { guildId } });
-}
-
-/** On the bot's homeserver: one of our bots leaves a guild, wherever it is hosted. */
-export async function leaveGuild(server: Server | null, bot: User, guildId: string) {
-  const federatedGuild = parseFederatedGuildId(guildId);
-  if (federatedGuild) {
-    // best effort: we drop the guild either way, and the host won't send us its events anymore
-    await postSignedFederationJson(
-      federatedGuild.homeserver,
-      `/federation/guilds/${encodeURIComponent(federatedGuild.id)}/bots/leave`,
-      { user: federationUserPayload({ user: bot }) }
-    ).catch(() => null);
-  }
-  await removeMember(server, guildId, bot);
 }
 
 /** On the bot's homeserver: the host of `guildId` took our bot out of it. */

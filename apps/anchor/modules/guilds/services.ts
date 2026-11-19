@@ -28,18 +28,30 @@ import { and, eq, sql } from 'drizzle-orm';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import {
   channelResponseSchema,
+  guildBanCreateSchema,
+  guildBanResponseSchema,
   guildCreateSchema,
   guildInviteResponseSchema as inviteSchema,
   guildResponseSchema as guildSchema,
 } from '../../src/db/zod';
 import { processImage } from '../../utils/optimizeWebp';
+import { banMember, kickMember, leaveGuild, listBans, unbanMember } from './membership';
 
 const maxAvatarSize = getConfig().files.max_avatar_size * 1024 * 1024;
 const successResponseSchema = z.object({ success: z.boolean() });
+const moderationResponses = {
+  200: successResponseSchema,
+  400: genericResponseErrorSchema,
+  401: genericResponseErrorSchema,
+  403: genericResponseErrorSchema,
+  404: genericResponseErrorSchema,
+};
 const guildListResponseSchema = z.object({
   guilds: z.array(
     guildSchema.pick({ id: true, name: true, avatarUrl: true, description: true }).extend({
       down: z.boolean(),
+      // only the owner can't leave; our copies of remote guilds name the joiner as owner, so never there
+      owner: z.boolean(),
       canManageChannels: z.boolean(),
       channels: z.array(
         channelResponseSchema.extend({
@@ -340,6 +352,7 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
           id,
           name: guild.name as string,
           down: guild.extAnchorDown ?? false,
+          owner: !parseFederatedGuildId(id) && guild.ownerId === session.userId,
           canManageChannels:
             !parseFederatedGuildId(id) && (await canManageGuild(guild, session.userId)),
           avatarUrl: guild.avatarUrl as string | null,
@@ -499,6 +512,62 @@ export const guilds = new Elysia({ prefix: '/guilds', tags: ['Guilds'] })
         500: genericResponseErrorSchema,
       },
     }
+  )
+  .post(
+    '/:id/leave',
+    async ({ params, server, session, status }) => {
+      const left = await leaveGuild(server, session.user, params.id);
+      if (!left.ok) return status(left.status, { error: left.error });
+      return { success: true };
+    },
+    { response: moderationResponses }
+  )
+  .delete(
+    '/:id/members/:userId',
+    async ({ params, server, session, status }) => {
+      const kicked = await kickMember(server, params.id, session.userId, params.userId);
+      if (!kicked.ok) return status(kicked.status, { error: kicked.error });
+      return { success: true };
+    },
+    { response: moderationResponses }
+  )
+  .get(
+    '/:id/bans',
+    async ({ params, session, status }) => {
+      const result = await listBans(params.id, session.userId);
+      if (!result.ok) return status(result.status, { error: result.error });
+      return { bans: result.bans };
+    },
+    {
+      response: {
+        ...moderationResponses,
+        200: z.object({ bans: z.array(guildBanResponseSchema) }),
+      },
+    }
+  )
+  .put(
+    '/:id/bans/:userId',
+    async ({ body, params, server, session, status }) => {
+      const banned = await banMember(
+        server,
+        params.id,
+        session.userId,
+        params.userId,
+        body?.reason || null
+      );
+      if (!banned.ok) return status(banned.status, { error: banned.error });
+      return { success: true };
+    },
+    { body: guildBanCreateSchema.optional(), response: moderationResponses }
+  )
+  .delete(
+    '/:id/bans/:userId',
+    async ({ params, session, status }) => {
+      const unbanned = await unbanMember(params.id, session.userId, params.userId);
+      if (!unbanned.ok) return status(unbanned.status, { error: unbanned.error });
+      return { success: true };
+    },
+    { response: moderationResponses }
   )
   .patch(
     '/order',

@@ -12,6 +12,8 @@ import { federationUserPayload } from '../../utils/federationPayload';
 import { searchEmojis } from '../../utils/emojiSearch';
 import { qualifyEmojiUnicode } from '../../utils/emojiWriter';
 import {
+  getVoicePresence,
+  livekitServiceClient,
   removeVoicePresence,
   setVoicePresence,
   voicePresenceForChannels,
@@ -89,10 +91,42 @@ export function closeSessionSockets(matches: (session: SessionWithUser) => boole
   }
 }
 
-// someone left (or was removed from) a guild: their open sockets stop getting its events
-export function unsubscribeUserFromGuild(userId: string, guildId: string) {
+// someone left (or was removed from) a guild: their open sockets stop getting its events and
+// canvases, and they drop out of its calls
+export async function unsubscribeUserFromGuild(
+  server: { publish(topic: string, data: string): unknown } | null,
+  user: CallUser,
+  guildId: string,
+  channelIds: string[]
+) {
   for (const socket of openSockets.values()) {
-    if (socket.session.userId === userId) socket.unsubscribe(`guildEvents:${guildId}`);
+    if (socket.session.userId !== user.id) continue;
+    socket.unsubscribe(`guildEvents:${guildId}`);
+    for (const channelId of channelIds) socket.unsubscribe(canvasTopic(channelId));
+  }
+
+  const voice = getVoicePresence(user.id);
+  if (voice?.guildId === guildId) {
+    voiceSocketByUser.delete(user.id);
+    removeVoicePresence(user.id);
+    void livekitServiceClient
+      .removeParticipant(`voice:${voice.channelId}`, user.id)
+      .catch(() => null);
+    if (server) {
+      await publishToChannel(
+        server,
+        { id: voice.channelId, guildId },
+        {
+          type: 'voice.state.changed',
+          data: { ...voice, connected: false },
+        }
+      );
+    }
+  }
+  const federatedVoice = federatedVoiceChannelsByUser.get(user.id);
+  if (federatedVoice && channelIds.includes(federatedVoice)) {
+    voiceSocketByUser.delete(user.id);
+    leaveFederatedVoice({ userId: user.id, user });
   }
 }
 
@@ -474,7 +508,12 @@ async function publishVoiceState(
   ws.send(JSON.stringify(event));
 }
 
-function leaveFederatedVoice(session: SessionWithUser, exceptChannelId?: string) {
+type CallUser = SessionWithUser['user'];
+
+function leaveFederatedVoice(
+  session: { userId: string; user: CallUser },
+  exceptChannelId?: string
+) {
   const channelId = federatedVoiceChannelsByUser.get(session.userId);
   if (!channelId || channelId === exceptChannelId) return;
 
