@@ -207,6 +207,18 @@ const guildRoutes: Route[] = [
     expected: [401, 403, 200, 200],
   },
   {
+    key: 'GET /message/search',
+    method: 'GET',
+    path: (fx) => `/message/search?guildId=${fx.guild.id}&q=member`,
+    expected: [401, 403, 200, 200],
+  },
+  {
+    key: 'GET /message/search (channel)',
+    method: 'GET',
+    path: (fx) => `/message/search?channelId=${fx.channel.id}&q=member`,
+    expected: [401, 403, 200, 200],
+  },
+  {
     key: 'POST /message/send',
     method: 'POST',
     path: () => '/message/send',
@@ -302,7 +314,7 @@ describe('guild routes: anonymous / non-member / member / owner', () => {
     const keys = Object.entries(doc.paths)
       .filter(([path]) => /^\/(guilds|channel|message|invite)\//.test(path))
       .flatMap(([path, methods]) => Object.keys(methods).map((m) => `${m.toUpperCase()} ${path}`));
-    const known = new Set([...guildRoutes.map((r) => r.key), ...covered]);
+    const known = new Set([...guildRoutes.map((r) => r.key.replace(/ \(.*\)$/, '')), ...covered]);
     expect(keys.filter((k) => !known.has(k))).toEqual([]);
     expect([...known].filter((k) => !keys.includes(k))).toEqual([]);
   });
@@ -369,6 +381,11 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
         method: 'GET',
         path: `/message/list?channelId=${fx.dmId}&cursor=0&amount=20`,
       }),
+      expected: [401, 403, 200, 200],
+    },
+    {
+      name: 'GET /message/search',
+      request: (fx) => ({ method: 'GET', path: `/message/search?channelId=${fx.dmId}&q=hello` }),
       expected: [401, 403, 200, 200],
     },
     {

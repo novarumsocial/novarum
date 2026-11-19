@@ -1,14 +1,18 @@
 import Elysia, { t } from 'elysia';
 import { requestSession } from '../auth/provider';
 import { publishToChannel } from '../../utils/publishRealtime';
-import { parseFederatedChannelId } from '../../utils/federationIds';
+import {
+  makeFederatedChannelId,
+  parseFederatedChannelId,
+  parseFederatedGuildId,
+} from '../../utils/federationIds';
 import { callRemote, federationChannelPath, passThrough } from '../../utils/federationClient';
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles, mentionsEveryone } from '../../utils/mentions';
 import { canAccessChannel, canSendInChannel } from '../../utils/channelAccess';
 import { dmRecipients, notifyInBackground } from '../../utils/notify';
-import { db } from '../../src/db';
+import { db, messages as messagesTable } from '../../src/db';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from './store';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -17,11 +21,24 @@ import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
 import { messageExtras } from '../../utils/messagePayload';
 import { componentsSchema, embedsSchema } from '../../utils/botSchemas';
+import { messageCursorSchema } from '../../utils/messageCursor';
+import { maxSearchQueryLength, parseSearchQuery } from '../../utils/messageSearch';
+import { and, count, eq, gte } from 'drizzle-orm';
+import {
+  allowSearch,
+  defaultSearchPageSize,
+  isEmptySearch,
+  maxSearchPageSize,
+  searchMessages,
+  searchResponseSchema,
+} from './search';
 
 export const maxMessageLength = 4000;
 // a remote channel is walked page by page on every list, so a host that never stops paging is cut off here
 const maxRemoteMessagePages = 100;
 const remotePageSize = 100;
+// how far back jumping to a message (`until`) loads a channel in one go
+const maxJumpMessages = 1000;
 
 const messageSchema = messageResponseBaseSchema.extend({
   guildId: z.string().nullable(),
@@ -48,7 +65,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
   .get(
     '/list',
     async ({ query, session, status }) => {
-      const { channelId, amount, cursor } = query;
+      const { channelId, amount, cursor, until } = query;
 
       const channel = await db.query.channels.findFirst({
         where: { id: channelId },
@@ -92,6 +109,24 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         };
       }
 
+      // jumping to an older message loads everything from the newest one down to it, plus a bit
+      const target =
+        until && cursor === 0
+          ? await db.query.messages.findFirst({ where: { id: until, channelId } })
+          : null;
+      const [newer] = target
+        ? await db
+            .select({ count: count() })
+            .from(messagesTable)
+            .where(
+              and(
+                eq(messagesTable.channelId, channelId),
+                gte(messagesTable.createdAt, target.createdAt)
+              )
+            )
+        : [];
+      const limit = newer ? Math.min(Math.max(amount, newer.count + 20), maxJumpMessages) : amount;
+
       const messages = await db.query.messages.findMany({
         where: { channelId },
         orderBy: { createdAt: 'desc' },
@@ -99,7 +134,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
           author: true,
           attachments: true,
         },
-        limit: amount,
+        limit,
         offset: cursor,
       });
       messages.reverse();
@@ -134,12 +169,126 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         channelId: t.String(),
         cursor: t.Integer({ minimum: 0 }),
         amount: t.Integer({ minimum: 20, maximum: 100, default: 50 }),
+        until: t.Optional(t.String()),
       }),
       response: {
         200: messageListResponseSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
+  .get(
+    '/search',
+    async ({ query, session, status }) => {
+      if (!allowSearch(session.userId)) {
+        return status(429, { error: 'Too many searches, try again in a minute' });
+      }
+      const parsed = parseSearchQuery(query.q);
+      if (!parsed.ok) return status(400, { error: parsed.error });
+      if (isEmptySearch(parsed.query)) return status(400, { error: 'Nothing to search for' });
+      if (!query.channelId === !query.guildId) {
+        return status(400, { error: 'Search either a channel or a guild' });
+      }
+      const remoteBody = { q: query.q, cursor: query.cursor, limit: query.limit };
+
+      if (query.channelId) {
+        const channel = await db.query.channels.findFirst({ where: { id: query.channelId } });
+        if (!channel) return status(404, { error: 'Channel not found' });
+        if (!(await canAccessChannel(channel, session.userId))) {
+          return status(403, { error: 'Forbidden' });
+        }
+
+        const federatedChannel = parseFederatedChannelId(channel.id);
+        if (federatedChannel) {
+          const found = await callRemote(
+            federatedChannel.homeserver,
+            federationChannelPath(federatedChannel, 'messages/search'),
+            session,
+            remoteBody,
+            remoteSearchOptions
+          );
+          if (!found.ok) return status(found.status, found.error);
+          return {
+            ...found.data,
+            messages: found.data.messages.map((message) => ({
+              ...mapFederatedMessage(message, channel.id, channel.guildId),
+              channelName: channel.name,
+            })),
+          };
+        }
+
+        const cursor = messageCursorSchema.safeParse(query.cursor);
+        if (!cursor.success) return status(400, { error: 'Invalid search cursor' });
+        return searchMessages([channel.id], parsed.query, cursor.data, query.limit);
+      }
+
+      const guildId = query.guildId!;
+      const membership = await db.query.guildMembers.findFirst({
+        where: { guildId, userId: session.userId },
+      });
+      if (!membership) {
+        const guild = await db.query.guilds.findFirst({ where: { id: guildId } });
+        return guild
+          ? status(403, { error: 'Forbidden' })
+          : status(404, { error: 'Guild not found' });
+      }
+
+      // our copy of a federated guild has no messages: its host searches and checks access
+      const federatedGuild = parseFederatedGuildId(guildId);
+      if (federatedGuild) {
+        const found = await callRemote(
+          federatedGuild.homeserver,
+          `/federation/guilds/${encodeURIComponent(federatedGuild.id)}/messages/search`,
+          session,
+          remoteBody,
+          remoteSearchOptions
+        );
+        if (!found.ok) return status(found.status, found.error);
+        return {
+          ...found.data,
+          messages: found.data.messages.map((message) => ({
+            ...mapFederatedMessage(
+              message,
+              makeFederatedChannelId(federatedGuild.homeserver, message.channelId),
+              guildId
+            ),
+            channelName: message.channelName,
+          })),
+        };
+      }
+
+      const cursor = messageCursorSchema.safeParse(query.cursor);
+      if (!cursor.success) return status(400, { error: 'Invalid search cursor' });
+      const channels = await db.query.channels.findMany({ where: { guildId } });
+      return searchMessages(
+        channels.map((channel) => channel.id),
+        parsed.query,
+        cursor.data,
+        query.limit
+      );
+    },
+    {
+      query: t.Object({
+        q: t.String({ maxLength: maxSearchQueryLength }),
+        channelId: t.Optional(t.String()),
+        guildId: t.Optional(t.String()),
+        cursor: t.Optional(t.String({ maxLength: 512 })),
+        limit: t.Integer({
+          minimum: 1,
+          maximum: maxSearchPageSize,
+          default: defaultSearchPageSize,
+        }),
+      }),
+      response: {
+        200: searchResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        429: genericResponseErrorSchema,
         502: genericResponseErrorSchema,
       },
     }
@@ -514,6 +663,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       },
     }
   );
+
+const remoteSearchOptions = {
+  response: searchResponseSchema,
+  forward: passThrough(400, 401, 403, 404, 429),
+  errors: { failed: 'Remote search failed', invalid: 'Remote search returned an invalid response' },
+};
 
 function fetchRemoteMessagePage(
   channel: { homeserver: string; id: string },

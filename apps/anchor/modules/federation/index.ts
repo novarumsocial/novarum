@@ -9,6 +9,7 @@ import { invites } from './routes/invites';
 import { messageRoutes } from './routes/messages';
 import { push } from './routes/push';
 import { realtime } from './routes/realtime';
+import { search } from './routes/search';
 import { userStatus } from './routes/status';
 import { users } from './routes/users';
 
@@ -19,6 +20,7 @@ export const federation = new Elysia({ prefix: '/federation', tags: ['Federation
   .use(friends)
   .use(invites)
   .use(messageRoutes)
+  .use(search)
   .use(channels)
   .use(guilds)
   .use(userStatus)
