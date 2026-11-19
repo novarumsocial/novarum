@@ -555,10 +555,17 @@ export async function acceptGroupSync(
       (a) => a.user.username === user.username && ours(a.user.homeserver)
     );
     if (!added) return fail(403, `${user.username} was not added by anyone`);
-    const by = await ensureParticipant(added.by, origin);
+    // whoever added them is in the group, and if they are one of ours, they already were here
+    const byRef = userRef(added.by);
+    const by = participants.find(
+      (p) => p.username === byRef.username && p.homeserver.toLowerCase() === byRef.homeserver
+    );
+    if (!by || (ours(by.homeserver) && !before.some((member) => member.userId === by.id))) {
+      return fail(403, `${user.username} can't be added to this group`);
+    }
     const allowed = user.isBot
       ? await botMayJoin(user, origin, sync.channelId, added.grant)
-      : !!by && (await findFriendship(user.id, by.id))?.status === 'ACCEPTED';
+      : (await findFriendship(user.id, by.id))?.status === 'ACCEPTED';
     if (!allowed) return fail(403, `${user.username} can't be added to this group`);
   }
 

@@ -127,10 +127,18 @@ describe('a 1:1 hosted on another homeserver', () => {
   });
 
   test("a ring from the non-host side reaches the host's phone, and declining there ends it on both sides", async () => {
-    const { a, hostId, shadowId, rb, phones } = await oneToOne();
+    const { a, b, hostId, shadowId, rb, phones } = await oneToOne();
     rb.send({ type: 'call.ring', channelId: shadowId, ringing: true });
     const [ring] = await pushes(phones.a.label, 1, 'ring push on A');
     expect(ring).toMatchObject({ ringing: true, body: 'Is calling you', url: appUrl(hostId) });
+
+    // B follows the ring with the host's id for b, yet b's own new device doesn't ring for b's call
+    await rb.waitFor('call.ringing', (e) => e.data.ringing && e.data.channelId === shadowId);
+    await Bun.sleep(300);
+    const own = await connect(b);
+    await Bun.sleep(500);
+    expect(own.events.filter((e) => e.type === 'call.ringing')).toHaveLength(0);
+    own.close();
 
     const ra = await connect(a);
     expect((await ra.waitFor('call.ringing')).data).toMatchObject({

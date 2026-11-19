@@ -112,4 +112,42 @@ describe('group DMs across homeservers', () => {
     )`SELECT 1 FROM channel WHERE id = ${fedChannelId(anchors.b.homeserver, 'forced')}`;
     expect(row).toBeUndefined();
   });
+
+  test('a homeserver cannot say that one of our users added someone to a group they are not in', async () => {
+    const [a, a2] = [await signup('a'), await signup('a')];
+    await makeFriends(a, a2);
+    const b = await signup('b');
+    const signer = await signerFor('b');
+    const ref = (u: TestUser) => ({ username: u.user.username, homeserver: hostA });
+    const res = await signer.send('a', 'POST', '/federation/dms/sync', {
+      channelId: 'forged-adder',
+      name: 'spam',
+      iconUrl: null,
+      owner: userPayload(b.user),
+      participants: [userPayload(b.user), userPayload(a.user), userPayload(a2.user)],
+      added: [
+        { user: ref(a), by: userPayload(a2.user) },
+        { user: ref(a2), by: userPayload(a.user) },
+      ],
+    });
+    expect(res.status).toBe(403);
+    const [row] = await pg(
+      'a'
+    )`SELECT 1 FROM channel WHERE id = ${fedChannelId(anchors.b.homeserver, 'forged-adder')}`;
+    expect(row).toBeUndefined();
+  });
+
+  test('a remote user who is not in the group cannot make the host look up the people they add', async () => {
+    const b = await signup('b');
+    const stranger = await signup('c');
+    const signer = await signerFor('b');
+    const res = await signer.send('a', 'POST', '/federation/dms/nope/members', {
+      user: userPayload(b.user),
+      users: [{ username: stranger.user.username, homeserver: anchors.c.homeserver }],
+    });
+    expect(res.status).toBe(404);
+    expect(res.json.error).toBe('Channel not found');
+    const [row] = await pg('a')`SELECT 1 FROM "user" WHERE username = ${stranger.user.username}`;
+    expect(row).toBeUndefined();
+  });
 });

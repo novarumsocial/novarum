@@ -168,10 +168,14 @@ export function trackRings(appServer: Server) {
 }
 
 /** What still rings for this user in these DMs, for a device that just connected. */
-export function activeRings(userId: string, channelIds: string[]): RealtimeEvent[] {
+export function activeRings(
+  user: { id: string; username: string; homeserver: string },
+  channelIds: string[]
+): RealtimeEvent[] {
   return channelIds.flatMap((channelId) => {
     const ring = rings.get(channelId);
-    if (!ring || ring.caller.userId === userId || ring.stopped.has(userId)) return [];
+    // a ring relayed by another host carries that host's id for the caller, so match the handle
+    if (!ring || sameUser(ring.caller, user) || ring.stopped.has(user.id)) return [];
     return [ringEvent(channelId, ring.caller, true)];
   });
 }

@@ -256,7 +256,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       })
     );
 
-    for (const event of activeRings(session.userId, dmIds)) ws.send(JSON.stringify(event));
+    for (const event of activeRings(session.user, dmIds)) ws.send(JSON.stringify(event));
 
     pingIntervals.set(
       ws.id,

@@ -267,16 +267,19 @@ export const dms = new Elysia()
     async ({ params, payload, remoteUser, server, status }) => {
       const refs = z.array(userRefSchema).min(1).max(100).safeParse(payload.users);
       if (!refs.success) return status(400, { error: 'Invalid users' });
-      const targets = await Promise.all(refs.data.map(resolveUserRef));
-      if (targets.some((user) => !user)) return status(404, { error: 'User not found' });
-      const result = await asMember(params.id, remoteUser, (group, actor) =>
-        hostAddMembers(
+      // only a member gets us to look up (and maybe fetch) the people they add
+      const result = await asMember(params.id, remoteUser, async (group, actor) => {
+        const targets = await Promise.all(refs.data.map(resolveUserRef));
+        if (targets.some((user) => !user)) {
+          return { ok: false as const, status: 404 as const, error: 'User not found' };
+        }
+        return hostAddMembers(
           server,
           group,
           actor,
           targets.filter((user) => !!user)
-        )
-      );
+        );
+      });
       return result.ok ? { ok: true } : status(result.status, { error: result.error });
     },
     { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
