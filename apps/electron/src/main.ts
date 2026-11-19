@@ -298,6 +298,7 @@ async function updateOnLaunch() {
 function handOffFromSplash() {
   if (!splash) return;
   mainWindow?.show();
+  mainWindow?.webContents.setBackgroundThrottling(true);
   splash.destroy();
   splash = undefined;
 }
@@ -323,6 +324,9 @@ function createWindow() {
       nodeIntegration: false,
       preload: path.join(app.getAppPath(), '.electron/preload.cjs'),
       sandbox: true,
+      additionalArguments: splash ? ['--behind-splash'] : [],
+      // hidden windows get their timers throttled, which would hold up the handoff
+      backgroundThrottling: !splash,
     },
   });
 

@@ -54,6 +54,7 @@ const api: ElectronAPI = {
   getVersion: () => ipcRenderer.invoke('version:get'),
   setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
   platform: process.platform,
+  behindSplash: process.argv.includes('--behind-splash'),
   venmic: {
     isAvailable: () => ipcRenderer.invoke('venmic:available'),
     link: () => ipcRenderer.invoke('venmic:link'),

@@ -237,7 +237,9 @@
 />
 
 {#if booting}
-  <InitialLoader finished={bootFinished} />
+  {#if !window.electron?.behindSplash}
+    <InitialLoader finished={bootFinished} />
+  {/if}
 {:else if currentUser}
   <div class="flex h-svh overflow-hidden bg-background">
     {#if mobileNavigationOpen}

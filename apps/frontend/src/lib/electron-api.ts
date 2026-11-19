@@ -38,6 +38,8 @@ export interface ElectronAPI {
   setBadgeCount(count: number): Promise<void>;
   /** `process.platform` from the main process, e.g. 'linux' | 'darwin' | 'win32'. */
   platform: string;
+  /** The window boots hidden behind the launch updater, so it has no need for its own loader. */
+  behindSplash: boolean;
   venmic: {
     /** Whether the linux system-audio virtual mic (pipewire) is usable on this machine. */
     isAvailable(): Promise<boolean>;
