@@ -15,6 +15,8 @@ import {
   IdCardLanyard,
   Link,
   Pencil,
+  Pin,
+  PinOff,
   Reply,
   Trash2,
 } from 'lucide-react-native';
@@ -42,7 +44,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { VideoPlayer } from '@/components/video-player';
-import { chat, selectActiveChannel, useChat } from '@/lib/chat-state';
+import { chat, selectActiveChannel, selectCanPinInCurrentChannel, useChat } from '@/lib/chat-state';
 import { formatDate, formatTime } from '@/lib/format-date';
 import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
@@ -192,6 +194,8 @@ function MessageMenu({
   onDelete: () => void;
 }) {
   const developerMode = useSettings((s) => s.developerMode);
+  const canPin = useChat(selectCanPinInCurrentChannel);
+  const channelId = useChat(selectActiveChannel);
   // run the action once the sheet has started closing
   const then = (action: () => void) => () => {
     onClose();
@@ -227,6 +231,18 @@ function MessageMenu({
       {text ? (
         <SheetItem icon={Copy} label="Copy text" onPress={copy(message.content, 'Text')} />
       ) : null}
+      {!localOnly && canPin && channelId && (
+        <SheetItem
+          icon={message.pinned ? PinOff : Pin}
+          label={message.pinned ? 'Unpin message' : 'Pin message'}
+          onPress={then(() =>
+            chat()
+              .setPinned(channelId, message.id, !message.pinned)
+              .then(() => toast(message.pinned ? 'Message unpinned' : 'Message pinned'))
+              .catch((error: Error) => toast(error.message, { tone: 'error' }))
+          )}
+        />
+      )}
       {!localOnly && (
         <SheetItem
           icon={Link}
@@ -416,7 +432,11 @@ export const Message = memo(function Message({
           {flash && <Flash onEnd={onFlashEnd} />}
 
           {grouped ? (
-            <View className="w-9 shrink-0" />
+            <View className="w-9 shrink-0 items-center pt-1.5">
+              {message.pinned && (
+                <Icon as={Pin} size={12} className="text-primary/70" accessibilityLabel="Pinned" />
+              )}
+            </View>
           ) : (
             <ProfileCard user={message.author} className="self-start">
               <Avatar
@@ -455,6 +475,14 @@ export const Message = memo(function Message({
                 </ProfileCard>
                 {message.author.isBot && <BotBadge className="self-center" />}
                 <Text className="text-xs text-muted-foreground">{stamp(message.timestamp)}</Text>
+                {message.pinned && (
+                  <Icon
+                    as={Pin}
+                    size={12}
+                    className="self-center text-primary/70"
+                    accessibilityLabel="Pinned"
+                  />
+                )}
               </View>
             )}
 

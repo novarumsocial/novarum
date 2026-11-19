@@ -42,6 +42,7 @@ import Animated, {
 import { Avatar } from '@/components/avatar';
 import { CanvasPanel } from '@/components/canvas-panel';
 import { Message } from '@/components/message';
+import { PinsButton } from '@/components/pins-sheet';
 import { ProfileSheet } from '@/components/profile-card';
 import { Sheet } from '@/components/ui/sheet';
 import { MessageInput } from '@/components/message-input';
@@ -486,6 +487,7 @@ export function ChatArea({
       <ScreenHeader
         actions={
           <>
+            {channel.type !== 'VOICE' && <PinsButton channelId={channel.id} />}
             {canvasSupported && (
               <Button
                 variant={canvasOpen ? 'secondary' : 'ghost'}
