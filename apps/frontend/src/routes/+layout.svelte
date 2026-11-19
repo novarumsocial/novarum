@@ -7,6 +7,7 @@
   import { Capacitor } from '@capacitor/core';
   import { checkForUpdates } from '$lib/ota';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import { Toaster } from '$lib/components/ui/sonner/index.js';
 
   let { children } = $props();
   const desktop = browser && navigator.userAgent.includes('Electron');
@@ -41,3 +42,4 @@
 <Tooltip.Provider delayDuration={250}>
   {@render children()}
 </Tooltip.Provider>
+<Toaster />

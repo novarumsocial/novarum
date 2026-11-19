@@ -36,6 +36,7 @@
   import ParticipantContextMenu from './participant-context-menu.svelte';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
+  import { moderation } from '$lib/moderation.svelte';
   import ProfileCard from './profile-card.svelte';
   import NotificationMenu from './notification-menu.svelte';
   import { notificationSettings } from '$lib/notification-settings.svelte';
@@ -315,13 +316,18 @@
           <Bell class="size-3" />
         </DropdownMenu.Shortcut>
       </DropdownMenu.Item>
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item variant="destructive">
-        Leave Guild
-        <DropdownMenu.Shortcut>
-          <LogOut class="size-3" style="color: var(--destructive);" />
-        </DropdownMenu.Shortcut>
-      </DropdownMenu.Item>
+      {#if !server.owner}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          variant="destructive"
+          onclick={() => moderation.ask({ kind: 'leave', server })}
+        >
+          Leave Server
+          <DropdownMenu.Shortcut>
+            <LogOut class="size-3" style="color: var(--destructive);" />
+          </DropdownMenu.Shortcut>
+        </DropdownMenu.Item>
+      {/if}
       <DropdownMenu.Separator />
       <DropdownMenu.Item>
         Copy Guild ID

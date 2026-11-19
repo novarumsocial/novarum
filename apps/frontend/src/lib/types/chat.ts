@@ -5,6 +5,8 @@ export interface Server {
   initials: string;
   down: boolean;
   canManageChannels: boolean;
+  // the owner is the only one who can't leave
+  owner?: boolean;
   avatarUrl?: string | null;
   description?: string | null;
   color?: string;
@@ -34,6 +36,8 @@ export interface Channel {
 export interface Author extends Omit<PublicUser, 'homeserver'> {
   server: string;
   status?: 'ONLINE' | 'OFFLINE';
+  // only known in a guild's member list
+  role?: 'OWNER' | 'ADMIN' | 'MEMBER';
 }
 
 export interface Message {

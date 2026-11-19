@@ -18,6 +18,7 @@ import { notificationSettings } from './notification-settings.svelte';
 import { friends } from './friends.svelte';
 import { dms, dmPath } from './dms.svelte';
 import { openCanvases, type CanvasMessage } from './canvas.svelte';
+import { guildRemoved } from './moderation.svelte';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -162,6 +163,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message.ephemeral'),
     data: ephemeralMessageSchema,
+  }),
+  z.object({
+    type: z.literal('guild.deleted'),
+    data: z.object({ guildId: z.string(), reason: z.enum(['kicked', 'banned']).optional() }),
   }),
   z.object({
     type: z.literal('member.left'),
@@ -507,8 +512,11 @@ class RealtimeState {
       if (event.type === 'member.joined') {
         chat.addOrUpdateMember(event.data.guildId, event.data.user);
       }
+      if (event.type === 'guild.deleted') {
+        guildRemoved(event.data.guildId, event.data.reason);
+      }
       if (event.type === 'member.left') {
-        chat.removeMember(event.data.userId);
+        chat.removeMember(event.data.guildId, event.data.userId);
       }
       if (event.type === 'message.ephemeral') {
         chat.addEphemeral({ ...event.data, attachments: [], pingedHandles: [], replyTo: null });

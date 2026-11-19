@@ -4,7 +4,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
-  import { Users, Palette, Cog, Tags, Trash2, Camera, Bot } from '@lucide/svelte';
+  import { Users, Cog, Tags, Camera, Bot, Ban } from '@lucide/svelte';
   import * as Select from '$lib/components/ui/select/index.js';
   import BotBadge from './bot-badge.svelte';
   import { addBotToGuild, parseBotHandle, removeBotFromGuild } from '$lib/bots.svelte';
@@ -13,6 +13,7 @@
   import type { Server } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
   import AvatarCropDialog from './avatar-crop-dialog.svelte';
+  import { canModerate, listBans, moderation, unban, type GuildBan } from '$lib/moderation.svelte';
 
   let {
     open = $bindable(false),
@@ -58,6 +59,31 @@
     botBusy = false;
     botMessage = error ? { ok: false, text: error } : null;
   }
+
+  let tab = $state('server');
+  let bans = $state<GuildBan[]>([]);
+  let bansError = $state<string | null>(null);
+  let bansBusy = $state(false);
+
+  async function loadBans() {
+    bansBusy = true;
+    const result = await listBans(server.id);
+    bansBusy = false;
+    if (typeof result === 'string') bansError = result;
+    else [bans, bansError] = [result, null];
+  }
+
+  async function liftBan(userId: string) {
+    bansBusy = true;
+    bansError = await unban(server.id, userId);
+    bansBusy = false;
+    if (!bansError) bans = bans.filter((ban) => ban.user.userId !== userId);
+  }
+
+  // a ban made from the members tab shows up here the next time the tab opens
+  $effect(() => {
+    if (open && tab === 'bans' && !moderation.pending) void loadBans();
+  });
 
   let fileInput: HTMLInputElement;
   let cropFile = $state<File | null>(null);
@@ -118,7 +144,7 @@
     </Dialog.Header>
 
     <Tabs.Root
-      value="server"
+      bind:value={tab}
       orientation="vertical"
       class="flex flex-col gap-4 sm:h-[420px] sm:flex-row sm:gap-0"
     >
@@ -142,6 +168,14 @@
           >
             <Users class="size-3.5" />
             Members
+          </Tabs.Trigger>
+
+          <Tabs.Trigger
+            value="bans"
+            class="min-h-10 shrink-0 justify-start gap-2 rounded-none px-2 py-1.5 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground sm:w-full"
+          >
+            <Ban class="size-3.5" />
+            Bans
           </Tabs.Trigger>
 
           <Tabs.Trigger
@@ -242,15 +276,73 @@
                       @{member.username}:{member.server}
                     </p>
                   </div>
-                  <div class="flex shrink-0 gap-1.5">
-                    <Button variant="destructive" size="xs" disabled>Kick</Button>
-                    <Button variant="destructive" size="xs" disabled>Ban</Button>
-                  </div>
+                  {#if canModerate(server, member)}
+                    <div class="flex shrink-0 gap-1.5">
+                      <Button
+                        variant="destructive"
+                        size="xs"
+                        onclick={() => moderation.ask({ kind: 'kick', server, member })}
+                        >Kick</Button
+                      >
+                      <Button
+                        variant="destructive"
+                        size="xs"
+                        onclick={() => moderation.ask({ kind: 'ban', server, member })}>Ban</Button
+                      >
+                    </div>
+                  {/if}
                 </div>
               {/each}
               {#if chat.members.length === 0}
                 <p class="text-[11px] text-muted-foreground">No members found.</p>
               {/if}
+            </div>
+          </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="bans" class="sm:h-full sm:overflow-y-auto sm:pr-1">
+          <div class="space-y-3 pb-1">
+            <p class="text-xs font-medium">
+              Banned <span class="text-muted-foreground">({bans.length})</span>
+            </p>
+            {#if bansError}
+              <p class="text-xs text-destructive" role="alert">{bansError}</p>
+            {/if}
+            <div class="space-y-1.5">
+              {#each bans as ban (ban.user.userId)}
+                <div class="flex items-center gap-3 border bg-card px-3 py-2">
+                  <Avatar
+                    src={ban.user.avatarUrl}
+                    name={ban.user.displayName || ban.user.username}
+                    class="size-8 shrink-0 text-xs"
+                    bgColor={ban.user.avatarColor}
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">
+                      {ban.user.displayName || ban.user.username}
+                      <span class="text-xs font-normal text-muted-foreground"
+                        >@{ban.user.username}:{ban.user.homeserver}</span
+                      >
+                    </p>
+                    <p class="truncate text-xs text-muted-foreground">
+                      {ban.reason || 'No reason given'}
+                      {#if ban.bannedBy}· by {ban.bannedBy.displayName ||
+                          ban.bannedBy.username}{/if}
+                      · {new Date(ban.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    disabled={bansBusy}
+                    onclick={() => liftBan(ban.user.userId)}>Unban</Button
+                  >
+                </div>
+              {:else}
+                {#if !bansBusy && !bansError}
+                  <p class="text-[11px] text-muted-foreground">Nobody is banned.</p>
+                {/if}
+              {/each}
             </div>
           </div>
         </Tabs.Content>

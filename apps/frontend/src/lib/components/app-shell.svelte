@@ -23,6 +23,8 @@
   import DevelopersHome from './developers-home.svelte';
   import DmSidebar from './dm-sidebar.svelte';
   import CallRinging from './call-ringing.svelte';
+  import ModerationDialog from './moderation-dialog.svelte';
+  import { moderation } from '$lib/moderation.svelte';
   import { X } from '@lucide/svelte';
   import { ConnectionState } from 'livekit-client';
 
@@ -143,6 +145,10 @@
     await new Promise((resolve) => setTimeout(resolve, 100));
     booting = false;
   }
+
+  $effect(() => {
+    if (voice.channelId && moderation.removedChannelIds.includes(voice.channelId)) leaveVoice();
+  });
 
   function leaveVoice() {
     void voice.leave();
@@ -385,6 +391,7 @@
       </div>
     {/if}
   </div>
+  <ModerationDialog />
   <CallRinging
     {voice}
     onAccept={(id) => {

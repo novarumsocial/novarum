@@ -13,6 +13,7 @@
   import CreateServerDialog from './create-server-dialog.svelte';
   import NotificationMenu from './notification-menu.svelte';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
+  import { moderation } from '$lib/moderation.svelte';
 
   let {
     servers,
@@ -188,6 +189,14 @@
           </ContextMenu.Trigger>
           <ContextMenu.Content class="w-56">
             <NotificationMenu targetId={server.id} noun="Server" />
+            {#if !server.owner}
+              <ContextMenu.Separator />
+              <ContextMenu.Item
+                variant="destructive"
+                onclick={() => moderation.ask({ kind: 'leave', server })}
+                >Leave server</ContextMenu.Item
+              >
+            {/if}
           </ContextMenu.Content>
         </ContextMenu.Root>
       </div>

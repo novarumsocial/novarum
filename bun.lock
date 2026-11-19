@@ -114,6 +114,7 @@
         "svelte": "^5.56.1",
         "svelte-check": "^4.6.0",
         "svelte-easy-crop": "^5.0.1",
+        "svelte-sonner": "^1.2.0",
         "sveltekit-superforms": "^2.30.0",
         "tailwind-merge": "^3.5.0",
         "tailwind-variants": "^3.3.0",
@@ -3363,6 +3364,8 @@
     "svelte-dnd-action": ["svelte-dnd-action@0.9.76", "", { "peerDependencies": { "svelte": ">=3.23.0 || ^5.0.0-next.0" } }, "sha512-5yKiEkeMITG6cdRqXGdGkk8Inn5JzZVC0V6hBg2ZbMa723hh7iNYn3zXPmw9Ww9eWd6ECpPItZF9wUD5tA+Iaw=="],
 
     "svelte-easy-crop": ["svelte-easy-crop@5.0.1", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-Dq2rgmPsSEo+K8k49TFGXZAJwJa537AR6hW1RqKEdYj7QKlc4Ya7l4VlSYWlOV8/uAiQ10VyGRdSVAUcZiMwjg=="],
+
+    "svelte-sonner": ["svelte-sonner@1.2.3", "", { "peerDependencies": { "svelte": "^5.0.0" } }, "sha512-SjQaDI/k6L/ordD2w84XOkGv3kaZwyGRsJzR+lHW097/aJCaydvp63VblMTFsrakm58BxRjUSySK/BWH9jdY1Q=="],
 
     "svelte-sound": ["svelte-sound@0.6.0", "", { "dependencies": { "howler": "^2.2.3" } }, "sha512-n0JJwWwNEmsGntSN9oe57yevHrIg8Lw3tW2XsfdrDhJXwrbAAmLvbBJQ0Z3TFqONUW7+OWb5Yx04CSCo7q56fA=="],
 
