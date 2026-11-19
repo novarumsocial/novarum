@@ -16,7 +16,11 @@
     LoaderCircle,
     SquareSlash,
     EyeOff,
+    SmilePlus,
   } from '@lucide/svelte';
+  import ReactionPicker from './reaction-picker.svelte';
+  import EmojiText from './emoji-text.svelte';
+  import type { Reaction } from '$lib/types/chat';
   import BotBadge from './bot-badge.svelte';
   import MessageEmbed from './message-embed.svelte';
   import MessageComponents from './message-components.svelte';
@@ -67,6 +71,8 @@
   let editContent = $state('');
   let editMsgTextarea = $state<HTMLTextAreaElement | null>(null);
   let savingEdit = $state(false);
+  let pickerOpen = $state(false);
+  let chipPickerOpen = $state(false);
 
   $effect(() => {
     if (!chat.editingMessage || chat.editingMessageId !== message.id) return;
@@ -97,6 +103,14 @@
             variant: 'default',
             onclick: onReply,
             hideFromShift: true,
+          },
+          {
+            label: () => 'Add Reaction',
+            icon: SmilePlus,
+            variant: 'default',
+            hideFromShift: true,
+            // after the menu has closed, or closing it would close the picker too
+            onclick: () => void setTimeout(() => (pickerOpen = true)),
           },
           ...(isSelf(message.author)
             ? [
@@ -247,6 +261,16 @@
     } finally {
       deleting = false;
     }
+  }
+
+  function react(emoji: string, add: boolean) {
+    chat.react(channelId, message.id, emoji, add).catch(() => {});
+  }
+
+  function reactors(reaction: Reaction) {
+    const names = reaction.users.map((user) => user.displayName || user.username);
+    const others = reaction.count - names.length;
+    return others > 0 ? `${names.join(', ')} and ${others} more` : names.join(', ');
   }
 
   async function saveEdit() {
@@ -452,9 +476,16 @@
             </p>
           {/if}
 
-          {#if (hovered || dropdownOpen || contextMenuOpen) && !localOnly}
+          {#if (hovered || dropdownOpen || contextMenuOpen || pickerOpen) && !localOnly}
             <div class="absolute top-0 right-0">
               <ButtonGroup.Root>
+                <ReactionPicker bind:open={pickerOpen} onPick={(emoji) => react(emoji, true)}>
+                  {#snippet trigger({ props })}
+                    <Button {...props} variant="ghost" size="icon-xs" aria-label="Add reaction"
+                      ><SmilePlus class="size-3" /></Button
+                    >
+                  {/snippet}
+                </ReactionPicker>
                 <Button variant="ghost" size="icon-xs" aria-label="Reply" onclick={onReply}
                   ><Reply class="size-3" /></Button
                 >
@@ -600,6 +631,51 @@
                 {/each}
               </div>
             {/if}
+          {/if}
+
+          {#if message.reactions.length && !localOnly}
+            <div class="mt-1 flex flex-wrap items-center gap-1">
+              {#each message.reactions as reaction (reaction.emoji)}
+                <Tooltip.Root>
+                  <Tooltip.Trigger>
+                    {#snippet child({ props })}
+                      <Button
+                        {...props}
+                        variant="outline"
+                        size="xs"
+                        aria-pressed={reaction.me}
+                        aria-label={`${reaction.emoji} ${reaction.count}`}
+                        class={cn(
+                          'h-6 gap-1 px-1.5 text-xs',
+                          reaction.me &&
+                            'border-primary bg-primary/25 hover:bg-primary/35 dark:border-primary dark:bg-primary/25 dark:hover:bg-primary/35'
+                        )}
+                        onclick={() => react(reaction.emoji, !reaction.me)}
+                      >
+                        <span class="text-sm leading-none"
+                          ><EmojiText content={reaction.emoji} /></span
+                        >
+                        <span class="tabular-nums">{reaction.count}</span>
+                      </Button>
+                    {/snippet}
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    <p>{reactors(reaction)}</p>
+                  </Tooltip.Content>
+                </Tooltip.Root>
+              {/each}
+              <ReactionPicker bind:open={chipPickerOpen} onPick={(emoji) => react(emoji, true)}>
+                {#snippet trigger({ props })}
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Add reaction"
+                    class="text-muted-foreground"><SmilePlus class="size-3.5" /></Button
+                  >
+                {/snippet}
+              </ReactionPicker>
+            </div>
           {/if}
         </div>
       </div>

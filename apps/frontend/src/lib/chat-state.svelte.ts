@@ -1,8 +1,16 @@
 import { page } from '$app/state';
 import { goto } from '$app/navigation';
 import { anchor } from '$lib/anchor.svelte';
-import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from '$lib/types/chat';
-import { useSession } from './session.svelte';
+import type {
+  Author,
+  Channel,
+  ChannelCategory,
+  ChatRoute,
+  Message,
+  Reaction,
+  Server,
+} from '$lib/types/chat';
+import { isSelf, useSession } from './session.svelte';
 import type { PublicUser } from 'anchor/public-user';
 import { dms, dmPath } from './dms.svelte';
 import { mentionsEveryone } from './utils';
@@ -54,8 +62,19 @@ type AddMessageInput = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  reactions?: ReactionInput[];
   ephemeral?: boolean;
   thinking?: boolean;
+};
+
+type ReactionInput = Omit<Reaction, 'users'> & { users: PublicUser[] };
+
+type ReactionEventInput = {
+  messageId: string;
+  channelId: string;
+  emoji: string;
+  count: number;
+  user: PublicUser;
 };
 
 type ChannelMemberInput = PublicUser & {
@@ -78,6 +97,8 @@ type TypingInput = {
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+// the server names this many people per reaction
+const maxListedReactors = 10;
 export const maxMessageLength = 4000;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -121,6 +142,7 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    reactions: (message.reactions ?? []).map(reactionFromInput),
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
@@ -129,6 +151,10 @@ function messageFromInput(message: AddMessageInput): Message {
 function memberFromInput(member: ChannelMemberInput): Author {
   const { status, ...user } = member;
   return { ...authorFromInput(user), status };
+}
+
+function reactionFromInput(reaction: ReactionInput): Reaction {
+  return { ...reaction, users: reaction.users.map(authorFromInput) };
 }
 
 function authorFromInput({ homeserver, ...user }: PublicUser): Author {
@@ -466,14 +492,68 @@ class ChatState {
     );
   }
 
+  // an edit never changes reactions, and message.updated events don't carry them
   updateMessage(channelId: string, message: AddMessageInput) {
     const messages = this.messagesByChannel[channelId];
     if (!messages?.some((item) => item.id === message.id)) return;
 
     this.setChannelMessages(
       channelId,
-      messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+      messages.map((item) =>
+        item.id === message.id ? { ...messageFromInput(message), reactions: item.reactions } : item
+      )
     );
+  }
+
+  private updateReactions(
+    channelId: string,
+    messageId: string,
+    update: (reactions: Reaction[]) => Reaction[]
+  ) {
+    const messages = this.messagesByChannel[channelId];
+    if (!messages?.some((item) => item.id === messageId)) return;
+
+    this.setChannelMessages(
+      channelId,
+      messages.map((item) =>
+        item.id === messageId ? { ...item, reactions: update(item.reactions) } : item
+      )
+    );
+  }
+
+  /** someone's reaction came or went; the event's count is the truth, whatever we had */
+  applyReaction(event: ReactionEventInput, added: boolean) {
+    const user = authorFromInput(event.user);
+    const same = (other: Author) => other.userId === user.userId && other.server === user.server;
+    this.updateReactions(event.channelId, event.messageId, (reactions) => {
+      const existing = reactions.find((reaction) => reaction.emoji === event.emoji);
+      if (!event.count) return reactions.filter((reaction) => reaction !== existing);
+
+      const others = existing?.users.filter((other) => !same(other)) ?? [];
+      const next = {
+        emoji: event.emoji,
+        count: event.count,
+        me: isSelf(user) ? added : (existing?.me ?? false),
+        users: added ? [...others, user].slice(0, maxListedReactors) : others,
+      };
+      return existing
+        ? reactions.map((reaction) => (reaction === existing ? next : reaction))
+        : [...reactions, next];
+    });
+  }
+
+  async react(channelId: string, messageId: string, emoji: string, add: boolean) {
+    const result = await anchor.client.message.react.post({ channelId, messageId, emoji, add });
+
+    if (result.error || !result.data || 'error' in result.data) {
+      if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
+      console.error('Failed to react', result.error ?? result.data);
+      throw new Error('Failed to react');
+    }
+
+    const reactions = result.data.reactions.map(reactionFromInput);
+    this.updateReactions(channelId, messageId, () => reactions);
   }
 
   updateMemberStatus(userId: string, status: 'ONLINE' | 'OFFLINE') {
