@@ -11,7 +11,15 @@ import { session } from './session';
 import { storage } from './storage';
 import { mentionsEveryone } from './utils';
 import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
-import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from './types/chat';
+import type {
+  Author,
+  Channel,
+  ChannelCategory,
+  ChatRoute,
+  Message,
+  Reaction,
+  Server,
+} from './types/chat';
 
 function initialsFor(name: string) {
   const initials = name
@@ -61,8 +69,19 @@ type AddMessageInput = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  reactions?: ReactionInput[];
   ephemeral?: boolean;
   thinking?: boolean;
+};
+
+type ReactionInput = Omit<Reaction, 'users'> & { users: PublicUser[] };
+
+type ReactionEventInput = {
+  messageId: string;
+  channelId: string;
+  emoji: string;
+  count: number;
+  user: PublicUser;
 };
 
 type ChannelMemberInput = PublicUser & {
@@ -88,6 +107,8 @@ export type PickedFile = { uri: string; name: string; mimeType: string; size: nu
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+// the server names this many people per reaction
+const maxListedReactors = 10;
 export const maxMessageLength = 4000;
 const reencodedImageFormats = {
   'image/jpeg': SaveFormat.JPEG,
@@ -128,9 +149,14 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    reactions: (message.reactions ?? []).map(reactionFromInput),
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
+}
+
+function reactionFromInput(reaction: ReactionInput): Reaction {
+  return { ...reaction, users: reaction.users.map(authorFromInput) };
 }
 
 function memberFromInput(member: ChannelMemberInput): Author {
@@ -339,6 +365,8 @@ type ChatState = {
   removeMember: (userId: string) => void;
   removeMessage: (channelId: string, messageId: string) => void;
   updateMessage: (channelId: string, message: AddMessageInput) => void;
+  applyReaction: (event: ReactionEventInput, added: boolean) => void;
+  react: (channelId: string, messageId: string, emoji: string, add: boolean) => Promise<void>;
   updateMemberStatus: (userId: string, status: 'ONLINE' | 'OFFLINE') => void;
   updateUserProfile: (
     userId: string,
@@ -438,6 +466,21 @@ function messageNonce() {
 export const useChat = create<ChatState>((set, get) => {
   const setChannelMessages = (channelId: string, messages: Message[]) =>
     set({ messagesByChannel: { ...get().messagesByChannel, [channelId]: messages } });
+
+  const updateReactions = (
+    channelId: string,
+    messageId: string,
+    update: (reactions: Reaction[]) => Reaction[]
+  ) => {
+    const messages = get().messagesByChannel[channelId];
+    if (!messages?.some((item) => item.id === messageId)) return;
+    setChannelMessages(
+      channelId,
+      messages.map((item) =>
+        item.id === messageId ? { ...item, reactions: update(item.reactions) } : item
+      )
+    );
+  };
 
   const setFlag = (
     key: 'messagesLoadingByChannel' | 'loadingOlderByChannel',
@@ -822,14 +865,56 @@ export const useChat = create<ChatState>((set, get) => {
       );
     },
 
+    // an edit never changes reactions, and message.updated events don't carry them
     updateMessage(channelId, message) {
       const messages = get().messagesByChannel[channelId];
       if (!messages?.some((item) => item.id === message.id)) return;
 
       setChannelMessages(
         channelId,
-        messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
+        messages.map((item) =>
+          item.id === message.id
+            ? { ...messageFromInput(message), reactions: item.reactions }
+            : item
+        )
       );
+    },
+
+    // someone's reaction came or went; the event's count is the truth, whatever we had
+    applyReaction(event, added) {
+      const user = authorFromInput(event.user);
+      const same = (other: Author) => other.userId === user.userId && other.server === user.server;
+      const self =
+        `@${user.username}:${user.server}`.toLowerCase() === session().user?.handle.toLowerCase();
+      updateReactions(event.channelId, event.messageId, (reactions) => {
+        const existing = reactions.find((reaction) => reaction.emoji === event.emoji);
+        if (!event.count) return reactions.filter((reaction) => reaction !== existing);
+
+        const others = existing?.users.filter((other) => !same(other)) ?? [];
+        const next = {
+          emoji: event.emoji,
+          count: event.count,
+          me: self ? added : (existing?.me ?? false),
+          users: added ? [...others, user].slice(0, maxListedReactors) : others,
+        };
+        return existing
+          ? reactions.map((reaction) => (reaction === existing ? next : reaction))
+          : [...reactions, next];
+      });
+    },
+
+    async react(channelId, messageId, emoji, add) {
+      const result = await anchor().client.message.react.post({ channelId, messageId, emoji, add });
+
+      if (result.error || !result.data || 'error' in result.data) {
+        if (sendToGuildsIfFederatedServerDown(result.error)) return;
+
+        console.error('Failed to react', result.error ?? result.data);
+        throw new Error('Failed to react');
+      }
+
+      const reactions = result.data.reactions.map(reactionFromInput);
+      updateReactions(channelId, messageId, () => reactions);
     },
 
     updateMemberStatus: (userId, status) =>

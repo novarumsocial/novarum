@@ -51,9 +51,19 @@ export interface Message {
   components: ActionRow[];
   // "<someone> used /command", on a bot's answer to a slash command
   interaction: { id: string; name: string; user: Author } | null;
+  reactions: Reaction[];
   // only on this screen: a bot's answer only you can see, or a bot still thinking about it
   ephemeral?: boolean;
   thinking?: boolean;
+}
+
+export interface Reaction {
+  emoji: string;
+  count: number;
+  // whether you are one of them
+  me: boolean;
+  // the first few people who reacted
+  users: Author[];
 }
 
 export interface Attachment {
