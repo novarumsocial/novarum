@@ -5,16 +5,32 @@ export interface LaunchPrefs {
   autoUpdate: boolean;
 }
 
-export interface UpdateCheck {
-  status: 'available' | 'current' | 'unsupported' | 'error';
+export interface UpdateStatus {
+  status:
+    | 'idle'
+    | 'checking'
+    | 'current'
+    | 'available'
+    | 'downloading'
+    | 'downloaded'
+    | 'error'
+    | 'unsupported';
   version?: string;
+  /** Download progress, 0-100. */
+  percent?: number;
 }
 
 export interface ElectronAPI {
   getAudioDevices(): Promise<MediaDeviceInfo[]>;
   getLaunchPrefs(): Promise<LaunchPrefs>;
   setLaunchPrefs(prefs: Partial<LaunchPrefs>): Promise<LaunchPrefs>;
-  checkForUpdates(): Promise<UpdateCheck>;
+  checkForUpdates(): Promise<UpdateStatus>;
+  getUpdateStatus(): Promise<UpdateStatus>;
+  downloadUpdate(): Promise<void>;
+  /** Quits Novarum, installs the downloaded update and relaunches. */
+  installUpdate(): Promise<void>;
+  /** Subscribes to update status changes; returns an unsubscribe function. */
+  onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
   getVersion(): Promise<string>;
   /** Sets the dock / launcher unread badge; 0 clears it. */
   setBadgeCount(count: number): Promise<void>;

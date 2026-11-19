@@ -1,6 +1,7 @@
 <script lang="ts">
   import './layout.css';
   import { browser } from '$app/environment';
+  import { page } from '$app/state';
   import favicon from '$lib/assets/favicon.svg';
   import { settings } from '$lib/settings.svelte';
   import { onMount } from 'svelte';
@@ -9,7 +10,9 @@
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
   let { children } = $props();
-  const desktop = browser && navigator.userAgent.includes('Electron');
+  const desktop = $derived(
+    browser && navigator.userAgent.includes('Electron') && page.route.id !== '/updater'
+  );
 
   onMount(() => {
     if (Capacitor.isNativePlatform()) {
