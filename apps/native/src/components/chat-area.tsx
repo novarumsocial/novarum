@@ -16,6 +16,7 @@ import {
   Phone,
   Reply,
   RotateCw,
+  Search,
   Users,
   X,
 } from 'lucide-react-native';
@@ -41,6 +42,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Avatar } from '@/components/avatar';
 import { CanvasPanel } from '@/components/canvas-panel';
+import { SearchPanel } from '@/components/search-panel';
 import { Message } from '@/components/message';
 import { ProfileSheet } from '@/components/profile-card';
 import { Sheet } from '@/components/ui/sheet';
@@ -279,6 +281,9 @@ export function ChatArea({
       : undefined
   );
   const closeCanvas = useCallback(() => setCanvasOpen(false), []);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const guildId = useChat((s) => (s.route.kind === 'guild' ? s.route.serverId : null));
   // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
   const canvasSupported = channel.type !== 'VOICE' && !channel.id.startsWith('fed:');
 
@@ -486,13 +491,30 @@ export function ChatArea({
       <ScreenHeader
         actions={
           <>
+            {channel.type !== 'VOICE' && (
+              <Button
+                variant={searchOpen ? 'secondary' : 'ghost'}
+                size="icon"
+                accessibilityLabel={searchOpen ? 'Close search' : 'Search messages'}
+                accessibilityState={{ selected: searchOpen }}
+                onPress={() => {
+                  setSearchOpen((open) => !open);
+                  setCanvasOpen(false);
+                }}
+              >
+                <Icon as={Search} size={20} />
+              </Button>
+            )}
             {canvasSupported && (
               <Button
                 variant={canvasOpen ? 'secondary' : 'ghost'}
                 size="icon"
                 accessibilityLabel={canvasOpen ? 'Close notes' : 'Open notes'}
                 accessibilityState={{ selected: canvasOpen }}
-                onPress={() => setCanvasOpen((open) => !open)}
+                onPress={() => {
+                  setCanvasOpen((open) => !open);
+                  setSearchOpen(false);
+                }}
               >
                 <Icon as={NotebookPen} size={20} />
               </Button>
@@ -632,11 +654,14 @@ export function ChatArea({
       {canvasOpen && canvasSupported && !(call && callExpanded) && (
         <CanvasPanel key={channel.id} channelId={channel.id} onClose={closeCanvas} />
       )}
+      {searchOpen && !(call && callExpanded) && (
+        <SearchPanel guildId={guildId} channel={channel} onClose={closeSearch} />
+      )}
 
       <KeyboardAvoidingView
         behavior="padding"
         style={
-          (call && callExpanded) || (canvasOpen && canvasSupported)
+          (call && callExpanded) || (canvasOpen && canvasSupported) || searchOpen
             ? { display: 'none' }
             : { flex: 1, minHeight: 0 }
         }

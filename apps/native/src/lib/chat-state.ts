@@ -88,6 +88,7 @@ export type PickedFile = { uri: string; name: string; mimeType: string; size: nu
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+const searchPageSize = 25;
 export const maxMessageLength = 4000;
 const reencodedImageFormats = {
   'image/jpeg': SaveFormat.JPEG,
@@ -362,10 +363,17 @@ type ChatState = {
   deleteMessage: (channelId: string, messageId: string) => Promise<void>;
   editMessage: (channelId: string, messageId: string, content: string | null) => Promise<void>;
   loadMessages: (
-    channelId: string
+    channelId: string,
+    until?: string | null
   ) => Promise<{ id: string; createdAt: string | Date } | undefined>;
   loadOlderMessages: (channelId: string) => Promise<void>;
   hasMoreMessages: (channelId: string) => boolean;
+  searchMessages: (
+    scope: { guildId: string } | { channelId: string },
+    q: string,
+    cursor?: string | null
+  ) => ReturnType<ReturnType<typeof anchor>['client']['message']['search']['get']>;
+  jumpToMessage: (channelId: string, messageId: string) => Promise<void>;
   onTyping: () => Promise<void>;
   setTyping: (
     channelId: string,
@@ -546,7 +554,7 @@ export const useChat = create<ChatState>((set, get) => {
 
     const isDm = get().route.kind === 'dms';
     const [lastMessage] = await Promise.all([
-      get().loadMessages(channelId),
+      get().loadMessages(channelId, selectActiveMessage(get())),
       isDm ? Promise.resolve() : get().loadMembers(channelId),
     ]);
     if (!lastMessage) {
@@ -968,7 +976,8 @@ export const useChat = create<ChatState>((set, get) => {
       get().updateMessage(channelId, result.data.message);
     },
 
-    async loadMessages(channelId) {
+    // `until` is a message to jump to: the page reaches back far enough to hold it
+    async loadMessages(channelId, until) {
       // show the last session's messages right away while the fresh page loads
       if (!get().messagesByChannel[channelId]?.length) {
         const cached = z.string().safeParse(storage.getString(messagesKey(channelId)));
@@ -980,7 +989,7 @@ export const useChat = create<ChatState>((set, get) => {
       try {
         const count = resetCount;
         const result = await anchor().client.message.list.get({
-          query: { channelId, cursor: 0, amount: messagesPageSize },
+          query: { channelId, cursor: 0, amount: messagesPageSize, ...(until ? { until } : {}) },
         });
         if (count !== resetCount) return;
 
@@ -991,7 +1000,8 @@ export const useChat = create<ChatState>((set, get) => {
           return;
         }
 
-        hasMoreByChannel.set(channelId, result.data.messages.length === messagesPageSize);
+        hasMoreByChannel.set(channelId, result.data.messages.length >= messagesPageSize);
+        nextCursorByChannel.set(channelId, result.data.messages.length);
         get().setMessages(channelId, result.data.messages);
         storage.set(messagesKey(channelId), JSON.stringify(result.data.messages));
         return result.data.messages.at(-1);
@@ -1036,6 +1046,19 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     hasMoreMessages: (channelId) => hasMoreByChannel.get(channelId) ?? false,
+
+    searchMessages: (scope, q, cursor = null) =>
+      anchor().client.message.search.get({
+        query: { ...scope, q, limit: searchPageSize, ...(cursor ? { cursor } : {}) },
+      }),
+
+    // opens a message from anywhere (a search result): loads the history back to it if it isn't loaded yet
+    async jumpToMessage(channelId, messageId) {
+      const loaded = get().messagesByChannel[channelId]?.some((m) => m.id === messageId);
+      if (!loaded && channelId === get().loadedChannel)
+        await get().loadMessages(channelId, messageId);
+      goto(channelPath(channelId, messageId));
+    },
 
     async onTyping() {
       const activeChannel = selectActiveChannel(get());

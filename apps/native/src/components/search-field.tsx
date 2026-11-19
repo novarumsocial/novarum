@@ -10,11 +10,15 @@ export function SearchField({
   onChangeText,
   placeholder,
   className,
+  onSubmitEditing,
+  autoFocus,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
   className?: string;
+  onSubmitEditing?: () => void;
+  autoFocus?: boolean;
 }) {
   return (
     <View className={cn('min-h-11 flex-row items-center gap-2 bg-muted px-3', className)}>
@@ -28,6 +32,8 @@ export function SearchField({
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        onSubmitEditing={onSubmitEditing}
+        autoFocus={autoFocus}
       />
       {value ? (
         <Pressable
