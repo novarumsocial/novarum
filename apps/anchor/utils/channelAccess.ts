@@ -36,3 +36,10 @@ export async function canSendInChannel(
   const guild = await db.query.guilds.findFirst({ where: { id: channel.guildId } });
   return !!guild && (await canManageGuild(guild, userId));
 }
+
+// in guilds only the owner and ADMINs pin; in DMs every participant can
+export async function canPinInChannel(channel: { guildId: string | null }, userId: string) {
+  if (!channel.guildId) return true;
+  const guild = await db.query.guilds.findFirst({ where: { id: channel.guildId } });
+  return !!guild && (await canManageGuild(guild, userId));
+}

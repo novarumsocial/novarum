@@ -50,6 +50,8 @@ const fixtures: Record<string, unknown> = {
   'message.created': message,
   'message.updated': { ...message, edited: true },
   'message.deleted': { id: 'm1', channelId: 'c1', guildId: 'g1' },
+  'message.pinned': { ...message, pinned: true, pinnedAt: '2026-01-01T00:00:00.000Z' },
+  'message.unpinned': { id: 'm1', channelId: 'c1', guildId: 'g1' },
   'user.status.changed': { userId: 'u1', status: 'ONLINE' },
   'member.joined': { guildId: 'g1', user: { ...user, status: 'ONLINE' } },
   'voice.states.snapshot': {
@@ -168,7 +170,7 @@ describe('mapFederatedRealtimeEvent', () => {
     guildOnce(data.guildId, 'g1');
   });
 
-  test.each(['message.created', 'message.updated'])('%s', (type) => {
+  test.each(['message.created', 'message.updated', 'message.pinned'])('%s', (type) => {
     const { data } = map(type);
     channelOnce(data.channelId, 'c1');
     guildOnce(data.guildId, 'g1');
@@ -184,8 +186,8 @@ describe('mapFederatedRealtimeEvent', () => {
     channelOnce(event.data.channelId, 'c1');
   });
 
-  test('message.deleted', () => {
-    const { data } = map('message.deleted');
+  test.each(['message.deleted', 'message.unpinned'])('%s', (type) => {
+    const { data } = map(type);
     channelOnce(data.channelId, 'c1');
     guildOnce(data.guildId, 'g1');
     expect(data.id).toBe('m1');

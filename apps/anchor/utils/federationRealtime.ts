@@ -88,6 +88,18 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
     data: messageEventDataSchema,
   }),
   z.object({
+    type: z.literal('message.pinned'),
+    data: messageEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('message.unpinned'),
+    data: z.object({
+      id: z.string(),
+      channelId: z.string(),
+      guildId: z.string().nullable(),
+    }),
+  }),
+  z.object({
     type: z.literal('message.deleted'),
     data: z.object({
       id: z.string(),
@@ -384,7 +396,8 @@ export async function vetBridgedEvent(
 
   switch (event.type) {
     case 'message.created':
-    case 'message.updated': {
+    case 'message.updated':
+    case 'message.pinned': {
       const author = await vetLocalIdentity(scope, event.data.author);
       if (!author || !event.data.interaction)
         return author && { ...event, data: { ...event.data, author } };
@@ -645,6 +658,7 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
       };
     case 'message.created':
     case 'message.updated':
+    case 'message.pinned':
       return {
         ...event,
         data: {
@@ -654,6 +668,7 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
         },
       };
     case 'message.deleted':
+    case 'message.unpinned':
       return {
         ...event,
         data: {

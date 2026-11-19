@@ -13,16 +13,19 @@ type MessageRow = {
   embeds?: Embed[] | null;
   components?: ActionRow[] | null;
   interaction?: MessageInteraction | null;
+  pinnedAt?: Date | null;
   attachments: Parameters<typeof attachmentPayload>[0][];
 };
 
-/** What bots added to a message, as every message response and event carries it. */
+/** What bots added to a message and whether it is pinned, as every message response and event carries it. */
 export const messageExtras = (
-  message: Pick<MessageRow, 'embeds' | 'components' | 'interaction'>
+  message: Pick<MessageRow, 'embeds' | 'components' | 'interaction' | 'pinnedAt'>
 ) => ({
   embeds: message.embeds ?? [],
   components: message.components ?? [],
   interaction: message.interaction ?? null,
+  pinned: !!message.pinnedAt,
+  pinnedAt: message.pinnedAt?.toISOString() ?? null,
 });
 
 /** A stored message as clients see it. */

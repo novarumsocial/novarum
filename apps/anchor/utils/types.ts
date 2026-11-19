@@ -27,6 +27,14 @@ export type RealtimeEvent =
       data: MessageEventData;
     }
   | {
+      type: 'message.pinned';
+      data: MessageEventData;
+    }
+  | {
+      type: 'message.unpinned';
+      data: { id: string; channelId: string; guildId: string | null };
+    }
+  | {
       type: 'message.deleted';
       data: {
         id: string;
@@ -178,6 +186,8 @@ export type MessageEventData = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  pinned?: boolean;
+  pinnedAt?: string | null;
 };
 
 export type DmChannel = {

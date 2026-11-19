@@ -292,9 +292,13 @@ export const messages = pgTable(
     components: jsonb('components').$type<ActionRow[]>(),
     // set when a bot sent this in answer to a slash command
     interaction: jsonb('interaction').$type<MessageInteraction>(),
+
+    pinnedAt: date('pinnedAt'),
   },
   (table) => [
     unique('message_authorId_nonce_unique').on(table.authorId, table.nonce),
+
+    index('message_channelId_pinnedAt_idx').on(table.channelId, table.pinnedAt),
 
     index('message_channelId_createdAt_id_idx').on(table.channelId, table.createdAt, table.id),
 
