@@ -78,6 +78,7 @@ type TypingInput = {
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
+const searchPageSize = 25;
 export const maxMessageLength = 4000;
 const reencodedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -666,7 +667,8 @@ class ChatState {
     this.updateMessage(channelId, result.data.message);
   }
 
-  async loadMessages(channelId: string) {
+  // `until` is a message to jump to: the page reaches back far enough to hold it
+  async loadMessages(channelId: string, until?: string | null) {
     this.messagesLoadingByChannel = {
       ...this.messagesLoadingByChannel,
       [channelId]: true,
@@ -675,7 +677,7 @@ class ChatState {
 
     try {
       const result = await anchor.client.message.list.get({
-        query: { channelId, cursor: 0, amount: messagesPageSize },
+        query: { channelId, cursor: 0, amount: messagesPageSize, ...(until ? { until } : {}) },
       });
 
       if (result.error || !result.data || 'error' in result.data) {
@@ -685,7 +687,8 @@ class ChatState {
         return;
       }
 
-      this.hasMoreByChannel.set(channelId, result.data.messages.length === messagesPageSize);
+      this.hasMoreByChannel.set(channelId, result.data.messages.length >= messagesPageSize);
+      this.nextCursorByChannel.set(channelId, result.data.messages.length);
       this.setMessages(channelId, result.data.messages);
       return result.data.messages.at(-1);
     } finally {
@@ -734,6 +737,29 @@ class ChatState {
         [channelId]: false,
       };
     }
+  }
+
+  searchMessages(
+    scope: { guildId: string } | { channelId: string },
+    q: string,
+    cursor: string | null = null
+  ) {
+    return anchor.client.message.search.get({
+      query: { ...scope, q, limit: searchPageSize, ...(cursor ? { cursor } : {}) },
+    });
+  }
+
+  // opens a message from anywhere (a search result): loads the history back to it if it isn't loaded yet
+  async jumpToMessage(channelId: string, messageId: string) {
+    const loaded = this.messagesByChannel[channelId]?.some((message) => message.id === messageId);
+    if (!loaded && channelId === this.loadedChannel) await this.loadMessages(channelId, messageId);
+    if (dms.get(channelId)) return goto(dmPath(channelId, messageId));
+    const serverId = Object.keys(this.channelsByServer).find((id) =>
+      this.channelsByServer[id]!.some((category) =>
+        category.channels.some((channel) => channel.id === channelId)
+      )
+    );
+    return goto(guildPath(serverId ?? this.activeServer ?? undefined, channelId, messageId));
   }
 
   hasMoreMessages(channelId: string) {
@@ -975,7 +1001,7 @@ class ChatState {
 
     const isDm = this.route.kind === 'dms';
     const [lastMessage] = await Promise.all([
-      this.loadMessages(channelId),
+      this.loadMessages(channelId, this.activeMessage),
       isDm ? Promise.resolve() : this.loadMembers(channelId),
     ]);
     if (!lastMessage) {
