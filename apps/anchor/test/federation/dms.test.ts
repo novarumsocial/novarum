@@ -257,6 +257,7 @@ describe('messages', () => {
       content: `${'long '.repeat(27)}long…`,
       attachmentCount: 0,
       system: null,
+      author: { username: a.user.username, displayName: null },
     });
     expect(Array.from(preview.content)).toHaveLength(140);
 

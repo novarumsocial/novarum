@@ -335,7 +335,11 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
         (group, actor) => hostUpdateGroup(server, group, actor, { iconUrl }),
         { action: 'update', body: { iconUrl } }
       );
-      return result.ok ? { iconUrl } : status(result.status, { error: result.error });
+      if (!result.ok) {
+        await storage.delete(`dm-icons/${key}.webp`).catch(() => null);
+        return status(result.status, { error: result.error });
+      }
+      return { iconUrl };
     },
     {
       body: t.Object({ icon: t.File({ maxSize: maxIconSize }) }),
@@ -569,7 +573,11 @@ export async function latestMessages(channelIds: string[]) {
       id: messages.id,
       channelId: messages.channelId,
       authorId: messages.authorId,
-      author: { username: users.username, homeserver: users.homeserver },
+      author: {
+        username: users.username,
+        homeserver: users.homeserver,
+        displayName: users.displayName,
+      },
       content: messages.content,
       system: messages.system,
       createdAt: messages.createdAt,
@@ -642,13 +650,17 @@ async function buildDms(
         id: message.id,
         own: message.own,
         preview:
-          message.content !== undefined && authorId
+          message.content !== undefined && (authorId || author)
             ? {
+                // empty when the author left the group: the client names them from `author`
                 id: message.id,
-                authorId,
+                authorId: authorId ?? '',
                 content: messagePreview(message.content),
                 attachmentCount: message.attachmentCount ?? 0,
                 system: message.system ?? null,
+                author: author
+                  ? { username: author.username, displayName: author.displayName ?? null }
+                  : null,
               }
             : null,
       });
@@ -665,6 +677,7 @@ async function buildDms(
           content: messagePreview(message.content),
           attachmentCount: message.attachmentCount,
           system: message.system,
+          author: { username: message.author.username, displayName: message.author.displayName },
         },
       });
     }

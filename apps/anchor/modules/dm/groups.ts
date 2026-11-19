@@ -18,7 +18,7 @@ import { publishRealtime, publishToChannel } from '../../utils/publishRealtime';
 import { randomString } from '../../utils/randomString';
 import { rateLimiter } from '../../utils/rateLimit';
 import { systemTarget, type SystemMessage } from '../../utils/systemMessage';
-import { consumeGrant } from '../bots/membership';
+import { dropGrant, grantFits } from '../bots/membership';
 import { findFriendship } from '../friends/model';
 import { createMessage } from '../message/store';
 import { stopFollowingDm } from '../federation/routes/realtime';
@@ -40,7 +40,7 @@ const ours = (homeserver: string) =>
   homeserver.toLowerCase() === getConfig().server.homeserver.toLowerCase();
 export const maxGroupMembers = () => getConfig().dms.max_group_members;
 
-// creating groups and adding people to them notifies (and federates to) everyone involved
+// every change to a group notifies (and federates to) everyone involved
 export const allowGroupChange = rateLimiter(20);
 
 export const userRefSchema = z.object({
@@ -277,7 +277,10 @@ export async function hostCreateGroup(
   await db.insert(channelMembers).values({ channelId: group.id, userId: creator.id });
 
   await postSystemMessage(server, group, creator, { type: 'group.created' });
-  await addMembers(group, creator, unique);
+  if (!(await addMembers(group, creator, unique)).length) {
+    await db.delete(channels).where(eq(channels.id, group.id));
+    return fail(403, "Their homeservers didn't let them join");
+  }
 
   const members = await membersOf(group.id);
   announce(server, group, members, { created: members.map((member) => member.userId) });
@@ -360,6 +363,7 @@ export async function hostRemoveMember(
   target: User
 ): Promise<GroupResult> {
   if (group.ownerId !== actor.id) return fail(403, 'Only the group owner can remove members');
+  if (!allowGroupChange(actor.id)) return fail(429, 'Too many changes, try again later');
   if (target.id === actor.id) return fail(400, 'Leave the group instead');
   const [removed] = await db
     .delete(channelMembers)
@@ -443,6 +447,7 @@ export async function hostUpdateGroup(
   change: { name?: string; iconUrl?: string | null }
 ): Promise<GroupResult> {
   if (group.ownerId !== actor.id) return fail(403, 'Only the group owner can change the group');
+  if (!allowGroupChange(actor.id)) return fail(429, 'Too many changes, try again later');
   const name = change.name?.trim();
   const [updated] = await db
     .update(channels)
@@ -470,6 +475,7 @@ export async function hostTransferOwner(
   target: User
 ): Promise<GroupResult> {
   if (group.ownerId !== actor.id) return fail(403, 'Only the group owner can transfer it');
+  if (!allowGroupChange(actor.id)) return fail(429, 'Too many changes, try again later');
   const members = await membersOf(group.id);
   if (!members.some((member) => member.userId === target.id)) {
     return fail(404, 'Member not found');
@@ -512,7 +518,7 @@ export const groupSyncSchema = z.object({
 // one of our bots joins a group hosted elsewhere when it is public, or its owner asked for it
 async function botMayJoin(bot: User, host: string, groupId: string, grant?: string) {
   const row = await db.query.bots.findFirst({ where: { userId: bot.id } });
-  return !!row && (row.public || consumeGrant(grant, bot.id, host, groupId));
+  return !!row && (row.public || grantFits(grant, bot.id, host, groupId));
 }
 
 // a host may tell us about remote users we don't know yet. For users of its own homeserver it is
@@ -549,6 +555,7 @@ export async function acceptGroupSync(
   const local = participants.filter((user) => ours(user.homeserver));
 
   // nobody of ours joins a group without a friend (or, for bots, its own say) letting them
+  const usedGrants: (string | undefined)[] = [];
   for (const user of local) {
     if (before.some((member) => member.userId === user.id)) continue;
     const added = sync.added.find(
@@ -567,7 +574,10 @@ export async function acceptGroupSync(
       ? await botMayJoin(user, origin, sync.channelId, added.grant)
       : (await findFriendship(user.id, by.id))?.status === 'ACCEPTED';
     if (!allowed) return fail(403, `${user.username} can't be added to this group`);
+    if (user.isBot) usedGrants.push(added.grant);
   }
+  // grants are single use, but only spent once the whole push is accepted
+  usedGrants.forEach(dropGrant);
 
   const removed = before.filter(
     (member) => ours(member.user.homeserver) && !local.some((user) => user.id === member.userId)

@@ -26,6 +26,8 @@ export type DmPreview = {
   content: string | null;
   attachmentCount: number;
   system: SystemMessage | null;
+  // names the author even after they left the group
+  author?: { username: string; displayName: string | null } | null;
 };
 
 type PreviewMessage = {
@@ -35,7 +37,7 @@ type PreviewMessage = {
   content: string | null;
   attachments: unknown[];
   system?: SystemMessage | null;
-  author: Pick<PublicUser, 'userId' | 'username' | 'homeserver'>;
+  author: Pick<PublicUser, 'userId' | 'username' | 'homeserver' | 'displayName'>;
 };
 
 const sameUser = (a: { username: string; homeserver: string }, b: typeof a) =>
@@ -56,6 +58,7 @@ function toPreview(dm: DmEntry, message: PreviewMessage): DmPreview {
     content: message.content,
     attachmentCount: message.attachments.length,
     system: message.system ?? null,
+    author: { username: message.author.username, displayName: message.author.displayName },
   };
 }
 
@@ -65,7 +68,7 @@ export function dmPreviewText({ lastMessage, participants, type }: DmEntry) {
   const author =
     lastMessage.authorId === self?.id
       ? self
-      : participants.find((user) => user.userId === lastMessage.authorId);
+      : (participants.find((user) => user.userId === lastMessage.authorId) ?? lastMessage.author);
   if (lastMessage.system) return author ? systemText(lastMessage.system, author) : null;
 
   const { content, attachmentCount } = lastMessage;

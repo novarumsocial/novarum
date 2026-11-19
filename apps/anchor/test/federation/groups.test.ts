@@ -119,8 +119,9 @@ describe('group DMs across homeservers', () => {
     const b = await signup('b');
     const signer = await signerFor('b');
     const ref = (u: TestUser) => ({ username: u.user.username, homeserver: hostA });
+    const channelId = `forged-adder-${crypto.randomUUID()}`;
     const res = await signer.send('a', 'POST', '/federation/dms/sync', {
-      channelId: 'forged-adder',
+      channelId,
       name: 'spam',
       iconUrl: null,
       owner: userPayload(b.user),
@@ -133,7 +134,7 @@ describe('group DMs across homeservers', () => {
     expect(res.status).toBe(403);
     const [row] = await pg(
       'a'
-    )`SELECT 1 FROM channel WHERE id = ${fedChannelId(anchors.b.homeserver, 'forged-adder')}`;
+    )`SELECT 1 FROM channel WHERE id = ${fedChannelId(anchors.b.homeserver, channelId)}`;
     expect(row).toBeUndefined();
   });
 
@@ -149,5 +150,28 @@ describe('group DMs across homeservers', () => {
     expect(res.json.error).toBe('Channel not found');
     const [row] = await pg('a')`SELECT 1 FROM "user" WHERE username = ${stranger.user.username}`;
     expect(row).toBeUndefined();
+  });
+
+  test('a group whose only invitee is refused by their homeserver is not created', async () => {
+    const a = await signup('a');
+    const b = await signup('b');
+    await makeFriends(a, b);
+    // b's homeserver no longer has the friendship, so it won't let a add b
+    const [bRow] = await pg('b')`SELECT id FROM "user" WHERE username = ${b.user.username}`;
+    await pg('b')`DELETE FROM friend_relationship WHERE ${bRow!.id} IN ("userOneId", "userTwoId")`;
+    const res = await call(a, 'POST', '/dm/group', { userIds: [await idOf(a, b)] });
+    expect(res.status).toBe(403);
+    const owned = await pg('a')`
+      SELECT 1 FROM channel WHERE "ownerId" IN (SELECT id FROM "user" WHERE username = ${a.user.username})`;
+    expect(owned).toHaveLength(0);
+  });
+
+  test('a group update has to change something', async () => {
+    const b = await signup('b');
+    const signer = await signerFor('b');
+    const res = await signer.send('a', 'POST', '/federation/dms/x/update', {
+      user: userPayload(b.user),
+    });
+    expect(res.status).toBe(400);
   });
 });

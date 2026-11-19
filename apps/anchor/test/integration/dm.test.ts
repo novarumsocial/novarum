@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { S3Client } from 'bun';
+import sharp from 'sharp';
 import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { connect } from '../harness/db';
 import { signup } from '../harness/users';
@@ -187,6 +189,7 @@ describe('messages and unread', () => {
       content: 'second line',
       attachmentCount: 0,
       system: null,
+      author: { username: b.user.username, displayName: null },
     };
     expect((await dms(a))[0].lastMessage).toEqual(preview);
     expect((await dms(b))[0].lastMessage).toEqual(preview);
@@ -230,6 +233,7 @@ describe('messages and unread', () => {
       content: null,
       attachmentCount: 2,
       system: null,
+      author: { username: a.user.username, displayName: null },
     });
   });
 
@@ -433,6 +437,14 @@ describe('group DMs', () => {
       content: 'hi all',
       attachmentCount: 0,
       system: null,
+      author: { username: c.user.username, displayName: null },
+    });
+
+    // c isn't a participant anymore, but the preview still says who left
+    expect((await call(c, 'POST', `/dm/${group}/leave`)).status).toBe(200);
+    expect(await preview(b)).toMatchObject({
+      system: { type: 'member.left' },
+      author: { username: c.user.username },
     });
   });
 
@@ -550,7 +562,51 @@ describe('group DMs', () => {
     expect((await create(a, [c])).status).toBe(429);
     expect((await create(b, [a])).status).toBe(200);
   });
+
+  test("renaming, changing the icon, kicking and transferring count towards the same limit, and a refused icon isn't kept", async () => {
+    const { a, b, c } = await trio();
+    const group = (await create(a, [b, c])).body;
+    const icon = async () => {
+      const form = new FormData();
+      const image = await sharp({
+        create: { width: 64, height: 64, channels: 3, background: '#336699' },
+      })
+        .png()
+        .toBuffer();
+      form.append('icon', new File([image], 'icon.png', { type: 'image/png' }));
+      return a.fetch(`/dm/${group.id}/icon`, { method: 'POST', body: form });
+    };
+
+    const before = await iconKeys();
+    expect((await icon()).status).toBe(200);
+    expect(await iconKeys()).toHaveLength(before.length + 1);
+    for (let i = 3; i <= 20; i++) {
+      expect((await call(a, 'PATCH', `/dm/${group.id}`, { name: `n${i}` })).status).toBe(200);
+    }
+    expect((await call(a, 'PATCH', `/dm/${group.id}`, { name: 'again' })).status).toBe(429);
+    expect((await call(a, 'DELETE', `/dm/${group.id}/members/${c.user.id}`)).status).toBe(429);
+    expect((await call(a, 'POST', `/dm/${group.id}/owner`, { userId: b.user.id })).status).toBe(
+      429
+    );
+
+    const kept = await iconKeys();
+    expect((await icon()).status).toBe(429);
+    expect(await iconKeys()).toEqual(kept);
+  });
 });
+
+// the bucket the anchors of these tests write to (test/config.toml)
+const bucket = new S3Client({
+  accessKeyId: 'test-access-key',
+  secretAccessKey: 'test-secret-key-0000',
+  endpoint: 'http://127.0.0.1:3900',
+  region: 'garage',
+  bucket: 'anchortest',
+});
+const iconKeys = async () =>
+  ((await bucket.list({ prefix: 'dm-icons/', maxKeys: 1000 })).contents ?? [])
+    .map((object) => object.key)
+    .sort();
 
 test('max_group_members caps a group, the creator included', async () => {
   const small = await spawnAnchor({ name: 'dm-small', config: { dms: { max_group_members: 3 } } });

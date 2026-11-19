@@ -82,6 +82,10 @@ const dmChannelSchema = z.object({
       content: z.string().nullable(),
       attachmentCount: z.number(),
       system: systemMessageSchema.nullable().catch(null),
+      author: z
+        .object({ username: z.string(), displayName: z.string().nullable() })
+        .nullable()
+        .default(null),
     })
     .nullable()
     .default(null),

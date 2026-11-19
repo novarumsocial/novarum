@@ -27,6 +27,8 @@ export type DmLastMessage = {
   content: string | null;
   attachmentCount: number;
   system: SystemMessage | null;
+  // names the author even after they left the group
+  author?: { username: string; displayName: string | null } | null;
 };
 
 // the DM list's second line: "You: hi", "Ana: hi" in a group, "Sent 2 attachments", "Missed call from Ana."
@@ -38,7 +40,7 @@ export function dmPreviewText(
   const author =
     lastMessage.authorId === self?.id
       ? self
-      : participants.find((user) => user.userId === lastMessage.authorId);
+      : (participants.find((user) => user.userId === lastMessage.authorId) ?? lastMessage.author);
   if (lastMessage.system) return author ? systemText(lastMessage.system, author) : null;
 
   const { content, attachmentCount } = lastMessage;

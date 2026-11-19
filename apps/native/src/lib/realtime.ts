@@ -87,6 +87,10 @@ const dmChannelSchema = z.object({
       content: z.string().nullable(),
       attachmentCount: z.number(),
       system: systemMessageSchema.nullable().catch(null),
+      author: z
+        .object({ username: z.string(), displayName: z.string().nullable() })
+        .nullable()
+        .default(null),
     })
     .nullable()
     .default(null),
@@ -486,6 +490,7 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
             content: event.data.content?.replace(/\s+/g, ' ').trim().slice(0, 140) || null,
             attachmentCount: event.data.attachments.length,
             system: event.data.system ?? null,
+            author: { username: author.username, displayName: author.displayName },
           },
         });
       }

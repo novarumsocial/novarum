@@ -144,6 +144,11 @@ export const dmLastMessageSchema = z.object({
   attachmentCount: z.number().int().nonnegative(),
   // "Ana added Leo", a missed call...: the client writes the text
   system: systemMessageSchema.nullable().default(null),
+  // names the author even after they left the group, like in "Leo left the group"
+  author: z
+    .object({ username: z.string(), displayName: z.string().nullable() })
+    .nullable()
+    .default(null),
 });
 
 export const dmResponseSchema = z.object({
@@ -177,7 +182,13 @@ export const dmLatestResponseSchema = z.object({
       attachmentCount: z.number().int().nonnegative().optional(),
       system: systemMessageSchema.nullish().catch(null),
       // who wrote it, so a group's preview names them; older homeservers only send `own`
-      author: z.object({ username: z.string(), homeserver: z.string() }).optional(),
+      author: z
+        .object({
+          username: z.string(),
+          homeserver: z.string(),
+          displayName: z.string().nullable().optional(),
+        })
+        .optional(),
     })
   ),
 });

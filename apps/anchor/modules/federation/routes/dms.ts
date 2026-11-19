@@ -328,6 +328,7 @@ export const dms = new Elysia()
     async ({ params, payload, remoteUser, server, status }) => {
       const change = z
         .object({ name: z.string().max(100).optional(), iconUrl: z.url().nullable().optional() })
+        .refine((change) => change.name !== undefined || change.iconUrl !== undefined)
         .safeParse(payload);
       if (!change.success) return status(400, { error: 'Invalid change' });
       const result = await asMember(params.id, remoteUser, (group, actor) =>

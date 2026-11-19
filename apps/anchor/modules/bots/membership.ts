@@ -59,21 +59,28 @@ export function createGrant(botId: string, host: string, guildId: string) {
   return grant;
 }
 
+export function grantFits(grant: string | undefined, botId: string, host: string, guildId: string) {
+  const found = grant ? grants.get(grant) : undefined;
+  return (
+    !!found &&
+    found.expires > Date.now() &&
+    found.botId === botId &&
+    found.host === host.toLowerCase() &&
+    found.guildId === guildId
+  );
+}
+
+export const dropGrant = (grant: string | undefined) => grant && grants.delete(grant);
+
 export function consumeGrant(
   grant: string | undefined,
   botId: string,
   host: string,
   guildId: string
 ) {
-  const found = grant ? grants.get(grant) : undefined;
-  if (!found) return false;
-  grants.delete(grant!);
-  return (
-    found.expires > Date.now() &&
-    found.botId === botId &&
-    found.host === host.toLowerCase() &&
-    found.guildId === guildId
-  );
+  const fits = grantFits(grant, botId, host, guildId);
+  dropGrant(grant);
+  return fits;
 }
 
 // ---- adding -----------------------------------------------------------------------------------
