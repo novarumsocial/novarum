@@ -145,6 +145,7 @@
 
     if (!user) {
       await goto('/login');
+      window.electron?.appReady();
       return;
     }
 
@@ -152,6 +153,8 @@
     bootFinished = true;
     await new Promise((resolve) => setTimeout(resolve, 100));
     booting = false;
+    // let the loader's fade-out finish before the desktop app reveals this window
+    setTimeout(() => window.electron?.appReady(), 150);
   }
 
   function leaveVoice() {
@@ -244,7 +247,9 @@
 />
 
 {#if booting}
-  <InitialLoader finished={bootFinished} />
+  {#if !window.electron?.behindSplash}
+    <InitialLoader finished={bootFinished} />
+  {/if}
 {:else if currentUser}
   <div class="flex h-svh overflow-hidden bg-background">
     {#if mobileNavigationOpen}
