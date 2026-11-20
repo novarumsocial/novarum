@@ -68,7 +68,10 @@ export default function RootLayout() {
     () => colorScheme.set(followSystemTheme ? 'system' : darkMode ? 'dark' : 'light'),
     [darkMode, followSystemTheme]
   );
-  useEffect(() => void checkForUpdates(), []);
+  useEffect(
+    () => void checkForUpdates().catch((e) => console.error('Update check failed:', e)),
+    []
+  );
   useEffect(() => {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);

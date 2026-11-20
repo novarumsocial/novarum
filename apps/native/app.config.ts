@@ -80,6 +80,8 @@ const config: ExpoConfig = {
     'expo-audio',
     'expo-notifications',
     'expo-unified-push',
+    // OTA updates (see hot-updater.config.ts); the channel is what CI deploys `main` to
+    ['@hot-updater/expo', { channel: 'production' }],
     // the foreground service Android needs for screen share (MediaProjection)
     ['@livekit/react-native-expo-plugin', { android: { enableScreenShareService: true } }],
     [
@@ -90,9 +92,6 @@ const config: ExpoConfig = {
       },
     ],
   ],
-  // OTA updates turn on when EAS_UPDATE_URL is set (the `eas update` URL from `eas init`)
-  updates: { enabled: Boolean(process.env.EAS_UPDATE_URL), url: process.env.EAS_UPDATE_URL },
-  runtimeVersion: { policy: 'appVersion' }, // set `updates.url` after `eas init` to turn on OTA updates
   experiments: { typedRoutes: true },
   extra: { gitCommitHash },
 };

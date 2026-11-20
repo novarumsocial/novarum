@@ -28,6 +28,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Stack.Screen name="voice" options={{ title: 'Voice & audio' }} />
       <Stack.Screen name="language" options={{ title: 'Language & time' }} />
+      <Stack.Screen name="updates" options={{ title: 'Updates' }} />
     </Stack>
   );
 }

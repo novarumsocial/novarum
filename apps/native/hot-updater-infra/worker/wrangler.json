@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "novarum-hot-updater",
+  "main": "./dist/index.js",
+  "compatibility_date": "2026-08-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "cache": {
+    "enabled": true
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "38ae3c22-5ab7-4b79-88ad-730ce6709a9c",
+      "database_name": "novarum-hot-updater"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "novarum-hot-updater"
+    }
+  ],
+  "vars": {
+    "ACCOUNT_ID": "93855b35e29be35d9b1831a8f940e0f0",
+    "BUCKET_NAME": "novarum-hot-updater"
+  },
+  "account_id": "93855b35e29be35d9b1831a8f940e0f0"
+}

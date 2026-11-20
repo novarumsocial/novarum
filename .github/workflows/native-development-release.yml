@@ -1,5 +1,9 @@
 name: Release native development build
 
+# Native builds only run when the Hot Updater fingerprint (native deps, app.config.ts, local modules, icons)
+# has no build yet; JS-only changes ship as an OTA bundle instead: `main` to the `production` channel, PRs to a
+# channel named after their branch (switch to it in Settings > Updates).
+
 on:
   workflow_dispatch:
   # called by release-please.yml to attach the APK/IPA to a versioned release
@@ -26,6 +30,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,10 +40,70 @@ env:
   # every build gets a higher build number, so it installs as an update over the previous one
   BUILD_NUMBER: ${{ github.run_number }}
   CI: 1
+  # baked into the JS bundle; the client key the app sends to the update server
+  EXPO_PUBLIC_HOT_UPDATER_API_KEY: ${{ secrets.HOT_UPDATER_API_KEY }}
 
 jobs:
+  fingerprint:
+    name: Check native fingerprint
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      android: ${{ steps.hash.outputs.android }}
+      ios: ${{ steps.hash.outputs.ios }}
+      android_build: ${{ steps.lookup.outputs.android_build }}
+      ios_build: ${{ steps.lookup.outputs.ios_build }}
+      android_id: ${{ steps.lookup.outputs.android_id }}
+      ios_id: ${{ steps.lookup.outputs.ios_id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compute fingerprints
+        id: hash
+        run: |
+          bunx --no-install hot-updater fingerprint create
+          for platform in android ios; do
+            echo "$platform=$(node -p "require('./fingerprint.json').$platform.hash")" >> "$GITHUB_OUTPUT"
+          done
+        working-directory: apps/native
+
+      # a build whose artifact is still around (from any branch) already has this native code
+      - name: Look up existing builds
+        id: lookup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          # releases (workflow_call) and manual runs always build
+          FORCE: ${{ github.event_name == 'workflow_dispatch' || inputs.release_tag != '' }}
+          ANDROID: ${{ steps.hash.outputs.android }}
+          IOS: ${{ steps.hash.outputs.ios }}
+        run: |
+          find_artifact() {
+            gh api "repos/$GH_REPO/actions/artifacts?name=$1&per_page=10" \
+              --jq '[.artifacts[] | select(.expired | not)][0].id // empty'
+          }
+          android_id=$(find_artifact "novarum-apk-$ANDROID")
+          ios_id=$(find_artifact "novarum-ipa-$IOS")
+          echo "android_id=$android_id" >> "$GITHUB_OUTPUT"
+          echo "ios_id=$ios_id" >> "$GITHUB_OUTPUT"
+          echo "android_build=$([ "$FORCE" = true ] || [ -z "$android_id" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "ios_build=$([ "$FORCE" = true ] || [ -z "$ios_id" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   android:
     name: Build APK
+    needs: fingerprint
+    if: needs.fingerprint.outputs.android_build == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       id: ${{ steps.upload.outputs.artifact-id }}
@@ -69,9 +134,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # generates android/ from app.config.ts (it is not committed)
+      # generates android/ from app.config.ts (it is not committed); the build embeds fingerprint.json's hash
       - name: Generate native project
-        run: bunx expo prebuild --platform android --clean --no-install
+        run: |
+          bunx --no-install hot-updater fingerprint create
+          bunx expo prebuild --platform android --clean --no-install
         working-directory: apps/native
 
       # the same keystore as the old Capacitor app, so the APK installs as an update over it
@@ -90,16 +157,19 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/novarum.apk"
         working-directory: apps/native/android
 
+      # named by fingerprint, so later runs with the same native code reuse it instead of rebuilding
       - name: Upload APK
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: novarum-apk
+          name: novarum-apk-${{ needs.fingerprint.outputs.android }}
           path: ${{ runner.temp }}/novarum.apk
           if-no-files-found: error
 
   ios:
     name: Build unsigned IPA
+    needs: fingerprint
+    if: needs.fingerprint.outputs.ios_build == 'true'
     # signing needs an Apple Developer account; this IPA is for sideloading (AltStore, SideStore, ...),
     # which signs it with your own Apple ID on install
     runs-on: macos-26
@@ -125,9 +195,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # generates ios/ from app.config.ts and runs pod install
+      # generates ios/ from app.config.ts and runs pod install; the build embeds fingerprint.json's hash
       - name: Generate native project
-        run: bunx expo prebuild --platform ios --clean
+        run: |
+          bunx --no-install hot-updater fingerprint create
+          bunx expo prebuild --platform ios --clean
         working-directory: apps/native
 
       - name: Build app
@@ -155,14 +227,66 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: novarum-ipa
+          name: novarum-ipa-${{ needs.fingerprint.outputs.ios }}
           path: ${{ runner.temp }}/novarum-unsigned.ipa
           if-no-files-found: error
 
+  ota:
+    name: Deploy OTA bundle
+    # forks don't get the deploy secrets; releases ship as builds
+    if: >-
+      inputs.release_tag == '' && (github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+    env:
+      HOT_UPDATER_CLOUDFLARE_ACCOUNT_ID: 93855b35e29be35d9b1831a8f940e0f0
+      HOT_UPDATER_CLOUDFLARE_R2_BUCKET_NAME: novarum-hot-updater
+      HOT_UPDATER_CLOUDFLARE_D1_DATABASE_ID: 38ae3c22-5ab7-4b79-88ad-730ce6709a9c
+      HOT_UPDATER_CLOUDFLARE_API_TOKEN: ${{ secrets.HOT_UPDATER_CLOUDFLARE_API_TOKEN }}
+      HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_ACCESS_KEY_ID }}
+      HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.HOT_UPDATER_CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # same rule as branchChannel() in apps/native/src/lib/ota.ts
+      - name: Pick channel
+        id: channel
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then echo "channel=production" >> "$GITHUB_OUTPUT"; exit 0; fi
+          channel=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        env:
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+          MESSAGE: ${{ github.event.pull_request.title || github.event.head_commit.message }}
+        run: |
+          bunx --no-install hot-updater fingerprint create
+          for platform in android ios; do
+            bunx --no-install hot-updater deploy -p "$platform" -c "$CHANNEL" -m "${MESSAGE%%$'\n'*}"
+          done
+        working-directory: apps/native
+
   release:
     name: Publish development release
-    needs: [android, ios]
-    # the APK is still published when only the iOS build failed
+    needs: [fingerprint, android, ios]
+    # the APK is still published when only the iOS build failed; nothing to publish when nothing was rebuilt
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.android.result == 'success' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
@@ -203,7 +327,7 @@ jobs:
 
   comment:
     name: Comment download links on PR
-    needs: [android, ios]
+    needs: [fingerprint, android, ios, ota]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
@@ -218,15 +342,30 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ANDROID_RESULT: ${{ needs.android.result }}
-          ANDROID_ID: ${{ needs.android.outputs.id }}
+          ANDROID_ID: ${{ needs.android.outputs.id || needs.fingerprint.outputs.android_id }}
           IOS_RESULT: ${{ needs.ios.result }}
-          IOS_ID: ${{ needs.ios.outputs.id }}
+          IOS_ID: ${{ needs.ios.outputs.id || needs.fingerprint.outputs.ios_id }}
+          OTA_RESULT: ${{ needs.ota.result }}
+          CHANNEL: ${{ needs.ota.outputs.channel }}
         run: |
-          link() { [ "$1" = success ] && echo "[Download](https://nightly.link/$GH_REPO/actions/artifacts/$2.zip)" || echo "Build $1 ([logs]($RUN_URL))"; }
+          link() {
+            case "$1" in
+              success) echo "[Download](https://nightly.link/$GH_REPO/actions/artifacts/$2.zip) (new build)" ;;
+              skipped) echo "[Download](https://nightly.link/$GH_REPO/actions/artifacts/$2.zip) (no native changes, earlier build)" ;;
+              *) echo "Build $1 ([logs]($RUN_URL))" ;;
+            esac
+          }
+          if [ "$OTA_RESULT" = success ]; then
+            ota="Already have a build with the same native code? Open **Settings → Updates** and switch to branch \`$CHANNEL\`."
+          else
+            ota="OTA deploy $OTA_RESULT ([logs]($RUN_URL))"
+          fi
           gh pr comment "$PR" --edit-last --create-if-none --body "### Native development builds
           | Platform | Build |
           | --- | --- |
           | Android APK | $(link "$ANDROID_RESULT" "$ANDROID_ID") |
           | iOS IPA (unsigned, install with AltStore/SideStore) | $(link "$IOS_RESULT" "$IOS_ID") |
+
+          $ota
 
           Commit \`${SHA::7}\` · [workflow run]($RUN_URL)"

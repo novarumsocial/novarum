@@ -6,6 +6,7 @@ on:
       - main
 
 permissions:
+  actions: read # native-development-release.yml looks up earlier builds
   contents: write
   issues: write
   pull-requests: write

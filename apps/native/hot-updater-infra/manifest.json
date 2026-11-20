@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "provider": "cloudflare",
+  "cliVersion": "1.1.17",
+  "providerVersion": "1.1.17",
+  "serverVersion": "1.1.17",
+  "infrastructureGeneration": 1,
+  "clientAuth": {
+    "plugin": "apiKeys",
+    "varyHeaders": [
+      "x-api-key"
+    ],
+    "credential": {
+      "label": "API key",
+      "header": "x-api-key",
+      "env": "HOT_UPDATER_API_KEY"
+    }
+  },
+  "clientPlugins": [
+    {
+      "module": "@hot-updater/react-native",
+      "name": "insights"
+    }
+  ],
+  "packages": {
+    "hot-updater": "1.1.17",
+    "@hot-updater/server": "1.1.17",
+    "@hot-updater/react-native": "1.1.17",
+    "@hot-updater/cloudflare": "1.1.17",
+    "@hot-updater/expo": "1.1.17"
+  },
+  "requiredInputs": {
+    "workerName": null,
+    "accountId": null,
+    "d1DatabaseId": null,
+    "d1DatabaseName": null,
+    "bucketName": null
+  },
+  "upgradeRequirements": [
+    "1.0.0"
+  ],
+  "operation": "setup",
+  "build": "expo",
+  "files": {
+    ".gitignore": "1ca9035e99b2a41ab5f188d79b45569d5ca88e7271d60bb493845e8a142097e0",
+    "app/hot-updater.config.ts": "60b564a561bcbb7c1c2e55f6190694bd8ecbc2c6e78a05b7f2959d713f90e40d",
+    "app/hotUpdater.ts": "148142e897b9bd9ebdda2af8834b5b201e9c4a9e952f7de3da889c0cc6e12d24",
+    "app/provision-client-credential.mjs": "6495d18eabff3688a9ca289dfc13b09458cb9f1bf51d35b5159ae2983747a507",
+    "app/verify-server.mjs": "c04a66de29ad82d05579aa31eebaa28d41a1bcd8c822f2dc1a2391996e124f46",
+    "COMMON.md": "24a109dab1a8add307edca723ce76decae3b3f46a51ca2142f344062fddf1351",
+    "env.example": "8a57475d82a6513e4c7f53591c96a5fdc86203784d944fa1ab670ad3ad048ee3",
+    "ENVIRONMENT.md": "6452e12ad10cf3e3c0351cf2a36d0982b544675fa8b50461bfefb96f022a306a",
+    "SETUP.md": "c30d729a7cfa62dc5a8e35832a5dd48d708a3685a089936562f607f87981aafe",
+    "upgrades/1.0.0.md": "42c3424ffb0a286fdc0253afad2b31e8abc34d2fb7a060fc5818b5be2d6a76d5",
+    "upgrades/README.md": "341e428565e35666b427f53e27ad97428183729f1aba21825b5bcfaa00bef770",
+    "worker/dist/index.js": "6b54bc17ee48710765abf1fdf5d645c70cceb9a0626b84778f358f14cf2ab595",
+    "worker/dist/index.js.map": "1f600fe9876b93a0fb96f4f8ee1bd7153e85c238c17ca882f2d0d4e92f3d6554",
+    "worker/dist/README.md": "f3115febced85f790a7012130e9e54a17f01f9cbd3571cd2a11d37e5d27614ee",
+    "worker/migrations/0001_hot-updater_1.0.0.sql": "ed96ee68fe1511d77fcec2cdd704389a68f13976814467b45a07fbfae4b3612f",
+    "worker/package.json": "f5c51eff03c6bba7c761a556932a9ab6f06cbb3c188d3e7224e52da8f19857e2",
+    "worker/wrangler.json": "fc08283babe060a4e307c8d3cbcb53742f6c4301fdd3ae228939ecf068b4fbd9"
+  }
+}

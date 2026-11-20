@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "provider": "cloudflare",
+  "resources": {
+    "workerName": "novarum-hot-updater",
+    "accountId": "93855b35e29be35d9b1831a8f940e0f0",
+    "d1DatabaseId": "38ae3c22-5ab7-4b79-88ad-730ce6709a9c",
+    "d1DatabaseName": "novarum-hot-updater",
+    "bucketName": "novarum-hot-updater"
+  },
+  "baseUrl": "https://novarum-hot-updater.sr-izan.workers.dev",
+  "deployedServerVersion": null,
+  "pendingStep": null,
+  "verifiedSteps": [
+    {
+      "id": "cf.account",
+      "target": {
+        "accountId": "93855b35e29be35d9b1831a8f940e0f0"
+      },
+      "observation": "single account; no worker/D1/R2 named novarum-hot-updater exists",
+      "checkedAt": "2026-11-20T22:59:25.710Z"
+    },
+    {
+      "id": "cf.storage",
+      "target": {
+        "accountId": "93855b35e29be35d9b1831a8f940e0f0",
+        "bucketName": "novarum-hot-updater"
+      },
+      "observation": "bucket created, location WEUR, 0 objects, private (no public dev URL/custom domain)",
+      "checkedAt": "2026-11-20T22:59:35.708Z"
+    },
+    {
+      "id": "cf.database",
+      "target": {
+        "accountId": "93855b35e29be35d9b1831a8f940e0f0",
+        "databaseName": "novarum-hot-updater"
+      },
+      "observation": "created D1 38ae3c22-5ab7-4b79-88ad-730ce6709a9c, 0 tables",
+      "checkedAt": "2026-11-20T22:59:46.860Z"
+    },
+    {
+      "id": "cf.schema",
+      "target": {
+        "accountId": "93855b35e29be35d9b1831a8f940e0f0",
+        "databaseId": "38ae3c22-5ab7-4b79-88ad-730ce6709a9c"
+      },
+      "observation": "applied 0001_hot-updater_1.0.0.sql; no pending migrations; schema.engine=1, core/insights/apiKeys/remoteConfig 1.0.0",
+      "checkedAt": "2026-11-20T23:00:32.128Z"
+    },
+    {
+      "id": "cf.worker",
+      "target": {
+        "accountId": "93855b35e29be35d9b1831a8f940e0f0",
+        "workerName": "novarum-hot-updater"
+      },
+      "observation": "active version fa35d1d2-4e4a-4b7e-b218-97d53b322616; bindings DB=D1 novarum-hot-updater, BUCKET=R2 novarum-hot-updater; URL https://novarum-hot-updater.sr-izan.workers.dev",
+      "checkedAt": "2026-11-20T23:00:50.776Z"
+    }
+  ]
+}

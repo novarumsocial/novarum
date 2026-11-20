@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import {
   Bell,
   ChevronRight,
+  Download,
   Languages,
   LogOut,
   Palette,
@@ -43,6 +44,7 @@ const groups: { label: string; pages: { href: string; title: string; icon: Lucid
       { href: '/settings/notifications', title: 'Notifications', icon: Bell },
       { href: '/settings/voice', title: 'Voice & audio', icon: Volume2 },
       { href: '/settings/language', title: 'Language & time', icon: Languages },
+      { href: '/settings/updates', title: 'Updates', icon: Download },
     ],
   },
 ];
