@@ -75,6 +75,10 @@ export const relations = defineRelations(schema, (r) => ({
     channels: r.many.channels({ from: r.guilds.id, to: r.channels.guildId }),
     invites: r.many.guildInvites({ from: r.guilds.id, to: r.guildInvites.guildId }),
   },
+  guildBans: {
+    user: r.one.users({ from: r.guildBans.userId, to: r.users.id, optional: false }),
+    bannedBy: r.one.users({ from: r.guildBans.bannedById, to: r.users.id }),
+  },
   guildMembers: {
     guild: r.one.guilds({
       from: r.guildMembers.guildId,

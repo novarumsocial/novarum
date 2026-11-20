@@ -5,6 +5,7 @@ import {
   channelMembers,
   channels,
   friendRelationships,
+  guildBans,
   guildInvites,
   guildMembers,
   guilds,
@@ -41,6 +42,17 @@ export const federatedGuildResponseSchema = guildResponseSchema
 export const guildInviteResponseSchema = createSelectSchema(guildInvites, {
   createdAt: isoDateSchema,
   expiresAt: isoDateSchema.nullable(),
+});
+
+export const guildBanResponseSchema = createSelectSchema(guildBans, {
+  reason: z.string().nullable(),
+  createdAt: isoDateSchema,
+})
+  .pick({ reason: true, createdAt: true })
+  .extend({ user: publicUserSchema, bannedBy: publicUserSchema.nullable() });
+
+export const guildBanCreateSchema = z.object({
+  reason: z.string().trim().max(512).optional(),
 });
 
 // this is guild-channel-only: guildId and type are always present for TEXT/VOICE channels.

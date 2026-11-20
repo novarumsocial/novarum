@@ -3,7 +3,16 @@
 // unread DMs light up Home (with a count) instead of being added to the rail, so the rail never reshuffles;
 // "Add a server" offers create or join with an invite link; a server whose homeserver is down says so on tap.
 import * as Haptics from 'expo-haptics';
-import { ArrowDown, ArrowDownUp, ArrowUp, Bell, Link, Plus, WifiOff } from 'lucide-react-native';
+import {
+  ArrowDown,
+  ArrowDownUp,
+  ArrowUp,
+  Bell,
+  Link,
+  LogOut,
+  Plus,
+  WifiOff,
+} from 'lucide-react-native';
 import { memo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -17,6 +26,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, useChat } from '@/lib/chat-state';
+import { moderation } from '@/lib/moderation';
 import type { DmEntry } from '@/lib/dms';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
@@ -219,6 +229,17 @@ export const GuildSidebar = memo(function GuildSidebar({
             icon={ArrowDownUp}
             label="Reorder servers"
             onPress={() => setMenu('reorder')}
+          />
+        )}
+        {menuServer && !menuServer.owner && (
+          <SheetItem
+            icon={LogOut}
+            label="Leave server"
+            destructive
+            onPress={() => {
+              setMenu(null);
+              moderation().ask({ kind: 'leave', server: menuServer });
+            }}
           />
         )}
       </Sheet>

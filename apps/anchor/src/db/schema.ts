@@ -170,6 +170,32 @@ export const guildMembers = pgTable(
   ]
 );
 
+// a banned user can't join the guild again until they are unbanned
+export const guildBans = pgTable(
+  'guild_ban',
+  {
+    guildId: text('guildId')
+      .notNull()
+      .references(() => guilds.id, { onDelete: 'cascade' }),
+
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    reason: text('reason'),
+
+    bannedById: text('bannedById').references(() => users.id, { onDelete: 'set null' }),
+
+    createdAt: date('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'guild_ban_pkey',
+      columns: [table.guildId, table.userId],
+    }),
+  ]
+);
+
 export const channels = pgTable(
   'channel',
   {

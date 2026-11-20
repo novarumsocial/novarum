@@ -80,6 +80,7 @@ type Socket = {
   data: { request: Request; query: unknown };
   close(code: number, reason: string): void;
   subscribe(topic: string): void;
+  unsubscribe(topic: string): void;
   isSubscribed(topic: string): boolean;
   subscriptions: string[];
   send(data: string): void;
@@ -98,15 +99,47 @@ async function verifySocket(ws: Socket, signedPath: string) {
   return verifyFederationRequest(request, '', signedPath);
 }
 
+// every open socket by who is on the other end, so a homeserver can be cut off from a guild
+// once none of its users is in it anymore
+const followers = new Map<
+  string,
+  {
+    ws: Socket;
+    origin: Promise<FederationOrigin | null>;
+    single?: { kind: SharedKind; id: string };
+  }
+>();
+
+/** Stops `homeserver` getting the guild's events, unless one of its users is still in it. */
+export async function stopFollowingGuild(homeserver: string, guildId: string) {
+  if ((await guildSource.followable([guildId], homeserver)).has(guildId)) return;
+  const topic = sharedSocketTopic('guild', guildId);
+  for (const { ws, origin, single } of followers.values()) {
+    if ((await origin)?.homeserver.toLowerCase() !== homeserver.toLowerCase()) continue;
+    if (single) {
+      if (single.kind === 'guild' && single.id === guildId) ws.close(policyViolation, 'Forbidden');
+    } else if (ws.isSubscribed(topic)) {
+      ws.unsubscribe(topic);
+      ws.send(sharedRefusedFrame('guild', guildId));
+    }
+  }
+}
+
 // one socket for one guild or DM
 function singleSocket(source: Source) {
   return {
     async open(ws: Socket & { data: { params: { id: string } } }) {
       const id = ws.data.params.id;
-      const verification = await verifySocket(
+      const verifying = verifySocket(
         ws,
         `/federation/realtime/${source.path}/${encodeURIComponent(id)}`
       );
+      followers.set(ws.id, {
+        ws,
+        origin: verifying.then((v) => (v.ok ? v.origin : null)).catch(() => null),
+        single: { kind: source.kind, id },
+      });
+      const verification = await verifying;
       if (!verification.ok) return ws.close(policyViolation, verification.error);
 
       const followable = await source.followable([id], verification.origin.homeserver);
@@ -117,6 +150,9 @@ function singleSocket(source: Source) {
     },
     message() {
       // server-to-server realtime is publish-only for now.
+    },
+    close(ws: Socket) {
+      followers.delete(ws.id);
     },
   };
 }
@@ -143,6 +179,7 @@ const sharedSocket = {
         return null;
       });
     sharedSocketOrigins.set(ws.id, origin);
+    followers.set(ws.id, { ws, origin });
   },
   async message(ws: Socket, message: unknown) {
     const origin = await sharedSocketOrigins.get(ws.id);
@@ -175,6 +212,7 @@ const sharedSocket = {
   },
   close(ws: Socket) {
     sharedSocketOrigins.delete(ws.id);
+    followers.delete(ws.id);
   },
 };
 

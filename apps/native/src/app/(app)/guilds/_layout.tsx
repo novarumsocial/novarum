@@ -6,6 +6,7 @@ import { Stack, type StackCardStyleInterpolator } from 'expo-router/js-stack';
 import { useIsFocused } from 'expo-router';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { ModerationSheet } from '@/components/moderation-sheet';
 import { CallRinging } from '@/components/call-ringing';
 import { SwipeBack } from '@/components/swipe-back';
 import { pathSegments } from '@/lib/chat-state';
@@ -82,6 +83,7 @@ export default function GuildsLayout() {
         <Stack.Screen name="[server]/[...rest]" {...singularChannel} />
         <Stack.Screen name="members" />
       </Stack>
+      <ModerationSheet />
       <CallRinging
         onAccept={(id) => {
           goto(dmPath(id));

@@ -10,6 +10,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { dms } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { canModerate, moderation } from '$lib/moderation.svelte';
 
   let {
     server,
@@ -112,9 +113,19 @@
             {#if server.canManageChannels}
               <ContextMenu.Separator />
               <ContextMenu.Item>Roles</ContextMenu.Item>
+            {/if}
+            {#if canModerate(server, member)}
               <ContextMenu.Separator />
-              <ContextMenu.Item variant="destructive">Kick {member.username}</ContextMenu.Item>
-              <ContextMenu.Item variant="destructive">Ban {member.username}</ContextMenu.Item>
+              <ContextMenu.Item
+                variant="destructive"
+                onclick={() => moderation.ask({ kind: 'kick', server, member })}
+                >Kick {member.username}</ContextMenu.Item
+              >
+              <ContextMenu.Item
+                variant="destructive"
+                onclick={() => moderation.ask({ kind: 'ban', server, member })}
+                >Ban {member.username}</ContextMenu.Item
+              >
             {/if}
           </ContextMenu.Content>
         </ContextMenu.Root>
@@ -175,9 +186,19 @@
               {#if server.canManageChannels}
                 <ContextMenu.Separator />
                 <ContextMenu.Item>Roles</ContextMenu.Item>
+              {/if}
+              {#if canModerate(server, member)}
                 <ContextMenu.Separator />
-                <ContextMenu.Item variant="destructive">Kick {member.username}</ContextMenu.Item>
-                <ContextMenu.Item variant="destructive">Ban {member.username}</ContextMenu.Item>
+                <ContextMenu.Item
+                  variant="destructive"
+                  onclick={() => moderation.ask({ kind: 'kick', server, member })}
+                  >Kick {member.username}</ContextMenu.Item
+                >
+                <ContextMenu.Item
+                  variant="destructive"
+                  onclick={() => moderation.ask({ kind: 'ban', server, member })}
+                  >Ban {member.username}</ContextMenu.Item
+                >
               {/if}
             </ContextMenu.Content>
           </ContextMenu.Root>

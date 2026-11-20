@@ -177,10 +177,12 @@ export function ProfileCard({
   user,
   children,
   className,
+  onLongPress,
 }: {
   user: Author;
   children: ReactNode;
   className?: string;
+  onLongPress?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   // the sheet is mounted on first tap only, so a long message list doesn't create one per message
@@ -196,6 +198,7 @@ export function ProfileCard({
           setMounted(true);
           setOpen(true);
         }}
+        onLongPress={onLongPress}
       >
         {children}
       </Pressable>

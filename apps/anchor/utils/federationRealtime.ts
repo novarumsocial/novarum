@@ -112,6 +112,10 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({
+    type: z.literal('member.left'),
+    data: z.object({ guildId: z.string(), userId: z.string() }),
+  }),
+  z.object({
     type: z.literal('voice.states.snapshot'),
     data: z.object({
       guildIds: z.array(z.string()),
@@ -406,6 +410,7 @@ export async function vetBridgedEvent(
       return user && { ...event, data: { ...event.data, displayName: user.displayName } };
     }
     case 'user.status.changed':
+    case 'member.left':
     case 'voice.state.changed':
       return (await localUserIds([event.data.userId])).size ? null : event;
     case 'voice.states.snapshot': {
@@ -663,6 +668,8 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
         },
       };
     case 'member.joined':
+      return { ...event, data: { ...event.data, guildId: guild(event.data.guildId) } };
+    case 'member.left':
       return { ...event, data: { ...event.data, guildId: guild(event.data.guildId) } };
     case 'voice.states.snapshot':
       return {

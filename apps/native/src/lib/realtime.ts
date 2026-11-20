@@ -21,6 +21,7 @@ import { notificationSettings } from './notification-settings';
 import { friends } from './friends';
 import { dms, dmPath } from './dms';
 import { openCanvases, type CanvasMessage } from './canvas';
+import { guildRemoved } from './moderation';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
 const userStatusSchema = z.enum(['ONLINE', 'OFFLINE']);
@@ -163,6 +164,10 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message.ephemeral'),
     data: ephemeralMessageSchema,
+  }),
+  z.object({
+    type: z.literal('guild.deleted'),
+    data: z.object({ guildId: z.string(), reason: z.enum(['kicked', 'banned']).optional() }),
   }),
   z.object({
     type: z.literal('member.left'),
@@ -474,8 +479,11 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     if (event.type === 'member.joined') {
       chat().addOrUpdateMember(event.data.guildId, event.data.user);
     }
+    if (event.type === 'guild.deleted') {
+      guildRemoved(event.data.guildId, event.data.reason);
+    }
     if (event.type === 'member.left') {
-      chat().removeMember(event.data.userId);
+      chat().removeMember(event.data.guildId, event.data.userId);
     }
     if (event.type === 'message.ephemeral') {
       chat().addEphemeral({ ...event.data, attachments: [], pingedHandles: [], replyTo: null });

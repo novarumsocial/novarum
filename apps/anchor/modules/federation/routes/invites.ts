@@ -12,6 +12,7 @@ import { upsertFederatedUser } from '../../../utils/federationPayload';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { publicUser } from '../../../utils/publicUser';
 import { publishRealtime } from '../../../utils/publishRealtime';
+import { isBanned } from '../../guilds/membership';
 import { federationAuth } from '../plugin';
 import { federationErrors } from '../schemas';
 
@@ -78,6 +79,9 @@ export const invites = new Elysia()
       if (!guild) return status(404, { error: 'Guild not found' });
 
       const user = await upsertFederatedUser(remoteUser);
+      if (await isBanned(guild.id, user.id)) {
+        return status(403, { error: 'You are banned from this guild' });
+      }
       const membership = await db.query.guildMembers.findFirst({
         where: { guildId: guild.id, userId: user.id },
       });
@@ -133,6 +137,7 @@ export const invites = new Elysia()
           channels: z.array(channelResponseSchema),
         }),
         ...federationErrors,
+        403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
       },
     }

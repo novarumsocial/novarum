@@ -61,7 +61,7 @@ export type RealtimeEvent =
   | {
       // only to the user who left (or was removed from) the guild
       type: 'guild.deleted';
-      data: { guildId: string };
+      data: { guildId: string; reason?: 'kicked' | 'banned' };
     }
   | {
       type: 'voice.states.snapshot';

@@ -24,7 +24,7 @@ describe('create', () => {
 
     const { guilds } = (await call(owner, 'GET', '/guilds/list')).body;
     expect(guilds).toHaveLength(1);
-    expect(guilds[0]).toMatchObject({ id: guild.id, canManageChannels: true });
+    expect(guilds[0]).toMatchObject({ id: guild.id, canManageChannels: true, owner: true });
     expect(guilds[0].channels).toEqual([
       expect.objectContaining({
         id: channel.id,

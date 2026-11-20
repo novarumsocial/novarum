@@ -20,7 +20,8 @@ import { storage } from '../../utils/services/storage';
 import { processImage } from '../../utils/optimizeWebp';
 import { commandListSchema } from '../../utils/botSchemas';
 import type { RealtimeEvent } from '../../utils/types';
-import { hostRemoveBot, leaveGuild, lookupBot, requestAddBot } from './membership';
+import { hostRemoveBot, lookupBot, requestAddBot } from './membership';
+import { leaveGuild } from '../guilds/membership';
 import { parseFederatedGuildId } from '../../utils/federationIds';
 import { callRemote, passThrough } from '../../utils/federationClient';
 

@@ -60,6 +60,7 @@ type AddMessageInput = {
 
 type ChannelMemberInput = PublicUser & {
   status: 'ONLINE' | 'OFFLINE';
+  role?: 'OWNER' | 'ADMIN' | 'MEMBER';
 };
 
 type VoicePresenceInput = {
@@ -310,11 +311,15 @@ class ChatState {
     name: string;
     down?: boolean;
     ownerId?: string;
+    owner?: boolean;
     canManageChannels?: boolean;
     avatarUrl?: string | null;
     description?: string | null;
   }) {
     const down = guild.down ?? false;
+    // our copy of a remote guild names whoever joined first as its owner
+    const owner =
+      guild.owner ?? (!guild.id.startsWith('fed:') && guild.ownerId === useSession().user?.id);
 
     if (this.servers.some((server) => server.id === guild.id)) {
       this.servers = this.servers.map((server) =>
@@ -324,7 +329,8 @@ class ChatState {
               name: guild.name,
               initials: initialsFor(guild.name),
               down,
-              canManageChannels: guild.canManageChannels ?? guild.ownerId === useSession().user?.id,
+              owner,
+              canManageChannels: guild.canManageChannels ?? owner,
               avatarUrl: guild.avatarUrl ?? null,
               description: guild.description ?? null,
             }
@@ -340,7 +346,8 @@ class ChatState {
         name: guild.name,
         initials: initialsFor(guild.name),
         down,
-        canManageChannels: guild.canManageChannels ?? guild.ownerId === useSession().user?.id,
+        owner,
+        canManageChannels: guild.canManageChannels ?? owner,
         avatarUrl: guild.avatarUrl ?? null,
         description: guild.description ?? null,
         ownerId: guild.ownerId,
@@ -452,8 +459,17 @@ class ChatState {
     );
   }
 
-  removeMember(userId: string) {
+  removeMember(guildId: string, userId: string) {
+    if (this.activeServer !== guildId) return;
     this.members = this.members.filter((member) => member.userId !== userId);
+  }
+
+  /** we left the guild or were removed from it */
+  removeGuild(guildId: string) {
+    this.servers = this.servers.filter((server) => server.id !== guildId);
+    const { [guildId]: _, ...channelsByServer } = this.channelsByServer;
+    this.channelsByServer = channelsByServer;
+    if (this.activeServer === guildId) void goto('/guilds', { replaceState: true });
   }
 
   removeMessage(channelId: string, messageId: string) {
@@ -954,6 +970,10 @@ class ChatState {
     const result = await anchor.client.guilds.list.get();
 
     if (result.error || !result.data) return;
+
+    // guilds we left or were removed from while disconnected
+    const ids = new Set(result.data.guilds.map((guild) => guild.id));
+    for (const server of this.servers) if (!ids.has(server.id)) this.removeGuild(server.id);
 
     for (const guild of result.data.guilds) {
       this.addGuild(guild);
