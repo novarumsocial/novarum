@@ -63,8 +63,21 @@
 
   const memberById = $derived(new Map(members.map((member) => [member.userId, member])));
 
+  function memberFor(identity: string) {
+    const handle = voice.participantHandle(identity);
+    return (
+      memberById.get(identity) ??
+      members.find(
+        (m) =>
+          handle &&
+          m.username === handle.username &&
+          m.server.toLowerCase() === handle.homeserver.toLowerCase()
+      )
+    );
+  }
+
   function nameFor(identity: string) {
-    const member = memberById.get(identity);
+    const member = memberFor(identity);
     return member?.displayName || member?.username || identity;
   }
 
@@ -78,7 +91,7 @@
           identity,
           state,
           kind,
-          member: memberById.get(identity),
+          member: memberFor(identity),
           name: nameFor(identity),
         }));
 

@@ -87,6 +87,8 @@ export const channels = new Elysia()
           channelId: access.channel.id,
           guildId: access.channel.guildId,
           userId: access.user.id,
+          username: access.user.username,
+          homeserver: access.user.homeserver,
         }),
       });
       token.addGrant({

@@ -34,6 +34,15 @@ import { DeepFilterProcessor, deepFilterLevel, setDeepFilterLevel } from './deep
 
 const livekitConnectionTimeoutMs = 15_000;
 
+const handleMetadataSchema = z.object({ username: z.string(), homeserver: z.string() });
+const safeJson = (text?: string) => {
+  try {
+    return JSON.parse(text ?? '');
+  } catch {
+    return null;
+  }
+};
+
 const participantAudioKey = 'novarum:participant-audio';
 const selfAudioKey = 'novarum:self-audio';
 const participantAudioSchema = z.object({
@@ -142,6 +151,13 @@ export class Voice {
 
   get participantCount() {
     return this.voiceStates.size;
+  }
+
+  /** Federated users join with their id on the call's host, so match them by handle instead. */
+  participantHandle(identity: string) {
+    const metadata = this.room?.getParticipantByIdentity(identity)?.metadata;
+    const parsed = handleMetadataSchema.safeParse(safeJson(metadata));
+    return parsed.success ? parsed.data : null;
   }
 
   get localIdentity(): string | null {

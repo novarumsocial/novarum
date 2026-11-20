@@ -48,6 +48,7 @@ import {
   selectConnected,
   selectConnecting,
   selectLocalIdentity,
+  participantHandle,
   selectParticipantCount,
   useVoice,
   voice,
@@ -157,6 +158,7 @@ export function VoiceArea({
     (connectionState === ConnectionState.Reconnecting ||
       connectionState === ConnectionState.SignalReconnecting);
 
+  const room = useVoice((s) => s.room);
   const memberById = useMemo(() => new Map(members.map((m) => [m.userId, m])), [members]);
 
   const tiles = useMemo<VoiceTile[]>(() => {
@@ -165,7 +167,15 @@ export function VoiceArea({
       entries
         .filter(([, state]) => (kind === 'screen' ? state.screenShare : true))
         .map(([identity, state]) => {
-          const member = memberById.get(identity);
+          const handle = participantHandle(room, identity);
+          const member =
+            memberById.get(identity) ??
+            members.find(
+              (m) =>
+                handle &&
+                m.username === handle.username &&
+                m.server.toLowerCase() === handle.homeserver.toLowerCase()
+            );
           return {
             key: kind === 'screen' ? `screen:${identity}` : identity,
             identity,
@@ -178,7 +188,7 @@ export function VoiceArea({
 
     // Screen shares first so they sort ahead of the people sharing them.
     return [...build('screen'), ...build('participant')];
-  }, [voiceStates, memberById]);
+  }, [voiceStates, memberById, members, room]);
 
   // The tile someone explicitly tapped into the spotlight. Beats screen-share
   // auto-promotion, same as tapping a face over a presentation in a real call.

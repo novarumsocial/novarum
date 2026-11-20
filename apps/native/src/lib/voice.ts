@@ -712,6 +712,18 @@ export const voice = useVoice.getState;
 export const selectConnected = (s: VoiceStore) => s.connectionState === ConnectionState.Connected;
 export const selectConnecting = (s: VoiceStore) => s.connectionState === ConnectionState.Connecting;
 export const selectParticipantCount = (s: VoiceStore) => s.voiceStates.size;
+const handleMetadataSchema = z.object({ username: z.string(), homeserver: z.string() });
+
+/** Federated users join with their id on the call's host, so match them by handle instead. */
+export function participantHandle(room: Room | null, identity: string) {
+  try {
+    const metadata = room?.getParticipantByIdentity(identity)?.metadata;
+    return handleMetadataSchema.parse(JSON.parse(metadata ?? ''));
+  } catch {
+    return null;
+  }
+}
+
 export const selectLocalIdentity = (s: VoiceStore) => s.room?.localParticipant.identity ?? null;
 
 // join a DM call, and ring the other side when nobody is in it yet

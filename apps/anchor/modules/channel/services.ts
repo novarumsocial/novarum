@@ -455,6 +455,8 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           channelId: channel.id,
           guildId: channel.guildId,
           userId: session.userId,
+          username: session.user.username,
+          homeserver: session.user.homeserver,
         }),
       });
 
