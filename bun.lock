@@ -227,6 +227,7 @@
         "@babel/core": "^7.29",
         "@babel/plugin-transform-react-jsx": "^7",
         "@hot-updater/cloudflare": "^1.1.17",
+        "@hot-updater/server": "1.1.17",
         "@tiptap/core": "^3.32.0",
         "@tiptap/extension-collaboration": "^3.32.0",
         "@tiptap/extension-collaboration-caret": "^3.32.0",

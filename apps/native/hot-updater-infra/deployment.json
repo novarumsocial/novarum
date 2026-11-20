@@ -9,7 +9,7 @@
     "bucketName": "novarum-hot-updater"
   },
   "baseUrl": "https://novarum-hot-updater.sr-izan.workers.dev",
-  "deployedServerVersion": null,
+  "deployedServerVersion": "1.1.17",
   "pendingStep": null,
   "verifiedSteps": [
     {
@@ -55,6 +55,40 @@
       },
       "observation": "active version fa35d1d2-4e4a-4b7e-b218-97d53b322616; bindings DB=D1 novarum-hot-updater, BUCKET=R2 novarum-hot-updater; URL https://novarum-hot-updater.sr-izan.workers.dev",
       "checkedAt": "2026-11-20T23:00:50.776Z"
+    },
+    {
+      "id": "cf.presign",
+      "target": {
+        "workerName": "novarum-hot-updater"
+      },
+      "observation": "secrets R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY present on worker (names only)",
+      "checkedAt": "2026-11-20T23:10:31.418Z"
+    },
+    {
+      "id": "cf.client-credential",
+      "target": {
+        "databaseId": "38ae3c22-5ab7-4b79-88ad-730ce6709a9c"
+      },
+      "observation": "client API key registered via apiKeys plugin; stored in hot-updater-infra/app/client-credential.local (private), .env.hotupdater and .env.local",
+      "checkedAt": "2026-11-20T23:10:56.819Z"
+    },
+    {
+      "id": "common.verify",
+      "target": {
+        "baseUrl": "https://novarum-hot-updater.sr-izan.workers.dev",
+        "channel": "production",
+        "strategy": "fingerprint"
+      },
+      "observation": "doctor --scope infrastructure success for android and ios: /version 1.1.17 gen 1, catalog 401 without key, authorized with key",
+      "checkedAt": "2026-11-20T23:11:31.175Z"
+    },
+    {
+      "id": "common.local",
+      "target": {
+        "bucketName": "novarum-hot-updater"
+      },
+      "observation": "config loads (expo build, cloudflare d1/r2, fingerprint); R2 ListObjectsV2 maxKeys=1 ok (0 objects); app doctor only flags stale local android/ (pre-plugin prebuild)",
+      "checkedAt": "2026-11-20T23:11:31.212Z"
     }
   ]
 }
