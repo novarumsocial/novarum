@@ -66,8 +66,7 @@ export async function sendNotification(notification: NotificationOptions): Promi
   }
 
   // with a push subscription the server already notifies a user whose app is not in the foreground
-  // (calls are not pushed)
-  if (!notification.tag?.startsWith('call:') && hasPushSubscription()) return false;
+  if (hasPushSubscription()) return false;
 
   if ((await getNotificationPermission()) !== 'granted') {
     return false;

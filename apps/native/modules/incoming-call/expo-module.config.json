@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["me.novarum.incomingcall.IncomingCallModule"]
+  }
+}

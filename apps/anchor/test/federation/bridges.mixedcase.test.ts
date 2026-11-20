@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { fake, resetHarness, restart, signup, stackIsUp } from '../harness/federation';
+import { anchors, fake, resetHarness, restart, signup, stackIsUp } from '../harness/federation';
 import { call, createGuild } from '../harness/chat';
 import { closePg, fakeSend, openBridge, pg, userPayload } from '../harness/fedflows';
 import { uniqueName } from '../harness/users';
@@ -10,7 +10,7 @@ import { randomString } from '../../utils/randomString';
 // the check runs on anchor-p with the fake anchor as a letters-bearing homeserver (evil.test, https, discovered by p over
 // the public network): its member rows are inserted straight into p's database, as the plan prescribes for the Caddy
 // variant (A cannot reach 203.0.113.x, so b.test cannot be discovered from A at all).
-const pHost = '172.30.0.20'; // the host p sees on requests made to its fed address
+const pHost = new URL(anchors.p.baseUrl).host; // signatures are bound to p's own base_url host
 const evil = 'evil.test';
 
 beforeAll(async () => {

@@ -14,6 +14,7 @@ import {
 } from './schema';
 import { publicUserSchema } from '../../utils/publicUser';
 import { componentsSchema, embedsSchema, messageInteractionSchema } from '../../utils/botSchemas';
+import { systemMessageSchema } from '../../utils/systemMessage';
 
 const isoDateSchema = z.iso.datetime();
 
@@ -94,6 +95,7 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     embeds: embedsSchema.default([]).catch([]),
     components: componentsSchema.default([]).catch([]),
     interaction: messageInteractionSchema.nullish().catch(null),
+    system: systemMessageSchema.nullish().catch(null),
   });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {
@@ -140,12 +142,23 @@ export const dmLastMessageSchema = z.object({
   authorId: z.string(),
   content: z.string().nullable(),
   attachmentCount: z.number().int().nonnegative(),
+  // "Ana added Leo", a missed call...: the client writes the text
+  system: systemMessageSchema.nullable().default(null),
+  // names the author even after they left the group, like in "Leo left the group"
+  author: z
+    .object({ username: z.string(), displayName: z.string().nullable() })
+    .nullable()
+    .default(null),
 });
 
 export const dmResponseSchema = z.object({
   id: z.string(),
   type: dmChannelTypeSchema,
   participants: z.array(publicUserSchema),
+  // group DMs only; an empty name means the client shows the members' names instead
+  name: z.string().nullable().default(null),
+  iconUrl: z.url().nullable().default(null),
+  ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
   lastMessage: dmLastMessageSchema.nullable(),
   unread: z.boolean(),
@@ -167,6 +180,15 @@ export const dmLatestResponseSchema = z.object({
       // older homeservers don't send these, so their DMs just get no preview
       content: z.string().nullable().optional(),
       attachmentCount: z.number().int().nonnegative().optional(),
+      system: systemMessageSchema.nullish().catch(null),
+      // who wrote it, so a group's preview names them; older homeservers only send `own`
+      author: z
+        .object({
+          username: z.string(),
+          homeserver: z.string(),
+          displayName: z.string().nullable().optional(),
+        })
+        .optional(),
     })
   ),
 });

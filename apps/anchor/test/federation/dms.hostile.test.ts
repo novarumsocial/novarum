@@ -95,6 +95,9 @@ describe('/dms/latest from a host that predates previews', () => {
       authorId: remoteId,
       content: `hi ${'y'.repeat(136)}…`,
       attachmentCount: 3,
+      system: null,
+      // an older host doesn't name the author
+      author: null,
     });
   });
 });

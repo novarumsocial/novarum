@@ -56,9 +56,9 @@ describe('replay', () => {
   });
 });
 
-// anchor-b sits behind Caddy at https://b.test (203.0.113.12 -> 172.30.0.12:80). The signature host must be the Host the
-// proxy forwarded (b.test); X-Forwarded-* and a spoofed Host must not change the outcome. Requests to the proxy are made
-// from inside anchor-p (it resolves b.test and trusts the test CA).
+// anchor-b sits behind Caddy at https://b.test (203.0.113.12 -> 172.30.0.12:80). Signatures are bound to b's own base_url
+// host (172.30.0.12), so neither the Host the proxy forwards (b.test), X-Forwarded-* nor a spoofed Host change the outcome.
+// Requests to the proxy are made from inside anchor-p (it resolves b.test and trusts the test CA).
 describe('Host header handling behind Caddy (b-proxy)', () => {
   const body = pingBody('172.30.0.66');
   const viaProxy = async (signedHost: string, extra: Record<string, string> = {}) => {
@@ -76,20 +76,17 @@ describe('Host header handling behind Caddy (b-proxy)', () => {
     return (await sendSigned(s, undefined, extra)).status;
   };
 
-  test('signed for b.test and sent through the proxy -> accepted', async () => {
-    expect(await viaProxy('b.test')).toBe(200);
+  test("signed for b's own host and sent through the proxy -> accepted", async () => {
+    expect(await viaProxy('172.30.0.12')).toBe(200);
   });
 
-  test("signed for the backend's own address but sent through the proxy -> 401 (the host is b.test)", async () => {
-    expect(await viaProxy('172.30.0.12')).toBe(401);
+  test('signed for the Host the proxy forwards (b.test) -> 401', async () => {
+    expect(await viaProxy('b.test')).toBe(401);
   });
 
   test('a spoofed X-Forwarded-Host / Forwarded cannot make a signature for another host verify', async () => {
     expect(
-      await viaProxy('172.30.0.12', {
-        'x-forwarded-host': '172.30.0.12',
-        forwarded: 'host=172.30.0.12',
-      })
+      await viaProxy('b.test', { 'x-forwarded-host': 'b.test', forwarded: 'host=b.test' })
     ).toBe(401);
     expect(await viaProxy('evil.example', { 'x-forwarded-host': 'evil.example' })).toBe(401);
   });
@@ -99,8 +96,8 @@ describe('Host header handling behind Caddy (b-proxy)', () => {
     expect(await direct('172.30.0.12', { 'x-forwarded-host': 'b.test' })).toBe(200);
   });
 
-  test('the Host the request carries is what is checked: a b.test signature verifies with Host: b.test even on the direct address', async () => {
-    expect(await direct('b.test', { host: 'b.test' })).toBe(200);
-    expect(await direct('172.30.0.12', { host: 'b.test' })).toBe(401);
+  test('the Host header is ignored: a b.test signature fails even with Host: b.test', async () => {
+    expect(await direct('b.test', { host: 'b.test' })).toBe(401);
+    expect(await direct('172.30.0.12', { host: 'b.test' })).toBe(200);
   });
 });

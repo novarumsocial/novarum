@@ -1,3 +1,4 @@
+import { isCallChannel, isDmChannel } from '../federation/access';
 import Elysia, { t } from 'elysia';
 import { requestSession, sessionCookieName, type SessionWithUser } from '../auth/provider';
 import {
@@ -33,6 +34,7 @@ import { z } from 'zod';
 import { getConfig } from '../../utils/config';
 import type { VoicePresence } from '../../utils/types';
 import { publicUser } from '../../utils/publicUser';
+import { activeRings, declinedBy, ring, stopRingingFor } from '../dm/ringing';
 
 const activeRealtimeConnections = new Map<string, number>();
 // whether each open socket's window is focused. a socket that is connected but backgrounded
@@ -81,6 +83,30 @@ function ringRemote(userId: string, send: () => Promise<unknown>) {
       nextRings.delete(userId);
       if (next) ringRemote(userId, next);
     });
+}
+
+/** `user` (one of ours) starts or stops ringing in a DM, from a socket or the notification's Decline. */
+export async function ringAs(user: SessionWithUser['user'], channelId: string, ringing: boolean) {
+  const federatedChannel = parseFederatedChannelId(channelId);
+  if (federatedChannel) {
+    if (!(await knowsFederatedChannel(user.id, channelId, federatedChannel.homeserver))) return;
+    ringRemote(user.id, () =>
+      postSignedFederationJson(
+        federatedChannel.homeserver,
+        federationChannelPath(federatedChannel, 'ring'),
+        { user: federationUserPayload({ user }), ringing }
+      )
+    );
+    // the host can't reach our people's devices when they decline a group call
+    if (!ringing) await declinedBy(channelId, publicUser(user));
+    return;
+  }
+
+  const channel = await db.query.channels.findFirst({ where: { id: channelId } });
+  if (!channel || !isDmChannel(channel)) return;
+  if (!(await canAccessChannel(channel, user.id, true))) return;
+
+  await ring(channel, publicUser(user), ringing);
 }
 
 export function closeSessionSockets(matches: (session: SessionWithUser) => boolean) {
@@ -230,6 +256,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       })
     );
 
+    for (const event of activeRings(session.user, dmIds)) ws.send(JSON.stringify(event));
+
     pingIntervals.set(
       ws.id,
       setInterval(() => ws.send(JSON.stringify({ type: 'misc.ping' })), 30_000)
@@ -288,6 +316,8 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
           await publishVoiceState(ws, previous, false);
         leaveFederatedVoice(session, message.channelId);
         federatedVoiceChannelsByUser.set(session.userId, message.channelId);
+        // the host only stops a 1:1 from ringing; in a group our other devices stop here
+        void stopRingingFor(message.channelId, [session.userId]).catch(() => null);
         voiceSocketByUser.set(session.userId, ws.id);
         return;
       }
@@ -297,7 +327,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
       const channel = await db.query.channels.findFirst({
         where: { id: message.channelId },
       });
-      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) return;
+      if (!channel || !isCallChannel(channel)) return;
 
       if (!(await canAccessChannel(channel, session.userId, true))) return;
 
@@ -318,34 +348,7 @@ export const realtime = new Elysia({ prefix: '/realtime', tags: ['Realtime'] }).
     }
 
     if (message.type === 'call.ring') {
-      const federatedChannel = parseFederatedChannelId(message.channelId);
-      if (federatedChannel) {
-        if (
-          !(await knowsFederatedChannel(
-            session.userId,
-            message.channelId,
-            federatedChannel.homeserver
-          ))
-        )
-          return;
-        ringRemote(session.userId, () =>
-          postSignedFederationJson(
-            federatedChannel.homeserver,
-            federationChannelPath(federatedChannel, 'ring'),
-            { user: federationUserPayload(session), ringing: message.ringing }
-          )
-        );
-        return;
-      }
-
-      const channel = await db.query.channels.findFirst({ where: { id: message.channelId } });
-      if (!channel || channel.type !== 'DM') return;
-      if (!(await canAccessChannel(channel, session.userId, true))) return;
-
-      await publishToChannel(ws, channel, {
-        type: 'call.ringing',
-        data: { channelId: channel.id, user: publicUser(session.user), ringing: message.ringing },
-      });
+      await ringAs(session.user, message.channelId, message.ringing);
       return;
     }
 

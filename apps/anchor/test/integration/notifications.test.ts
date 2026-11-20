@@ -464,3 +464,172 @@ describe('who is skipped', () => {
     expect(JSON.stringify(push)).not.toContain('top secret');
   });
 });
+
+describe('calls', () => {
+  const pushesFor = (label: string, count: number, message: string) =>
+    eventually(() => (sink.for(label).length >= count ? sink.for(label) : null), { message });
+
+  // `a` is in the call and rings `b`, whose phone has no app open
+  async function ringingDm() {
+    const [a, b] = await Promise.all([user(), user()]);
+    await befriend(a, b);
+    const dm = (await call(a, 'POST', '/dm', { userId: b.user.id })).body.id as string;
+    const [phoneA, phoneB] = [
+      await sink.subscribe(a, undefined, 'UNIFIEDPUSH'),
+      await sink.subscribe(b, undefined, 'UNIFIEDPUSH'),
+    ];
+    const ra = await openRealtime(anchor.url, a.cookie);
+    ra.send({ type: 'voice.join', channelId: dm });
+    await ra.waitFor('voice.state.changed', (e) => e.data.connected);
+    ra.send({ type: 'call.ring', channelId: dm, ringing: true });
+    const [ring] = await pushesFor(phoneB.label, 1, 'ring push');
+    return { a, b, dm, phoneA, phoneB, ra, ring };
+  }
+
+  test('a ring wakes the phone with a call push, and hanging up stops it', async () => {
+    const { a, dm, phoneA, phoneB, ra, ring } = await ringingDm();
+    expect(ring).toMatchObject({
+      type: 'call',
+      ringing: true,
+      title: a.user.username,
+      body: 'Is calling you',
+      tag: `call:${dm}`,
+      url: `novarum://guilds/dms/${dm}`,
+    });
+    expect(Number.isInteger(ring.id)).toBe(true);
+
+    ra.send({ type: 'voice.leave' });
+    const [, stop] = await pushesFor(phoneB.label, 2, 'stop push');
+    expect(stop).toMatchObject({ type: 'call', ringing: false, id: ring.id, tag: `call:${dm}` });
+    expect(sink.for(phoneA.label)).toHaveLength(0);
+    ra.close();
+  });
+
+  test('a device that connects mid-ring still rings, and not once the call is answered', async () => {
+    const { b, dm, phoneB, ra } = await ringingDm();
+    const late = await openRealtime(anchor.url, b.cookie);
+    const ringing = await late.waitFor('call.ringing');
+    expect(ringing.data).toMatchObject({ channelId: dm, ringing: true });
+
+    late.send({ type: 'voice.join', channelId: dm });
+    // answering a 1:1 ends the ring for everyone, the caller included
+    await ra.waitFor('call.ringing', (e) => !e.data.ringing);
+    await pushesFor(phoneB.label, 2, 'answered stops the phone');
+    const after = await openRealtime(anchor.url, b.cookie);
+    await sink.settle();
+    expect(after.events.filter((e) => e.type === 'call.ringing')).toHaveLength(0);
+    for (const socket of [ra, late, after]) socket.close();
+  });
+
+  test('declining a 1:1 stops the ring on every device', async () => {
+    const { b, phoneB, ra } = await ringingDm();
+    const rb = await openRealtime(anchor.url, b.cookie);
+    const ringing = await rb.waitFor('call.ringing');
+    rb.send({ type: 'call.ring', channelId: ringing.data.channelId, ringing: false });
+    await ra.waitFor('call.ringing', (e) => !e.data.ringing);
+    const pushes = await pushesFor(phoneB.label, 2, 'decline push');
+    expect(pushes.at(-1)).toMatchObject({ ringing: false });
+    ra.close();
+    rb.close();
+  });
+
+  // the link in the push names the homeserver's base_url; the test anchor listens elsewhere
+  const declineVia = (link: string, edit: (url: URL) => void = () => {}) => {
+    const url = new URL(link);
+    edit(url);
+    return fetch(new URL(`${url.pathname}${url.search}`, anchor.url), { method: 'POST' });
+  };
+
+  test("the notification's Decline link ends a 1:1 ring without a session, and only as signed", async () => {
+    const { a, dm, phoneB, ra, ring } = await ringingDm();
+    for (const tamper of [
+      (url: URL) => url.searchParams.set('user', a.user.id),
+      (url: URL) => url.searchParams.set('exp', String(Number(url.searchParams.get('exp')) + 1)),
+      (url: URL) => (url.pathname = url.pathname.replace(dm, 'someotherdm')),
+      (url: URL) => url.searchParams.delete('sig'),
+    ]) {
+      expect([403, 422]).toContain((await declineVia(ring.decline, tamper)).status);
+    }
+    await sink.settle();
+    expect(sink.for(phoneB.label)).toHaveLength(1);
+
+    const res = await declineVia(ring.decline);
+    expect(res.status).toBe(200);
+    await ra.waitFor('call.ringing', (e) => !e.data.ringing);
+    const [, stop] = await pushesFor(phoneB.label, 2, 'declined from the notification');
+    expect(stop).toMatchObject({ type: 'call', ringing: false, tag: `call:${dm}` });
+    ra.close();
+  });
+
+  test('declining a group call from the notification silences only that person', async () => {
+    const [a, b, c] = await Promise.all([user(), user(), user()]);
+    await Promise.all([befriend(a, b), befriend(a, c)]);
+    const group = (await call(a, 'POST', '/dm/group', { userIds: [b.user.id, c.user.id] })).body
+      .id as string;
+    const phoneB = await sink.subscribe(b, undefined, 'UNIFIEDPUSH');
+    const phoneC = await sink.subscribe(c, undefined, 'UNIFIEDPUSH');
+    const ra = await openRealtime(anchor.url, a.cookie);
+    ra.send({ type: 'voice.join', channelId: group });
+    await ra.waitFor('voice.state.changed', (e) => e.data.connected);
+    ra.send({ type: 'call.ring', channelId: group, ringing: true });
+    const [ring] = await pushesFor(phoneB.label, 1, 'group ring');
+    await pushesFor(phoneC.label, 1, 'group ring for c');
+    const tabletB = await openRealtime(anchor.url, b.cookie);
+    await tabletB.waitFor('call.ringing', (e) => e.data.ringing);
+
+    expect((await declineVia(ring.decline)).status).toBe(200);
+    await tabletB.waitFor('call.ringing', (e) => !e.data.ringing);
+    await pushesFor(phoneB.label, 2, "b's phone stops");
+    await sink.settle();
+    expect(sink.for(phoneC.label)).toHaveLength(1);
+    expect(ra.events.some((e) => e.type === 'call.ringing' && !e.data.ringing)).toBe(false);
+    ra.close();
+    tabletB.close();
+  });
+
+  test('in a group, whoever answers stops ringing and the others keep going', async () => {
+    const [a, b, c] = await Promise.all([user(), user(), user()]);
+    await Promise.all([befriend(a, b), befriend(a, c)]);
+    const group = (
+      await call(a, 'POST', '/dm/group', { userIds: [b.user.id, c.user.id], name: 'Trip' })
+    ).body.id as string;
+    const phoneB = await sink.subscribe(b, undefined, 'UNIFIEDPUSH');
+    const phoneC = await sink.subscribe(c, undefined, 'UNIFIEDPUSH');
+    const ra = await openRealtime(anchor.url, a.cookie);
+    ra.send({ type: 'voice.join', channelId: group });
+    await ra.waitFor('voice.state.changed', (e) => e.data.connected);
+    ra.send({ type: 'call.ring', channelId: group, ringing: true });
+    const [ring] = await pushesFor(phoneB.label, 1, 'group ring');
+    expect(ring.body).toBe('Calling Trip');
+    await pushesFor(phoneC.label, 1, 'group ring for c');
+
+    const rb = await openRealtime(anchor.url, b.cookie);
+    rb.send({ type: 'voice.join', channelId: group });
+    await pushesFor(phoneB.label, 2, 'b answered');
+    await sink.settle();
+    expect(sink.for(phoneC.label)).toHaveLength(1);
+    expect(ra.events.some((e) => e.type === 'call.ringing' && !e.data.ringing)).toBe(false);
+
+    // the caller hanging up ends it for the rest
+    ra.send({ type: 'voice.leave' });
+    const [, stop] = await pushesFor(phoneC.label, 2, 'caller left');
+    expect(stop).toMatchObject({ ringing: false });
+    ra.close();
+    rb.close();
+  });
+
+  test('a browser gets the ring but no stop push, which it would have to show', async () => {
+    const [a, b] = await Promise.all([user(), user()]);
+    await befriend(a, b);
+    const dm = (await call(a, 'POST', '/dm', { userId: b.user.id })).body.id as string;
+    const browser = await sink.subscribe(b);
+    const ra = await openRealtime(anchor.url, a.cookie);
+    ra.send({ type: 'call.ring', channelId: dm, ringing: true });
+    const [ring] = await pushesFor(browser.label, 1, 'browser ring');
+    expect(ring.url).toBe(`/guilds/dms/${dm}`);
+    ra.send({ type: 'call.ring', channelId: dm, ringing: false });
+    await sink.settle();
+    expect(sink.for(browser.label)).toHaveLength(1);
+    ra.close();
+  });
+});

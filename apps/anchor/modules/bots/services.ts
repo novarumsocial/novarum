@@ -2,7 +2,9 @@ import Elysia, { t } from 'elysia';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { getAverageColor } from 'fast-average-color-node';
-import { bots, db, guildMembers, sessions, users } from '../../src/db';
+import { bots, channelMembers, db, guildMembers, sessions, users } from '../../src/db';
+import { groupView, leaveGroup, membersOf } from '../dm/groups';
+import { dmResponseSchema } from '../../src/db/zod';
 import {
   botTokenExpiry,
   createSession,
@@ -256,14 +258,19 @@ export const developers = new Elysia({ prefix: '/developers/bots', tags: ['Bots'
       if (!bot) return status(404, { error: 'Bot not found' });
 
       const memberships = await db.query.guildMembers.findMany({ where: { userId: bot.userId } });
-      await Promise.all(
-        memberships.map((m) => leaveGuild(server, bot.user, m.guildId).catch(() => null))
-      );
+      const groups = await db.query.channelMembers.findMany({
+        where: { userId: bot.userId, channel: { type: 'GROUP_DM' } },
+      });
+      await Promise.all([
+        ...memberships.map((m) => leaveGuild(server, bot.user, m.guildId).catch(() => null)),
+        ...groups.map((g) => leaveGroup(server, bot.user, g.channelId).catch(() => null)),
+      ]);
       await db.delete(sessions).where(eq(sessions.userId, bot.userId));
       closeSessionSockets((s) => s.userId === bot.userId);
       await db.transaction(async (tx) => {
         await tx.delete(bots).where(eq(bots.userId, bot.userId));
         await tx.delete(guildMembers).where(eq(guildMembers.userId, bot.userId));
+        await tx.delete(channelMembers).where(eq(channelMembers.userId, bot.userId));
         await tx
           .update(users)
           .set({
@@ -322,6 +329,50 @@ export const botSelf = new Elysia({ prefix: '/bots/@me', tags: ['Bots'] })
     {
       body: z.object({ commands: commandListSchema }),
       response: { 200: z.object({ commands: commandListSchema }), 401: genericResponseErrorSchema },
+    }
+  )
+  // the group DMs the bot was added to; bots can't open DMs themselves
+  .get(
+    '/dms',
+    async ({ bot }) => {
+      const memberships = await db.query.channelMembers.findMany({
+        where: { userId: bot.userId, channel: { type: 'GROUP_DM' } },
+        with: { channel: true },
+      });
+      return {
+        dms: await Promise.all(
+          memberships.map(async ({ channel }) =>
+            groupView(channel, await membersOf(channel.id), bot.userId)
+          )
+        ),
+      };
+    },
+    {
+      response: {
+        200: z.object({ dms: z.array(dmResponseSchema) }),
+        401: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/dms/:id/leave',
+    async ({ params, bot, server, status }) => {
+      const membership = await db.query.channelMembers.findFirst({
+        where: { channelId: params.id, userId: bot.userId },
+        with: { channel: true },
+      });
+      if (membership?.channel.type !== 'GROUP_DM') return status(404, { error: 'DM not found' });
+      const left = await leaveGroup(server, bot.user, params.id);
+      if (!left.ok) return status(left.status === 404 ? 404 : 502, { error: left.error });
+      return { success: true };
+    },
+    {
+      response: {
+        200: successResponseSchema,
+        401: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
     }
   )
   .post(

@@ -100,7 +100,8 @@ export const resolvedOptionSchema = z.object({
 export const ephemeralMessageSchema = z.object({
   id: z.string(),
   channelId: z.string(),
-  guildId: z.string(),
+  // null in group DMs
+  guildId: z.string().nullable(),
   content: z.string().max(maxMessageLength).nullable(),
   embeds: embedsSchema,
   components: componentsSchema,
@@ -115,7 +116,8 @@ export const interactionPayloadSchema = z.object({
   id: z.string().min(1).max(64),
   token: z.string().min(1).max(128),
   type: z.enum(['command', 'autocomplete', 'button']),
-  guildId: z.string().min(1),
+  // null in group DMs
+  guildId: z.string().min(1).nullable(),
   channelId: z.string().min(1),
   user: publicUserSchema,
   data: z.object({

@@ -17,18 +17,25 @@ const typingCount = (rt: { events: { type: string }[] }) =>
 
 test('A restarts: B reconnects with backoff and the events resume', async () => {
   const { owner, channel, shadowChannel, rt } = await joinedRoom();
-  const before = typingCount(rt);
+  // joinedRoom's last typing events can still be arriving, so only count ones A sent after restarting
+  const restartedAt = Date.now();
   await restart('a');
   // B's bridge retries after 1s, 2s, 4s... (A needs a couple of seconds to boot); the owner's session survives in the database
   await eventually(
     async () => {
       await call(owner, 'POST', `/channel/${channel.id}/typing`);
-      return typingCount(rt) > before;
+      return rt.events.some(
+        (e) => e.type === 'channel.typing' && Date.parse(e.data.time) > restartedAt
+      );
     },
     { timeout: 40_000, interval: 500, message: 'bridge reconnected after the host restart' }
   );
   const sent = await send(owner, channel.id, 'after the restart');
-  const evt = await rt.waitFor('message.created', (e) => e.data.content === 'after the restart');
+  const evt = await rt.waitFor(
+    'message.created',
+    (e) => e.data.content === 'after the restart',
+    15_000
+  );
   expect(evt.data.id).toBe(sent.body.message.id);
   expect(evt.data.channelId).toBe(shadowChannel);
   rt.close();

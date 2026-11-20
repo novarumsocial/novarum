@@ -6,6 +6,7 @@ import { goto } from '$app/navigation';
 import { z } from 'zod';
 import { publicUserSchema } from 'anchor/public-user';
 import { componentsSchema, embedsSchema, messageInteractionSchema } from 'anchor/bot-schemas';
+import { systemMessageSchema } from 'anchor/system-message';
 import type { RealtimeEvent } from 'anchor';
 import {
   getNotificationPermission,
@@ -16,7 +17,7 @@ import {
 } from './notifications';
 import { notificationSettings } from './notification-settings.svelte';
 import { friends } from './friends.svelte';
-import { dms, dmPath } from './dms.svelte';
+import { dms, dmDisplay, dmPath } from './dms.svelte';
 import { openCanvases, type CanvasMessage } from './canvas.svelte';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
@@ -69,6 +70,10 @@ const dmChannelSchema = z.object({
   id: z.string(),
   type: z.enum(['DM', 'GROUP_DM']),
   participants: dmParticipantsSchema,
+  // older homeservers don't send these
+  name: z.string().nullable().default(null),
+  iconUrl: z.string().nullable().default(null),
+  ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
   lastMessage: z
     .object({
@@ -76,6 +81,11 @@ const dmChannelSchema = z.object({
       authorId: z.string(),
       content: z.string().nullable(),
       attachmentCount: z.number(),
+      system: systemMessageSchema.nullable().catch(null),
+      author: z
+        .object({ username: z.string(), displayName: z.string().nullable() })
+        .nullable()
+        .default(null),
     })
     .nullable()
     .default(null),
@@ -109,12 +119,13 @@ const messageEventDataSchema = z.object({
   ),
   components: componentsSchema.default([]),
   interaction: messageInteractionSchema.nullish(),
+  system: systemMessageSchema.nullish().catch(null),
 });
 
 const ephemeralMessageSchema = messageEventDataSchema
   .omit({ nonce: true, replyTo: true, attachments: true, pingedHandles: true })
   .extend({
-    guildId: z.string(),
+    guildId: z.string().nullable(),
     interaction: messageInteractionSchema.nullable(),
     ephemeral: z.literal(true),
   });
@@ -158,6 +169,20 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('dm.created'),
     data: dmChannelSchema,
+  }),
+  z.object({
+    type: z.literal('dm.updated'),
+    data: dmChannelSchema.pick({
+      id: true,
+      name: true,
+      iconUrl: true,
+      ownerId: true,
+      participants: true,
+    }),
+  }),
+  z.object({
+    type: z.literal('dm.removed'),
+    data: z.object({ id: z.string() }),
   }),
   z.object({
     type: z.literal('message.ephemeral'),
@@ -527,16 +552,27 @@ class RealtimeState {
           caller.homeserver.toLowerCase() === user.homeserver.toLowerCase();
 
         if (!ringing) {
-          // declined on another of my devices, or the other person declined my call.
-          if (dms.incomingCall?.channelId === channelId) dms.incomingCall = null;
+          // declined on another of my devices, the caller hung up, or the other person declined my call.
+          const incoming = dms.incomingCall;
+          if (
+            incoming?.channelId === channelId &&
+            (self ||
+              (incoming.user.username === caller.username &&
+                incoming.user.homeserver.toLowerCase() === caller.homeserver.toLowerCase()))
+          )
+            dms.incomingCall = null;
           if (!self && dms.outgoingCall === channelId) dms.outgoingCall = null;
         } else if (!self) {
           dms.incomingCall = { channelId, user: caller };
           if (document.hidden && settings.value.pushNotifications) {
             notificationSound();
+            const group = dms.get(channelId);
             void sendNotification({
               title: caller.displayName || caller.username,
-              body: 'Is calling you',
+              body:
+                group?.type === 'GROUP_DM'
+                  ? `Is calling ${dmDisplay(group).name}`
+                  : 'Is calling you',
               icon: caller.avatarUrl ?? undefined,
               tag: `call:${channelId}`,
               onClick: () => void goto(dmPath(channelId)),
@@ -571,6 +607,13 @@ class RealtimeState {
       }
       if (event.type === 'dm.created') {
         dms.upsert(event.data);
+      }
+      if (event.type === 'dm.updated') {
+        dms.update(event.data);
+      }
+      if (event.type === 'dm.removed') {
+        dms.remove(event.data.id);
+        if (chat.activeChannel === event.data.id) void goto('/guilds/dms');
       }
     });
   }

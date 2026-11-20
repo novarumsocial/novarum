@@ -14,6 +14,7 @@ export function Avatar({
   focused = false,
   fallback,
   bgColor,
+  textClassName,
 }: {
   src?: string | null;
   name: string;
@@ -21,6 +22,8 @@ export function Avatar({
   focused?: boolean;
   fallback?: string;
   bgColor?: string | null;
+  // the initial's size, for big avatars
+  textClassName?: string;
 }) {
   const circleIcons = useSettings((s) => s.circleIcons);
   const [failed, setFailed] = useState(false);
@@ -55,7 +58,7 @@ export function Avatar({
           style={{ width: '100%', height: '100%' }}
         />
       ) : (
-        <Text className="font-bold text-white">
+        <Text className={cn('font-bold text-white', textClassName)}>
           {fallback || name.charAt(0).toUpperCase() || '?'}
         </Text>
       )}

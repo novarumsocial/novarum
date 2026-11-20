@@ -1,3 +1,4 @@
+import { followRing } from '../modules/dm/ringing';
 import type { Server } from 'elysia/universal';
 import { z } from 'zod';
 import { discoverRemoteAnchor, signFederationRequest } from './discovery';
@@ -302,6 +303,15 @@ export async function ensureFederatedDmRealtimeBridge(server: Server, channelId:
           .where(eq(channelMembers.channelId, channelId));
       }
       await publishToChannel(server, { id: channelId, guildId: null }, event);
+      if (event.type === 'call.ringing') {
+        const channel = await db.query.channels.findFirst({ where: { id: channelId } });
+        await followRing(
+          channelId,
+          channel?.type === 'GROUP_DM',
+          event.data.user,
+          event.data.ringing
+        );
+      }
     },
   });
 }

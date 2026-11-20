@@ -18,6 +18,7 @@ type AnchorState = {
   homeServer: string;
   baseUrl: string;
   maxFileSize: number;
+  maxGroupMembers: number;
   client: ReturnType<typeof createAnchorClient>;
   setHomeServer: (homeServer: string) => Promise<void>;
   refreshInfo: () => Promise<void>;
@@ -27,6 +28,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
   homeServer,
   baseUrl,
   maxFileSize: 10,
+  maxGroupMembers: 30,
   client: createAnchorClient(baseUrl),
 
   async setHomeServer(input) {
@@ -38,6 +40,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
       homeServer,
       baseUrl,
       maxFileSize: info.maxFileSize,
+      maxGroupMembers: info.maxGroupMembers,
       client: createAnchorClient(baseUrl),
     });
     storage.set(homeServerStorageKey, homeServer);
@@ -54,6 +57,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
       set({
         baseUrl,
         maxFileSize: info.maxFileSize,
+        maxGroupMembers: info.maxGroupMembers,
         ...(baseUrl === get().baseUrl ? {} : { client: createAnchorClient(baseUrl) }),
       });
     } catch {

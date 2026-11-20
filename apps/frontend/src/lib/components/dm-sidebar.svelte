@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Bot, LoaderCircle, Phone, Plus, Users, X, IdCardLanyard } from '@lucide/svelte';
   import { goto } from '$app/navigation';
-  import { dms, dmPath, dmPreviewText } from '$lib/dms.svelte';
+  import { dms, dmDisplay, dmPath, dmPreviewText } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -68,9 +68,12 @@
     </div>
 
     {#each entries as entry (entry.id)}
-      {@const other = entry.participants[0]}
-      {@const name = other ? other.displayName || other.username : 'Direct Message'}
-      {@const preview = dmPreviewText(entry)}
+      {@const display = dmDisplay(entry)}
+      {@const other = display.other}
+      {@const name = display.name}
+      {@const group = entry.type === 'GROUP_DM'}
+      {@const preview =
+        dmPreviewText(entry) ?? (group ? `${entry.participants.length + 1} members` : null)}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
       {@const unread =
         entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
@@ -90,10 +93,10 @@
           >
             <div class="relative shrink-0">
               <Avatar
-                src={other?.avatarUrl}
+                src={display.avatarUrl}
                 {name}
                 class="size-6 text-[10px]"
-                bgColor={other?.avatarColor}
+                bgColor={display.avatarColor}
               />
               {#if other && friends.isOnline(other.userId)}
                 <span
@@ -154,14 +157,26 @@
           >
             Start a Call
           </ContextMenu.Item>
-          <ContextMenu.Item
-            onclick={() => {
-              void dms.close(entry.id);
-              if (active) void goto('/guilds/dms');
-            }}
-          >
-            Close DM
-          </ContextMenu.Item>
+          {#if group}
+            <ContextMenu.Item
+              variant="destructive"
+              onclick={() => {
+                void dms.leave(entry.id);
+                if (active) void goto('/guilds/dms');
+              }}
+            >
+              Leave Group
+            </ContextMenu.Item>
+          {:else}
+            <ContextMenu.Item
+              onclick={() => {
+                void dms.close(entry.id);
+                if (active) void goto('/guilds/dms');
+              }}
+            >
+              Close DM
+            </ContextMenu.Item>
+          {/if}
 
           {#if other && friends.isFriend?.(other.userId)}
             <ContextMenu.Item onclick={() => void friends.remove?.(other.userId)}>

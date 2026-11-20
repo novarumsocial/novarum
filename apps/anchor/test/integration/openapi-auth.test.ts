@@ -19,6 +19,7 @@ const publicRoutes: Record<string, string> = {
   'POST /auth/reset-password': 'authorised by the mailed OTP',
   'POST /auth/password-reset/request': 'unauthenticated by nature (the user forgot the password)',
   'GET /guilds/avatar/{id}': 'avatars are public images (redirect to a presigned URL)',
+  'GET /dm/icon/{key}': 'group DM icons are public images, like guild avatars',
   'GET /user/avatar/{userId}': 'avatars are public images (redirect to a presigned URL)',
   'GET /user/banner/{userId}': 'banners are public images (redirect to a presigned URL)',
   'GET /user/about/{userId}': 'profile text is public (also fetched by remote homeservers/clients)',
@@ -31,6 +32,7 @@ const otherCredential: Record<string, string> = {
   'GET /attachment/{id}': 'signed URL (exp + sig)',
   'GET /attachment/{id}/preview': 'signed URL (exp + sig)',
   'POST /channel/livekit/webhook': 'LiveKit JWT in the Authorization header',
+  'POST /dm/{id}/ring/decline': 'signed link from the call push (user + exp + sig)',
 };
 /** not plain HTTP: the WebSocket upgrade's cookie check belongs to the realtime suite */
 const websocketRoutes = new Set(['WS /realtime/']);

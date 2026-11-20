@@ -1,12 +1,19 @@
 import { anchor } from '$lib/anchor.svelte';
 import { goto } from '$app/navigation';
 import type { PublicUser } from 'anchor/public-user';
+import { z } from 'zod';
 import { useSession } from '$lib/session.svelte';
+import type { SystemMessage } from 'anchor/system-message';
+import { systemText } from '$lib/system-message';
 
 export type DmEntry = {
   id: string;
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
+  // group DMs only; an empty name means the members' names are shown instead
+  name?: string | null;
+  iconUrl?: string | null;
+  ownerId?: string | null;
   lastMessageAt: string | null;
   lastMessage: DmPreview | null;
   unread: boolean;
@@ -18,6 +25,9 @@ export type DmPreview = {
   authorId: string;
   content: string | null;
   attachmentCount: number;
+  system: SystemMessage | null;
+  // names the author even after they left the group
+  author?: { username: string; displayName: string | null } | null;
 };
 
 type PreviewMessage = {
@@ -26,7 +36,8 @@ type PreviewMessage = {
   createdAt: string;
   content: string | null;
   attachments: unknown[];
-  author: Pick<PublicUser, 'userId' | 'username' | 'homeserver'>;
+  system?: SystemMessage | null;
+  author: Pick<PublicUser, 'userId' | 'username' | 'homeserver' | 'displayName'>;
 };
 
 const sameUser = (a: { username: string; homeserver: string }, b: typeof a) =>
@@ -46,11 +57,20 @@ function toPreview(dm: DmEntry, message: PreviewMessage): DmPreview {
     authorId,
     content: message.content,
     attachmentCount: message.attachments.length,
+    system: message.system ?? null,
+    author: { username: message.author.username, displayName: message.author.displayName },
   };
 }
 
-export function dmPreviewText({ lastMessage }: DmEntry) {
+export function dmPreviewText({ lastMessage, participants, type }: DmEntry) {
   if (!lastMessage) return null;
+  const self = useSession().user;
+  const author =
+    lastMessage.authorId === self?.id
+      ? self
+      : (participants.find((user) => user.userId === lastMessage.authorId) ?? lastMessage.author);
+  if (lastMessage.system) return author ? systemText(lastMessage.system, author) : null;
+
   const { content, attachmentCount } = lastMessage;
   const text =
     content ??
@@ -60,7 +80,9 @@ export function dmPreviewText({ lastMessage }: DmEntry) {
         ? 'Sent an attachment'
         : null);
   if (!text) return null;
-  return lastMessage.authorId === useSession().user?.id ? `You: ${text}` : text;
+  if (author === self) return `You: ${text}`;
+  // in a group, who said it matters
+  return type === 'GROUP_DM' && author ? `${author.displayName || author.username}: ${text}` : text;
 }
 
 export const RING_TIMEOUT = 30_000;
@@ -68,6 +90,33 @@ export const RING_TIMEOUT = 30_000;
 // federated DM ids look like fed:channel:<homeserver>:<id> (see anchor's federationIds.ts)
 const isFromHomeserver = (dm: DmEntry, homeserver: string) =>
   dm.id.startsWith(`fed:channel:${encodeURIComponent(homeserver)}:`);
+
+const apiErrorSchema = z.object({ error: z.string() });
+// eden puts the error body in `value`; validation errors only have a message
+const errorMessage = (error: { value?: unknown } | null | undefined, fallback: string) =>
+  apiErrorSchema.safeParse(error?.value).data?.error ?? fallback;
+
+const personName = (user: PublicUser) => user.displayName || user.username;
+
+/** What a DM is called and shown as: the other person, or the group's name and icon. */
+export function dmDisplay(dm: DmEntry) {
+  if (dm.type !== 'GROUP_DM') {
+    const other = dm.participants[0];
+    return {
+      name: other ? personName(other) : 'Direct Message',
+      avatarUrl: other?.avatarUrl ?? null,
+      avatarColor: other?.avatarColor ?? null,
+      other: other ?? null,
+    };
+  }
+  const people = dm.participants.filter((user) => !user.isBot);
+  return {
+    name: dm.name || people.map(personName).join(', ') || 'Empty group',
+    avatarUrl: dm.iconUrl ?? null,
+    avatarColor: null,
+    other: null,
+  };
+}
 
 export function dmPath(channelId: string, messageId?: string) {
   const path = `/guilds/dms/${encodeURIComponent(channelId)}`;
@@ -90,7 +139,11 @@ class DmsState {
 
   // the DM that already exists with this friend, if any — used to avoid opening duplicates.
   withUser(userId: string) {
-    return this.list.find((dm) => dm.participants.some((user) => user.userId === userId)) ?? null;
+    return (
+      this.list.find(
+        (dm) => dm.type === 'DM' && dm.participants.some((user) => user.userId === userId)
+      ) ?? null
+    );
   }
 
   async load() {
@@ -162,6 +215,63 @@ class DmsState {
 
     const result = await anchor.client.dm({ id: channelId }).close.post();
     if (result.error && closed) this.upsert(closed);
+  }
+
+  // a group with these friends; any number of them, so adding people to a 1:1 makes a new group
+  async createGroup(userIds: string[], name = '') {
+    const { data, error } = await anchor.client.dm.group.post({ userIds, name });
+    if (error || !data || 'error' in data)
+      return { error: errorMessage(error, 'Could not create the group.') };
+    this.upsert(data);
+    void goto(dmPath(data.id));
+    return { id: data.id };
+  }
+
+  async addMembers(channelId: string, userIds: string[]) {
+    const { error } = await anchor.client.dm({ id: channelId }).members.post({ userIds });
+    return error ? errorMessage(error, 'Could not add them.') : null;
+  }
+
+  async kick(channelId: string, userId: string) {
+    const { error } = await anchor.client.dm({ id: channelId }).members({ userId }).delete();
+    return error ? errorMessage(error, 'Could not remove them.') : null;
+  }
+
+  async transferOwner(channelId: string, userId: string) {
+    const { error } = await anchor.client.dm({ id: channelId }).owner.post({ userId });
+    return error ? errorMessage(error, 'Could not transfer the group.') : null;
+  }
+
+  async rename(channelId: string, name: string) {
+    const { error } = await anchor.client.dm({ id: channelId }).patch({ name });
+    return error ? errorMessage(error, 'Could not rename the group.') : null;
+  }
+
+  async uploadIcon(channelId: string, icon: File) {
+    const { error } = await anchor.client.dm({ id: channelId }).icon.post({ icon });
+    return error ? errorMessage(error, 'Could not upload the icon.') : null;
+  }
+
+  async addBot(channelId: string, bot: { username: string; homeserver: string }) {
+    const { error } = await anchor.client.dm({ id: channelId }).bots.post(bot);
+    return error ? errorMessage(error, 'Could not add the bot.') : null;
+  }
+
+  async leave(channelId: string) {
+    const { error } = await anchor.client.dm({ id: channelId }).leave.post();
+    if (error) return errorMessage(error, 'Could not leave the group.');
+    this.remove(channelId);
+    return null;
+  }
+
+  remove(channelId: string) {
+    this.list = this.list.filter((dm) => dm.id !== channelId);
+    if (this.incomingCall?.channelId === channelId) this.incomingCall = null;
+    if (this.outgoingCall === channelId) this.outgoingCall = null;
+  }
+
+  update(change: Partial<DmEntry> & { id: string }) {
+    this.list = this.list.map((dm) => (dm.id === change.id ? { ...dm, ...change } : dm));
   }
 
   upsert(dm: DmEntry) {

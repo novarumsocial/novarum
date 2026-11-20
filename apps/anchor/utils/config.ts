@@ -94,6 +94,13 @@ const schema = z.object({
     })
     .optional()
     .prefault({}),
+  dms: z
+    .object({
+      // bots count towards this too
+      max_group_members: z.number().int().min(3).optional().default(30),
+    })
+    .optional()
+    .prefault({}),
   network: z
     .object({
       proxy_url: z.url().optional(),

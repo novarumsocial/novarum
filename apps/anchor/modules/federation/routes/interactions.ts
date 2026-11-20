@@ -2,10 +2,10 @@ import Elysia from 'elysia';
 import { z } from 'zod';
 import { db } from '../../../src/db';
 import { getConfig } from '../../../utils/config';
-import { makeFederatedGuildId } from '../../../utils/federationIds';
+import { makeFederatedChannelId, makeFederatedGuildId } from '../../../utils/federationIds';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
 import { commandListSchema } from '../../../utils/botSchemas';
-import { guildCommands, startInteraction } from '../../interactions/host';
+import { groupCommands, guildCommands, startInteraction } from '../../interactions/host';
 import { acceptDelivery, acceptEphemeral, acceptRemoteResponse } from '../../interactions/relay';
 import {
   guildCommandsSchema,
@@ -39,12 +39,28 @@ export const interactions = new Elysia()
     },
     { federatedUser: true, response: { 200: guildCommandsSchema, ...errors } }
   )
-  // a guild host wants the commands of one of our bots in one of its guilds
+  // a remote member of one of our group DMs wants the commands of the bots in it
+  .post(
+    '/channels/:id/commands',
+    async ({ params, remoteUser, status }) => {
+      const access = await getFederatedChannelAccess(params.id, remoteUser);
+      if (!access.ok) return status(access.status, { error: access.error });
+      if (access.channel.type !== 'GROUP_DM') return status(404, { error: 'Channel not found' });
+      return groupCommands(params.id);
+    },
+    { federatedUser: true, response: { 200: guildCommandsSchema, ...errors } }
+  )
+  // a guild or group DM host wants the commands of one of our bots in it
   .post(
     '/bots/:username/commands',
     async ({ params, origin, payload, status }) => {
-      const body = z.object({ guildId: z.string().min(1) }).safeParse(payload);
-      if (!body.success) return status(400, { error: 'Invalid guild' });
+      const body = z
+        .union([
+          z.object({ guildId: z.string().min(1) }),
+          z.object({ channelId: z.string().min(1) }),
+        ])
+        .safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid guild or group' });
       const bot = await db.query.users.findFirst({
         where: {
           username: params.username,
@@ -55,12 +71,19 @@ export const interactions = new Elysia()
       });
       const member =
         bot &&
-        (await db.query.guildMembers.findFirst({
-          where: {
-            guildId: makeFederatedGuildId(origin.homeserver, body.data.guildId),
-            userId: bot.id,
-          },
-        }));
+        ('guildId' in body.data
+          ? await db.query.guildMembers.findFirst({
+              where: {
+                guildId: makeFederatedGuildId(origin.homeserver, body.data.guildId),
+                userId: bot.id,
+              },
+            })
+          : await db.query.channelMembers.findFirst({
+              where: {
+                channelId: makeFederatedChannelId(origin.homeserver, body.data.channelId),
+                userId: bot.id,
+              },
+            }));
       if (!bot?.bot || !member) return status(404, { error: 'Bot not found' });
       return { commands: bot.bot.commands };
     },

@@ -1,3 +1,4 @@
+import type { SystemMessage } from 'anchor/system-message';
 import type { ActionRow, Embed } from 'anchor/bot-schemas';
 export interface Server {
   id: string;
@@ -25,7 +26,9 @@ export interface Channel {
   unread: boolean;
   lastReadMessageId: string | null;
   mention: number;
+  // group DMs are DMs too (calls, ringing), with `group` set
   type: 'TEXT' | 'VOICE' | 'DM';
+  group?: boolean;
   ownerOnly?: boolean;
   avatarUrl?: string | null;
   avatarColor?: string | null;
@@ -50,6 +53,8 @@ export interface Message {
   components: ActionRow[];
   // "<someone> used /command", on a bot's answer to a slash command
   interaction: { id: string; name: string; user: Author } | null;
+  // written by the homeserver: "Ana added Leo", a call...
+  system: SystemMessage | null;
   // only on this screen: a bot's answer only you can see, or a bot still thinking about it
   ephemeral?: boolean;
   thinking?: boolean;

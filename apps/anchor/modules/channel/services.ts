@@ -1,3 +1,4 @@
+import { isCallChannel } from '../federation/access';
 import Elysia, { t } from 'elysia';
 import { randomString } from '../../utils/randomString';
 import { requestSession } from '../auth/provider';
@@ -438,7 +439,7 @@ export const channel = new Elysia({ prefix: '/channel', tags: ['Channel'] })
           id: params.id,
         },
       });
-      if (!channel || (channel.type !== 'VOICE' && channel.type !== 'DM')) {
+      if (!channel || !isCallChannel(channel)) {
         return status(404, { error: 'Channel not right' });
       }
 

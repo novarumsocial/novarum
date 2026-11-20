@@ -5,6 +5,7 @@ import type {
   APIChannel,
   APIEmbed,
   APIEphemeralMessage,
+  APIGroupDM,
   APIGuild,
   APIInteraction,
   APIMember,
@@ -90,7 +91,7 @@ export class Channel {
     return this.data.type;
   }
   get guild() {
-    return this.client.guilds.get(this.data.guildId);
+    return this.data.guildId ? this.client.guilds.get(this.data.guildId) : undefined;
   }
   isText() {
     return this.data.type === 'TEXT';
@@ -117,6 +118,41 @@ export class Channel {
   }
   toString() {
     return `#${this.name}`;
+  }
+}
+
+export class GroupDM {
+  /** where its messages go; `channel.guild` is undefined */
+  readonly channel: Channel;
+  constructor(
+    private client: Client,
+    public data: APIGroupDM
+  ) {
+    this.channel = new Channel(client, {
+      id: data.id,
+      guildId: null,
+      name: data.name ?? '',
+      type: 'GROUP_DM',
+      position: 0,
+      ownerOnly: false,
+    });
+  }
+  get id() {
+    return this.data.id;
+  }
+  get name() {
+    return this.data.name;
+  }
+  /** Everyone in the group but the bot. */
+  get participants() {
+    return this.data.participants.map((user) => new User(user));
+  }
+  send(options: MessageOptions) {
+    return this.channel.send(options);
+  }
+  /** Leaves the group. */
+  leave() {
+    return this.client.rest.post(`/bots/@me/dms/${encodeURIComponent(this.id)}/leave`);
   }
 }
 
@@ -277,8 +313,9 @@ abstract class BaseInteraction {
   get channel() {
     return this.client.channel(this.channelId);
   }
+  /** undefined in group DMs */
   get guild() {
-    return this.client.guilds.get(this.guildId);
+    return this.guildId ? this.client.guilds.get(this.guildId) : undefined;
   }
   isCommand(): this is CommandInteraction {
     return this.data.type === 'command';

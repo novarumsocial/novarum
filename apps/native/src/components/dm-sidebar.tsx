@@ -4,7 +4,16 @@
 // field finds DMs and channels in every server, the "new message" button sits in thumb reach at the bottom right,
 // and when two people share a display name their handles tell them apart.
 import * as Haptics from 'expo-haptics';
-import { Bell, Hash, LoaderCircle, Phone, SquarePen, Volume2, X } from 'lucide-react-native';
+import {
+  Bell,
+  Hash,
+  LoaderCircle,
+  LogOut,
+  Phone,
+  SquarePen,
+  Volume2,
+  X,
+} from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +26,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { guildPath, useChat } from '@/lib/chat-state';
-import { dmPath, dmPreviewText, dms, useDms, type DmEntry } from '@/lib/dms';
+import { dmDisplay, dmPath, dmPreviewText, dms, useDms, type DmEntry } from '@/lib/dms';
 import { useSession } from '@/lib/session';
 import { formatShortDate } from '@/lib/format-date';
 import { friends, useFriends } from '@/lib/friends';
@@ -35,7 +44,7 @@ export function DmSidebar() {
   const loading = useDms((s) => s.loading);
   const voiceStates = useChat((s) => s.voiceStates);
   useFriends((s) => s.accepted); // re-render when someone goes online or offline
-  const selfId = useSession((s) => s.user?.id);
+  const self = useSession((s) => s.user);
   const servers = useChat((s) => s.servers);
   const channelsByServer = useChat((s) => s.channelsByServer);
   const [query, setQuery] = useState('');
@@ -58,8 +67,7 @@ export function DmSidebar() {
   const nameCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of list) {
-      const other = entry.participants[0];
-      const name = other ? other.displayName || other.username : '';
+      const name = dmDisplay(entry).name;
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
     return counts;
@@ -71,7 +79,7 @@ export function DmSidebar() {
   const handleOf = (other?: PublicUser) => (other ? `@${other.username}:${other.homeserver}` : '');
   const shownDms = needle
     ? entries.filter((entry) =>
-        `${nameOf(entry.participants[0])} ${handleOf(entry.participants[0])}`
+        `${dmDisplay(entry).name} ${entry.participants.map(handleOf).join(' ')}`
           .toLowerCase()
           .includes(needle)
       )
@@ -98,10 +106,22 @@ export function DmSidebar() {
     );
   };
 
+  const leaveGroup = (entry: DmEntry) => {
+    setMenu(null);
+    Alert.alert(
+      `Leave ${dmDisplay(entry).name}?`,
+      "You won't get its messages any more, unless someone adds you again.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => void dms().leave(entry.id) },
+      ]
+    );
+  };
+
   const row = (entry: DmEntry) => {
-    const other = entry.participants[0];
-    const name = nameOf(other);
-    const repeated = (nameCounts.get(name) ?? 0) > 1;
+    const { other, name, avatarUrl, avatarColor } = dmDisplay(entry);
+    const group = entry.type === 'GROUP_DM';
+    const repeated = !group && (nameCounts.get(name) ?? 0) > 1;
     const unread =
       entry.unread &&
       useNotificationSettings.getState().showsUnread({ channelId: entry.id, guildId: null });
@@ -122,12 +142,7 @@ export function DmSidebar() {
         className="min-h-16 flex-row items-center gap-3 bg-sidebar px-3 active:bg-accent"
       >
         <View>
-          <Avatar
-            src={other?.avatarUrl}
-            name={name}
-            bgColor={other?.avatarColor}
-            className="size-10"
-          />
+          <Avatar src={avatarUrl} name={name} bgColor={avatarColor} className="size-10" />
           {other && friends().isOnline(other.userId) && (
             <View
               className={cn(
@@ -144,12 +159,12 @@ export function DmSidebar() {
           >
             {name}
           </Text>
-          {repeated || needle ? (
+          {other && (repeated || needle) ? (
             <Text numberOfLines={1} className="text-sm text-muted-foreground">
               {handleOf(other)}
             </Text>
           ) : null}
-          {!needle && dmPreviewText(entry, selfId) ? (
+          {!needle && (dmPreviewText(entry, self) || group) ? (
             <Text
               numberOfLines={1}
               className={cn(
@@ -157,7 +172,7 @@ export function DmSidebar() {
                 unread ? 'text-sidebar-foreground' : 'text-muted-foreground'
               )}
             >
-              {dmPreviewText(entry, selfId)}
+              {dmPreviewText(entry, self) ?? `${entry.participants.length + 1} members`}
             </Text>
           ) : null}
         </View>
@@ -289,16 +304,31 @@ export function DmSidebar() {
       <Sheet
         open={menu === 'actions'}
         onClose={() => setMenu((current) => (current === 'actions' ? null : current))}
-        title={menuEntry ? nameOf(menuEntry.participants[0]) : undefined}
-        subtitle={menuEntry ? handleOf(menuEntry.participants[0]) : undefined}
+        title={menuEntry ? dmDisplay(menuEntry).name : undefined}
+        subtitle={
+          menuEntry?.type === 'GROUP_DM'
+            ? `${menuEntry.participants.length + 1} members`
+            : menuEntry
+              ? handleOf(menuEntry.participants[0])
+              : undefined
+        }
       >
         <SheetItem icon={Bell} label="Notification settings" onPress={() => setMenu('notify')} />
-        <SheetItem
-          icon={X}
-          label="Close conversation"
-          destructive
-          onPress={() => menuEntry && closeDm(menuEntry)}
-        />
+        {menuEntry?.type === 'GROUP_DM' ? (
+          <SheetItem
+            icon={LogOut}
+            label="Leave group"
+            destructive
+            onPress={() => menuEntry && leaveGroup(menuEntry)}
+          />
+        ) : (
+          <SheetItem
+            icon={X}
+            label="Close conversation"
+            destructive
+            onPress={() => menuEntry && closeDm(menuEntry)}
+          />
+        )}
       </Sheet>
       {menuEntry && (
         <NotificationMenu

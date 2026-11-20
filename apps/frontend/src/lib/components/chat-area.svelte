@@ -8,6 +8,7 @@
     NotebookPen,
     Phone,
     RotateCw,
+    UserPlus,
     Users,
     Volume2,
     X,
@@ -20,6 +21,8 @@
   import { cn } from '$lib/utils';
   import type { Channel, Message } from '$lib/types/chat';
   import MessageComponent from './message.svelte';
+  import SystemMessage from './system-message.svelte';
+  import NewDmDialog from './new-dm-dialog.svelte';
   import MessageInput from './message-input.svelte';
   import Avatar from './avatar.svelte';
   import { formatDate } from '$lib/formatDate';
@@ -77,6 +80,8 @@
   const canvasSupported = $derived(channel.type !== 'VOICE' && !channel.id.startsWith('fed:'));
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
   const ringing = $derived(!!call && dms.outgoingCall === channel.id);
+  let addPeopleOpen = $state(false);
+  const dmEntry = $derived(channel.type === 'DM' ? dms.get(channel.id) : null);
 
   function resizeCall(event: PointerEvent) {
     event.preventDefault();
@@ -376,6 +381,17 @@
         <NotebookPen class="size-5" />
       </Button>
     {/if}
+    {#if dmEntry}
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        onclick={() => (addPeopleOpen = true)}
+        aria-label={channel.group ? 'Add people' : 'Start a group with them'}
+        title={channel.group ? 'Add people' : 'Start a group with them'}
+      >
+        <UserPlus class="size-5" />
+      </Button>
+    {/if}
     {#if channel.type === 'DM'}
       {#if !call}
         <Button variant="ghost" size="icon-lg" onclick={onCall} aria-label="Start call">
@@ -386,7 +402,8 @@
           <BellRing class="size-5" />
         </Button>
       {/if}
-    {:else}
+    {/if}
+    {#if channel.type !== 'DM' || channel.group}
       <Button
         variant="ghost"
         size="icon-lg"
@@ -479,9 +496,11 @@
                 {/if}
                 <div class="border border-dashed border-border p-4">
                   <p class="text-sm font-medium text-foreground">
-                    {channel.type === 'DM'
-                      ? `This is the beginning of your conversation with ${channel.name}.`
-                      : 'No messages yet'}
+                    {channel.group
+                      ? `This is the beginning of the ${channel.name} group.`
+                      : channel.type === 'DM'
+                        ? `This is the beginning of your conversation with ${channel.name}.`
+                        : 'No messages yet'}
                   </p>
                   {#if channel.type !== 'DM'}
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -501,6 +520,8 @@
                     prev !== undefined &&
                     !msg.interaction &&
                     !msg.ephemeral &&
+                    !msg.system &&
+                    !prev.system &&
                     prev.author.username === msg.author.username &&
                     prev.author.server === msg.author.server &&
                     msg.timestamp.getTime() - prev.timestamp.getTime() < 5 * 60 * 1000}
@@ -529,15 +550,19 @@
                       <span>New</span>
                     </div>
                   {/if}
-                  <MessageComponent
-                    message={msg}
-                    {repliedMessage}
-                    {grouped}
-                    {onDelete}
-                    {onEdit}
-                    onReply={() => (replyingTo = msg)}
-                    {onProfileCall}
-                  />
+                  {#if msg.system}
+                    <SystemMessage message={{ ...msg, system: msg.system }} />
+                  {:else}
+                    <MessageComponent
+                      message={msg}
+                      {repliedMessage}
+                      {grouped}
+                      {onDelete}
+                      {onEdit}
+                      onReply={() => (replyingTo = msg)}
+                      {onProfileCall}
+                    />
+                  {/if}
                 {/each}
                 {#each channelPending as item (item.id)}
                   {@render pendingMessage(item)}
@@ -568,9 +593,11 @@
 
       {#if chat.canSendInCurrentChannel}
         <MessageInput
-          placeholder={channel.type === 'DM'
-            ? `Message @${channel.name}`
-            : `Message #${channel.name}`}
+          placeholder={channel.group
+            ? `Message ${channel.name}`
+            : channel.type === 'DM'
+              ? `Message @${channel.name}`
+              : `Message #${channel.name}`}
           onSend={sendMessage}
           onTyping={() => chat.onTyping()}
           context={replyingTo ? replyContext : undefined}
@@ -616,3 +643,7 @@
     {/if}
   </div>
 </div>
+
+{#if dmEntry}
+  <NewDmDialog bind:open={addPeopleOpen} addTo={dmEntry} />
+{/if}

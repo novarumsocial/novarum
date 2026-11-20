@@ -66,6 +66,10 @@ export async function getFederatedGuildAccess(guildId: string, remoteUser: Feder
   return { ok: true as const, guild, user };
 }
 
-/** Voice and ringing only make sense in voice channels and DMs. */
+/** Voice only makes sense in voice channels and DMs (1:1 or group). */
 export const isCallChannel = (channel: { type: string }) =>
-  channel.type === 'VOICE' || channel.type === 'DM';
+  channel.type === 'VOICE' || isDmChannel(channel);
+
+/** Ringing is for DMs only: nobody rings a guild's voice channel. */
+export const isDmChannel = (channel: { type: string }) =>
+  channel.type === 'DM' || channel.type === 'GROUP_DM';
