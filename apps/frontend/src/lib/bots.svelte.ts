@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { anchor } from '$lib/anchor.svelte';
 import { chat } from '$lib/chat-state.svelte';
+import { dms } from '$lib/dms.svelte';
 import type { Command } from 'anchor/bot-schemas';
 import type { PublicUser } from 'anchor/public-user';
 
@@ -133,10 +134,13 @@ class InteractionsState {
     return guildId ? (this.commandsByGuild[guildId]?.bots ?? []) : [];
   }
 
+  // `guildId` is a group DM's id in group DMs
   async loadCommands(guildId: string, force = false) {
     const cached = this.commandsByGuild[guildId];
     if (!force && cached && Date.now() - cached.at < commandCacheMs) return cached.bots;
-    const { data } = await anchor.client.guilds({ id: guildId }).commands.get();
+    const { data } = dms.get(guildId)
+      ? await anchor.client.dm({ id: guildId }).commands.get()
+      : await anchor.client.guilds({ id: guildId }).commands.get();
     const bots = data?.bots ?? [];
     this.commandsByGuild = { ...this.commandsByGuild, [guildId]: { bots, at: Date.now() } };
     return bots;

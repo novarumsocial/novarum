@@ -119,7 +119,7 @@
   // so stopping it sticks until they share again.
   const autoWatched = new Set<string>();
   $effect(() => {
-    const dmOneOnOne = channel.type === 'DM' && voice.voiceStates.size === 2;
+    const dmOneOnOne = channel.type === 'DM' && !channel.group && voice.voiceStates.size === 2;
     for (const [identity, state] of voice.voiceStates) {
       if (identity === voice.localIdentity) continue;
       if (!state.screenShare) autoWatched.delete(identity);

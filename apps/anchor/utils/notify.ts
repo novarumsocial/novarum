@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import webpush from 'web-push';
 import { eq } from 'drizzle-orm';
 import { db, pushSubscriptions } from '../src/db';
@@ -43,87 +44,195 @@ export type PushPayload = {
 
 export type PushRecipient = { userId: string; homeserver: string; handle: string };
 
-// pushes to every device of the users who should hear about this: push on, level allows it,
-// and no open window to see it in. content only goes out when the user turned previews on.
-export async function notifyLocal(userIds: string[], payload: PushPayload) {
-  if (!userIds.length) return;
+// a stable numeric id per tag: expo-unified-push drops a notification without one
+const notificationId = (tag: string) =>
+  [...tag].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0) & 0x7fffffff;
 
-  const targetIds = [payload.channelId, ...(payload.guildId ? [payload.guildId] : [])];
-  const [preferences, settings, subscriptions, channel, guild] = await Promise.all([
+// android can only open an absolute url (the app's novarum:// scheme), browsers resolve the path
+const forDevice = (subscription: typeof pushSubscriptions.$inferSelect, message: { url: string }) =>
+  JSON.stringify(
+    subscription.kind === 'UNIFIEDPUSH' ? { ...message, url: `novarum:/${message.url}` } : message
+  );
+
+// a remote author's avatar lives on a server we don't control, and showing it would tell that
+// server when and where this user got the notification
+const iconFor = (author: { homeserver: string; avatarUrl: string | null }) =>
+  author.homeserver.toLowerCase() === getConfig().server.homeserver.toLowerCase()
+    ? (author.avatarUrl ?? undefined)
+    : undefined;
+
+// the users who should hear about something in this channel, with their devices: push on, level
+// allows it, no open window to see it in, and not over the rate limit
+async function pushTargets(
+  userIds: string[],
+  target: { channelId: string; guildId: string | null }
+) {
+  const targetIds = [target.channelId, ...(target.guildId ? [target.guildId] : [])];
+  const [preferences, settings, subscriptions] = await Promise.all([
     db.query.notificationPreferences.findMany({ where: { userId: { in: userIds } } }),
     db.query.notificationSettings.findMany({
       where: { userId: { in: userIds }, targetId: { in: targetIds } },
     }),
     db.query.pushSubscriptions.findMany({ where: { userId: { in: userIds } } }),
+  ]);
+
+  return [...new Set(userIds)].flatMap((userId) => {
+    const devices = subscriptions.filter((subscription) => subscription.userId === userId);
+    if (!devices.length || isUserActive(userId)) return [];
+
+    const preference = preferences.find((item) => item.userId === userId);
+    if (preference && !preference.push) return [];
+
+    const entries = Object.fromEntries(
+      settings.filter((item) => item.userId === userId).map((item) => [item.targetId, item])
+    );
+    // everything pushed is a DM, a call or a mention, so it always counts as one
+    if (!levelAllows(effectiveLevel(entries, target), true)) return [];
+    if (!allowPushTo(userId)) return [];
+    return [{ userId, devices, preview: preference?.messagePreview ?? true }];
+  });
+}
+
+// pushes to every device of the users who should hear about this message. content only goes out
+// when the user turned previews on.
+export async function notifyLocal(userIds: string[], payload: PushPayload) {
+  if (!userIds.length) return;
+
+  const [targets, channel, guild] = await Promise.all([
+    pushTargets(userIds, { channelId: payload.channelId, guildId: payload.guildId }),
     db.query.channels.findFirst({ where: { id: payload.channelId } }),
     payload.guildId ? db.query.guilds.findFirst({ where: { id: payload.guildId } }) : null,
   ]);
 
-  const target = { channelId: payload.channelId, guildId: payload.guildId };
-  const localHomeserver = getConfig().server.homeserver.toLowerCase();
   const name = payload.author.displayName || payload.author.username;
   const url = payload.guildId
     ? `/guilds/${[payload.guildId, payload.channelId, payload.messageId].map(encodeURIComponent).join('/')}`
     : `/guilds/dms/${encodeURIComponent(payload.channelId)}`;
 
-  for (const userId of new Set(userIds)) {
-    const userSubscriptions = subscriptions.filter(
-      (subscription) => subscription.userId === userId
-    );
-    if (!userSubscriptions.length || isUserActive(userId)) continue;
-
-    const preference = preferences.find((item) => item.userId === userId);
-    if (preference && !preference.push) continue;
-
-    const entries = Object.fromEntries(
-      settings.filter((item) => item.userId === userId).map((item) => [item.targetId, item])
-    );
-    // everything pushed is a DM or a mention, so it always counts as one
-    if (!levelAllows(effectiveLevel(entries, target), true)) continue;
-    if (!allowPushTo(userId)) continue;
-
-    const preview = preference?.messagePreview ?? true;
+  for (const { devices, preview } of targets) {
     const message = {
       title: payload.guildId
         ? `${name} (#${channel?.name ?? 'channel'} · ${guild?.name ?? 'server'})`
-        : name,
+        : channel?.type === 'GROUP_DM' && channel.name
+          ? `${name} (${channel.name})`
+          : name,
       body:
         preview && payload.snippet
           ? payload.snippet
           : payload.guildId
             ? 'Mentioned you'
             : 'Sent you a message',
-      // a remote author's avatar lives on a server we don't control, and showing it would tell that
-      // server when and where this user got the notification
-      icon:
-        payload.author.homeserver.toLowerCase() === localHomeserver
-          ? (payload.author.avatarUrl ?? undefined)
-          : undefined,
+      icon: iconFor(payload.author),
       tag: payload.channelId,
-      // expo-unified-push drops a notification without a numeric id; one per channel, like `tag`
-      id:
-        [...payload.channelId].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) | 0, 0) &
-        0x7fffffff,
+      // one per channel, like `tag`
+      id: notificationId(payload.channelId),
       url,
       channelId: payload.channelId,
       messageId: payload.messageId,
     };
 
-    await Promise.all(
-      userSubscriptions.map((subscription) =>
-        sendPush(
-          subscription,
-          // android can only open an absolute url (the app's novarum:// scheme), browsers resolve the path
-          JSON.stringify(
-            subscription.kind === 'UNIFIEDPUSH' ? { ...message, url: `novarum:/${url}` } : message
-          )
-        )
-      )
-    );
+    await Promise.all(devices.map((device) => sendPush(device, forDevice(device, message))));
   }
 }
 
-async function sendPush(subscription: typeof pushSubscriptions.$inferSelect, message: string) {
+// a ring is over after 30 seconds, so a phone that comes back later must not start ringing
+const ringTtl = 30;
+
+// the notification's Decline runs without the app, so the push carries a link that declines this
+// one ring for this one person; it expires shortly after the ring would have
+const declineSignature = (channelId: string, userId: string, exp: number) =>
+  crypto
+    .createHmac('sha256', `ring-decline:${getConfig().files.s3_secret_key}`)
+    .update(`${channelId}:${userId}:${exp}`)
+    .digest('base64url');
+
+function declineUrl(channelId: string, userId: string) {
+  const exp = Math.floor(Date.now() / 1000) + ringTtl * 2;
+  const url = new URL(
+    `/dm/${encodeURIComponent(channelId)}/ring/decline`,
+    getConfig().server.base_url
+  );
+  url.search = new URLSearchParams({
+    user: userId,
+    exp: String(exp),
+    sig: declineSignature(channelId, userId, exp),
+  }).toString();
+  return url.toString();
+}
+
+export function isValidDeclineSignature(
+  channelId: string,
+  userId: string,
+  exp: number,
+  sig: string
+) {
+  const expected = Buffer.from(declineSignature(channelId, userId, exp));
+  const given = Buffer.from(sig);
+  return (
+    exp > Date.now() / 1000 &&
+    expected.length === given.length &&
+    crypto.timingSafeEqual(expected, given)
+  );
+}
+
+export type CallPush = {
+  channelId: string;
+  caller: {
+    username: string;
+    displayName: string | null;
+    homeserver: string;
+    avatarUrl: string | null;
+  };
+  ringing: boolean;
+};
+
+// rings the phones of these users for a call in a DM, or stops them ringing. The app turns a
+// `type: 'call'` push into its call screen (modules/incoming-call in the native app).
+export async function notifyCall(userIds: string[], { channelId, caller, ringing }: CallPush) {
+  if (!userIds.length) return;
+
+  const tag = `call:${channelId}`;
+  if (!ringing) {
+    // a browser has to show something for every push, so only phones are told to stop ringing;
+    // the browser's notification stays until it's dismissed
+    const devices = await db.query.pushSubscriptions.findMany({
+      where: { userId: { in: userIds }, kind: 'UNIFIEDPUSH' },
+    });
+    const message = { type: 'call', ringing: false, id: notificationId(tag), tag, channelId };
+    await Promise.all(devices.map((device) => sendPush(device, JSON.stringify(message), ringTtl)));
+    return;
+  }
+
+  const [targets, channel] = await Promise.all([
+    pushTargets(userIds, { channelId, guildId: null }),
+    db.query.channels.findFirst({ where: { id: channelId } }),
+  ]);
+  const message = {
+    type: 'call',
+    ringing: true,
+    title: caller.displayName || caller.username,
+    body:
+      channel?.type === 'GROUP_DM' ? `Calling ${channel.name || 'your group'}` : 'Is calling you',
+    icon: iconFor(caller),
+    tag,
+    id: notificationId(tag),
+    url: `/guilds/dms/${encodeURIComponent(channelId)}`,
+    channelId,
+  };
+  await Promise.all(
+    targets.flatMap(({ userId, devices }) => {
+      const push = { ...message, decline: declineUrl(channelId, userId) };
+      return devices.map((device) => sendPush(device, forDevice(device, push), ringTtl));
+    })
+  );
+}
+
+// `ttl`: how long the push service keeps trying a phone that is offline, in seconds
+async function sendPush(
+  subscription: typeof pushSubscriptions.$inferSelect,
+  message: string,
+  ttl = 60 * 60
+) {
   try {
     const vapid = await getVapidKeys();
     const request = webpush.generateRequestDetails(
@@ -133,7 +242,7 @@ async function sendPush(subscription: typeof pushSubscriptions.$inferSelect, mes
       },
       message,
       {
-        TTL: 60 * 60,
+        TTL: ttl,
         urgency: 'high',
         vapidDetails: { subject: vapidSubject(), ...vapid },
       }

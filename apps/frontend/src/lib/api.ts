@@ -13,6 +13,8 @@ const anchorInfoSchema = z.object({
     })
     .optional(),
   maxFileSize: z.number(),
+  // older homeservers don't say
+  maxGroupMembers: z.number().default(30),
   homeserver: z.string(),
   baseUrl: z.url(),
   version: z.string().optional(),

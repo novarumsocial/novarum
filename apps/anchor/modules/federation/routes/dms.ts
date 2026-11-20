@@ -8,12 +8,63 @@ import { makeFederatedChannelId } from '../../../utils/federationIds';
 import { federationUserSchema, upsertFederatedUser } from '../../../utils/federationPayload';
 import { ensureFederatedDmRealtimeBridge } from '../../../utils/federationRealtime';
 import { genericResponseErrorSchema } from '../../../utils/genericResponseError';
+import { messagePreview } from '../../../utils/messagePreview';
 import { publicUser } from '../../../utils/publicUser';
 import { publishRealtime } from '../../../utils/publishRealtime';
 import { dmResponse, latestMessages, openLocalDm, upsertDmShadow } from '../../dm/services';
 import { findFriendship, friendAuthority } from '../../friends/model';
 import { federationAuth } from '../plugin';
+import { getFederatedChannelAccess } from '../access';
+import {
+  acceptGroupSync,
+  groupSyncSchema,
+  hostAddBot,
+  hostAddMembers,
+  hostLeave,
+  hostRemoveMember,
+  hostTransferOwner,
+  hostUpdateGroup,
+  resolveUserRef,
+  userRefSchema,
+  type GroupResult,
+} from '../../dm/groups';
 import { federationErrors, okResponseSchema } from '../schemas';
+
+const groupErrors = {
+  ...federationErrors,
+  403: genericResponseErrorSchema,
+  404: genericResponseErrorSchema,
+  409: genericResponseErrorSchema,
+  429: genericResponseErrorSchema,
+  502: genericResponseErrorSchema,
+};
+
+// a remote member asks us, the host, to change one of our group DMs
+async function asMember(
+  id: string,
+  remoteUser: Parameters<typeof getFederatedChannelAccess>[1],
+  change: (
+    group: NonNullable<Awaited<ReturnType<typeof db.query.channels.findFirst>>>,
+    actor: Awaited<ReturnType<typeof upsertFederatedUser>>
+  ) => Promise<GroupResult>
+) {
+  const access = await getFederatedChannelAccess(id, remoteUser);
+  if (!access.ok) return { ok: false as const, status: access.status, error: access.error };
+  if (access.channel.type !== 'GROUP_DM') {
+    return { ok: false as const, status: 404 as const, error: 'DM not found' };
+  }
+  return change(access.channel, access.user);
+}
+
+const memberRef = async (groupId: string, ref: unknown) => {
+  const parsed = userRefSchema.safeParse(ref);
+  const user = parsed.success ? await resolveUserRef(parsed.data) : undefined;
+  if (!user) return undefined;
+  const member = await db.query.channelMembers.findFirst({
+    where: { channelId: groupId, userId: user.id },
+  });
+  return member ? user : undefined;
+};
 
 // Every DM is hosted by one of the two homeservers, the one that sorts first (see friendAuthority).
 // The other homeserver keeps a "shadow" copy of the DM and talks to the host about it.
@@ -181,6 +232,10 @@ export const dms = new Elysia()
           id: message.id,
           createdAt: message.createdAt.toISOString(),
           own: message.authorId === user.id,
+          content: messagePreview(message.content),
+          attachmentCount: message.attachmentCount,
+          system: message.system,
+          author: message.author,
         })),
       };
     },
@@ -192,4 +247,104 @@ export const dms = new Elysia()
         404: genericResponseErrorSchema,
       },
     }
+  )
+  // the host of a group DM pushes its state to us, since some of our users are (or were) in it
+  .post(
+    '/dms/sync',
+    async ({ payload, origin, server, status }) => {
+      const sync = groupSyncSchema.safeParse(payload);
+      if (!sync.success) return status(400, { error: 'Invalid group DM' });
+      const result = await acceptGroupSync(server, origin.homeserver, sync.data);
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    {
+      federated: true,
+      response: { 200: okResponseSchema, ...groupErrors },
+    }
+  )
+  .post(
+    '/dms/:id/members',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const refs = z.array(userRefSchema).min(1).max(100).safeParse(payload.users);
+      if (!refs.success) return status(400, { error: 'Invalid users' });
+      // only a member gets us to look up (and maybe fetch) the people they add
+      const result = await asMember(params.id, remoteUser, async (group, actor) => {
+        const targets = await Promise.all(refs.data.map(resolveUserRef));
+        if (targets.some((user) => !user)) {
+          return { ok: false as const, status: 404 as const, error: 'User not found' };
+        }
+        return hostAddMembers(
+          server,
+          group,
+          actor,
+          targets.filter((user) => !!user)
+        );
+      });
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/dms/:id/bots',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const body = userRefSchema
+        .extend({ grant: z.string().max(64).optional() })
+        .safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid bot' });
+      const { grant, ...ref } = body.data;
+      const result = await asMember(params.id, remoteUser, (group, actor) =>
+        hostAddBot(server, group, actor, ref, grant)
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/dms/:id/members/remove',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const target = await memberRef(params.id, payload.target);
+      if (!target) return status(404, { error: 'Member not found' });
+      const result = await asMember(params.id, remoteUser, (group, actor) =>
+        hostRemoveMember(server, group, actor, target)
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/dms/:id/owner',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const target = await memberRef(params.id, payload.target);
+      if (!target) return status(404, { error: 'Member not found' });
+      const result = await asMember(params.id, remoteUser, (group, actor) =>
+        hostTransferOwner(server, group, actor, target)
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/dms/:id/update',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const change = z
+        .object({ name: z.string().max(100).optional(), iconUrl: z.url().nullable().optional() })
+        .refine((change) => change.name !== undefined || change.iconUrl !== undefined)
+        .safeParse(payload);
+      if (!change.success) return status(400, { error: 'Invalid change' });
+      const result = await asMember(params.id, remoteUser, (group, actor) =>
+        hostUpdateGroup(server, group, actor, change.data)
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/dms/:id/leave',
+    async ({ params, remoteUser, server, status }) => {
+      const result = await asMember(params.id, remoteUser, (group, actor) =>
+        hostLeave(server, group, actor)
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { federatedUser: true, response: { 200: okResponseSchema, ...groupErrors } }
   );

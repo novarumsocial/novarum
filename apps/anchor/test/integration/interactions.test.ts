@@ -4,6 +4,7 @@ import { signup, type TestUser } from '../harness/users';
 import { anonymous, call, createGuild, join, list, send } from '../harness/chat';
 import { connect } from '../harness/realtime';
 import { addBot, connectBot, createBot, type TestBot } from '../harness/bots';
+import { befriend } from '../harness/friends';
 
 let anchor: RunningAnchor;
 beforeAll(async () => {
@@ -702,5 +703,153 @@ describe('buttons', () => {
     expect((await command(w.member, w, 'ping')).status).toBe(404);
     expect((await call(w.member, 'GET', `/guilds/${w.guild.id}/commands`)).body.bots).toEqual([]);
     w.rt.close();
+  });
+});
+
+describe('bots in group DMs', () => {
+  async function group() {
+    const [owner, member, outsider] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
+    await befriend(owner, member);
+    const groupId = (await call(owner, 'POST', '/dm/group', { userIds: [member.user.id] })).body
+      .id as string;
+    const bot = await createBot(outsider);
+    await call(bot, 'PUT', '/bots/@me/commands', { commands });
+    const rt = await connectBot(anchor.url, bot.token);
+    const add = (
+      user: Pick<TestUser, 'fetch'>,
+      b: { username: string; homeserver: string } = bot.bot
+    ) =>
+      call(user, 'POST', `/dm/${groupId}/bots`, { username: b.username, homeserver: b.homeserver });
+    return { owner, member, outsider, groupId, bot, rt, add };
+  }
+  type Group = Awaited<ReturnType<typeof group>>;
+  const groupCommand = (
+    user: Pick<TestUser, 'fetch'>,
+    g: Group,
+    name: string,
+    options: object[] = []
+  ) =>
+    call(user, 'POST', '/interactions', {
+      channelId: g.groupId,
+      type: 'command',
+      botId: g.bot.bot.userId,
+      name,
+      options,
+    });
+
+  test('only the owner adds a bot; it hears the group and answers slash commands and buttons there', async () => {
+    const g = await group();
+    expect((await g.add(g.member)).status).toBe(403);
+    expect((await g.add(g.owner)).status).toBe(200);
+    expect((await g.add(g.owner)).status).toBe(409);
+    await g.rt.waitFor('dm.created', (e) => e.data.id === g.groupId);
+
+    const listed = (await call(g.member, 'GET', `/dm/${g.groupId}/commands`)).body.bots;
+    expect(listed.map((b: any) => b.bot.userId)).toEqual([g.bot.bot.userId]);
+    expect((await call(g.outsider, 'GET', `/dm/${g.groupId}/commands`)).status).toBe(404);
+
+    await send(g.member, g.groupId, 'anyone there?');
+    await g.rt.waitFor('message.created', (e) => e.data.content === 'anyone there?');
+
+    // user options are the group's members, nobody else
+    expect(
+      (await groupCommand(g.member, g, 'poke', [{ name: 'who', value: g.outsider.user.id }])).status
+    ).toBe(400);
+    const seen = g.rt.events.length;
+    const started = groupCommand(g.member, g, 'poke', [{ name: 'who', value: g.owner.user.id }]);
+    const event = await g.rt.waitFor('interaction.created', (e) => g.rt.events.indexOf(e) >= seen);
+    expect(event.data).toMatchObject({ guildId: null, channelId: g.groupId });
+    expect(event.data.data.options[0].user.userId).toBe(g.owner.user.id);
+    const button = [
+      {
+        type: 'actionRow',
+        components: [{ type: 'button', style: 'primary', label: 'Again', customId: 'again' }],
+      },
+    ];
+    expect(
+      (
+        await respond(g.bot, event.data, 'callback', {
+          type: 'message',
+          data: { content: 'poked', components: button },
+        })
+      ).status
+    ).toBe(200);
+    expect((await started).status).toBe(200);
+    const reply = (await list(g.member, g.groupId)).body.messages.find(
+      (m: any) => m.content === 'poked'
+    );
+    expect(reply.interaction).toMatchObject({ name: 'poke' });
+
+    const pressed = call(g.member, 'POST', '/interactions', {
+      channelId: g.groupId,
+      type: 'button',
+      messageId: reply.id,
+      customId: 'again',
+    });
+    const press = await g.rt.waitFor(
+      'interaction.created',
+      (e) => e.data.type === 'button' && e.data.message?.id === reply.id
+    );
+    await respond(g.bot, press.data, 'callback', { type: 'update', data: { content: 'again!' } });
+    expect((await pressed).status).toBe(200);
+    g.rt.close();
+  });
+
+  test('private bots only join groups their owner owns', async () => {
+    const g = await group();
+    const theirs = await createBot(g.outsider, { public: false });
+    expect((await g.add(g.owner, theirs.bot)).status).toBe(403);
+    const mine = await createBot(g.owner, { public: false });
+    expect((await g.add(g.owner, mine.bot)).status).toBe(200);
+    expect((await g.add(g.owner, { username: 'nobody', homeserver: 'localhost' })).status).toBe(
+      404
+    );
+    g.rt.close();
+  });
+
+  test('a removed bot loses the group; a bot can also leave on its own', async () => {
+    const g = await group();
+    await g.add(g.owner);
+    const message = (
+      await send(g.bot as any, g.groupId, 'press', {
+        components: [
+          {
+            type: 'actionRow',
+            components: [{ type: 'button', style: 'primary', label: 'Go', customId: 'go' }],
+          },
+        ],
+      })
+    ).body.message;
+    expect(
+      (await call(g.owner, 'DELETE', `/dm/${g.groupId}/members/${g.bot.bot.userId}`)).status
+    ).toBe(200);
+    await g.rt.waitFor('dm.removed', (e) => e.data.id === g.groupId);
+    expect((await send(g.bot as any, g.groupId, 'still here')).status).not.toBe(200);
+    expect((await call(g.member, 'GET', `/dm/${g.groupId}/commands`)).body.bots).toEqual([]);
+    expect(
+      (
+        await call(g.member, 'POST', '/interactions', {
+          channelId: g.groupId,
+          type: 'button',
+          messageId: message.id,
+          customId: 'go',
+        })
+      ).status
+    ).toBe(404);
+
+    await g.add(g.owner);
+    expect((await call(g.bot, 'GET', '/bots/@me/dms')).body.dms.map((d: any) => d.id)).toContain(
+      g.groupId
+    );
+    // bots use their own routes, not the people's DM routes
+    expect((await call(g.bot, 'POST', `/dm/${g.groupId}/leave`)).status).toBe(401);
+    expect((await call(g.bot, 'POST', `/bots/@me/dms/${g.groupId}/leave`)).status).toBe(200);
+    const after = (await call(g.owner, 'GET', '/dm')).body.dms.find((d: any) => d.id === g.groupId);
+    expect(after.participants.map((p: any) => p.userId)).toEqual([g.member.user.id]);
+    g.rt.close();
   });
 });

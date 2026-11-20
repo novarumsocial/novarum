@@ -92,7 +92,13 @@ describe('events from a host guild reach the member server, with mapped ids', ()
     expect(await listedChannels()).toEqual(reordered.data.channelIds);
 
     const other = await signup('c');
-    await call(other, 'POST', '/invite/accept', { code: invite, homeserver: hostA });
+    // other files restart A, so C's first request to it can fail (502) before anything reaches A
+    await eventually(
+      async () =>
+        (await call(other, 'POST', '/invite/accept', { code: invite, homeserver: hostA }))
+          .status === 200,
+      { timeout: 15_000, interval: 500, message: 'c joins through the invite' }
+    );
     const joined = await rt.waitFor('member.joined');
     expect(joined.data.guildId).toBe(shadowGuild);
     expect(joined.data.user).toMatchObject({

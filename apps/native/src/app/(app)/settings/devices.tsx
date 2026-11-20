@@ -103,7 +103,12 @@ export default function Devices() {
             <Text className="text-sm text-muted-foreground">
               Couldn&apos;t load your devices. Check your connection and try again.
             </Text>
-            <Button variant="outline" size="sm" className="flex-row gap-2 self-start" onPress={load}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-row gap-2 self-start"
+              onPress={load}
+            >
               <Icon as={RefreshCw} size={14} />
               <Text>Retry</Text>
             </Button>
@@ -185,13 +190,7 @@ export default function Devices() {
                   }
                   onPress={() => void remove(device)}
                 >
-                  {removing ? (
-                    <Spinner />
-                  ) : (
-                    <Text>
-                      {confirming ? 'Confirm remove' : 'Remove'}
-                    </Text>
-                  )}
+                  {removing ? <Spinner /> : <Text>{confirming ? 'Confirm remove' : 'Remove'}</Text>}
                 </Button>
               </Animated.View>
             );

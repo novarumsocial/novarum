@@ -37,6 +37,17 @@ export function expectEphemerals(userId: string, host: string) {
   }, interactionLifetimeMs + 1_000).unref?.();
 }
 
+// our ids for the guild and channel of something the host sent; group DMs have no guild
+const federatedScope = (origin: string, ids: { guildId: string | null; channelId: string }) => ({
+  guildId: ids.guildId ? makeFederatedGuildId(origin, ids.guildId) : null,
+  channelId: makeFederatedChannelId(origin, ids.channelId),
+});
+
+const isMember = async (scope: { guildId: string | null; channelId: string }, userId: string) =>
+  !!(scope.guildId
+    ? await db.query.guildMembers.findFirst({ where: { guildId: scope.guildId, userId } })
+    : await db.query.channelMembers.findFirst({ where: { channelId: scope.channelId, userId } }));
+
 /** On the bot's homeserver: the host of a guild tells one of our bots about an interaction. */
 export async function acceptDelivery(server: Server | null, origin: string, payload: unknown) {
   const body = z
@@ -51,11 +62,11 @@ export async function acceptDelivery(server: Server | null, origin: string, payl
   });
   if (!bot) return fail(404, 'Bot not found');
 
-  // the host can only send interactions from its own guilds, and only to bots that are in them
-  const guildId = makeFederatedGuildId(origin, interaction.guildId);
-  const channelId = makeFederatedChannelId(origin, interaction.channelId);
-  const membership = await db.query.guildMembers.findFirst({ where: { guildId, userId: bot.id } });
-  if (!membership) return fail(403, 'Bot is not in this guild');
+  // the host can only send interactions from its own guilds and group DMs, and only to bots in them
+  const { guildId, channelId } = federatedScope(origin, interaction);
+  if (!(await isMember({ guildId, channelId }, bot.id))) {
+    return fail(403, 'Bot is not in this guild or group');
+  }
   // nor speak for one of our people who isn't in the guild
   const user = await vetLocalIdentity({ guildId, channelId }, interaction.user);
   if (!user) return fail(403, 'Forbidden');
@@ -150,14 +161,12 @@ export async function acceptEphemeral(server: Server | null, origin: string, pay
   if ((expectingEphemerals.get(ephemeralKey(user.id, origin)) ?? 0) <= Date.now()) {
     return fail(403, 'Forbidden');
   }
-  // only for a channel of a guild of the sender that our person is in
-  const guildId = makeFederatedGuildId(origin, message.guildId);
-  const channelId = makeFederatedChannelId(origin, message.channelId);
-  const [membership, channel] = await Promise.all([
-    db.query.guildMembers.findFirst({ where: { guildId, userId: user.id } }),
-    db.query.channels.findFirst({ where: { id: channelId, guildId } }),
-  ]);
-  if (!membership || !channel) return fail(403, 'Forbidden');
+  // only for a channel (of a guild, or a group DM) of the sender that our person is in
+  const { guildId, channelId } = federatedScope(origin, message);
+  const channel = await db.query.channels.findFirst({ where: { id: channelId } });
+  if (channel?.guildId !== guildId || !(await isMember({ guildId, channelId }, user.id))) {
+    return fail(403, 'Forbidden');
+  }
   const scope = { guildId, channelId };
   const author = await vetLocalIdentity(scope, message.author);
   const interactionUser =

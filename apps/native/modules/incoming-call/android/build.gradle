@@ -1,0 +1,24 @@
+apply plugin: 'com.android.library'
+
+group = 'me.novarum.incomingcall'
+version = '0.1.0'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
+
+android {
+  namespace "me.novarum.incomingcall"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // the push renderer plugs into expo-unified-push, which calls it for every push
+  implementation project(':expo-unified-push')
+  implementation 'androidx.core:core-ktx:1.13.1'
+}

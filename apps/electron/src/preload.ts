@@ -42,9 +42,19 @@ const api: ElectronAPI = {
   getLaunchPrefs: () => ipcRenderer.invoke('launch:get'),
   setLaunchPrefs: (prefs) => ipcRenderer.invoke('launch:set', prefs),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:status'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (callback) => {
+    const listener = (_event: unknown, status: Parameters<typeof callback>[0]) => callback(status);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.off('update:status', listener);
+  },
+  appReady: () => ipcRenderer.send('app:ready'),
   getVersion: () => ipcRenderer.invoke('version:get'),
   setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
   platform: process.platform,
+  behindSplash: process.argv.includes('--behind-splash'),
   venmic: {
     isAvailable: () => ipcRenderer.invoke('venmic:available'),
     link: () => ipcRenderer.invoke('venmic:link'),

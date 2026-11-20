@@ -5,12 +5,13 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { publicUserSchema } from 'anchor/public-user';
 import { componentsSchema, embedsSchema, messageInteractionSchema } from 'anchor/bot-schemas';
+import { systemMessageSchema } from 'anchor/system-message';
 import type { RealtimeEvent } from 'anchor';
 import { anchor } from './anchor';
 import { chat, selectActiveChannel } from './chat-state';
 import { settings } from './settings';
 import { session } from './session';
-import { goto } from './navigation';
+import { goHome, goto } from './navigation';
 import {
   messageNotificationTitle,
   notificationSound,
@@ -19,7 +20,7 @@ import {
 } from './notifications';
 import { notificationSettings } from './notification-settings';
 import { friends } from './friends';
-import { dms, dmPath } from './dms';
+import { dms, dmDisplay, dmPath } from './dms';
 import { openCanvases, type CanvasMessage } from './canvas';
 
 const channelTypeSchema = z.enum(['TEXT', 'VOICE']);
@@ -74,7 +75,25 @@ const dmChannelSchema = z.object({
   id: z.string(),
   type: z.enum(['DM', 'GROUP_DM']),
   participants: dmParticipantsSchema,
+  // older homeservers don't send these
+  name: z.string().nullable().default(null),
+  iconUrl: z.string().nullable().default(null),
+  ownerId: z.string().nullable().default(null),
   lastMessageAt: isoDateSchema.nullable(),
+  lastMessage: z
+    .object({
+      id: z.string(),
+      authorId: z.string(),
+      content: z.string().nullable(),
+      attachmentCount: z.number(),
+      system: systemMessageSchema.nullable().catch(null),
+      author: z
+        .object({ username: z.string(), displayName: z.string().nullable() })
+        .nullable()
+        .default(null),
+    })
+    .nullable()
+    .default(null),
   unread: z.boolean(),
   joinedAt: isoDateSchema,
 });
@@ -105,12 +124,13 @@ const messageEventDataSchema = z.object({
   ),
   components: componentsSchema.default([]),
   interaction: messageInteractionSchema.nullish(),
+  system: systemMessageSchema.nullish().catch(null),
 });
 
 const ephemeralMessageSchema = messageEventDataSchema
   .omit({ nonce: true, replyTo: true, attachments: true, pingedHandles: true })
   .extend({
-    guildId: z.string(),
+    guildId: z.string().nullable(),
     interaction: messageInteractionSchema.nullable(),
     ephemeral: z.literal(true),
   });
@@ -162,6 +182,20 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('dm.created'),
     data: dmChannelSchema,
+  }),
+  z.object({
+    type: z.literal('dm.updated'),
+    data: dmChannelSchema.pick({
+      id: true,
+      name: true,
+      iconUrl: true,
+      ownerId: true,
+      participants: true,
+    }),
+  }),
+  z.object({
+    type: z.literal('dm.removed'),
+    data: z.object({ id: z.string() }),
   }),
   z.object({
     type: z.literal('user.status.changed'),
@@ -432,17 +466,47 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
       chat().clearTyping(event.data.channelId, event.data.author.userId);
 
       if (isDm) {
+        // a federated DM's messages keep the hosting server's user ids, so match ourselves by handle
+        const { author } = event.data;
+        const fromSelf =
+          !!user &&
+          author.username.toLowerCase() === user.username.toLowerCase() &&
+          author.homeserver.toLowerCase() === user.homeserver.toLowerCase();
         dms().handleMessage(event.data.channelId, event.data.createdAt, {
           active: isActive,
-          fromSelf: user ? event.data.author.userId === user.id : false,
+          fromSelf,
+          lastMessage: {
+            id: event.data.id,
+            // in a group the author is one of several participants, found by handle like ourselves
+            authorId: fromSelf
+              ? user.id
+              : (dms()
+                  .get(event.data.channelId)
+                  ?.participants.find(
+                    (p) =>
+                      p.username.toLowerCase() === author.username.toLowerCase() &&
+                      p.homeserver.toLowerCase() === author.homeserver.toLowerCase()
+                  )?.userId ?? author.userId),
+            content: event.data.content?.replace(/\s+/g, ' ').trim().slice(0, 140) || null,
+            attachmentCount: event.data.attachments.length,
+            system: event.data.system ?? null,
+            author: { username: author.username, displayName: author.displayName },
+          },
         });
       }
     }
     if (event.type === 'message.updated') {
       chat().updateMessage(event.data.channelId, { ...event.data, edited: true });
+      dms().handleMessageEdit(
+        event.data.channelId,
+        event.data.id,
+        event.data.content ?? null,
+        event.data.system ?? null
+      );
     }
     if (event.type === 'message.deleted') {
       chat().removeMessage(event.data.channelId, event.data.id);
+      dms().handleMessageDelete(event.data.channelId, event.data.id);
     }
     if (event.type === 'user.status.changed') {
       chat().updateMemberStatus(event.data.userId, event.data.status);
@@ -471,16 +535,25 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
         caller.homeserver.toLowerCase() === user.homeserver.toLowerCase();
 
       if (!ringing) {
-        // declined on another of my devices, or the other person declined my call.
-        if (dms().incomingCall?.channelId === channelId) dms().setIncomingCall(null);
+        // declined on another of my devices, the caller hung up, or the other person declined my call.
+        const incoming = dms().incomingCall;
+        if (
+          incoming?.channelId === channelId &&
+          (self ||
+            (incoming.user.username === caller.username &&
+              incoming.user.homeserver.toLowerCase() === caller.homeserver.toLowerCase()))
+        )
+          dms().setIncomingCall(null);
         if (!self && dms().outgoingCall === channelId) dms().setOutgoingCall(null);
       } else if (!self) {
         dms().setIncomingCall({ channelId, user: caller });
         if (!isForeground() && settings().pushNotifications) {
           notificationSound();
+          const group = dms().get(channelId);
           void sendNotification({
             title: caller.displayName || caller.username,
-            body: 'Is calling you',
+            body:
+              group?.type === 'GROUP_DM' ? `Is calling ${dmDisplay(group).name}` : 'Is calling you',
             icon: caller.avatarUrl ?? undefined,
             tag: `call:${channelId}`,
             url: dmPath(channelId),
@@ -516,6 +589,13 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     }
     if (event.type === 'dm.created') {
       dms().upsert(event.data);
+    }
+    if (event.type === 'dm.updated') {
+      dms().update(event.data);
+    }
+    if (event.type === 'dm.removed') {
+      dms().remove(event.data.id);
+      if (selectActiveChannel(chat()) === event.data.id) goHome();
     }
   };
 

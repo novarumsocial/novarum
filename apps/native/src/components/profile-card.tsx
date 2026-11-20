@@ -18,6 +18,7 @@ import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { BotBadge } from '@/components/bot-badge';
+import { Markdown } from '@/components/markdown';
 import { dms } from '@/lib/dms';
 import { friends, useFriends, type FriendStatus } from '@/lib/friends';
 import { useSession } from '@/lib/session';
@@ -78,9 +79,12 @@ export function ProfileSheet({
 
   return (
     <Sheet open={open} onClose={onClose}>
+      {/* no banner: a short strip in their color instead of a big empty slab */}
       <View
-        className="aspect-[3/1] overflow-hidden bg-primary/20"
-        style={user.avatarColor ? { backgroundColor: user.avatarColor } : undefined}
+        className={cn('overflow-hidden bg-primary/20', user.bannerUrl ? 'aspect-[3/1]' : 'h-16')}
+        style={
+          user.avatarColor && !user.bannerUrl ? { backgroundColor: user.avatarColor } : undefined
+        }
       >
         {user.bannerUrl && (
           <Image
@@ -117,16 +121,20 @@ export function ProfileSheet({
           </Text>
           {user.isBot && <BotBadge />}
         </View>
-        <Text className="font-mono text-xs text-muted-foreground" numberOfLines={1}>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1} selectable>
           @{user.username}:{user.server}
         </Text>
 
         {user.about ? (
           <View className="mt-3">
-            <Text className="text-[10px] font-bold tracking-wider text-muted-foreground">
-              ABOUT
+            <Text className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+              About
             </Text>
-            <Text className="mt-1 text-sm leading-5 text-foreground/80">{user.about}</Text>
+            <Markdown
+              content={user.about}
+              links
+              className="mt-1 text-sm leading-5 text-foreground/80"
+            />
           </View>
         ) : null}
 

@@ -85,9 +85,11 @@ async function load(): Promise<Settings> {
 
 class SettingsStore {
   value = $state<Settings>({ ...defaults });
+  /** Resolves once the saved settings have replaced the defaults. */
+  ready = Promise.resolve();
   constructor() {
     if (typeof localStorage === 'undefined') return;
-    void load().then((value) => {
+    this.ready = load().then((value) => {
       this.value = value;
       $effect.root(() => {
         $effect(() => {

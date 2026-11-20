@@ -26,11 +26,19 @@ const colorSchema = z.object({
 });
 const channel = (value: number) => Math.round(Math.min(Math.max(value, 0), 1) * 255);
 
-function convert(value: string) {
+// React Native gets "R G B" with no alpha, so a see-through token (the dark theme's white-at-10% borders) is
+// blended over the background here; otherwise it would come out solid white
+function convert(value: string, background?: string) {
   const color = colorSchema.safeParse(toRgb(parse(value)));
   if (!color.success) return null; // not a color, e.g. --radius
   const { r, g, b, alpha } = color.data;
-  const [R, G, B] = [channel(r), channel(g), channel(b)];
+  const under = background ? colorSchema.parse(toRgb(parse(background))) : null;
+  const mix = (top: number, bottom: number) => (under ? top * alpha + bottom * (1 - alpha) : top);
+  const [R, G, B] = [
+    channel(mix(r, under?.r ?? 0)),
+    channel(mix(g, under?.g ?? 0)),
+    channel(mix(b, under?.b ?? 0)),
+  ];
   const hex = `#${[R, G, B].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
   return { channels: `${R} ${G} ${B}`, hex, alpha: Math.round(alpha * 100) / 100 };
 }
@@ -42,9 +50,12 @@ const theme: Record<string, { light: string; dark: string; alpha: number }> = {}
 const lightVars: string[] = [];
 const darkVars: string[] = [];
 
+const lightBackground = light.find((t) => t.name === 'background')?.value;
+const darkBackground = dark.get('background') ?? lightBackground;
+
 for (const { name, value } of light) {
-  const l = convert(value);
-  const d = convert(dark.get(name) ?? value);
+  const l = convert(value, lightBackground);
+  const d = convert(dark.get(name) ?? value, darkBackground);
   if (!l || !d) continue;
   theme[name] = { light: l.hex, dark: d.hex, alpha: l.alpha };
   lightVars.push(`    --${name}: ${l.channels};`);

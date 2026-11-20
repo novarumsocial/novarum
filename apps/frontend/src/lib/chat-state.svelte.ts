@@ -4,9 +4,10 @@ import { anchor } from '$lib/anchor.svelte';
 import type { Author, Channel, ChannelCategory, ChatRoute, Message, Server } from '$lib/types/chat';
 import { useSession } from './session.svelte';
 import type { PublicUser } from 'anchor/public-user';
-import { dms, dmPath } from './dms.svelte';
+import { dms, dmDisplay, dmPath } from './dms.svelte';
 import { mentionsEveryone } from './utils';
 import type { ActionRow, Embed, MessageInteraction } from 'anchor/bot-schemas';
+import type { SystemMessage } from 'anchor/system-message';
 
 function initialsFor(name: string) {
   const initials = name
@@ -53,6 +54,7 @@ type AddMessageInput = {
   }[];
   embeds?: Embed[];
   components?: ActionRow[];
+  system?: SystemMessage | null;
   interaction?: MessageInteraction | null;
   ephemeral?: boolean;
   thinking?: boolean;
@@ -121,6 +123,7 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    system: message.system ?? null,
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
@@ -148,16 +151,17 @@ function channelTypeFor(type: string | undefined): Channel['type'] {
 function dmChannel(entry: import('./dms.svelte').DmEntry | null): Channel | null {
   if (!entry) return null;
 
-  const other = entry.participants[0];
+  const display = dmDisplay(entry);
   return {
     id: entry.id,
-    name: other ? other.displayName || other.username : 'Direct Message',
+    name: display.name,
     unread: entry.unread,
     lastReadMessageId: null,
     mention: 0,
     type: 'DM',
-    avatarUrl: other?.avatarUrl ?? null,
-    avatarColor: other?.avatarColor ?? null,
+    group: entry.type === 'GROUP_DM',
+    avatarUrl: display.avatarUrl,
+    avatarColor: display.avatarColor,
   };
 }
 
@@ -220,6 +224,26 @@ class ChatState {
   activeChannel = $derived(
     this.route.kind === 'guild' || this.route.kind === 'dms' ? this.route.channelId : null
   );
+  // where slash commands come from: the guild, or the group DM (1:1 DMs have no bots)
+  commandScope = $derived(
+    this.activeServer ??
+      (this.route.kind === 'dms' && dms.get(this.route.channelId ?? '')?.type === 'GROUP_DM'
+        ? this.route.channelId
+        : null)
+  );
+
+  /** Who is in the current channel: the guild's members, or everyone in the group DM. */
+  get channelMembers(): Author[] {
+    if (this.route.kind !== 'dms') return this.members;
+    const group = dms.get(this.activeChannel ?? '');
+    const me = useSession().user;
+    if (group?.type !== 'GROUP_DM') return [];
+    return [
+      ...(me ? [{ ...me, userId: me.id, server: me.homeserver } as Author] : []),
+      ...group.participants.map(authorFromInput),
+    ];
+  }
+
   activeMessage = $derived(
     this.route.kind === 'home' || this.route.kind === 'developers' ? null : this.route.messageId
   );

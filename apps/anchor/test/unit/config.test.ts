@@ -65,6 +65,12 @@ describe('getConfig', () => {
     expect(c.misc.skip_emoji_download).toBe(false);
     expect(c.files.s3_disable_cors).toBe(false);
     expect(c.network).toEqual({});
+    expect(c.dms.max_group_members).toBe(30);
+  });
+
+  test('the group DM size can be changed, but a group needs room for three', () => {
+    expect(load((c) => (c.dms = { max_group_members: 50 })).dms.max_group_members).toBe(50);
+    expect(() => load((c) => (c.dms = { max_group_members: 2 }))).toThrow();
   });
 
   test('CORS: default is "*", and base_url is appended', () => {

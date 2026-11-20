@@ -80,13 +80,13 @@
     "alpha": 1
   },
   "border": {
-    "light": "#000000",
-    "dark": "#ffffff",
+    "light": "#e3e0e3",
+    "dark": "#242224",
     "alpha": 0.1
   },
   "input": {
-    "light": "#000000",
-    "dark": "#ffffff",
+    "light": "#d6d4d6",
+    "dark": "#302e30",
     "alpha": 0.15
   },
   "ring": {
@@ -155,8 +155,8 @@
     "alpha": 1
   },
   "sidebar-border": {
-    "light": "#000000",
-    "dark": "#ffffff",
+    "light": "#e3e0e3",
+    "dark": "#242224",
     "alpha": 0.1
   },
   "sidebar-ring": {

@@ -29,6 +29,7 @@ import { useVoice, voice } from '@/lib/voice';
 
 const noCategories: ChannelCategory[] = [];
 const leaveVoice = () => void voice().leave();
+const showDms = () => chat().selectServer(undefined);
 let restored = false;
 
 export default function Hub() {
@@ -128,7 +129,12 @@ export default function Hub() {
         </GestureDetector>
       </View>
       {user && (
-        <UserArea user={user} voiceChannelName={voiceChannelName} onLeaveVoice={leaveVoice} />
+        <UserArea
+          user={user}
+          voiceChannelName={voiceChannelName}
+          onLeaveVoice={leaveVoice}
+          onMessages={showDms}
+        />
       )}
     </View>
   );

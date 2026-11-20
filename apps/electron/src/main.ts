@@ -17,12 +17,14 @@ import {
   Tray,
 } from 'electron';
 import electronUpdater from 'electron-updater';
+import type { UpdateStatus } from '../../frontend/src/lib/electron-api';
 import { registerVenmicHandlers, shutdownVenmic } from './venmic';
 
 // apparently i need to do this pattern bc of commonjs, thanks commonjs
 const { autoUpdater } = electronUpdater;
 let isQuitting = false;
 let tray: Tray | undefined;
+let mainWindow: BrowserWindow | undefined;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -79,10 +81,29 @@ function applyAutoLaunch(enabled: boolean) {
   );
 }
 
+const launchHidden = () =>
+  (process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin) &&
+  readPrefs().startHidden;
+
 function showWindow(window: BrowserWindow) {
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
+}
+
+function updateTrayMenu() {
+  if (!tray || !mainWindow) return;
+  const window = mainWindow;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open Novarum', click: () => showWindow(window) },
+      ...(update.status === 'downloaded'
+        ? [{ label: `Restart to update to ${update.version}`, click: installUpdate }]
+        : []),
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() },
+    ])
+  );
 }
 
 function createTray(window: BrowserWindow) {
@@ -92,13 +113,7 @@ function createTray(window: BrowserWindow) {
 
   tray = new Tray(icon);
   tray.setToolTip('Novarum');
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Open Novarum', click: () => showWindow(window) },
-      { type: 'separator' },
-      { label: 'Quit', click: () => app.quit() },
-    ])
-  );
+  updateTrayMenu();
   tray.on('click', () => showWindow(window));
 }
 
@@ -183,7 +198,39 @@ function configurePermissions() {
   });
 }
 
-function configureAutoUpdater(window: BrowserWindow) {
+let update: UpdateStatus = { status: app.isPackaged ? 'idle' : 'unsupported' };
+let downloading: Promise<unknown> | undefined;
+let splash: BrowserWindow | undefined;
+
+function setUpdate(next: UpdateStatus) {
+  update = next;
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('update:status', update);
+    window.setProgressBar(update.status === 'downloading' ? (update.percent ?? 0) / 100 : -1);
+  }
+  updateTrayMenu();
+}
+
+function downloadUpdate() {
+  if (downloading) return downloading;
+  setUpdate({ status: 'downloading', version: update.version, percent: 0 });
+  return (downloading = autoUpdater.downloadUpdate().finally(() => (downloading = undefined)));
+}
+
+function installUpdate() {
+  // otherwise the window's close handler hides it to the tray and the install never runs
+  isQuitting = true;
+  autoUpdater.quitAndInstall(true, true);
+}
+
+function checkForUpdates() {
+  if (update.status === 'downloading' || update.status === 'downloaded') return;
+  return autoUpdater.checkForUpdates().catch((error) => {
+    console.error('Failed to check for updates', error);
+  });
+}
+
+function configureAutoUpdater() {
   if (!app.isPackaged) return;
 
   autoUpdater.logger = console;
@@ -192,70 +239,68 @@ function configureAutoUpdater(window: BrowserWindow) {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  let downloading = false;
-
-  const download = () => {
-    downloading = true;
-    void autoUpdater.downloadUpdate().catch((error) => {
-      downloading = false;
-      window.setProgressBar(-1);
-      console.error('Failed to download update', error);
-    });
-  };
-
-  autoUpdater.on('update-available', async ({ version }) => {
-    if (downloading) return;
-    if (readPrefs().autoUpdate) return download();
-
-    const { response } = await dialog.showMessageBox(window, {
-      type: 'info',
-      title: 'Novarum update available',
-      message: `Novarum ${version} is available.`,
-      detail: 'Download it now? You can keep using Novarum while it downloads.',
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (response === 0) download();
+  autoUpdater.on('checking-for-update', () => setUpdate({ status: 'checking' }));
+  autoUpdater.on('update-not-available', () => setUpdate({ status: 'current' }));
+  autoUpdater.on('update-available', ({ version }) => {
+    setUpdate({ status: 'available', version });
+    if (readPrefs().autoUpdate) void downloadUpdate().catch(() => {});
   });
-
-  autoUpdater.on('download-progress', ({ percent }) => {
-    window.setProgressBar(percent / 100);
-  });
-
-  autoUpdater.on('update-downloaded', async ({ version }) => {
-    window.setProgressBar(-1);
-    // with auto-update on, the update installs the next time Novarum quits
-    if (readPrefs().autoUpdate) return;
-    const { response } = await dialog.showMessageBox(window, {
-      type: 'info',
-      title: 'Novarum update ready',
-      message: `Novarum ${version} is ready to install.`,
-      detail: 'Restart Novarum to finish updating.',
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (response === 0) autoUpdater.quitAndInstall(false, true);
-  });
-
+  autoUpdater.on('download-progress', ({ percent }) =>
+    setUpdate({ status: 'downloading', version: update.version, percent })
+  );
+  autoUpdater.on('update-downloaded', ({ version }) =>
+    setUpdate({ status: 'downloaded', version })
+  );
   autoUpdater.on('error', (error) => {
-    downloading = false;
-    window.setProgressBar(-1);
     console.error('Auto-update failed', error);
+    setUpdate({ status: 'error', version: update.version });
   });
 
-  const check = () => {
-    if (!readPrefs().autoUpdate) return;
-    void autoUpdater.checkForUpdates().catch((error) => {
-      console.error('Failed to check for updates', error);
-    });
-  };
+  setInterval(() => readPrefs().autoUpdate && checkForUpdates(), 30 * 60_000).unref();
+}
 
-  setTimeout(check, 10_000).unref();
-  setInterval(check, 30 * 60_000).unref();
+// checks for an update before the main window opens and installs it right away,
+// returns true when the app is about to restart into the new version. otherwise the splash
+// stays up while the main window boots hidden, skipping the frontend's own loading screen
+async function updateOnLaunch() {
+  splash = new BrowserWindow({
+    width: 300,
+    height: 320,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: '#0c090c',
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(app.getAppPath(), '.electron/preload.cjs'),
+      sandbox: true,
+    },
+  });
+  void splash.loadURL(`${appOrigin}/updater`).catch(() => {});
+
+  try {
+    const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, 15_000));
+    const result = await Promise.race([autoUpdater.checkForUpdates(), timeout]);
+    if (result?.isUpdateAvailable) {
+      await downloadUpdate();
+      installUpdate();
+      return true;
+    }
+  } catch (error) {
+    console.error('Launch update failed', error);
+  }
+  return false;
+}
+
+function handOffFromSplash() {
+  if (!splash) return;
+  mainWindow?.show();
+  mainWindow?.webContents.setBackgroundThrottling(true);
+  splash.destroy();
+  splash = undefined;
 }
 
 function createWindow() {
@@ -279,6 +324,9 @@ function createWindow() {
       nodeIntegration: false,
       preload: path.join(app.getAppPath(), '.electron/preload.cjs'),
       sandbox: true,
+      additionalArguments: splash ? ['--behind-splash'] : [],
+      // hidden windows get their timers throttled, which would hold up the handoff
+      backgroundThrottling: !splash,
     },
   });
 
@@ -297,9 +345,7 @@ function createWindow() {
   });
 
   window.once('ready-to-show', () => {
-    const atLogin =
-      process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin;
-    if (!(atLogin && readPrefs().startHidden)) window.show();
+    if (!launchHidden() && !splash) window.show();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInternalUrl(url)) openExternalUrl(url);
@@ -321,9 +367,11 @@ function createWindow() {
   return window;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   ipcMain.on('titlebar-colors', (event, color: string, symbolColor: string) => {
-    BrowserWindow.fromWebContents(event.sender)?.setTitleBarOverlay({
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window === splash) return;
+    window?.setTitleBarOverlay({
       color,
       symbolColor,
       height: 36,
@@ -338,18 +386,23 @@ app.whenReady().then(() => {
     return next;
   });
 
+  ipcMain.handle('update:status', (event) => {
+    // the splash asks once it has painted in the user's theme, which avoids a flash on first paint
+    if (event.sender === splash?.webContents) splash.show();
+    return update;
+  });
   ipcMain.handle('update:check', async () => {
-    if (!app.isPackaged) return { status: 'unsupported' };
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      return result?.isUpdateAvailable
-        ? { status: 'available', version: result.updateInfo.version }
-        : { status: 'current' };
-    } catch {
-      return { status: 'error' };
-    }
+    if (app.isPackaged) await checkForUpdates();
+    return update;
+  });
+  ipcMain.handle('update:download', () => {
+    if (update.status === 'available') void downloadUpdate().catch(() => {});
+  });
+  ipcMain.handle('update:install', () => {
+    if (update.status === 'downloaded') installUpdate();
   });
 
+  ipcMain.on('app:ready', handOffFromSplash);
   ipcMain.handle('version:get', () => app.getVersion());
   ipcMain.handle('badge:set', (_event, count: number) => {
     app.setBadgeCount(Math.max(0, Math.floor(Number(count)) || 0));
@@ -362,9 +415,16 @@ app.whenReady().then(() => {
   registerAppProtocol();
   configurePermissions();
   registerVenmicHandlers();
-  const window = createWindow();
+  configureAutoUpdater();
+
+  const autoUpdate = app.isPackaged && readPrefs().autoUpdate;
+  if (autoUpdate && !launchHidden() && (await updateOnLaunch())) return;
+  if (autoUpdate && launchHidden()) setTimeout(checkForUpdates, 10_000).unref();
+
+  const window = (mainWindow = createWindow());
   createTray(window);
-  configureAutoUpdater(window);
+  // in case the frontend never reports ready, don't leave the user staring at the splash
+  if (splash) setTimeout(handOffFromSplash, 10_000);
 
   app.on('activate', () => {
     const window = BrowserWindow.getAllWindows()[0] ?? createWindow();

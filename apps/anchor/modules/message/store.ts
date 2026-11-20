@@ -3,6 +3,7 @@ import { attachments, channelMembers, db, messagePings, messages } from '../../s
 import { randomString } from '../../utils/randomString';
 import { storage } from '../../utils/services/storage';
 import type { ActionRow, Embed, MessageInteraction } from '../../utils/botSchemas';
+import type { SystemMessage } from '../../utils/systemMessage';
 
 // The database writes behind sending, editing and deleting a message. Local users and users of
 // other homeservers (see modules/federation) go through the same functions, so a message
@@ -37,6 +38,7 @@ export async function createMessage(input: {
   embeds?: Embed[] | null;
   components?: ActionRow[] | null;
   interaction?: MessageInteraction | null;
+  system?: SystemMessage | null;
 }) {
   const created = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -51,6 +53,7 @@ export async function createMessage(input: {
         embeds: input.embeds ?? null,
         components: input.components ?? null,
         interaction: input.interaction ?? null,
+        system: input.system ?? null,
       })
       .returning();
     if (!created) throw new Error('Failed to create message');

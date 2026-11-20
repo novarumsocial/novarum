@@ -14,7 +14,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Linking, View } from 'react-native';
 import { z } from 'zod';
 import { SettingsGroup, SettingsPage } from '@/components/settings-group';
-import { SettingsRow } from '@/components/settings-row';
+import { SettingsSwitchRow } from '@/components/settings-row';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
@@ -292,12 +292,12 @@ export default function Security() {
   return (
     <SettingsPage description="Protect your account and choose what others can see.">
       <SettingsGroup title="Privacy">
-        <SettingsRow title="Show online status" description="Let people see when you're online.">
-          <Switch
-            value={showOnlineStatus}
-            onValueChange={(value) => update({ showOnlineStatus: value })}
-          />
-        </SettingsRow>
+        <SettingsSwitchRow
+          title="Show online status"
+          description="Let people see when you're online."
+          value={showOnlineStatus}
+          onValueChange={(value) => update({ showOnlineStatus: value })}
+        />
       </SettingsGroup>
 
       {mfaLoading && !mfaLoaded ? (

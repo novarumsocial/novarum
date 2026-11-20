@@ -33,20 +33,20 @@
   let activeCommand = $state<{ entry: GuildBotCommands; command: Command } | null>(null);
   // "/name" with nothing after it, in a guild: the person is picking a slash command
   const commandQuery = $derived(
-    chat.activeServer && /^\/[\w-]*$/.test(content) ? content.slice(1).toLowerCase() : null
+    chat.commandScope && /^\/[\w-]*$/.test(content) ? content.slice(1).toLowerCase() : null
   );
   const commandResults = $derived(
     commandQuery === null
       ? []
       : interactions
-          .commandsFor(chat.activeServer)
+          .commandsFor(chat.commandScope)
           .flatMap((entry) => entry.commands.map((command) => ({ entry, command })))
           .filter(({ command }) => command.name.startsWith(commandQuery))
           .slice(0, 10)
   );
   $effect(() => {
-    if (commandQuery !== null && chat.activeServer)
-      void interactions.loadCommands(chat.activeServer);
+    if (commandQuery !== null && chat.commandScope)
+      void interactions.loadCommands(chat.commandScope);
   });
 
   async function pickCommand(result: { entry: GuildBotCommands; command: Command }) {

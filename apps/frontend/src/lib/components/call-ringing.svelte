@@ -3,7 +3,7 @@
   import { fly } from 'svelte/transition';
   import { Button } from '$lib/components/ui/button/index.js';
   import { chat } from '$lib/chat-state.svelte';
-  import { dms, RING_TIMEOUT } from '$lib/dms.svelte';
+  import { dms, dmDisplay, RING_TIMEOUT } from '$lib/dms.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { notificationSound } from '$lib/notifications';
   import { settings } from '$lib/settings.svelte';
@@ -15,6 +15,8 @@
 
   const call = $derived(dms.incomingCall);
   const name = $derived(call ? call.user.displayName || call.user.username : '');
+  const group = $derived(call ? dms.get(call.channelId) : null);
+  const groupName = $derived(group?.type === 'GROUP_DM' ? dmDisplay(group).name : null);
   const callerCount = $derived(call ? (chat.voiceStates[call.channelId]?.length ?? 0) : 0);
   const outgoing = $derived(dms.outgoingCall);
   const outgoingCount = $derived(outgoing ? (chat.voiceStates[outgoing]?.length ?? 0) : 0);
@@ -66,6 +68,7 @@
 
   function decline() {
     if (!call) return;
+    // stops my other devices; the homeserver only ends the whole ring for a 1:1
     realtime.ringCall(call.channelId, false);
     dms.incomingCall = null;
   }
@@ -89,7 +92,9 @@
     />
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-semibold text-foreground">{name}</p>
-      <p class="text-xs text-muted-foreground">Incoming call…</p>
+      <p class="truncate text-xs text-muted-foreground">
+        {groupName ? `Calling ${groupName}…` : 'Incoming call…'}
+      </p>
     </div>
     <Button
       variant="destructive"

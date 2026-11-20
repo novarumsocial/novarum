@@ -5,7 +5,7 @@
   import { chat } from '$lib/chat-state.svelte';
   import { realtime } from '$lib/realtime.svelte';
   import { friends } from '$lib/friends.svelte';
-  import { dms, dmPath } from '$lib/dms.svelte';
+  import { dms, dmDisplay, dmPath } from '$lib/dms.svelte';
   import { device } from '$lib/device.svelte';
   import { settings } from '$lib/settings.svelte';
   import { syncPush, watchNotificationTaps } from '$lib/push';
@@ -17,6 +17,7 @@
   import VoiceArea from './voice-area.svelte';
   import InitialLoader from './initial-loader.svelte';
   import MemberSidebar from './member-sidebar.svelte';
+  import GroupMembers from './group-members.svelte';
   import type { Channel } from '$lib/types/chat';
   import UserArea from './user-area.svelte';
   import FriendsHome from './friends-home.svelte';
@@ -116,12 +117,21 @@
       .flatMap((categories) => categories)
       .flatMap((category) => category.channels)
       .find((channel) => channel.id === voice.channelId)?.name ??
-      (voice.channelId ? dms.get(voice.channelId)?.participants[0]?.username : null) ??
+      (voice.channelId && dms.get(voice.channelId)
+        ? dmDisplay(dms.get(voice.channelId)!).name
+        : null) ??
       null
   );
 
   // a voice channel's call takes the whole width, so it has no member list
-  const showMembers = $derived(chat.route.kind === 'guild' && currentChannel?.type !== 'VOICE');
+  const currentGroup = $derived(
+    chat.route.kind === 'dms' && dms.get(chat.activeChannel ?? '')?.type === 'GROUP_DM'
+      ? dms.get(chat.activeChannel ?? '')
+      : null
+  );
+  const showMembers = $derived(
+    (chat.route.kind === 'guild' && currentChannel?.type !== 'VOICE') || !!currentGroup
+  );
   $effect(() => {
     if (!showMembers) mobileMembersOpen = false;
   });
@@ -135,6 +145,7 @@
 
     if (!user) {
       await goto('/login');
+      window.electron?.appReady();
       return;
     }
 
@@ -142,6 +153,8 @@
     bootFinished = true;
     await new Promise((resolve) => setTimeout(resolve, 100));
     booting = false;
+    // let the loader's fade-out finish before the desktop app reveals this window
+    setTimeout(() => window.electron?.appReady(), 150);
   }
 
   function leaveVoice() {
@@ -234,7 +247,9 @@
 />
 
 {#if booting}
-  <InitialLoader finished={bootFinished} />
+  {#if !window.electron?.behindSplash}
+    <InitialLoader finished={bootFinished} />
+  {/if}
 {:else if currentUser}
   <div class="flex h-svh overflow-hidden bg-sidebar">
     {#if mobileNavigationOpen}
@@ -387,7 +402,11 @@
           <X class="size-5" />
         </button>
         -->
-          <MemberSidebar server={currentServer!} members={chat.members} onCall={startCall} />
+          {#if currentGroup}
+            <GroupMembers group={currentGroup} onCall={startCall} />
+          {:else}
+            <MemberSidebar server={currentServer!} members={chat.members} onCall={startCall} />
+          {/if}
         </div>
       {/if}
     </div>

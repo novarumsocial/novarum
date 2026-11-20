@@ -1,5 +1,8 @@
-// Port of the web's settings-dialog.svelte shell: a stack with a native header per tab, styled with the theme
+// Port of the web's settings-dialog.svelte shell: a stack with one page per tab, under the same ScreenHeader as
+// every other pushed screen
 import { Stack } from 'expo-router';
+import { ScreenHeader } from '@/components/screen-header';
+import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/theme';
 
 export default function SettingsLayout() {
@@ -7,11 +10,13 @@ export default function SettingsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: 'IBMPlexSans_600SemiBold', color: colors.foreground },
-        headerShadowVisible: false,
-        headerBackButtonDisplayMode: 'minimal',
+        header: ({ options }) => (
+          <ScreenHeader>
+            <Text role="heading" numberOfLines={1} className="text-base font-semibold">
+              {options.title}
+            </Text>
+          </ScreenHeader>
+        ),
         contentStyle: { backgroundColor: colors.background },
       }}
     >

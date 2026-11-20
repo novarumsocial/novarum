@@ -1,40 +1,62 @@
 // Port of apps/frontend/src/lib/components/guild-sidebar.svelte
-// Differences: reordering is a long-press sheet with "Move up / Move down" instead of drag and drop.
+// Differences: reordering is a "Reorder servers" sheet with up/down buttons per server instead of drag and drop;
+// unread DMs light up Home (with a count) instead of being added to the rail, so the rail never reshuffles;
+// "Add a server" offers create or join with an invite link; a server whose homeserver is down says so on tap.
 import * as Haptics from 'expo-haptics';
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react-native';
+import { ArrowDown, ArrowDownUp, ArrowUp, Bell, Link, Plus, WifiOff } from 'lucide-react-native';
 import { memo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { CreateServerDialog } from '@/components/create-server-dialog';
+import { JoinServerDialog } from '@/components/join-server-dialog';
 import { NotificationMenu } from '@/components/notification-menu';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SheetItem } from '@/components/ui/sheet-item';
 import { Text } from '@/components/ui/text';
 import { chat, useChat } from '@/lib/chat-state';
-import { dmPath, type DmEntry } from '@/lib/dms';
-import { goto } from '@/lib/navigation';
+import type { DmEntry } from '@/lib/dms';
 import { useSettings } from '@/lib/settings';
 import { useThemeColors } from '@/lib/theme';
+import { toast } from '@/lib/toast';
 import type { Server } from '@/lib/types/chat';
 import { cn } from '@/lib/utils';
+import { fallbackAvatarBg } from '@/lib/voice-layout';
 
+// the Novarum logo, for Home (your DMs)
 const homePath =
   'M23,16a1,1,0,0,1-1,1H2a1,1,0,0,1,0-2H22A1,1,0,0,1,23,16Zm-5,5a1,1,0,0,0,0-2H6a1,1,0,0,0,0,2ZM7,12a1,1,0,0,0,2,0,3,3,0,0,1,6,0,1,1,0,0,0,2,0A5,5,0,0,0,7,12Zm4-7a1,1,0,0,0,2,0V4a1,1,0,0,0-2,0Zm7,7a1,1,0,0,0,1,1h1a1,1,0,0,0,0-2H19A1,1,0,0,0,18,12ZM4,11a1,1,0,0,0,0,2H5a1,1,0,0,0,0-2ZM5.636,5.636a1,1,0,0,0,0,1.414l.707.707A1,1,0,0,0,7.757,6.343L7.05,5.636A1,1,0,0,0,5.636,5.636Zm11.314,0-.707.707a1,1,0,1,0,1.414,1.414l.707-.707A1,1,0,1,0,16.95,5.636Z';
 
-// the bar at the rail's edge: tall for the open server, a dot for one with unread channels
+// the bar at the rail's edge: tall for the open server, a short one for unread
 function Pill({ active, unread }: { active: boolean; unread: boolean }) {
   if (!active && !unread) return null;
   return (
     <View
       pointerEvents="none"
       className={cn(
-        'absolute top-1/2 left-0 w-1 rounded-r-full bg-foreground',
-        active ? '-mt-5 h-10' : '-mt-1 h-2'
+        'absolute top-1/2 left-0 w-1.5 rounded-r-full bg-foreground',
+        active ? '-mt-5 h-10' : '-mt-2 h-4'
       )}
     />
+  );
+}
+
+function Badge({ count }: { count: number }) {
+  const circleIcons = useSettings((s) => s.circleIcons);
+  return (
+    <View
+      pointerEvents="none"
+      className={cn(
+        'absolute right-1 -bottom-1 h-6 min-w-6 items-center justify-center border-[3px] border-background bg-sidebar-primary px-1',
+        circleIcons && 'rounded-full'
+      )}
+    >
+      <Text className="text-xs leading-none font-bold text-sidebar-primary-foreground">
+        {count > 99 ? '99+' : count}
+      </Text>
+    </View>
   );
 }
 
@@ -57,38 +79,43 @@ export const GuildSidebar = memo(function GuildSidebar({
   const circleIcons = useSettings((s) => s.circleIcons);
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const [createOpen, setCreateOpen] = useState(false);
   const [menuServer, setMenuServer] = useState<Server | null>(null);
-  const [menu, setMenu] = useState<'actions' | 'notify' | null>(null);
+  const [menu, setMenu] = useState<
+    'actions' | 'notify' | 'reorder' | 'add' | 'create' | 'join' | null
+  >(null);
+  const closeIf = (name: typeof menu) => () =>
+    setMenu((current) => (current === name ? null : current));
 
   const ordered = servers.filter((server) => server.id !== 'home');
-  const index = menuServer ? ordered.findIndex((server) => server.id === menuServer.id) : -1;
 
-  // the web drags tiles; here the long-press sheet swaps a tile with its neighbour
-  const move = (by: -1 | 1) => {
+  // the web drags tiles; here the reorder sheet swaps a server with its neighbour
+  const move = (index: number, by: -1 | 1) => {
     const next = [...ordered];
     [next[index], next[index + by]] = [next[index + by]!, next[index]!];
     useChat.setState({ servers: next });
     void chat().reorderGuilds(next.map((server) => server.id));
-    setMenu(null);
+    void Haptics.selectionAsync();
   };
+
+  const homeActive = activeId === null;
 
   return (
     <View
-      className="w-[68px] items-center gap-2 bg-background pb-3"
+      className="w-[72px] items-center gap-2 bg-background pb-3"
       style={{ paddingTop: insets.top + 8 }}
     >
       <View className="w-full items-center">
-        {/* unread DMs show as their own avatars below, so Home itself doesn't light up for them */}
-        <Pill active={activeId === null} unread={false} />
+        <Pill active={homeActive} unread={unreadDms.length > 0} />
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ selected: activeId === null }}
+          accessibilityState={{ selected: homeActive }}
           onPress={() => onSelect(undefined)}
-          accessibilityLabel="Home"
+          accessibilityLabel={
+            unreadDms.length ? `Direct messages, ${unreadDms.length} unread` : 'Direct messages'
+          }
           className={cn(
             'size-12 items-center justify-center active:opacity-80',
-            activeId === null ? 'bg-primary' : 'bg-card',
+            homeActive ? 'bg-primary' : 'bg-card',
             circleIcons && 'rounded-full'
           )}
         >
@@ -96,36 +123,13 @@ export const GuildSidebar = memo(function GuildSidebar({
             width={26}
             height={26}
             viewBox="0 0 24 24"
-            fill={activeId === null ? colors['primary-foreground'] : colors['muted-foreground']}
+            fill={homeActive ? colors['primary-foreground'] : colors['muted-foreground']}
           >
             <Path d={homePath} />
           </Svg>
         </Pressable>
+        {unreadDms.length > 0 && <Badge count={unreadDms.length} />}
       </View>
-
-      {unreadDms.map((dm) => {
-        const other = dm.participants[0];
-        const name = other ? other.displayName || other.username : 'Direct Message';
-        return (
-          <View key={dm.id} className="w-full items-center">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${name}, unread direct message`}
-              onPress={() => goto(dmPath(dm.id))}
-              className={cn(
-                'size-12 overflow-hidden active:opacity-80',
-                circleIcons && 'rounded-full'
-              )}
-            >
-              <Avatar src={other?.avatarUrl} name={name} className="size-full" />
-            </Pressable>
-            <View
-              pointerEvents="none"
-              className="absolute right-2 bottom-0 size-4 rounded-full border-[3px] border-background bg-destructive"
-            />
-          </View>
-        );
-      })}
 
       <View className="h-0.5 w-8 bg-border" />
 
@@ -142,22 +146,30 @@ export const GuildSidebar = memo(function GuildSidebar({
               <Pill active={active} unread={!!unread[server.id]} />
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ selected: active, disabled: server.down }}
-                disabled={server.down}
-                onPress={() => onSelect(server.id)}
+                accessibilityState={{ selected: active }}
+                onPress={() =>
+                  server.down
+                    ? toast(`${server.name} is unreachable right now. Try again later.`, {
+                        tone: 'error',
+                      })
+                    : onSelect(server.id)
+                }
                 onLongPress={() => {
                   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   setMenuServer(server);
                   setMenu('actions');
                 }}
-                accessibilityLabel={
-                  mention
-                    ? `${server.name}, ${mention} unread mention${mention === 1 ? '' : 's'}`
-                    : server.name
-                }
+                accessibilityHint="Long-press for more actions"
+                accessibilityLabel={[
+                  server.name,
+                  server.down && 'unreachable',
+                  mention && `${mention} unread mention${mention === 1 ? '' : 's'}`,
+                  !mention && unread[server.id] && 'unread',
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
                 className={cn(
-                  'size-12 overflow-hidden active:opacity-80',
-                  server.down ? 'bg-destructive opacity-40' : 'bg-card',
+                  'size-12 items-center justify-center overflow-hidden active:opacity-80',
                   circleIcons && 'rounded-full'
                 )}
               >
@@ -165,66 +177,100 @@ export const GuildSidebar = memo(function GuildSidebar({
                   src={server.avatarUrl}
                   name={server.name}
                   fallback={server.initials}
-                  className="size-full bg-transparent"
+                  bgColor={server.avatarUrl ? undefined : fallbackAvatarBg(server.id)}
+                  className={cn('size-full', server.down && 'opacity-40')}
                   focused={active}
                 />
+                {server.down && (
+                  <View className="absolute inset-0 items-center justify-center">
+                    <Icon as={WifiOff} size={20} className="text-destructive" />
+                  </View>
+                )}
               </Pressable>
-              {mention > 0 && (
-                <View
-                  pointerEvents="none"
-                  className={cn(
-                    'absolute right-1.5 -bottom-1 h-5 min-w-5 items-center justify-center border-[3px] border-background bg-destructive px-1',
-                    circleIcons && 'rounded-full'
-                  )}
-                >
-                  <Text className="text-[10px] leading-none font-bold text-destructive-foreground">
-                    {mention > 99 ? '99+' : mention}
-                  </Text>
-                </View>
-              )}
+              {mention > 0 && <Badge count={mention} />}
             </View>
           );
         })}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add a server"
+          onPress={() => setMenu('add')}
+          className={cn(
+            'size-12 items-center justify-center self-center bg-card active:opacity-80',
+            circleIcons && 'rounded-full'
+          )}
+        >
+          <Icon as={Plus} size={22} className="text-emerald-500" />
+        </Pressable>
       </ScrollView>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add server"
-        onPress={() => setCreateOpen(true)}
-        className={cn(
-          'size-12 items-center justify-center bg-card active:opacity-80',
-          circleIcons && 'rounded-full'
+      <Sheet open={menu === 'add'} onClose={closeIf('add')} title="Add a server">
+        <SheetItem icon={Plus} label="Create a server" onPress={() => setMenu('create')} />
+        <SheetItem icon={Link} label="Join with an invite link" onPress={() => setMenu('join')} />
+      </Sheet>
+      <CreateServerDialog open={menu === 'create'} onClose={closeIf('create')} />
+      <JoinServerDialog open={menu === 'join'} onClose={closeIf('join')} />
+
+      <Sheet open={menu === 'actions'} onClose={closeIf('actions')} title={menuServer?.name}>
+        <SheetItem icon={Bell} label="Notification settings" onPress={() => setMenu('notify')} />
+        {ordered.length > 1 && (
+          <SheetItem
+            icon={ArrowDownUp}
+            label="Reorder servers"
+            onPress={() => setMenu('reorder')}
+          />
         )}
-      >
-        <Icon as={Plus} size={20} className="text-emerald-500" />
-      </Pressable>
-
-      <CreateServerDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-
-      <Sheet
-        open={menu === 'actions'}
-        onClose={() => setMenu((current) => (current === 'actions' ? null : current))}
-      >
-        <Text className="px-4 pt-2 pb-1 text-sm font-medium" numberOfLines={1}>
-          {menuServer?.name}
-        </Text>
-        <SheetItem icon={ArrowUp} label="Move up" disabled={index <= 0} onPress={() => move(-1)} />
-        <SheetItem
-          icon={ArrowDown}
-          label="Move down"
-          disabled={index < 0 || index >= ordered.length - 1}
-          onPress={() => move(1)}
-        />
-        <SheetItem label="Notification Settings" onPress={() => setMenu('notify')} />
       </Sheet>
       {menuServer && (
         <NotificationMenu
           open={menu === 'notify'}
-          onClose={() => setMenu(null)}
+          onClose={closeIf('notify')}
           targetId={menuServer.id}
           noun="Server"
         />
       )}
+
+      <Sheet open={menu === 'reorder'} onClose={closeIf('reorder')} title="Reorder servers">
+        {ordered.map((server, index) => (
+          <View key={server.id} className="min-h-14 flex-row items-center gap-3 pr-1 pl-4">
+            <Avatar
+              src={server.avatarUrl}
+              name={server.name}
+              fallback={server.initials}
+              bgColor={server.avatarUrl ? undefined : fallbackAvatarBg(server.id)}
+              className="size-9"
+            />
+            <Text numberOfLines={1} className="flex-1 text-base">
+              {server.name}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${server.name} up`}
+              disabled={index === 0}
+              onPress={() => move(index, -1)}
+              className={cn(
+                'size-12 items-center justify-center active:bg-accent',
+                index === 0 && 'opacity-30'
+              )}
+            >
+              <Icon as={ArrowUp} size={20} className="text-muted-foreground" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${server.name} down`}
+              disabled={index === ordered.length - 1}
+              onPress={() => move(index, 1)}
+              className={cn(
+                'size-12 items-center justify-center active:bg-accent',
+                index === ordered.length - 1 && 'opacity-30'
+              )}
+            >
+              <Icon as={ArrowDown} size={20} className="text-muted-foreground" />
+            </Pressable>
+          </View>
+        ))}
+      </Sheet>
     </View>
   );
 });

@@ -5,6 +5,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import { ChatArea } from '@/components/chat-area';
+import { GroupMembers } from '@/components/group-members';
 import { MemberSidebar } from '@/components/member-sidebar';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -49,7 +50,7 @@ export default function ChannelScreen() {
   const inCall = useVoice((s) => !!channel && s.channelId === channel.id);
   // phones have no room for the call and the chat together, so a call starts full screen
   const [callExpanded, setCallExpanded] = useState(width < 768);
-  // a DM call shows you and the other person
+  // a DM call shows you and everyone else in it
   const callMembers: Author[] = useMemo(
     () =>
       dm && user
@@ -90,7 +91,8 @@ export default function ChannelScreen() {
     return <VoiceArea channel={channel} members={members} onJoin={join} onLeave={leave} />;
   }
 
-  const wide = width >= 1024 && channel.type !== 'DM' && showMemberList;
+  const group = dm?.type === 'GROUP_DM' ? dm : null;
+  const wide = width >= 1024 && (channel.type !== 'DM' || !!group) && showMemberList;
 
   return (
     <View className="flex-1 flex-row bg-background">
@@ -105,7 +107,7 @@ export default function ChannelScreen() {
         onDelete={(messageId) => chat().deleteMessage(channel.id, messageId)}
         onEdit={(messageId, content) => chat().editMessage(channel.id, messageId, content)}
         onOpenMembers={
-          channel.type === 'DM'
+          channel.type === 'DM' && !group
             ? undefined
             : width < 1024
               ? openMembers
@@ -136,7 +138,7 @@ export default function ChannelScreen() {
       />
       {wide && (
         <View className="w-56 border-l border-border bg-sidebar">
-          <MemberSidebar members={members} />
+          {group ? <GroupMembers group={group} /> : <MemberSidebar members={members} />}
         </View>
       )}
     </View>

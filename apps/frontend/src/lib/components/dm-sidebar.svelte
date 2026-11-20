@@ -13,7 +13,7 @@
     X,
   } from '@lucide/svelte';
   import { goto } from '$app/navigation';
-  import { dms, dmPath } from '$lib/dms.svelte';
+  import { dms, dmDisplay, dmPath, dmPreviewText } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
@@ -83,9 +83,13 @@
     </div>
 
     {#each entries as entry (entry.id)}
-      {@const other = entry.participants[0]}
+      {@const display = dmDisplay(entry)}
+      {@const other = display.other}
       {@const friendStatus = other ? friends.statusFor(other.username, other.homeserver) : 'NONE'}
-      {@const name = other ? other.displayName || other.username : 'Direct Message'}
+      {@const name = display.name}
+      {@const group = entry.type === 'GROUP_DM'}
+      {@const preview =
+        dmPreviewText(entry) ?? (group ? `${entry.participants.length + 1} members` : null)}
       {@const active = chat.route.kind === 'dms' && chat.route.channelId === entry.id}
       {@const unread =
         entry.unread && notificationSettings.showsUnread({ channelId: entry.id, guildId: null })}
@@ -105,13 +109,25 @@
             }}
           >
             <Avatar
-              src={other?.avatarUrl}
+              src={display.avatarUrl}
               {name}
               class="size-6 text-[10px]"
-              bgColor={other?.avatarColor}
+              bgColor={display.avatarColor}
               status={other && friends.isOnline(other.userId) ? 'online' : undefined}
             />
-            <span class="flex-1 truncate" class:font-semibold={unread && !active}>{name}</span>
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate" class:font-semibold={unread}>{name}</span>
+              {#if preview}
+                <span
+                  class={[
+                    'truncate text-xs',
+                    unread ? 'text-sidebar-foreground' : 'text-muted-foreground',
+                  ]}
+                >
+                  {preview}
+                </span>
+              {/if}
+            </span>
             {#if chat.voiceStates[entry.id]?.length}
               <Phone class="size-3.5 shrink-0 text-green-500" aria-label="In a call" />
             {/if}
@@ -163,6 +179,17 @@
             <Plus class="size-4" />
             Pin Conversation to Top
           </ContextMenu.Item>
+          {#if group}
+            <ContextMenu.Item
+              variant="destructive"
+              onclick={() => {
+                void dms.leave(entry.id);
+                if (active) void goto('/guilds/dms');
+              }}
+            >
+              Leave Group
+            </ContextMenu.Item>
+          {/if}
 
           {#if other && friendStatus === 'FRIEND'}
             <ContextMenu.Item onclick={() => void friends.remove(other.userId)}>

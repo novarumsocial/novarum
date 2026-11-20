@@ -1,6 +1,9 @@
 // Port of apps/frontend/src/lib/dms.svelte.ts
 import { create } from 'zustand';
 import type { PublicUser } from 'anchor/public-user';
+import type { SystemMessage } from 'anchor/system-message';
+import { systemText } from './system-message';
+import { z } from 'zod';
 import { anchor } from './anchor';
 import { goto } from './navigation';
 
@@ -8,16 +11,84 @@ export type DmEntry = {
   id: string;
   type: 'DM' | 'GROUP_DM';
   participants: PublicUser[];
+  // group DMs only; an empty name means the members' names are shown instead
+  name?: string | null;
+  iconUrl?: string | null;
+  ownerId?: string | null;
   lastMessageAt: string | null;
+  lastMessage: DmLastMessage | null;
   unread: boolean;
   joinedAt: string;
 };
+
+export type DmLastMessage = {
+  id: string;
+  authorId: string;
+  content: string | null;
+  attachmentCount: number;
+  system: SystemMessage | null;
+  // names the author even after they left the group
+  author?: { username: string; displayName: string | null } | null;
+};
+
+// the DM list's second line: "You: hi", "Ana: hi" in a group, "Sent 2 attachments", "Missed call from Ana."
+export function dmPreviewText(
+  { lastMessage, participants, type }: DmEntry,
+  self: { id: string; username: string; displayName: string | null } | null | undefined
+) {
+  if (!lastMessage) return null;
+  const author =
+    lastMessage.authorId === self?.id
+      ? self
+      : (participants.find((user) => user.userId === lastMessage.authorId) ?? lastMessage.author);
+  if (lastMessage.system) return author ? systemText(lastMessage.system, author) : null;
+
+  const { content, attachmentCount } = lastMessage;
+  const text =
+    content ??
+    (attachmentCount > 1
+      ? `Sent ${attachmentCount} attachments`
+      : attachmentCount
+        ? 'Sent an attachment'
+        : null);
+  if (!text) return null;
+  if (author === self) return `You: ${text}`;
+  // in a group, who said it matters
+  return type === 'GROUP_DM' && author ? `${author.displayName || author.username}: ${text}` : text;
+}
 
 export const RING_TIMEOUT = 30_000;
 
 // federated DM ids look like fed:channel:<homeserver>:<id> (see anchor's federationIds.ts)
 const isFromHomeserver = (dm: DmEntry, homeserver: string) =>
   dm.id.startsWith(`fed:channel:${encodeURIComponent(homeserver)}:`);
+
+const apiErrorSchema = z.object({ error: z.string() });
+// eden puts the error body in `value`; validation errors only have a message
+const errorMessage = (error: { value?: unknown } | null | undefined, fallback: string) =>
+  apiErrorSchema.safeParse(error?.value).data?.error ?? fallback;
+
+const personName = (user: PublicUser) => user.displayName || user.username;
+
+/** What a DM is called and shown as: the other person, or the group's name and icon. */
+export function dmDisplay(dm: DmEntry) {
+  if (dm.type !== 'GROUP_DM') {
+    const other = dm.participants[0];
+    return {
+      name: other ? personName(other) : 'Direct Message',
+      avatarUrl: other?.avatarUrl ?? null,
+      avatarColor: other?.avatarColor ?? null,
+      other: other ?? null,
+    };
+  }
+  const people = dm.participants.filter((user) => !user.isBot);
+  return {
+    name: dm.name || people.map(personName).join(', ') || 'Empty group',
+    avatarUrl: dm.iconUrl ?? null,
+    avatarColor: null,
+    other: null,
+  };
+}
 
 export function dmPath(channelId: string, messageId?: string) {
   const message = messageId ? `/${encodeURIComponent(messageId)}` : '';
@@ -42,12 +113,38 @@ type DmsState = {
   load: () => Promise<void>;
   open: (userId: string) => Promise<string | null>;
   close: (channelId: string) => Promise<void>;
+  createGroup: (userIds: string[], name?: string) => Promise<{ id: string } | { error: string }>;
+  addMembers: (channelId: string, userIds: string[]) => Promise<string | null>;
+  kick: (channelId: string, userId: string) => Promise<string | null>;
+  transferOwner: (channelId: string, userId: string) => Promise<string | null>;
+  rename: (channelId: string, name: string) => Promise<string | null>;
+  // native takes a picked file's uri, as React Native has no File
+  uploadIcon: (
+    channelId: string,
+    uri: string,
+    type: 'image/gif' | 'image/png'
+  ) => Promise<string | null>;
+  addBot: (
+    channelId: string,
+    bot: { username: string; homeserver: string }
+  ) => Promise<string | null>;
+  leave: (channelId: string) => Promise<string | null>;
+  remove: (channelId: string) => void;
+  update: (change: Partial<DmEntry> & { id: string }) => void;
   upsert: (dm: DmEntry) => void;
   handleMessage: (
     channelId: string,
     createdAt: string,
-    options: { active: boolean; fromSelf: boolean }
+    options: { active: boolean; fromSelf: boolean; lastMessage: DmLastMessage }
   ) => void;
+  // an edit or delete of the message the list previews
+  handleMessageEdit: (
+    channelId: string,
+    messageId: string,
+    content: string | null,
+    system: SystemMessage | null
+  ) => void;
+  handleMessageDelete: (channelId: string, messageId: string) => void;
   markRead: (channelId: string) => void;
   // native-only: the web reloads the page when the account changes
   reset: () => void;
@@ -85,7 +182,9 @@ export const useDms = create<DmsState>((set, get) => {
 
     // the DM that already exists with this friend, if any — used to avoid opening duplicates.
     withUser: (userId) =>
-      get().list.find((dm) => dm.participants.some((user) => user.userId === userId)) ?? null,
+      get().list.find(
+        (dm) => dm.type === 'DM' && dm.participants.some((user) => user.userId === userId)
+      ) ?? null,
 
     async load() {
       set({ loading: true, error: null });
@@ -141,6 +240,79 @@ export const useDms = create<DmsState>((set, get) => {
       if (result.error && closed) get().upsert(closed);
     },
 
+    // a group with these friends; any number of them, so adding people to a 1:1 makes a new group
+    async createGroup(userIds, name = '') {
+      const { data, error } = await anchor().client.dm.group.post({ userIds, name });
+      if (error || !data || 'error' in data)
+        return { error: errorMessage(error, 'Could not create the group.') };
+      get().upsert(data);
+      void goto(dmPath(data.id));
+      return { id: data.id };
+    },
+
+    async addMembers(channelId, userIds) {
+      const { error } = await anchor().client.dm({ id: channelId }).members.post({ userIds });
+      return error ? errorMessage(error, 'Could not add them.') : null;
+    },
+
+    async kick(channelId, userId) {
+      const { error } = await anchor().client.dm({ id: channelId }).members({ userId }).delete();
+      return error ? errorMessage(error, 'Could not remove them.') : null;
+    },
+
+    async transferOwner(channelId, userId) {
+      const { error } = await anchor().client.dm({ id: channelId }).owner.post({ userId });
+      return error ? errorMessage(error, 'Could not transfer the group.') : null;
+    },
+
+    async rename(channelId, name) {
+      const { error } = await anchor().client.dm({ id: channelId }).patch({ name });
+      return error ? errorMessage(error, 'Could not rename the group.') : null;
+    },
+
+    async uploadIcon(channelId, uri, type) {
+      const form = new FormData();
+      form.append('icon', {
+        uri,
+        name: `group-icon.${type === 'image/gif' ? 'gif' : 'png'}`,
+        type,
+      } as unknown as Blob);
+      // the phone's cookie store signs the request, like `credentials: 'include'` on the web
+      const response = await fetch(`${anchor().baseUrl}/dm/${encodeURIComponent(channelId)}/icon`, {
+        method: 'POST',
+        body: form,
+      }).catch(() => null);
+      if (response?.ok) return null;
+      return errorMessage(
+        { value: await response?.json().catch(() => null) },
+        'Could not upload the icon.'
+      );
+    },
+
+    async addBot(channelId, bot) {
+      const { error } = await anchor().client.dm({ id: channelId }).bots.post(bot);
+      return error ? errorMessage(error, 'Could not add the bot.') : null;
+    },
+
+    async leave(channelId) {
+      const { error } = await anchor().client.dm({ id: channelId }).leave.post();
+      if (error) return errorMessage(error, 'Could not leave the group.');
+      get().remove(channelId);
+      return null;
+    },
+
+    remove(channelId) {
+      const { incomingCall, outgoingCall } = get();
+      set({
+        list: get().list.filter((dm) => dm.id !== channelId),
+        incomingCall: incomingCall?.channelId === channelId ? null : incomingCall,
+        outgoingCall: outgoingCall === channelId ? null : outgoingCall,
+      });
+    },
+
+    update: (change) =>
+      set({ list: get().list.map((dm) => (dm.id === change.id ? { ...dm, ...change } : dm)) }),
+
     upsert(dm) {
       const existing = get().get(dm.id);
       set({
@@ -150,7 +322,7 @@ export const useDms = create<DmsState>((set, get) => {
       });
     },
 
-    handleMessage(channelId, createdAt, { active, fromSelf }) {
+    handleMessage(channelId, createdAt, { active, fromSelf, lastMessage }) {
       if (!get().get(channelId)) {
         void get().load();
         return;
@@ -159,10 +331,33 @@ export const useDms = create<DmsState>((set, get) => {
       set({
         list: get().list.map((dm) =>
           dm.id === channelId
-            ? { ...dm, lastMessageAt: createdAt, unread: active || fromSelf ? false : true }
+            ? {
+                ...dm,
+                lastMessageAt: createdAt,
+                lastMessage,
+                unread: active || fromSelf ? false : true,
+              }
             : dm
         ),
       });
+    },
+
+    // a call's message is edited when it ends, with its duration
+    handleMessageEdit(channelId, messageId, content, system) {
+      set({
+        list: get().list.map((dm) =>
+          dm.id === channelId && dm.lastMessage?.id === messageId
+            ? {
+                ...dm,
+                lastMessage: { ...dm.lastMessage, content: content?.trim() || null, system },
+              }
+            : dm
+        ),
+      });
+    },
+
+    handleMessageDelete(channelId, messageId) {
+      if (get().get(channelId)?.lastMessage?.id === messageId) void get().load();
     },
 
     markRead: (channelId) =>

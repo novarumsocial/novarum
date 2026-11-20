@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
-  import type { LaunchPrefs, UpdateCheck } from '$lib/electron-api';
+  import type { LaunchPrefs } from '$lib/electron-api';
   import { Switch } from '$lib/components/ui/switch/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
@@ -24,6 +24,8 @@
     Trash2,
     Monitor,
     RefreshCw,
+    Download,
+    RotateCw,
   } from '@lucide/svelte';
   import { anchor } from '$lib/anchor.svelte';
   import { goto } from '$app/navigation';
@@ -124,25 +126,26 @@
   let launchPrefs = $state(await window.electron?.getLaunchPrefs());
   const setLaunchPref = async (prefs: Partial<LaunchPrefs>) =>
     (launchPrefs = await window.electron?.setLaunchPrefs(prefs));
-  let updateState = $state<'idle' | 'checking' | UpdateCheck['status']>('idle');
-  let updateVersion = $state<string>();
-  async function checkForUpdates() {
-    updateState = 'checking';
-    const result = await window.electron!.checkForUpdates();
-    updateState = result.status;
-    updateVersion = result.version;
-  }
+  let update = $state(await window.electron?.getUpdateStatus());
+  $effect(() => window.electron?.onUpdateStatus((status) => (update = status)));
+  const checkForUpdates = async () => {
+    update = { status: 'checking' };
+    update = await window.electron!.checkForUpdates();
+  };
   const updateMessage = $derived(
-    {
-      idle: launchPrefs?.autoUpdate
-        ? 'Novarum checks for updates every 30 minutes.'
-        : 'Automatic checks are off.',
-      checking: 'Checking for updates…',
-      current: "You're on the latest version.",
-      available: `Version ${updateVersion} is available.`,
-      unsupported: 'Updates are only available in installed builds.',
-      error: 'Could not check for updates. Try again later.',
-    }[updateState]
+    update &&
+      {
+        idle: launchPrefs?.autoUpdate
+          ? 'Novarum checks for updates every 30 minutes.'
+          : 'Automatic checks are off.',
+        checking: 'Checking for updates…',
+        current: "You're on the latest version.",
+        available: `Version ${update.version} is available.`,
+        downloading: `Downloading version ${update.version}… ${Math.round(update.percent ?? 0)}%`,
+        downloaded: `Version ${update.version} is ready. Restart Novarum to finish updating.`,
+        unsupported: 'Updates are only available in installed builds.',
+        error: 'Could not update. Try again later.',
+      }[update.status]
   );
   const frontendVersion = __FRONTEND_VERSION__;
   const gitCommit = __GIT_COMMIT_HASH__.slice(0, 7);
@@ -1595,7 +1598,7 @@
               <SettingsGroup title="Updates">
                 <SettingsRow
                   title="Update automatically"
-                  description="Download new versions in the background and install them when you quit Novarum."
+                  description="Download new versions in the background and install them when Novarum restarts."
                   id="auto-update"
                 >
                   <Switch
@@ -1608,17 +1611,33 @@
                   title={`Novarum Desktop v${desktopVersion}`}
                   description={updateMessage}
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={updateState === 'checking'}
-                    onclick={checkForUpdates}
-                  >
-                    <RefreshCw
-                      class={cn('size-3.5', updateState === 'checking' && 'animate-spin')}
-                    />
-                    Check for updates
-                  </Button>
+                  {#if update?.status === 'downloaded'}
+                    <Button size="sm" onclick={() => window.electron!.installUpdate()}>
+                      <RotateCw class="size-3.5" />
+                      Restart to update
+                    </Button>
+                  {:else if update?.status === 'available'}
+                    <Button size="sm" onclick={() => window.electron!.downloadUpdate()}>
+                      <Download class="size-3.5" />
+                      Download update
+                    </Button>
+                  {:else}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={update?.status === 'checking' || update?.status === 'downloading'}
+                      onclick={checkForUpdates}
+                    >
+                      <RefreshCw
+                        class={cn(
+                          'size-3.5',
+                          (update?.status === 'checking' || update?.status === 'downloading') &&
+                            'animate-spin'
+                        )}
+                      />
+                      Check for updates
+                    </Button>
+                  {/if}
                 </SettingsRow>
               </SettingsGroup>
             </Tabs.Content>

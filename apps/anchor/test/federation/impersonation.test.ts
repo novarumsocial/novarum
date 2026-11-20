@@ -16,8 +16,11 @@ const source = readdirSync(routesDir)
 // /push names no user: its ids are rebuilt from the signer (forged senders are in notify.hostile.test.ts).
 // The bot routes below act for the signing homeserver itself (a guild host, or the bot's homeserver), and
 // only ever on guilds the signer hosts; forged origins are in bots.test.ts ("hostile homeservers").
+// /dms/sync is a group's host pushing the group, whose id is rebuilt from the signer; forged pushes are in
+// groups.test.ts.
 const originOnly = new Set([
   '/push',
+  '/dms/sync',
   '/bots/:username/join',
   '/bots/:username/leave',
   '/bots/:username/commands',

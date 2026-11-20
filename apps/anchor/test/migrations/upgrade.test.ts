@@ -317,6 +317,39 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
     },
   },
+  '20261116190038_group_dms': {
+    check: async (url) => {
+      // existing channels have no owner or icon, and existing messages aren't system ones
+      expect(
+        await rows(
+          url,
+          `SELECT id FROM channel WHERE "ownerId" IS NOT NULL OR "iconUrl" IS NOT NULL`
+        )
+      ).toHaveLength(0);
+      expect(await rows(url, `SELECT id FROM message WHERE system IS NOT NULL`)).toHaveLength(0);
+      expect(
+        await rows(url, `SELECT 1 FROM channel WHERE id = 'd1' AND "dmKey" = 'u1:u2'`)
+      ).toHaveLength(1);
+
+      // a group DM keeps existing when its owner's account goes away, just without an owner
+      await query(
+        url,
+        `INSERT INTO "user" (id, username, "homeserverName", "isBot", "createdAt", "updatedAt") VALUES ('u9', 'owner', 'localhost', false, now(), now())`
+      );
+      await query(
+        url,
+        `INSERT INTO channel (id, name, type, "ownerId", "iconUrl") VALUES ('gd1', '', 'GROUP_DM', 'u9', 'https://localhost/icon.webp')`
+      );
+      await query(
+        url,
+        `INSERT INTO message (id, "channelId", "authorId", nonce, system) VALUES ('m8', 'gd1', 'u1', 'nonce-m8', '{"type":"group.created"}')`
+      );
+      await query(url, `DELETE FROM "user" WHERE id = 'u9'`);
+      expect(
+        await rows(url, `SELECT 1 FROM channel WHERE id = 'gd1' AND "ownerId" IS NULL`)
+      ).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

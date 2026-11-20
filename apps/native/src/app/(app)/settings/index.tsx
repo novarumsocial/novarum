@@ -15,7 +15,8 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { AccountSwitcher } from '@/components/account-switcher';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { SettingsGroup } from '@/components/settings-group';
@@ -46,13 +47,14 @@ const groups: { label: string; pages: { href: string; title: string; icon: Lucid
   },
 ];
 
-const row = 'h-12 flex-row items-center gap-3 px-4 active:bg-accent';
+const row = 'min-h-14 flex-row items-center gap-3 px-4 active:bg-accent';
 
 export default function Settings() {
   const user = useSession((s) => s.user);
   const insets = useSafeAreaInsets();
   const [anchorVersion, setAnchorVersion] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const appVersion = Application.nativeApplicationVersion ?? Constants.expoConfig?.version;
   const gitCommit: string = (Constants.expoConfig?.extra?.gitCommitHash ?? 'unknown').slice(0, 7);
 
@@ -61,6 +63,16 @@ export default function Settings() {
       .then((info) => setAnchorVersion(info.version ?? null))
       .catch(() => {});
   }, []);
+
+  const confirmLogout = () =>
+    Alert.alert(
+      'Log out?',
+      `You will need to sign in again to use ${user?.homeserver ?? 'this account'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log out', style: 'destructive', onPress: () => void logout() },
+      ]
+    );
 
   async function logout() {
     setLoggingOut(true);
@@ -78,7 +90,12 @@ export default function Settings() {
       className="flex-1 bg-background"
       contentContainerStyle={{ gap: 24, padding: 16, paddingBottom: insets.bottom + 32 }}
     >
-      <View className="flex-row items-center gap-3 px-1">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityHint="Switch accounts"
+        onPress={() => setSwitcherOpen(true)}
+        className="min-h-16 flex-row items-center gap-3 px-1 active:opacity-70"
+      >
         <Avatar
           src={user?.avatarUrl}
           bgColor={user?.avatarColor}
@@ -92,18 +109,21 @@ export default function Settings() {
             {user?.handle || `@${user?.username ?? 'you'}`}
           </Text>
         </View>
-      </View>
+        <Text className="text-sm text-link">Switch</Text>
+      </Pressable>
+      <AccountSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       {groups.map((group) => (
         <SettingsGroup key={group.label} title={group.label}>
           {group.pages.map((page) => (
             <Pressable
               key={page.href}
+              accessibilityRole="button"
               className={row}
               onPress={() => router.push(page.href as never)}
             >
               <Icon as={page.icon} size={18} className="text-muted-foreground" />
-              <Text className="flex-1 text-sm">{page.title}</Text>
+              <Text className="flex-1 text-base">{page.title}</Text>
               <Icon as={ChevronRight} size={16} className="text-muted-foreground" />
             </Pressable>
           ))}
@@ -111,9 +131,14 @@ export default function Settings() {
       ))}
 
       <SettingsGroup>
-        <Pressable className={row} disabled={loggingOut} onPress={logout}>
+        <Pressable
+          accessibilityRole="button"
+          className={row}
+          disabled={loggingOut}
+          onPress={confirmLogout}
+        >
           {loggingOut ? <Spinner /> : <Icon as={LogOut} size={18} className="text-destructive" />}
-          <Text className="flex-1 text-sm text-destructive">Log out</Text>
+          <Text className="flex-1 text-base text-destructive">Log out</Text>
         </Pressable>
       </SettingsGroup>
 

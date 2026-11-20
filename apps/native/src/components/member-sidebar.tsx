@@ -1,10 +1,13 @@
 // Port of apps/frontend/src/lib/components/member-sidebar.svelte
+// Differences: a search field filters by name or handle, and each row shows the handle (display names repeat)
 import { FlashList } from '@shopify/flash-list';
 import { Users } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
 import { ProfileCard } from '@/components/profile-card';
+import { SearchField } from '@/components/search-field';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { BotBadge } from '@/components/bot-badge';
@@ -14,13 +17,22 @@ import { cn } from '@/lib/utils';
 
 type Row = { kind: 'title'; label: string; online: boolean } | { kind: 'member'; member: Author };
 
-// the members modal on phones, the right column next to the chat on tablets
+const handle = (member: Author) => `@${member.username}:${member.server}`;
+
+// the members screen on phones, the right column next to the chat on tablets
 export function MemberSidebar({ members }: { members: Author[] }) {
   const circleIcons = useSettings((s) => s.circleIcons);
   const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
 
-  const online = members.filter((member) => member.status !== 'OFFLINE');
-  const offline = members.filter((member) => member.status === 'OFFLINE');
+  const needle = query.trim().toLowerCase();
+  const matching = needle
+    ? members.filter((member) =>
+        `${member.displayName ?? ''} ${handle(member)}`.toLowerCase().includes(needle)
+      )
+    : members;
+  const online = matching.filter((member) => member.status !== 'OFFLINE');
+  const offline = matching.filter((member) => member.status === 'OFFLINE');
   const rows: Row[] = [
     { kind: 'title', label: `Online - ${online.length}`, online: true },
     ...online.map((member) => ({ kind: 'member' as const, member })),
@@ -39,6 +51,18 @@ export function MemberSidebar({ members }: { members: Author[] }) {
         getItemType={(row) => row.kind}
         keyExtractor={(row) => (row.kind === 'title' ? row.label : row.member.userId)}
         contentContainerStyle={{ padding: 12, paddingBottom: insets.bottom + 12 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={
+          members.length > 8 ? (
+            <SearchField
+              placeholder="Search members"
+              value={query}
+              onChangeText={setQuery}
+              className="mb-2"
+            />
+          ) : null
+        }
         renderItem={({ item }) => {
           if (item.kind === 'title') {
             return (
@@ -50,34 +74,40 @@ export function MemberSidebar({ members }: { members: Author[] }) {
           }
           const { member } = item;
           const name = member.displayName || member.username;
+          const offline = member.status === 'OFFLINE';
           return (
             <ProfileCard user={member}>
-              <View
-                className={cn(
-                  'min-h-11 flex-row items-center gap-2 px-1',
-                  member.status === 'OFFLINE' && 'opacity-50'
-                )}
-              >
-                <View>
+              <View className="min-h-14 flex-row items-center gap-3 px-1">
+                <View className={cn(offline && 'opacity-60')}>
                   <Avatar
                     src={member.avatarUrl}
                     name={name}
                     bgColor={member.avatarColor}
-                    className="size-8"
+                    className="size-9"
                   />
-                  {member.status !== 'OFFLINE' && (
+                  {!offline && (
                     <View
                       className={cn(
-                        'absolute -right-px -bottom-px size-3 border-2 border-sidebar bg-emerald-500',
+                        'absolute -right-0.5 -bottom-0.5 size-3.5 border-2 border-sidebar bg-emerald-500',
                         circleIcons && 'rounded-full'
                       )}
                     />
                   )}
                 </View>
-                <Text numberOfLines={1} className="shrink text-sm">
-                  {name}
-                </Text>
-                {member.isBot && <BotBadge />}
+                <View className="min-w-0 flex-1">
+                  <View className="flex-row items-center gap-1.5">
+                    <Text
+                      numberOfLines={1}
+                      className={cn('shrink text-sm', offline && 'text-muted-foreground')}
+                    >
+                      {name}
+                    </Text>
+                    {member.isBot && <BotBadge />}
+                  </View>
+                  <Text numberOfLines={1} className="text-xs text-muted-foreground">
+                    {handle(member)}
+                  </Text>
+                </View>
               </View>
             </ProfileCard>
           );

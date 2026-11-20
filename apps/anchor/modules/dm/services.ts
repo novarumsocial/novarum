@@ -2,27 +2,144 @@ import Elysia, { t } from 'elysia';
 import { z } from 'zod';
 import { sessionCookieName, validateSessionToken } from '../auth/provider';
 import { randomString } from '../../utils/randomString';
-import { db, channels, channelMembers, messages } from '../../src/db';
+import { db, attachments, channels, channelMembers, messages, users } from '../../src/db';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { publicUser } from '../../utils/publicUser';
 import { findFriendship, friendAuthority } from '../friends/model';
 import { isMessageAfter } from '../../utils/messageCursor';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
-import { dmLatestResponseSchema, dmOpenResponseSchema, dmResponseSchema } from '../../src/db/zod';
+import {
+  dmLastMessageSchema,
+  dmLatestResponseSchema,
+  dmOpenResponseSchema,
+  dmResponseSchema,
+} from '../../src/db/zod';
 import { getConfig } from '../../utils/config';
 import { postSignedFederationJson } from '../../utils/discovery';
 import { federationUserPayload, upsertFederatedUser } from '../../utils/federationPayload';
 import { makeFederatedChannelId, parseFederatedChannelId } from '../../utils/federationIds';
 import { publishRealtime } from '../../utils/publishRealtime';
 import { ensureFederatedDmRealtimeBridge } from '../../utils/federationRealtime';
+import { callRemote, passThrough } from '../../utils/federationClient';
+import { processImage } from '../../utils/optimizeWebp';
+import { noStoreRedirect, publicPresign, storage } from '../../utils/services/storage';
+import { okResponseSchema } from '../federation/schemas';
+import { createGrant } from '../bots/membership';
+import {
+  hostAddBot,
+  hostAddMembers,
+  hostCreateGroup,
+  hostLeave,
+  hostRemoveMember,
+  hostTransferOwner,
+  hostUpdateGroup,
+  userRef,
+  type GroupResult,
+} from './groups';
+import { messagePreview } from '../../utils/messagePreview';
+import { isValidDeclineSignature } from '../../utils/notify';
+import { ringAs } from '../realtime/services';
 
 const successResponseSchema = z.object({ success: z.boolean() });
 const dmListResponseSchema = z.object({ dms: z.array(dmResponseSchema) });
+const maxIconSize = getConfig().files.max_avatar_size * 1024 * 1024;
+const groupErrors = {
+  400: genericResponseErrorSchema,
+  401: genericResponseErrorSchema,
+  403: genericResponseErrorSchema,
+  404: genericResponseErrorSchema,
+  409: genericResponseErrorSchema,
+  429: genericResponseErrorSchema,
+  502: genericResponseErrorSchema,
+};
+
+type Session = NonNullable<Awaited<ReturnType<typeof validateSessionToken>>>;
+type Group = typeof channels.$inferSelect;
+
+// runs a group change here when we host the group, or asks its host to (as `session`'s user)
+async function onGroup(
+  session: Session,
+  id: string,
+  local: (group: Group, actor: Session['user']) => Promise<GroupResult>,
+  remote: { action: string; body?: Record<string, unknown> }
+): Promise<GroupResult> {
+  const membership = await db.query.channelMembers.findFirst({
+    where: { channelId: id, userId: session.userId },
+    with: { channel: true },
+  });
+  if (membership?.channel.type !== 'GROUP_DM')
+    return { ok: false, status: 404, error: 'DM not found' };
+
+  const federated = parseFederatedChannelId(id);
+  if (!federated) return local(membership.channel, session.user);
+  const result = await callRemote(
+    federated.homeserver,
+    `/federation/dms/${encodeURIComponent(federated.id)}/${remote.action}`,
+    session,
+    remote.body ?? {},
+    {
+      response: okResponseSchema,
+      forward: passThrough(400, 403, 404, 409, 429),
+      errors: { failed: 'The group could not be changed', invalid: 'Invalid answer from the host' },
+    }
+  );
+  return result.ok ? { ok: true } : { ok: false, status: result.status, error: result.error.error };
+}
+
+// the users behind `userIds`, which must all be friends of `session`'s user
+async function friendsById(session: Session, userIds: string[]) {
+  const targets = await db.query.users.findMany({ where: { id: { in: userIds } } });
+  if (targets.length !== new Set(userIds).size) return null;
+  for (const target of targets) {
+    if ((await findFriendship(session.userId, target.id))?.status !== 'ACCEPTED') return null;
+  }
+  return targets;
+}
+
+const memberById = async (groupId: string, userId: string) =>
+  (
+    await db.query.channelMembers.findFirst({
+      where: { channelId: groupId, userId },
+      with: { user: true },
+    })
+  )?.user;
 
 export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
+  .get(
+    '/icon/:key',
+    ({ params, status }) => {
+      if (!/^[A-Za-z0-9]+$/.test(params.key)) return status(404, { error: 'Icon not found' });
+      return noStoreRedirect(
+        publicPresign(`dm-icons/${params.key}.webp`, {
+          method: 'GET',
+          expiresIn: 5 * 60,
+          type: 'image/webp',
+          contentDisposition: 'inline',
+        })
+      );
+    },
+    { response: { 302: t.Void(), 404: genericResponseErrorSchema } }
+  )
+  // the phone's Decline on a ringing notification: the signed link from the push is the credential
+  .post(
+    '/:id/ring/decline',
+    async ({ params, query, status }) => {
+      const user = isValidDeclineSignature(params.id, query.user, query.exp, query.sig)
+        ? await db.query.users.findFirst({ where: { id: query.user } })
+        : undefined;
+      if (!user) return status(403, { error: 'Invalid or expired link' });
+      await ringAs(user, params.id, false);
+      return { success: true };
+    },
+    {
+      query: t.Object({ user: t.String(), exp: t.Numeric(), sig: t.String() }),
+      response: { 200: successResponseSchema, 403: genericResponseErrorSchema },
+    }
+  )
   .resolve(async ({ cookie, status }) => {
-    const token = cookie[sessionCookieName]?.value as string | undefined;
-    const session = await validateSessionToken(token);
+    const session = await validateSessionToken(
+      cookie[sessionCookieName]?.value as string | undefined
+    );
     if (!session) return status(401, { error: 'Unauthorized' });
     return { session };
   })
@@ -159,6 +276,178 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
     }
   )
   .post(
+    '/group',
+    async ({ body, session, server, status }) => {
+      const targets = await friendsById(session, body.userIds);
+      if (!targets) return status(403, { error: 'You can only add your friends' });
+      const result = await hostCreateGroup(server, session.user, targets, body.name ?? '');
+      return result.ok ? result.dm : status(result.status, { error: result.error });
+    },
+    {
+      body: t.Object({
+        userIds: t.Array(t.String(), { minItems: 1, maxItems: 100 }),
+        name: t.Optional(t.String({ maxLength: 100 })),
+      }),
+      response: { 200: dmResponseSchema, ...groupErrors },
+    }
+  )
+  .patch(
+    '/:id',
+    async ({ params, body, session, server, status }) => {
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostUpdateGroup(server, group, actor, body),
+        { action: 'update', body }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    {
+      body: t.Object({ name: t.String({ maxLength: 100 }) }),
+      response: { 200: okResponseSchema, ...groupErrors },
+    }
+  )
+  // the icon is stored here, on the owner's homeserver, and the host only keeps its url
+  .post(
+    '/:id/icon',
+    async ({ params, body, session, server, status }) => {
+      const membership = await db.query.channelMembers.findFirst({
+        where: { channelId: params.id, userId: session.userId },
+        with: { channel: true },
+      });
+      if (membership?.channel.type !== 'GROUP_DM') return status(404, { error: 'DM not found' });
+      if (membership.channel.ownerId !== session.userId) {
+        return status(403, { error: 'Only the group owner can change the group' });
+      }
+      if (body.icon.type !== 'image/png' && body.icon.type !== 'image/gif') {
+        return status(415, { error: 'Group icon must be a PNG or GIF image' });
+      }
+      if (body.icon.size > maxIconSize) return status(413, { error: 'Group icon is too large' });
+
+      const key = randomString();
+      const image = await processImage(await body.icon.arrayBuffer());
+      await storage.write(`dm-icons/${key}.webp`, image.data, { type: 'image/webp' });
+      const iconUrl = new URL(`/dm/icon/${key}`, getConfig().server.base_url).toString();
+
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostUpdateGroup(server, group, actor, { iconUrl }),
+        { action: 'update', body: { iconUrl } }
+      );
+      if (!result.ok) {
+        await storage.delete(`dm-icons/${key}.webp`).catch(() => null);
+        return status(result.status, { error: result.error });
+      }
+      return { iconUrl };
+    },
+    {
+      body: t.Object({ icon: t.File({ maxSize: maxIconSize }) }),
+      response: {
+        200: z.object({ iconUrl: z.url() }),
+        ...groupErrors,
+        413: genericResponseErrorSchema,
+        415: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/:id/members',
+    async ({ params, body, session, server, status }) => {
+      const targets = await friendsById(session, body.userIds);
+      if (!targets) return status(403, { error: 'You can only add your friends' });
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostAddMembers(server, group, actor, targets),
+        { action: 'members', body: { users: targets.map(userRef) } }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    {
+      body: t.Object({ userIds: t.Array(t.String(), { minItems: 1, maxItems: 100 }) }),
+      response: { 200: okResponseSchema, ...groupErrors },
+    }
+  )
+  .delete(
+    '/:id/members/:userId',
+    async ({ params, session, server, status }) => {
+      const target = await memberById(params.id, params.userId);
+      if (!target) return status(404, { error: 'Member not found' });
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostRemoveMember(server, group, actor, target),
+        { action: 'members/remove', body: { target: userRef(target) } }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
+    '/:id/bots',
+    async ({ params, body, session, server, status }) => {
+      const ref = userRef(body);
+      // our own private bot in a group hosted elsewhere: leave a grant for the host to bring back
+      const federated = parseFederatedChannelId(params.id);
+      let grant: string | undefined;
+      if (federated && ref.homeserver === getConfig().server.homeserver.toLowerCase()) {
+        const bot = await db.query.users.findFirst({
+          where: { username: ref.username, homeserver: getConfig().server.homeserver, isBot: true },
+          with: { bot: true },
+        });
+        if (bot?.bot?.ownerId === session.userId) {
+          grant = createGrant(bot.id, federated.homeserver, federated.id);
+        }
+      }
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostAddBot(server, group, actor, ref),
+        { action: 'bots', body: { ...ref, grant } }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    {
+      body: t.Object({
+        username: t.String({ minLength: 1, maxLength: 64 }),
+        homeserver: t.String({ minLength: 1, maxLength: 255 }),
+      }),
+      response: { 200: okResponseSchema, ...groupErrors },
+    }
+  )
+  .post(
+    '/:id/owner',
+    async ({ params, body, session, server, status }) => {
+      const target = await memberById(params.id, body.userId);
+      if (!target) return status(404, { error: 'Member not found' });
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostTransferOwner(server, group, actor, target),
+        { action: 'owner', body: { target: userRef(target) } }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    {
+      body: t.Object({ userId: t.String() }),
+      response: { 200: okResponseSchema, ...groupErrors },
+    }
+  )
+  .post(
+    '/:id/leave',
+    async ({ params, session, server, status }) => {
+      const result = await onGroup(
+        session,
+        params.id,
+        (group, actor) => hostLeave(server, group, actor),
+        { action: 'leave' }
+      );
+      return result.ok ? { ok: true } : status(result.status, { error: result.error });
+    },
+    { response: { 200: okResponseSchema, ...groupErrors } }
+  )
+  .post(
     '/:id/close',
     async ({ params, session, status }) => {
       const membership = await db.query.channelMembers.findFirst({
@@ -185,15 +474,26 @@ export const dm = new Elysia({ prefix: '/dm', tags: ['DM'] })
   );
 
 export function dmResponse(
-  channel: { id: string; type: string },
+  channel: {
+    id: string;
+    type: string;
+    name?: string;
+    iconUrl?: string | null;
+    ownerId?: string | null;
+  },
   joinedAt: Date,
   participants: Parameters<typeof publicUser>[0][]
 ) {
+  const group = channel.type === 'GROUP_DM';
   return {
     id: channel.id,
     type: channel.type as 'DM' | 'GROUP_DM',
     participants: participants.map(publicUser),
+    name: group ? (channel.name ?? '') : null,
+    iconUrl: group ? (channel.iconUrl ?? null) : null,
+    ownerId: group ? (channel.ownerId ?? null) : null,
     lastMessageAt: null,
+    lastMessage: null as z.infer<typeof dmLastMessageSchema> | null,
     unread: false,
     joinedAt: joinedAt.toISOString(),
   };
@@ -269,8 +569,22 @@ async function reopenDm(channelId: string, userId: string) {
 export async function latestMessages(channelIds: string[]) {
   if (!channelIds.length) return [];
   return db
-    .selectDistinctOn([messages.channelId])
+    .selectDistinctOn([messages.channelId], {
+      id: messages.id,
+      channelId: messages.channelId,
+      authorId: messages.authorId,
+      author: {
+        username: users.username,
+        homeserver: users.homeserver,
+        displayName: users.displayName,
+      },
+      content: messages.content,
+      system: messages.system,
+      createdAt: messages.createdAt,
+      attachmentCount: db.$count(attachments, eq(attachments.messageId, messages.id)),
+    })
     .from(messages)
+    .innerJoin(users, eq(users.id, messages.authorId))
     .where(inArray(messages.channelId, channelIds))
     .orderBy(messages.channelId, desc(messages.createdAt), desc(messages.id));
 }
@@ -297,7 +611,15 @@ async function buildDms(
   });
   const readStateByChannel = new Map(readStates.map((state) => [state.channelId, state]));
 
-  const latestByChannel = new Map<string, { createdAt: Date; id: string; own: boolean }>();
+  const latestByChannel = new Map<
+    string,
+    {
+      createdAt: Date;
+      id: string;
+      own: boolean;
+      preview: z.infer<typeof dmLastMessageSchema> | null;
+    }
+  >();
   if (homeserver) {
     const result = await postSignedFederationJson(homeserver, '/federation/dms/latest', {
       user: federationUserPayload(session),
@@ -305,10 +627,42 @@ async function buildDms(
     }).catch(() => null);
     const latest = dmLatestResponseSchema.safeParse(result?.data);
     for (const message of result?.response.ok && latest.success ? latest.data.channels : []) {
-      latestByChannel.set(makeFederatedChannelId(homeserver, message.channelId), {
+      const channelId = makeFederatedChannelId(homeserver, message.channelId);
+      const others =
+        memberships
+          .find((m) => m.channelId === channelId)
+          ?.channel.members.filter((m) => m.userId !== session.userId) ?? [];
+      // the host names the author; an older one only says whether it was us, which is enough in a 1:1
+      const { author } = message;
+      const authorId = message.own
+        ? session.userId
+        : author
+          ? others.find(
+              ({ user }) =>
+                user.username === author.username &&
+                user.homeserver.toLowerCase() === author.homeserver.toLowerCase()
+            )?.userId
+          : others.length === 1
+            ? others[0]!.userId
+            : undefined;
+      latestByChannel.set(channelId, {
         createdAt: new Date(message.createdAt),
         id: message.id,
         own: message.own,
+        preview:
+          message.content !== undefined && (authorId || author)
+            ? {
+                // empty when the author left the group: the client names them from `author`
+                id: message.id,
+                authorId: authorId ?? '',
+                content: messagePreview(message.content),
+                attachmentCount: message.attachmentCount ?? 0,
+                system: message.system ?? null,
+                author: author
+                  ? { username: author.username, displayName: author.displayName ?? null }
+                  : null,
+              }
+            : null,
       });
     }
   } else {
@@ -317,6 +671,14 @@ async function buildDms(
         createdAt: message.createdAt,
         id: message.id,
         own: message.authorId === session.userId,
+        preview: {
+          id: message.id,
+          authorId: message.authorId,
+          content: messagePreview(message.content),
+          attachmentCount: message.attachmentCount,
+          system: message.system,
+          author: { username: message.author.username, displayName: message.author.displayName },
+        },
       });
     }
   }
@@ -332,6 +694,7 @@ async function buildDms(
           channel.members.filter((m) => m.userId !== session.userId).map((m) => m.user)
         ),
         lastMessageAt: latest ? latest.createdAt.toISOString() : null,
+        lastMessage: latest?.preview ?? null,
         unread: Boolean(
           latest &&
           !latest.own &&

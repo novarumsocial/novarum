@@ -19,6 +19,10 @@
     "./bot-schemas": {
       "types": "./utils/botSchemas.ts",
       "import": "./utils/botSchemas.ts"
+    },
+    "./system-message": {
+      "types": "./utils/systemMessage.ts",
+      "import": "./utils/systemMessage.ts"
     }
   },
   "module": "src/index.js",

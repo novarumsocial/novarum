@@ -24,6 +24,7 @@ class AnchorState {
   homeServer = $state(getInitialHomeServer());
   baseUrl = $state(getInitialBaseUrl(this.homeServer));
   maxFileSize = $state(10);
+  maxGroupMembers = $state(30);
   client = $derived(createAnchorClient(this.baseUrl));
 
   constructor() {
@@ -37,6 +38,7 @@ class AnchorState {
     this.homeServer = normalizedHomeServer;
     this.baseUrl = info.baseUrl.replace(/\/+$/, '');
     this.maxFileSize = info.maxFileSize;
+    this.maxGroupMembers = info.maxGroupMembers;
     localStorage.setItem(homeServerStorageKey, normalizedHomeServer);
     localStorage.setItem(anchorBaseUrlStorageKey, this.baseUrl);
   }
@@ -46,6 +48,7 @@ class AnchorState {
       const info = await getAnchorInfo(this.homeServer);
       this.baseUrl = info.baseUrl.replace(/\/+$/, '');
       this.maxFileSize = info.maxFileSize;
+      this.maxGroupMembers = info.maxGroupMembers;
     } catch {
       // offline or unreachable — keep cached values
     }

@@ -65,15 +65,13 @@ export function InviteDialog({
   }
 
   return (
-    <Sheet open={open} onClose={onClose}>
-      <View className="gap-4 px-4 pb-2">
-        <View>
-          <Text className="text-lg font-semibold">Invite People</Text>
-          <Text className="text-sm text-muted-foreground">
-            Share this link to let people join the server. It's active indefinitely until
-            regenerated.
-          </Text>
-        </View>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Invite people"
+      subtitle="Share this link to let people join the server. It works until it's regenerated."
+    >
+      <View className="gap-4 px-4 pt-3 pb-2">
         <View className="gap-1.5">
           <Text className="text-xs font-medium">Invite Link</Text>
           <View className="flex-row gap-2">

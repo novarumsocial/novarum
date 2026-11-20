@@ -1,8 +1,20 @@
 // Port of apps/frontend/src/routes/login/+page.svelte
+// Native differences: the home server field is folded behind "Sign in to a different server" (the default is
+// filled in), the password has a show/hide toggle, and errors show above the button instead of under it.
 import { anchor } from '@/lib/anchor';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, type Href } from 'expo-router';
-import { ArrowLeft, AtSign, Lock, LogIn, Mail, Server, Smartphone } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  AtSign,
+  Eye,
+  EyeOff,
+  Lock,
+  LogIn,
+  Mail,
+  Server,
+  Smartphone,
+} from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Pressable, TextInput, View } from 'react-native';
@@ -91,6 +103,8 @@ export default function Login() {
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showLoginOptions, setShowLoginOptions] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [pickServer, setPickServer] = useState(false);
   const session = useSession();
   const { add, query, done } = useAuthParams();
 
@@ -104,7 +118,9 @@ export default function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { control, handleSubmit, setFocus } = useForm<z.infer<typeof loginSchema>>({
+  const { control, handleSubmit, setFocus, watch, formState } = useForm<
+    z.infer<typeof loginSchema>
+  >({
     resolver: zodResolver(loginSchema),
     defaultValues: { homeServer: anchor().homeServer, username: '', password: '' },
   });
@@ -255,8 +271,7 @@ export default function Login() {
             <View className="items-center gap-3 border border-border bg-background/40 p-4">
               <Icon as={Mail} size={24} className="text-primary" />
               <Text className="text-center text-sm text-muted-foreground">
-                Ready? Click that fancy button below to send a one-time code to the email on your
-                account.
+                We’ll send a one-time code to the email on your account.
               </Text>
               <Button className="w-full" disabled={sendingEmail} onPress={sendEmailCode}>
                 {sendingEmail ? (
@@ -278,6 +293,8 @@ export default function Login() {
                 <Text className="text-center text-sm font-medium">Verification code</Text>
                 <OtpInput value={mfaCode} onChange={changeCode} disabled={loading} />
               </View>
+
+              {error}
 
               <Button
                 size="lg"
@@ -309,24 +326,37 @@ export default function Login() {
               <Text>Try another way</Text>
             </Button>
           )}
-
-          {error}
         </View>
       ) : (
         <View className="gap-4">
-          <AuthField
-            control={control}
-            name="homeServer"
-            label="Home server"
-            icon={Server}
-            placeholder="novarum.me"
-            autoComplete="url"
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-            onSubmitEditing={() => setFocus('username')}
-          />
+          {pickServer || formState.errors.homeServer ? (
+            <AuthField
+              control={control}
+              name="homeServer"
+              label="Home server"
+              icon={Server}
+              placeholder="novarum.me"
+              autoComplete="url"
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => setFocus('username')}
+            />
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Signing in to ${watch('homeServer')}. Sign in to a different server`}
+              onPress={() => setPickServer(true)}
+              className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+            >
+              <Icon as={Server} size={16} className="text-muted-foreground" />
+              <Text className="flex-1 text-sm text-muted-foreground" numberOfLines={1}>
+                Signing in to <Text className="text-sm font-medium">{watch('homeServer')}</Text>
+              </Text>
+              <Text className="text-sm text-link">Change</Text>
+            </Pressable>
+          )}
           <AuthField
             control={control}
             name="username"
@@ -354,7 +384,21 @@ export default function Login() {
                 <Text className="text-xs text-muted-foreground">Forgot password?</Text>
               </Pressable>
             }
-            secureTextEntry
+            right={
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                className="h-11 justify-center px-3"
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Icon
+                  as={showPassword ? EyeOff : Eye}
+                  size={16}
+                  className="text-muted-foreground"
+                />
+              </Pressable>
+            }
+            secureTextEntry={!showPassword}
             placeholder="••••••••"
             autoComplete="current-password"
             textContentType="password"
@@ -362,11 +406,15 @@ export default function Login() {
             onSubmitEditing={submit}
           />
 
+          {submitError ? (
+            <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
+              {submitError}
+            </Text>
+          ) : null}
+
           <Button size="lg" className="w-full" disabled={loading} onPress={submit}>
             <ButtonLabel loading={loading} loadingText="Signing in…" text="Sign in" icon={LogIn} />
           </Button>
-
-          {submitError ? <Text className="text-sm text-destructive">{submitError}</Text> : null}
         </View>
       )}
     </AuthCard>
