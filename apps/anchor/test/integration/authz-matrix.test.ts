@@ -232,6 +232,19 @@ const guildRoutes: Route[] = [
     body: async (fx) => ({ channelId: fx.channel.id, messageId: (await fx.ownerMessage()).id }),
     expected: [401, 403, 403, 200],
   },
+  // any member reacts to anyone's message
+  {
+    key: 'POST /message/react',
+    method: 'POST',
+    path: () => '/message/react',
+    body: async (fx) => ({
+      channelId: fx.channel.id,
+      messageId: (await fx.ownerMessage()).id,
+      emoji: '👍',
+      add: true,
+    }),
+    expected: [401, 403, 200, 200],
+  },
 ];
 
 // not in the table on purpose: the matrix needs each of these to have another test
@@ -377,6 +390,15 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
         method: 'POST',
         path: '/message/send',
         body: { channelId: fx.dmId, content: 'x', nonce: `n${Math.random()}` },
+      }),
+      expected: [401, 403, 200, 403],
+    },
+    {
+      name: 'POST /message/react',
+      request: (fx) => ({
+        method: 'POST',
+        path: '/message/react',
+        body: { channelId: fx.dmId, messageId: fx.message.id, emoji: '👍', add: true },
       }),
       expected: [401, 403, 200, 403],
     },

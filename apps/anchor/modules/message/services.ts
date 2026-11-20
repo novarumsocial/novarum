@@ -14,7 +14,13 @@ import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
 import sharp from 'sharp';
-import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
+import {
+  attachmentResponseSchema,
+  messageReactionSchema,
+  messageResponseBaseSchema,
+  reactionEmojiSchema,
+} from '../../src/db/zod';
+import { reactionsFor, setReaction } from './reactions';
 import { messageExtras } from '../../utils/messagePayload';
 import { componentsSchema, embedsSchema } from '../../utils/botSchemas';
 
@@ -36,6 +42,7 @@ const federatedMessageListResponseSchema = z.object({
 });
 const messageResponseSchema = z.object({ message: messageSchema });
 const successResponseSchema = z.object({ success: z.boolean() });
+const reactionsResponseSchema = z.object({ reactions: z.array(messageReactionSchema) });
 
 export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
   .resolve(async ({ cookie, request, status }) => {
@@ -103,6 +110,10 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         offset: cursor,
       });
       messages.reverse();
+      const reactions = await reactionsFor(
+        messages.map((message) => message.id),
+        session.userId
+      );
 
       return {
         messages: messages.map((message) => {
@@ -125,6 +136,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
                 : message.createdAt,
             author: publicUser(message.author),
             ...messageExtras(message),
+            reactions: reactions.get(message.id) ?? [],
           };
         }),
       };
@@ -185,10 +197,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         if (!sent.ok) return status(sent.status, sent.error);
 
         const mappedMessage = mapFederatedMessage(sent.data.message, channel.id, channel.guildId);
+        // events carry no reactions: `me` in them is about whoever asked
+        const { reactions: _, ...eventMessage } = mappedMessage;
         if (server) {
           await publishToChannel(server, channel, {
             type: 'message.created',
-            data: mappedMessage,
+            data: eventMessage,
           });
         }
 
@@ -237,6 +251,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
                 : priorMsg.createdAt,
             author: publicUser(session.user),
             ...messageExtras(priorMsg),
+            reactions: (await reactionsFor([priorMsg.id], session.userId)).get(priorMsg.id) ?? [],
           },
         };
       }
@@ -298,7 +313,7 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         channel.guildId ? pingRecipients : dmRecipients(channel.id)
       );
 
-      return { message: responseMessage };
+      return { message: { ...responseMessage, reactions: [] } };
     },
     {
       body: z.object({
@@ -359,10 +374,12 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         if (!edited.ok) return status(edited.status, edited.error);
 
         const mappedMessage = mapFederatedMessage(edited.data.message, channel.id, channel.guildId);
+        // events carry no reactions: `me` in them is about whoever asked
+        const { reactions: _, ...eventMessage } = mappedMessage;
         if (server) {
           await publishToChannel(server, channel, {
             type: 'message.updated',
-            data: mappedMessage,
+            data: eventMessage,
           });
         }
 
@@ -431,7 +448,8 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         pingRecipients.filter((recipient) => !alreadyPinged.has(recipient.userId))
       );
 
-      return { message: responseMessage };
+      const reactions = await reactionsFor([updated.id], session.userId);
+      return { message: { ...responseMessage, reactions: reactions.get(updated.id) ?? [] } };
     },
     {
       body: z.object({
@@ -507,6 +525,67 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
       }),
       response: {
         200: successResponseSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
+  // adds (`add: true`) or removes the caller's reaction; asking for what is already so is fine
+  .post(
+    '/react',
+    async ({ body, session, status, server }) => {
+      const { channelId, messageId, emoji, add } = body;
+      const channel = await db.query.channels.findFirst({ where: { id: channelId } });
+      if (!channel) return status(404, { error: 'Channel not found' });
+
+      // like sending, reacting in a DM needs the participants to still be friends
+      if (!(await canAccessChannel(channel, session.userId, true)))
+        return status(403, { error: 'Forbidden' });
+
+      const federatedChannel = parseFederatedChannelId(channelId);
+      if (federatedChannel) {
+        // the host announces it, and our bridge to it passes that on to our clients
+        const reacted = await callRemote(
+          federatedChannel.homeserver,
+          federationChannelPath(federatedChannel, 'messages/react'),
+          session,
+          { messageId, emoji, add },
+          {
+            response: reactionsResponseSchema,
+            forward: passThrough(400, 401, 403, 404),
+            errors: {
+              failed: 'Remote reaction failed',
+              invalid: 'Remote reaction returned an invalid response',
+            },
+          }
+        );
+        if (!reacted.ok) return status(reacted.status, reacted.error);
+        return reacted.data;
+      }
+
+      const reacted = await setReaction({
+        channel,
+        messageId,
+        user: session.user,
+        emoji,
+        add,
+        server,
+      });
+      if (!reacted.ok) return status(reacted.status, { error: reacted.error });
+      return { reactions: reacted.reactions };
+    },
+    {
+      body: z.object({
+        channelId: z.string(),
+        messageId: z.string(),
+        emoji: reactionEmojiSchema,
+        add: z.boolean(),
+      }),
+      response: {
+        200: reactionsResponseSchema,
+        400: genericResponseErrorSchema,
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,

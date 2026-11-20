@@ -50,6 +50,22 @@ const fixtures: Record<string, unknown> = {
   'message.created': message,
   'message.updated': { ...message, edited: true },
   'message.deleted': { id: 'm1', channelId: 'c1', guildId: 'g1' },
+  'message.reaction.added': {
+    messageId: 'm1',
+    channelId: 'c1',
+    guildId: 'g1',
+    emoji: '👍',
+    count: 1,
+    user,
+  },
+  'message.reaction.removed': {
+    messageId: 'm1',
+    channelId: 'c1',
+    guildId: null,
+    emoji: '👍',
+    count: 0,
+    user,
+  },
   'user.status.changed': { userId: 'u1', status: 'ONLINE' },
   'member.joined': { guildId: 'g1', user: { ...user, status: 'ONLINE' } },
   'voice.states.snapshot': {
@@ -189,6 +205,23 @@ describe('mapFederatedRealtimeEvent', () => {
     channelOnce(data.channelId, 'c1');
     guildOnce(data.guildId, 'g1');
     expect(data.id).toBe('m1');
+  });
+
+  test.each(['message.reaction.added', 'message.reaction.removed'])('%s', (type) => {
+    const { data } = map(type);
+    channelOnce(data.channelId, 'c1');
+    expect(data.messageId).toBe('m1');
+    expect(data.emoji).toBe('👍');
+  });
+
+  test('a reaction event naming a broken emoji is dropped', () => {
+    for (const emoji of ['', 'hi', '👍👍']) {
+      const raw = JSON.stringify({
+        type: 'message.reaction.added',
+        data: { ...(fixtures['message.reaction.added'] as object), emoji },
+      });
+      expect(parseRealtimeEvent(raw)).toBeNull();
+    }
   });
 
   test('member.joined', () => {

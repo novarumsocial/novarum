@@ -16,6 +16,7 @@ import {
   Link,
   Pencil,
   Reply,
+  SmilePlus,
   Trash2,
 } from 'lucide-react-native';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ import Reanimated, {
 import { Avatar } from '@/components/avatar';
 import { AudioPlayer } from '@/components/audio-player';
 import { BotBadge } from '@/components/bot-badge';
+import { EmojiPicker } from '@/components/emoji-picker';
 import { MessageComponents } from '@/components/message-components';
 import { MessageEmbed } from '@/components/message-embed';
 import { openAttachmentViewer, openFileWith } from '@/components/attachment-viewer';
@@ -48,7 +50,7 @@ import { goto } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { useSettings } from '@/lib/settings';
 import { toast } from '@/lib/toast';
-import type { Attachment, Message as ChatMessage } from '@/lib/types/chat';
+import type { Attachment, Message as ChatMessage, Reaction } from '@/lib/types/chat';
 import { cn, formatBytes, mentionsEveryone } from '@/lib/utils';
 
 // where shared message links point (the same host the app opens as a deep link)
@@ -176,12 +178,61 @@ function FileTile({ attachment, onPress }: { attachment: Attachment; onPress: ()
   );
 }
 
+// the reactions under a message: tap one to add or take back yours, the last chip adds a new one
+function Reactions({
+  reactions,
+  onToggle,
+  onAdd,
+}: {
+  reactions: Reaction[];
+  onToggle: (reaction: Reaction) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <View className="mt-1.5 flex-row flex-wrap gap-1">
+      {reactions.map((reaction) => (
+        <Pressable
+          key={reaction.emoji}
+          accessibilityRole="button"
+          accessibilityState={{ selected: reaction.me }}
+          accessibilityLabel={`${reaction.emoji} ${reaction.count}, ${reaction.users
+            .map((user) => user.displayName || user.username)
+            .join(', ')}`}
+          onPress={() => onToggle(reaction)}
+          hitSlop={4}
+          className={cn(
+            'h-8 flex-row items-center gap-1 border px-2 active:opacity-70',
+            reaction.me ? 'border-primary/60 bg-primary/15' : 'border-border bg-muted/30'
+          )}
+        >
+          <Text className="text-base leading-5">{reaction.emoji}</Text>
+          <Text
+            className={cn('text-sm', reaction.me ? 'text-foreground' : 'text-muted-foreground')}
+          >
+            {reaction.count}
+          </Text>
+        </Pressable>
+      ))}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add reaction"
+        onPress={onAdd}
+        hitSlop={4}
+        className="h-8 items-center justify-center border border-border px-2 active:bg-accent"
+      >
+        <Icon as={SmilePlus} size={16} className="text-muted-foreground" />
+      </Pressable>
+    </View>
+  );
+}
+
 function MessageMenu({
   message,
   own,
   open,
   onClose,
   onReply,
+  onReact,
   onDelete,
 }: {
   message: ChatMessage;
@@ -189,6 +240,7 @@ function MessageMenu({
   open: boolean;
   onClose: () => void;
   onReply: () => void;
+  onReact: () => void;
   onDelete: () => void;
 }) {
   const developerMode = useSettings((s) => s.developerMode);
@@ -221,6 +273,7 @@ function MessageMenu({
     >
       {/* ephemeral answers and "thinking…" only exist on this screen: nothing to reply to, link or delete */}
       {!localOnly && <SheetItem icon={Reply} label="Reply" onPress={then(onReply)} />}
+      {!localOnly && <SheetItem icon={SmilePlus} label="Add reaction" onPress={then(onReact)} />}
       {own && text && !localOnly && (
         <SheetItem icon={Pencil} label="Edit message" onPress={then(() => startEditing(message))} />
       )}
@@ -275,6 +328,7 @@ export const Message = memo(function Message({
   const editing = useChat((s) => s.editingMessage && s.editingMessageId === message.id);
   const [menuMounted, setMenuMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   // user ids are per server, so a message from a federated guild or DM carries the remote one
   const isMe = (author?: { username: string; server: string }) =>
     !!author && `@${author.username}:${author.server}`.toLowerCase() === selfHandle;
@@ -324,6 +378,11 @@ export const Message = memo(function Message({
         },
       },
     ]);
+
+  const react = (emoji: string, add: boolean) =>
+    chat()
+      .react(channelId, message.id, emoji, add)
+      .catch(() => toast('Could not react to the message', { tone: 'error' }));
 
   const openMenu = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -580,6 +639,17 @@ export const Message = memo(function Message({
                 ))}
               </View>
             )}
+
+            {message.reactions.length > 0 && !localOnly && (
+              <Reactions
+                reactions={message.reactions}
+                onToggle={(reaction) => {
+                  void Haptics.selectionAsync();
+                  void react(reaction.emoji, !reaction.me);
+                }}
+                onAdd={() => setPickerOpen(true)}
+              />
+            )}
           </View>
         </Pressable>
       </Animated.View>
@@ -591,7 +661,16 @@ export const Message = memo(function Message({
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
           onReply={reply}
+          onReact={() => setPickerOpen(true)}
           onDelete={confirmDelete}
+        />
+      )}
+      {/* mounted only while open, like the composer's: an always-mounted sheet per row is too heavy */}
+      {pickerOpen && (
+        <EmojiPicker
+          open
+          onClose={() => setPickerOpen(false)}
+          onPick={(emoji) => react(emoji, true)}
         />
       )}
     </View>

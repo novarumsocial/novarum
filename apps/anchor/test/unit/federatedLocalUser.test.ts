@@ -142,6 +142,19 @@ describe('vetBridgedEvent', () => {
     expect(await vetBridgedEvent(bridge, ring)).toBeNull();
   });
 
+  test('a reaction can only name a local user who is a member', async () => {
+    const reaction = (user: ReturnType<typeof author>) =>
+      ({
+        type: 'message.reaction.added',
+        data: { messageId: 'm1', channelId: 'c', guildId, emoji: '👍', count: 1, user },
+      }) as RealtimeEvent;
+    expect(await vetBridgedEvent(bridge, reaction(author('bob', 'localhost')))).toBeNull();
+    const member = (await vetBridgedEvent(bridge, reaction(author('alice', 'localhost')))) as any;
+    expect(member.data.user.displayName).toBe('Alice');
+    const remote = reaction(author('mallory', 'evil.test'));
+    expect(await vetBridgedEvent(bridge, remote)).toEqual(remote);
+  });
+
   test('events naming one of our own user ids are forged and dropped', async () => {
     const status = (userId: string) =>
       ({ type: 'user.status.changed', data: { userId, status: 'ONLINE' } }) as RealtimeEvent;

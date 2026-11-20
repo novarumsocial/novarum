@@ -20,6 +20,7 @@ import {
   attachmentResponseSchema,
   channelResponseSchema,
   messageResponseBaseSchema,
+  reactionEmojiSchema,
   userStatusSchema,
 } from '../src/db/zod';
 
@@ -50,13 +51,23 @@ function trackBridgedVoicePresence(id: string, event: RealtimeEvent) {
   }
 }
 
-const messageEventDataSchema = messageResponseBaseSchema.extend({
+// reactions are told apart from edits (`me` depends on who is looking), so a message event has none
+const messageEventDataSchema = messageResponseBaseSchema.omit({ reactions: true }).extend({
   guildId: z.string().nullable(),
   replyTo: messageResponseBaseSchema.shape.replyTo.default(null),
   pingedHandles: z.array(z.string()).default([]),
   attachments: z.array(attachmentResponseSchema),
   createdAt: z.string(),
   author: publicUserSchema,
+});
+
+const reactionEventDataSchema = z.object({
+  messageId: z.string(),
+  channelId: z.string(),
+  guildId: z.string().nullable(),
+  emoji: reactionEmojiSchema,
+  count: z.number().int().nonnegative(),
+  user: publicUserSchema,
 });
 
 export const realtimeEventSchema = z.discriminatedUnion('type', [
@@ -95,6 +106,8 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string().nullable(),
     }),
   }),
+  z.object({ type: z.literal('message.reaction.added'), data: reactionEventDataSchema }),
+  z.object({ type: z.literal('message.reaction.removed'), data: reactionEventDataSchema }),
   z.object({
     type: z.literal('user.status.changed'),
     data: z.object({
@@ -393,6 +406,11 @@ export async function vetBridgedEvent(
       const interaction = invoker ? { ...event.data.interaction, user: invoker } : null;
       return { ...event, data: { ...event.data, author, interaction } };
     }
+    case 'message.reaction.added':
+    case 'message.reaction.removed': {
+      const user = await vetLocalIdentity(scope, event.data.user);
+      return user && { ...event, data: { ...event.data, user } };
+    }
     case 'member.joined': {
       const user = await vetLocalIdentity(scope, event.data.user);
       return user && { ...event, data: { ...event.data, user } };
@@ -645,6 +663,16 @@ export function mapFederatedRealtimeEvent(event: RealtimeEvent, homeserver: stri
       };
     case 'message.created':
     case 'message.updated':
+      return {
+        ...event,
+        data: {
+          ...event.data,
+          channelId: channel(event.data.channelId),
+          guildId: guildOrNull(event.data.guildId),
+        },
+      };
+    case 'message.reaction.added':
+    case 'message.reaction.removed':
       return {
         ...event,
         data: {

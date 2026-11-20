@@ -35,6 +35,18 @@ export type RealtimeEvent =
       };
     }
   | {
+      // `count` is how many people now have this reaction; the event only says who changed it
+      type: 'message.reaction.added' | 'message.reaction.removed';
+      data: {
+        messageId: string;
+        channelId: string;
+        guildId: string | null;
+        emoji: string;
+        count: number;
+        user: PublicUser;
+      };
+    }
+  | {
       type: 'dm.created';
       data: DmChannel;
     }

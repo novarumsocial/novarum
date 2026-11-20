@@ -124,6 +124,15 @@ const ephemeralMessageSchema = messageEventDataSchema
     ephemeral: z.literal(true),
   });
 
+const reactionEventDataSchema = z.object({
+  messageId: z.string(),
+  channelId: z.string(),
+  guildId: z.string().nullable(),
+  emoji: z.string(),
+  count: z.number().int().nonnegative(),
+  user: publicUserSchema,
+});
+
 const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('guild.created'),
@@ -160,6 +169,8 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
       guildId: z.string().nullable(),
     }),
   }),
+  z.object({ type: z.literal('message.reaction.added'), data: reactionEventDataSchema }),
+  z.object({ type: z.literal('message.reaction.removed'), data: reactionEventDataSchema }),
   z.object({
     type: z.literal('message.ephemeral'),
     data: ephemeralMessageSchema,
@@ -462,6 +473,9 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     if (event.type === 'message.updated') {
       chat().updateMessage(event.data.channelId, { ...event.data, edited: true });
       dms().handleMessageEdit(event.data.channelId, event.data.id, event.data.content ?? null);
+    }
+    if (event.type === 'message.reaction.added' || event.type === 'message.reaction.removed') {
+      chat().applyReaction(event.data, event.type === 'message.reaction.added');
     }
     if (event.type === 'message.deleted') {
       chat().removeMessage(event.data.channelId, event.data.id);
