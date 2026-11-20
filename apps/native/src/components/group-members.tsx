@@ -92,10 +92,11 @@ export function GroupMembers({ group }: { group: DmEntry }) {
         {members.map((member) => {
           const name = member.displayName || member.username;
           const self = member.userId === me?.id;
+          const offline = !self && !friends().isOnline(member.userId);
           return (
             <View key={member.userId} className="flex-row items-center">
               <ProfileCard user={member} className="flex-1">
-                <View className="min-h-11 flex-row items-center gap-2 px-1">
+                <View className={cn('min-h-11 flex-row items-center gap-2 px-1', offline && 'opacity-60')}>
                   <View>
                     <Avatar
                       src={member.avatarUrl}

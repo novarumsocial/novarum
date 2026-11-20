@@ -381,13 +381,13 @@
         <NotebookPen class="size-5" />
       </Button>
     {/if}
-    {#if dmEntry}
+    {#if dmEntry && !channel.group}
       <Button
         variant="ghost"
         size="icon-lg"
         onclick={() => (addPeopleOpen = true)}
-        aria-label={channel.group ? 'Add people' : 'Start a group with them'}
-        title={channel.group ? 'Add people' : 'Start a group with them'}
+        aria-label="Start a group with them"
+        title="Start a group with them"
       >
         <UserPlus class="size-5" />
       </Button>

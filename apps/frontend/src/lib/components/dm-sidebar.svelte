@@ -6,6 +6,9 @@
   import { settings } from '$lib/settings.svelte';
   import { chat } from '$lib/chat-state.svelte';
   import Avatar from './avatar.svelte';
+  import { useSession } from '$lib/session.svelte';
+  import type { DmEntry } from '$lib/dms.svelte';
+  import GroupSettingsDialog from './group-settings-dialog.svelte';
   import NewDmDialog from './new-dm-dialog.svelte';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { device } from '$lib/device.svelte';
@@ -23,7 +26,9 @@
 
   let { onCall }: { onCall?: (channelId: string) => void } = $props();
 
+  const me = $derived(useSession().user);
   let newDmOpen = $state(false);
+  let settingsGroup = $state<DmEntry | null>(null);
 
   const itemClass = (active: boolean) =>
     `flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors ${
@@ -158,6 +163,11 @@
             Start a Call
           </ContextMenu.Item>
           {#if group}
+            {#if entry.ownerId === me?.id}
+              <ContextMenu.Item onclick={() => (settingsGroup = entry)}>
+                Group Settings
+              </ContextMenu.Item>
+            {/if}
             <ContextMenu.Item
               variant="destructive"
               onclick={() => {
@@ -220,3 +230,9 @@
 </aside>
 
 <NewDmDialog bind:open={newDmOpen} />
+{#if settingsGroup}
+  <GroupSettingsDialog
+    bind:open={() => true, () => (settingsGroup = null)}
+    group={settingsGroup}
+  />
+{/if}

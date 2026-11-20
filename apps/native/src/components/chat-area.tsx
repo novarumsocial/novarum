@@ -509,11 +509,11 @@ export function ChatArea({
                 <Icon as={NotebookPen} size={20} />
               </Button>
             )}
-            {dmEntry && (
+            {dmEntry && !channel.group && (
               <Button
                 variant="ghost"
                 size="icon"
-                accessibilityLabel={channel.group ? 'Add people' : 'Start a group with them'}
+                accessibilityLabel="Start a group with them"
                 onPress={() => setAddPeopleOpen(true)}
               >
                 <Icon as={UserPlus} size={20} />

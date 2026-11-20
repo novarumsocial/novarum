@@ -5,6 +5,7 @@
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
   import { dms, type DmEntry } from '$lib/dms.svelte';
   import { friends } from '$lib/friends.svelte';
+  import { cn } from '$lib/utils.js';
   import { useSession } from '$lib/session.svelte';
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
@@ -72,12 +73,13 @@
       {#each members as member (member.userId)}
         {@const name = member.displayName || member.username}
         {@const self = member.userId === me?.id}
+        {@const offline = !self && !friends.isOnline(member.userId)}
         <ContextMenu.Root>
           <ContextMenu.Trigger>
             <ProfileCard
               user={member}
               {onCall}
-              class="group flex w-full items-center gap-2 px-1 py-1"
+              class={cn('group flex w-full items-center gap-2 px-1 py-1', offline && 'opacity-50')}
             >
               <div class="relative">
                 <Avatar
