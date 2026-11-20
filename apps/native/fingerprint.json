@@ -7,552 +7,428 @@
         "type": "contents",
         "id": "dependency:@expo/dom-webview",
         "contents": "@expo/dom-webview@57.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "8e6ef4821f569defdeb08a2c32d55f89a653d0afc3087bc2f2c116e96f602e64"
       },
       {
         "type": "contents",
         "id": "dependency:@expo/log-box",
         "contents": "@expo/log-box@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e0ec3d18089081deb46a100c4693011ec8ccdf4b98d76d77892d2d57df53cd6c"
       },
       {
         "type": "contents",
         "id": "dependency:@expo/ui",
         "contents": "@expo/ui@57.0.25",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5b39baa4d56462970dd609e61bdc0bdc2ea2c190a4a5fb1ac77043de7bc872f8"
       },
       {
         "type": "contents",
         "id": "dependency:@hot-updater/react-native",
         "contents": "@hot-updater/react-native@1.1.17",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "0a71876208659e1a80a4f46f172fd2d1ce81cbc02c8bb1403ed851e0745a658d"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native",
         "contents": "@livekit/react-native@3.0.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "d82e16c47d0ec57ad3b40652d55a7840f4693f4fe8a5ab7d256662d982024bb7"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native-expo-plugin",
         "contents": "@livekit/react-native-expo-plugin@1.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5e6c9ba7605542c16f281cc6e5f213228c5c3488d1abeaf0e063c97fd7514f42"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native-webrtc",
         "contents": "@livekit/react-native-webrtc@144.2.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "54d30b033cd91afe1d4d2162d8d3bf1ff4350d9215466beb04a4a3e598942485"
       },
       {
         "type": "contents",
         "id": "dependency:@react-native-community/netinfo",
         "contents": "@react-native-community/netinfo@12.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "36017dfcab0b968688c1c7a605e1259b1ec58cbe901154c2c622a56e7289842e"
       },
       {
         "type": "contents",
         "id": "dependency:@react-native-masked-view/masked-view",
         "contents": "@react-native-masked-view/masked-view@0.3.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7e13cc992f97d1911e24fb215d06cf0feb6e87c32567872369ed43b66a2c353c"
       },
       {
         "type": "contents",
         "id": "dependency:expo",
         "contents": "expo@57.0.30",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "b27260992e0d7e94bd51f2a2034f33df8ddf2f51b755d46b3faba3b47ebdf954"
       },
       {
         "type": "contents",
         "id": "dependency:expo-application",
         "contents": "expo-application@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "566ee00bf1916411402c2e9166ac0ef697dd7aa4fbde647f1c15a66a14cb8bfe"
       },
       {
         "type": "contents",
         "id": "dependency:expo-asset",
         "contents": "expo-asset@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "50ff2dc632643c5223617904ac73c7fd9339ed4b2ba1d8666edabd999dc00a05"
       },
       {
         "type": "contents",
         "id": "dependency:expo-audio",
         "contents": "expo-audio@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "fee4fae7705e8670ce4c7c7d165ac774d489f5bb38d59cef0db2f0c02767066b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-clipboard",
         "contents": "expo-clipboard@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "459ac031eb49a0484551dff12877906ca59ff5ea1688e14a33d4820e764e014a"
       },
       {
         "type": "contents",
         "id": "dependency:expo-constants",
         "contents": "expo-constants@57.0.22",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "240abbfa05f52ca0beda487b34e9fe96326b8b4502f11ba696bdc4224883fee0"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-client",
         "contents": "expo-dev-client@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f4533ec3db4a1acba507c1d3d5df7015102c9dd4356e5b06bf34e1d64f82737b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-launcher",
         "contents": "expo-dev-launcher@57.0.21",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "4dfda8a6db9814ecb3464419eed1e5d2fd53220edd5653f949b322ef6992a21b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-menu",
         "contents": "expo-dev-menu@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7a0c4d7cb1946542e1e92bc41c660e4b337c29d3cbe2c34235ddc1b4b60e0f13"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-menu-interface",
         "contents": "expo-dev-menu-interface@57.0.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "9fe2fc5fc7f4583dfbb12b0e7e1df636e9833145268ef183e3399cc4a47cb814"
       },
       {
         "type": "contents",
         "id": "dependency:expo-document-picker",
         "contents": "expo-document-picker@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5402df10ff1c42001748587f08ea10144bcc87ac67fc939c23226b714f236e42"
       },
       {
         "type": "contents",
         "id": "dependency:expo-file-system",
         "contents": "expo-file-system@57.0.7",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "531df95bfbca51cfe71750db04d4e6bbbf296c927bd597238735e0316c3ba40c"
       },
       {
         "type": "contents",
         "id": "dependency:expo-font",
         "contents": "expo-font@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "3c244413e0de1c3b3e1c4b63b9b7c50a5906f5e29453275deb22fb12c582f2e9"
       },
       {
         "type": "contents",
         "id": "dependency:expo-glass-effect",
         "contents": "expo-glass-effect@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "959b955d36a12d5d330d5571b43fa01350a4fdcd6357f7785291382742c032c1"
       },
       {
         "type": "contents",
         "id": "dependency:expo-haptics",
         "contents": "expo-haptics@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "75657e2694c518a3c15388ea3480ac7f8d448c433b59372c22a9de32d8acb6b5"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image",
         "contents": "expo-image@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "2e7e79d1e5b2bdbcc47ba373878eadedfb26b69b88c3f547d4247aabfc100e1e"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image-manipulator",
         "contents": "expo-image-manipulator@57.0.21",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7600c41f7daf4f230951a21bc354756757c5ea4d55e972c3da8b33cd85d6bcf5"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image-picker",
         "contents": "expo-image-picker@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "1e853de0203c9b2ffa538b165f772ac028b9dad6688319eeeee8a1e82b212d6f"
       },
       {
         "type": "contents",
         "id": "dependency:expo-json-utils",
         "contents": "expo-json-utils@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "622e4333195bbf6581304c30a7be7e8fe52eb5673a2d4ec9608bac6190381d30"
       },
       {
         "type": "contents",
         "id": "dependency:expo-keep-awake",
         "contents": "expo-keep-awake@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f9f47e4665e8154f2a6366ec189ecdaaaca44663e6868279dfc69a7e04401324"
       },
       {
         "type": "contents",
         "id": "dependency:expo-linking",
         "contents": "expo-linking@57.0.13",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "154465f828fd6208eec6ee3e9874ccd9c28764b63df4390d00fd0cd85f3540da"
       },
       {
         "type": "contents",
         "id": "dependency:expo-manifests",
         "contents": "expo-manifests@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5eb0aae3972b4574fed04e1e5ffe9ba0b5a3b42fc385e8aadd2304f551f42bff"
       },
       {
         "type": "contents",
         "id": "dependency:expo-media-library",
         "contents": "expo-media-library@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "2505e9bfd2ad6eed06279cb6fe919cc740a5dae4ab07d4106f03ca68abb9507f"
       },
       {
         "type": "contents",
         "id": "dependency:expo-modules-core",
         "contents": "expo-modules-core@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "39b52a24ce31c8aa7dd83502170c0eaa906daa430da9929bebde309336b13c27"
       },
       {
         "type": "contents",
         "id": "dependency:expo-modules-jsi",
         "contents": "expo-modules-jsi@57.1.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7f63caae64caef10a255f36ce779eb54288e6fe649c6350cd2ce36538f7d207c"
       },
       {
         "type": "contents",
         "id": "dependency:expo-notifications",
         "contents": "expo-notifications@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "389f560f6abf19031c618213845e5c30f4d663d3fdf19e9cfd265248fb551a21"
       },
       {
         "type": "contents",
         "id": "dependency:expo-router",
         "contents": "expo-router@57.0.28",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "a8036ffb0958bd9380e5ec24d30675e5f4827e8d789d2992fb08669aa2f2cc98"
       },
       {
         "type": "contents",
         "id": "dependency:expo-sharing",
         "contents": "expo-sharing@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "bf067c871eeead7c103f55cbbbae3dec4d363b52c2ba4185f916d9958c1567ca"
       },
       {
         "type": "contents",
         "id": "dependency:expo-splash-screen",
         "contents": "expo-splash-screen@57.0.10",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7f8a690b3df5b5891fd88042cec5522a68e8e70a4bb390deb6fda07884b6a7aa"
       },
       {
         "type": "contents",
         "id": "dependency:expo-symbols",
         "contents": "expo-symbols@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e8d12d1d687cbe1d2ed5b717095e4e6730e513855e59aab927a7760891b9f44a"
       },
       {
         "type": "contents",
         "id": "dependency:expo-system-ui",
         "contents": "expo-system-ui@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f2a7cf12ccda17869019bbd28a1f7a3b63ef66f22e81ab884016b316c6967803"
       },
       {
         "type": "contents",
         "id": "dependency:expo-updates-interface",
         "contents": "expo-updates-interface@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "ed1139460967be9b8568c2b34ab070cfebf4c17536b43217d49ef193268b6e32"
       },
       {
         "type": "contents",
         "id": "dependency:expo-video",
         "contents": "expo-video@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "08458e21db20d469794f12648a6b14ebdaf79302b9900bde47d53c7594afece6"
       },
       {
         "type": "contents",
         "id": "dependency:expo-web-browser",
         "contents": "expo-web-browser@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "c94b4a6bf8c12f6da170a3308274d8589fd0da7072711680b7a9c880f6abee13"
       },
       {
         "type": "contents",
         "id": "dependency:mic-modes",
         "contents": "mic-modes@",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7b15675c192cbf796530b54368156e2b928fc9ff3e7d3264adf0261446c436ed"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-gesture-handler",
         "contents": "react-native-gesture-handler@2.32.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "de26e2ee38eed1d792a448c380cf948291cfbede2bfc943a884b670ede2947c6"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-keyboard-controller",
         "contents": "react-native-keyboard-controller@1.21.9",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "96a942d700ab64eb52a67c9795b70bbf561e85b062c1bb5415f0ac01c41b87a2"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-mmkv",
         "contents": "react-native-mmkv@4.3.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "cfa137b4ab26397f8a56d8f0bc777a7a8e37fbfd51ea453ba3ddd8f6a4b12567"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-nitro-modules",
         "contents": "react-native-nitro-modules@0.37.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "557f725682df9caec38b27aedc461b2b1e4cd048de67548db87a83ba62c123ac"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-reanimated",
         "contents": "react-native-reanimated@4.5.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e2fcec3f3ef02a53e458baf21e3841968d69511f22a925b50996e2d36ad83f1f"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-safe-area-context",
         "contents": "react-native-safe-area-context@5.7.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "d1a662107a8bcc5b61eddae423a9c80f7399e196e5cd2f18a43632e934d9332e"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-screens",
         "contents": "react-native-screens@4.26.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "6c38f9fa813b59f87363a713f08a7a7a9b51b469c3481f74e8c43f95e260f56a"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-svg",
         "contents": "react-native-svg@15.15.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "9825fce45f8c0e5b5b761fa00912517d852ee0e114e146311c27363efedb3e36"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-webview",
         "contents": "react-native-webview@13.16.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f893ae767276ba6adc6471d60706bccc61e8f7333b2fbfc12b3ad4428322fafe"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-worklets",
         "contents": "react-native-worklets@0.10.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e9faa49c50bf8ef3aba08a019997f3d727992e3cfd6ecaf1553f032a0db51789"
       },
       {
         "type": "contents",
         "id": "runtime",
         "contents": "react-native@0.86.3",
-        "reasons": [
-          "runtime"
-        ],
+        "reasons": ["runtime"],
         "hash": "ec1be0185eaa3ce3a477530a8f49b1b54177f0b39c6ee07ae03ad2c9cfb9d39e"
       },
       {
         "type": "contents",
         "id": "setting:expo.jsEngine",
         "contents": "hermes",
-        "reasons": [
-          "native-setting"
-        ],
+        "reasons": ["native-setting"],
         "hash": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180"
       },
       {
         "type": "file",
         "filePath": "app.config.ts",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "cf857812fd78c33d9de31fe313016f95fc5368b5235c8939cf87fa0abd2c10b0"
       },
       {
         "type": "file",
         "filePath": "assets/icon.png",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "e24cd279af32cf3ecdf254737d7b0c6f262e7bfed78884831fbb9772bda4532f"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/expo-module.config.json",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "16b1acdcc0653bb7d7518b520a775fb9d6e84f93c2e0e31eba5eaddee6842218"
       },
       {
         "type": "file",
         "filePath": "modules/mic-modes/expo-module.config.json",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "4f768213c96da43b0fba0a19608381e0197f56212038fb732e63b3440a3c785c"
       },
       {
         "type": "file",
         "filePath": "modules/mic-modes/ios/MicModes.podspec",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "1d5dd36bdd0b7c5bfd64b0f00736cbdeb5d31099260fe9d0174550033ed35d39"
       },
       {
         "type": "file",
         "filePath": "modules/mic-modes/ios/MicModesModule.swift",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "52eb09457231fed13f6265ef4c641e4e6b54c15c1404398e58fa27041b807c37"
       }
     ]
@@ -565,609 +441,471 @@
         "type": "contents",
         "id": "dependency:@expo/dom-webview",
         "contents": "@expo/dom-webview@57.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "8e6ef4821f569defdeb08a2c32d55f89a653d0afc3087bc2f2c116e96f602e64"
       },
       {
         "type": "contents",
         "id": "dependency:@expo/log-box",
         "contents": "@expo/log-box@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e0ec3d18089081deb46a100c4693011ec8ccdf4b98d76d77892d2d57df53cd6c"
       },
       {
         "type": "contents",
         "id": "dependency:@expo/ui",
         "contents": "@expo/ui@57.0.25",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5b39baa4d56462970dd609e61bdc0bdc2ea2c190a4a5fb1ac77043de7bc872f8"
       },
       {
         "type": "contents",
         "id": "dependency:@hot-updater/react-native",
         "contents": "@hot-updater/react-native@1.1.17",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "0a71876208659e1a80a4f46f172fd2d1ce81cbc02c8bb1403ed851e0745a658d"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native",
         "contents": "@livekit/react-native@3.0.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "d82e16c47d0ec57ad3b40652d55a7840f4693f4fe8a5ab7d256662d982024bb7"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native-expo-plugin",
         "contents": "@livekit/react-native-expo-plugin@1.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5e6c9ba7605542c16f281cc6e5f213228c5c3488d1abeaf0e063c97fd7514f42"
       },
       {
         "type": "contents",
         "id": "dependency:@livekit/react-native-webrtc",
         "contents": "@livekit/react-native-webrtc@144.2.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "54d30b033cd91afe1d4d2162d8d3bf1ff4350d9215466beb04a4a3e598942485"
       },
       {
         "type": "contents",
         "id": "dependency:@react-native-community/netinfo",
         "contents": "@react-native-community/netinfo@12.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "36017dfcab0b968688c1c7a605e1259b1ec58cbe901154c2c622a56e7289842e"
       },
       {
         "type": "contents",
         "id": "dependency:@react-native-masked-view/masked-view",
         "contents": "@react-native-masked-view/masked-view@0.3.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7e13cc992f97d1911e24fb215d06cf0feb6e87c32567872369ed43b66a2c353c"
       },
       {
         "type": "contents",
         "id": "dependency:expo",
         "contents": "expo@57.0.30",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "b27260992e0d7e94bd51f2a2034f33df8ddf2f51b755d46b3faba3b47ebdf954"
       },
       {
         "type": "contents",
         "id": "dependency:expo-application",
         "contents": "expo-application@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "566ee00bf1916411402c2e9166ac0ef697dd7aa4fbde647f1c15a66a14cb8bfe"
       },
       {
         "type": "contents",
         "id": "dependency:expo-asset",
         "contents": "expo-asset@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "50ff2dc632643c5223617904ac73c7fd9339ed4b2ba1d8666edabd999dc00a05"
       },
       {
         "type": "contents",
         "id": "dependency:expo-audio",
         "contents": "expo-audio@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "fee4fae7705e8670ce4c7c7d165ac774d489f5bb38d59cef0db2f0c02767066b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-clipboard",
         "contents": "expo-clipboard@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "459ac031eb49a0484551dff12877906ca59ff5ea1688e14a33d4820e764e014a"
       },
       {
         "type": "contents",
         "id": "dependency:expo-constants",
         "contents": "expo-constants@57.0.22",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "240abbfa05f52ca0beda487b34e9fe96326b8b4502f11ba696bdc4224883fee0"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-client",
         "contents": "expo-dev-client@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f4533ec3db4a1acba507c1d3d5df7015102c9dd4356e5b06bf34e1d64f82737b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-launcher",
         "contents": "expo-dev-launcher@57.0.21",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "4dfda8a6db9814ecb3464419eed1e5d2fd53220edd5653f949b322ef6992a21b"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-menu",
         "contents": "expo-dev-menu@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7a0c4d7cb1946542e1e92bc41c660e4b337c29d3cbe2c34235ddc1b4b60e0f13"
       },
       {
         "type": "contents",
         "id": "dependency:expo-dev-menu-interface",
         "contents": "expo-dev-menu-interface@57.0.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "9fe2fc5fc7f4583dfbb12b0e7e1df636e9833145268ef183e3399cc4a47cb814"
       },
       {
         "type": "contents",
         "id": "dependency:expo-document-picker",
         "contents": "expo-document-picker@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5402df10ff1c42001748587f08ea10144bcc87ac67fc939c23226b714f236e42"
       },
       {
         "type": "contents",
         "id": "dependency:expo-file-system",
         "contents": "expo-file-system@57.0.7",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "531df95bfbca51cfe71750db04d4e6bbbf296c927bd597238735e0316c3ba40c"
       },
       {
         "type": "contents",
         "id": "dependency:expo-font",
         "contents": "expo-font@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "3c244413e0de1c3b3e1c4b63b9b7c50a5906f5e29453275deb22fb12c582f2e9"
       },
       {
         "type": "contents",
         "id": "dependency:expo-haptics",
         "contents": "expo-haptics@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "75657e2694c518a3c15388ea3480ac7f8d448c433b59372c22a9de32d8acb6b5"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image",
         "contents": "expo-image@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "2e7e79d1e5b2bdbcc47ba373878eadedfb26b69b88c3f547d4247aabfc100e1e"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image-loader",
         "contents": "expo-image-loader@57.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "4869217859a9a681f6fce07e9b948995cf88405b5bf0d4cf41c3d42af5154b07"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image-manipulator",
         "contents": "expo-image-manipulator@57.0.21",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7600c41f7daf4f230951a21bc354756757c5ea4d55e972c3da8b33cd85d6bcf5"
       },
       {
         "type": "contents",
         "id": "dependency:expo-image-picker",
         "contents": "expo-image-picker@57.0.20",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "1e853de0203c9b2ffa538b165f772ac028b9dad6688319eeeee8a1e82b212d6f"
       },
       {
         "type": "contents",
         "id": "dependency:expo-json-utils",
         "contents": "expo-json-utils@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "622e4333195bbf6581304c30a7be7e8fe52eb5673a2d4ec9608bac6190381d30"
       },
       {
         "type": "contents",
         "id": "dependency:expo-keep-awake",
         "contents": "expo-keep-awake@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f9f47e4665e8154f2a6366ec189ecdaaaca44663e6868279dfc69a7e04401324"
       },
       {
         "type": "contents",
         "id": "dependency:expo-linking",
         "contents": "expo-linking@57.0.13",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "154465f828fd6208eec6ee3e9874ccd9c28764b63df4390d00fd0cd85f3540da"
       },
       {
         "type": "contents",
         "id": "dependency:expo-manifests",
         "contents": "expo-manifests@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "5eb0aae3972b4574fed04e1e5ffe9ba0b5a3b42fc385e8aadd2304f551f42bff"
       },
       {
         "type": "contents",
         "id": "dependency:expo-media-library",
         "contents": "expo-media-library@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "2505e9bfd2ad6eed06279cb6fe919cc740a5dae4ab07d4106f03ca68abb9507f"
       },
       {
         "type": "contents",
         "id": "dependency:expo-modules-core",
         "contents": "expo-modules-core@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "39b52a24ce31c8aa7dd83502170c0eaa906daa430da9929bebde309336b13c27"
       },
       {
         "type": "contents",
         "id": "dependency:expo-navigation-bar",
         "contents": "expo-navigation-bar@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f2d7219b1038ec5a413cb96cd381a4d3cae05b74ec6c945071926c529e0ef41d"
       },
       {
         "type": "contents",
         "id": "dependency:expo-notifications",
         "contents": "expo-notifications@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "389f560f6abf19031c618213845e5c30f4d663d3fdf19e9cfd265248fb551a21"
       },
       {
         "type": "contents",
         "id": "dependency:expo-router",
         "contents": "expo-router@57.0.28",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "a8036ffb0958bd9380e5ec24d30675e5f4827e8d789d2992fb08669aa2f2cc98"
       },
       {
         "type": "contents",
         "id": "dependency:expo-sharing",
         "contents": "expo-sharing@57.0.23",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "bf067c871eeead7c103f55cbbbae3dec4d363b52c2ba4185f916d9958c1567ca"
       },
       {
         "type": "contents",
         "id": "dependency:expo-splash-screen",
         "contents": "expo-splash-screen@57.0.10",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "7f8a690b3df5b5891fd88042cec5522a68e8e70a4bb390deb6fda07884b6a7aa"
       },
       {
         "type": "contents",
         "id": "dependency:expo-status-bar",
         "contents": "expo-status-bar@57.0.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "d70c576562bc195191496a7d847205c11719fb347c5da3490bd9ec2521bb35d9"
       },
       {
         "type": "contents",
         "id": "dependency:expo-system-ui",
         "contents": "expo-system-ui@57.0.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f2a7cf12ccda17869019bbd28a1f7a3b63ef66f22e81ab884016b316c6967803"
       },
       {
         "type": "contents",
         "id": "dependency:expo-unified-push",
         "contents": "expo-unified-push@0.6.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "28eb0022546fd6cedfb0e790def85cb267c2c52d25a851f7dedfcff250c04b12"
       },
       {
         "type": "contents",
         "id": "dependency:expo-updates-interface",
         "contents": "expo-updates-interface@57.0.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "ed1139460967be9b8568c2b34ab070cfebf4c17536b43217d49ef193268b6e32"
       },
       {
         "type": "contents",
         "id": "dependency:expo-video",
         "contents": "expo-video@57.0.5",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "08458e21db20d469794f12648a6b14ebdaf79302b9900bde47d53c7594afece6"
       },
       {
         "type": "contents",
         "id": "dependency:expo-web-browser",
         "contents": "expo-web-browser@57.0.3",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "c94b4a6bf8c12f6da170a3308274d8589fd0da7072711680b7a9c880f6abee13"
       },
       {
         "type": "contents",
         "id": "dependency:incoming-call",
         "contents": "incoming-call@",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "316fa695143de5023604267d060e1eebde11ee9abaa2f6dbe6521e67db0c098e"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-gesture-handler",
         "contents": "react-native-gesture-handler@2.32.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "de26e2ee38eed1d792a448c380cf948291cfbede2bfc943a884b670ede2947c6"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-keyboard-controller",
         "contents": "react-native-keyboard-controller@1.21.9",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "96a942d700ab64eb52a67c9795b70bbf561e85b062c1bb5415f0ac01c41b87a2"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-mmkv",
         "contents": "react-native-mmkv@4.3.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "cfa137b4ab26397f8a56d8f0bc777a7a8e37fbfd51ea453ba3ddd8f6a4b12567"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-nitro-modules",
         "contents": "react-native-nitro-modules@0.37.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "557f725682df9caec38b27aedc461b2b1e4cd048de67548db87a83ba62c123ac"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-reanimated",
         "contents": "react-native-reanimated@4.5.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e2fcec3f3ef02a53e458baf21e3841968d69511f22a925b50996e2d36ad83f1f"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-safe-area-context",
         "contents": "react-native-safe-area-context@5.7.0",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "d1a662107a8bcc5b61eddae423a9c80f7399e196e5cd2f18a43632e934d9332e"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-screens",
         "contents": "react-native-screens@4.26.2",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "6c38f9fa813b59f87363a713f08a7a7a9b51b469c3481f74e8c43f95e260f56a"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-svg",
         "contents": "react-native-svg@15.15.4",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "9825fce45f8c0e5b5b761fa00912517d852ee0e114e146311c27363efedb3e36"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-webview",
         "contents": "react-native-webview@13.16.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "f893ae767276ba6adc6471d60706bccc61e8f7333b2fbfc12b3ad4428322fafe"
       },
       {
         "type": "contents",
         "id": "dependency:react-native-worklets",
         "contents": "react-native-worklets@0.10.1",
-        "reasons": [
-          "native-dependency"
-        ],
+        "reasons": ["native-dependency"],
         "hash": "e9faa49c50bf8ef3aba08a019997f3d727992e3cfd6ecaf1553f032a0db51789"
       },
       {
         "type": "contents",
         "id": "runtime",
         "contents": "react-native@0.86.3",
-        "reasons": [
-          "runtime"
-        ],
+        "reasons": ["runtime"],
         "hash": "ec1be0185eaa3ce3a477530a8f49b1b54177f0b39c6ee07ae03ad2c9cfb9d39e"
       },
       {
         "type": "contents",
         "id": "setting:expo.jsEngine",
         "contents": "hermes",
-        "reasons": [
-          "native-setting"
-        ],
+        "reasons": ["native-setting"],
         "hash": "8cfde6efdfc4ed5ab1f6acbbd1ba49bf31932f84d0a4c090eb41c7d151e8b180"
       },
       {
         "type": "file",
         "filePath": "app.config.ts",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "cf857812fd78c33d9de31fe313016f95fc5368b5235c8939cf87fa0abd2c10b0"
       },
       {
         "type": "file",
         "filePath": "assets/adaptive-icon.png",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "e24cd279af32cf3ecdf254737d7b0c6f262e7bfed78884831fbb9772bda4532f"
       },
       {
         "type": "file",
         "filePath": "assets/icon.png",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "e24cd279af32cf3ecdf254737d7b0c6f262e7bfed78884831fbb9772bda4532f"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/build.gradle",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "1624dbe809dc1cbf88c67fcc3f38a701bcc6c46f63943a0d0c05cefb88c8f3cd"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/AndroidManifest.xml",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "92cf03e4311a6aca55df75321803ff0c79c968aaa66dd497bad7333a716c6b3b"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/java/me/novarum/incomingcall/CallPushRenderer.kt",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "f35e4973feec8dd6c6144974e9e70eccee6180e8fceb1d7dad144808ac421fe8"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/java/me/novarum/incomingcall/DeclineReceiver.kt",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "13d7118babaf96465a70aab5c3b07bb0858f3bf3497296ce93db1998eb5d37ba"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/java/me/novarum/incomingcall/IncomingCallModule.kt",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "5bbf2f282110bfbc23160c794490432d9b8caeee8a8605b0a8de298746d3b773"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/java/me/novarum/incomingcall/IncomingCallNotification.kt",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "204dcf10f72685dbd83653567cd8ca6cc1d9b6e7155b4c19a6a9a0b836c9a3c3"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/android/src/main/java/me/novarum/incomingcall/IncomingCallPackage.kt",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "8da16d3d2728398e640afb1bc294b0d4773c8cefd33daff928bcfb28e158db9e"
       },
       {
         "type": "file",
         "filePath": "modules/incoming-call/expo-module.config.json",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "16b1acdcc0653bb7d7518b520a775fb9d6e84f93c2e0e31eba5eaddee6842218"
       },
       {
         "type": "file",
         "filePath": "modules/mic-modes/expo-module.config.json",
-        "reasons": [
-          "extra-source"
-        ],
+        "reasons": ["extra-source"],
         "hash": "4f768213c96da43b0fba0a19608381e0197f56212038fb732e63b3440a3c785c"
       }
     ]
@@ -1179,14 +917,15 @@
         "app.config.ts",
         "assets/icon.png",
         "modules/*/expo-module.config.json",
-        "modules/*/ios/**/*"
+        "modules/*/ios/**/*.{swift,m,mm,h,podspec}"
       ],
       "android": [
         "app.config.ts",
         "assets/icon.png",
         "assets/adaptive-icon.png",
         "modules/*/expo-module.config.json",
-        "modules/*/android/**/*"
+        "modules/*/android/build.gradle",
+        "modules/*/android/src/**/*"
       ]
     }
   }

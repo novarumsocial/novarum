@@ -8,3 +8,7 @@ expo-env.d.ts
 .env.hotupdater
 /hot-updater-infra/worker/node_modules/
 /fingerprint-*.json
+# hot-updater
+.hot-updater/output
+/modules/*/android/build/
+/modules/*/ios/build/

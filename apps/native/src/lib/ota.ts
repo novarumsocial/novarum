@@ -21,7 +21,8 @@ export const branchChannel = (branch: string) =>
 export async function checkForUpdates(channel?: string) {
   if (__DEV__) return false;
   const update = await hotUpdater.checkForUpdate({ updateStrategy: 'fingerprint', channel });
-  if (!update) return false;
+  // a just-applied bundle can be offered once more before its first launch is confirmed
+  if (!update || update.id === hotUpdater.getBundleId()) return false;
   if (!(await update.updateBundle())) throw new Error('Could not download the update');
   await hotUpdater.reload();
   return true;

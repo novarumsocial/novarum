@@ -28,13 +28,19 @@ export default defineConfig({
   fingerprint: {
     // the fingerprint only sees npm native deps; also track our config plugins/permissions, local modules and icons
     extraSources: {
-      ios: ['app.config.ts', 'assets/icon.png', 'modules/*/expo-module.config.json', 'modules/*/ios/**/*'],
+      ios: [
+        'app.config.ts',
+        'assets/icon.png',
+        'modules/*/expo-module.config.json',
+        'modules/*/ios/**/*.{swift,m,mm,h,podspec}',
+      ],
       android: [
         'app.config.ts',
         'assets/icon.png',
         'assets/adaptive-icon.png',
         'modules/*/expo-module.config.json',
-        'modules/*/android/**/*',
+        'modules/*/android/build.gradle',
+        'modules/*/android/src/**/*',
       ],
     },
   },
