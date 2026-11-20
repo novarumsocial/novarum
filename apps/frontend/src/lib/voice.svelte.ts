@@ -528,11 +528,16 @@ export class Voice {
     try {
       if (!(await window.electron.venmic.link())) return;
 
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const device = devices.find(
-        (d) => d.kind === 'audioinput' && d.label === VENMIC_DEVICE_LABEL
-      );
+      // venmic creates its virtual source asynchronously after link() returns
+      let device: MediaDeviceInfo | undefined;
+      for (let attempt = 0; attempt < 30 && !device; attempt++) {
+        if (attempt) await new Promise((resolve) => setTimeout(resolve, 100));
+        device = (await navigator.mediaDevices.enumerateDevices()).find(
+          (d) => d.kind === 'audioinput' && d.label === VENMIC_DEVICE_LABEL
+        );
+      }
       if (!device) {
+        console.warn('venmic virtual source never appeared, sharing screen without audio');
         await window.electron.venmic.unlink();
         return;
       }
