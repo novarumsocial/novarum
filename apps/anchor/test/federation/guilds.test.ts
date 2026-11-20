@@ -257,6 +257,39 @@ describe('talking in a remote guild through the user API', () => {
     expect(list.body.messages.map((m: any) => m.content)).toEqual(['owner says']);
   });
 
+  test('search goes to the host, which only answers members, with channel ids mapped to B', async () => {
+    const { owner, guild, channel, code } = await hostedGuild();
+    const joiner = await signup('b');
+    const outsider = await signup('b');
+    await acceptRemote(joiner, code);
+    await send(owner, channel.id, 'hosted needle');
+    await send(owner, channel.id, 'other words');
+    const shadowGuild = fedGuildId(hostA, guild.id);
+    const shadowChannel = fedChannelId(hostA, channel.id);
+    const search = (user: TestUser, params: string) =>
+      call(user, 'GET', `/message/search?${params}`);
+
+    const byGuild = await search(joiner, `guildId=${encodeURIComponent(shadowGuild)}&q=needle`);
+    expect(byGuild.status).toBe(200);
+    expect(byGuild.body.messages).toHaveLength(1);
+    expect(byGuild.body.messages[0]).toMatchObject({
+      content: 'hosted needle',
+      channelId: shadowChannel,
+      guildId: shadowGuild,
+      channelName: expect.any(String),
+    });
+    const byChannel = await search(joiner, `channelId=${encodeURIComponent(shadowChannel)}&q=need`);
+    expect(byChannel.body.messages.map((m: any) => m.content)).toEqual(['hosted needle']);
+    expect(byChannel.body.messages[0].channelId).toBe(shadowChannel);
+    // the host's own errors come back as they are
+    expect(
+      (await search(joiner, `guildId=${encodeURIComponent(shadowGuild)}&q=has:pony`)).status
+    ).toBe(400);
+    expect(
+      (await search(outsider, `guildId=${encodeURIComponent(shadowGuild)}&q=needle`)).status
+    ).toBe(403);
+  });
+
   test('listing a long history follows the host cursor through every page', async () => {
     const { owner, channel, code } = await hostedGuild();
     const joiner = await signup('b');

@@ -301,6 +301,12 @@ export const messages = pgTable(
     // added because replyTo is now a foreign key and will commonly
     // be used when resolving replies.
     index('message_replyTo_idx').on(table.replyTo),
+
+    // message search; queries have to repeat this exact expression to use it
+    index('message_content_search_idx').using(
+      'gin',
+      sql`to_tsvector('simple', coalesce(${table.content}, ''))`
+    ),
   ]
 );
 

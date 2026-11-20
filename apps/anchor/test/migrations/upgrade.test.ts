@@ -317,6 +317,18 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
     },
   },
+  '20261118222920_flippant_stellaris': {
+    check: async (url) => {
+      // existing messages (null content too) are searchable through the new index
+      const search = `SELECT id FROM message WHERE to_tsvector('simple', coalesce(content, '')) @@ to_tsquery('simple', 'hel:*') ORDER BY id`;
+      expect(await rows(url, search)).toEqual([{ id: 'm1' }] as never);
+      const [index] = await rows<{ indexdef: string }>(
+        url,
+        `SELECT indexdef FROM pg_indexes WHERE indexname = 'message_content_search_idx'`
+      );
+      expect(index?.indexdef).toContain(`gin (to_tsvector('simple'::regconfig`);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {
@@ -363,7 +375,7 @@ describe('upgrade by booting anchor', () => {
       const anchor = await spawnAnchor({ name: 'upgrade', db: url });
       try {
         expect(await recordedMigrations(url)).toHaveLength(migrationNames.length);
-        expect(await query(url, `SELECT 1 FROM message`)).toHaveLength(6);
+        expect(await query(url, `SELECT 1 FROM message`)).toHaveLength(7);
       } finally {
         await anchor.destroy();
       }

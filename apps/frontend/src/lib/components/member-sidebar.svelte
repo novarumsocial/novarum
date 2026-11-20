@@ -4,6 +4,7 @@
   import type { Author } from '$lib/types/chat';
   import Avatar from './avatar.svelte';
   import ProfileCard from './profile-card.svelte';
+  import SearchBox from './search-box.svelte';
   import { settings } from '$lib/settings.svelte';
   import type { Server } from '$lib/types/chat';
   import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
@@ -41,14 +42,8 @@
 
 <aside class="flex size-full w-56 flex-col bg-sidebar">
   <div class="h-12 shrink-0 border-b border-border p-2">
-    <!--
-      <Input
-        id="search-in-channel"
-        placeholder="Search {server.name}"
-        autocomplete="off"
-        spellcheck="false"
-      />
--->
+    <!-- below lg the member list is a drawer, so the channel header keeps the box -->
+    <SearchBox placeholder="Search {server.name}" class="hidden lg:block" />
   </div>
   <div class="flex-1 space-y-2 overflow-y-auto px-3 py-3">
     <div class="flex items-center gap-1 text-xs font-semibold text-muted-foreground">

@@ -34,6 +34,7 @@ import {
 } from '../../../utils/botSchemas';
 import { federatedMessageSchema, federationErrors, successResponseSchema } from '../schemas';
 import { uploadQuotaExceeded } from '../../../utils/uploadQuota';
+import { encodeMessageCursor, messageCursorSchema } from '../../../utils/messageCursor';
 
 const defaultPageSize = 50;
 const maxPageSize = 100;
@@ -59,28 +60,6 @@ const attachmentIdsSchema = z
   .default([]);
 
 const pageLimitSchema = z.number().int().min(1).max(maxPageSize).default(defaultPageSize);
-
-// A cursor is the position of the last message of a page: base64url of {"createdAt", "id"}.
-// Clients treat it as an opaque string and hand it back to get the next page.
-const messageCursorSchema = z
-  .string()
-  .transform((raw, ctx) => {
-    try {
-      const decoded = z
-        .object({ createdAt: z.string(), id: z.string() })
-        .parse(JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')));
-      const createdAt = new Date(decoded.createdAt);
-      if (!Number.isNaN(createdAt.getTime())) return { createdAt, id: decoded.id };
-    } catch {}
-    ctx.addIssue({ code: 'custom', message: 'Invalid message cursor' });
-    return z.NEVER;
-  })
-  .nullish();
-
-const encodeMessageCursor = (message: { createdAt: Date; id: string }) =>
-  Buffer.from(
-    JSON.stringify({ createdAt: message.createdAt.toISOString(), id: message.id })
-  ).toString('base64url');
 
 type MessageForResponse = {
   id: string;

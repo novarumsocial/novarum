@@ -1,0 +1,1 @@
+CREATE INDEX "message_content_search_idx" ON "message" USING gin (to_tsvector('simple', coalesce("content", '')));

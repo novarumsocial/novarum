@@ -19,6 +19,10 @@
     "./bot-schemas": {
       "types": "./utils/botSchemas.ts",
       "import": "./utils/botSchemas.ts"
+    },
+    "./message-search": {
+      "types": "./utils/messageSearch.ts",
+      "import": "./utils/messageSearch.ts"
     }
   },
   "module": "src/index.js",

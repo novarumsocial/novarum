@@ -26,6 +26,9 @@
   import { session } from '$lib/session.svelte';
   import { Progress } from '$lib/components/ui/progress/index.js';
   import CanvasPanel from './canvas-panel.svelte';
+  import SearchPanel from './search-panel.svelte';
+  import SearchBox from './search-box.svelte';
+  import { messageSearch } from '$lib/search.svelte';
 
   // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
   type Pending = {
@@ -73,6 +76,9 @@
 
   let callHeight = $state(320);
   let canvasOpen = $state(false);
+  $effect(() => {
+    if (messageSearch.query) canvasOpen = false;
+  });
   // canvases live on our own text and DM channels; federated ones would need their homeserver to host them
   const canvasSupported = $derived(channel.type !== 'VOICE' && !channel.id.startsWith('fed:'));
   const callers = $derived(channel.type === 'DM' ? (chat.voiceStates[channel.id] ?? []) : []);
@@ -364,11 +370,24 @@
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
     <div class="flex-1"></div>
+    {#if channel.type !== 'VOICE'}
+      <!-- with the member list open on a wide screen, the box sits above it instead -->
+      <SearchBox
+        placeholder={chat.activeServer ? 'Search server' : 'Search'}
+        class={cn(
+          'w-32 transition-[width] focus-within:w-56 sm:w-44 sm:focus-within:w-64',
+          chat.route.kind === 'guild' && settings.value.showMemberList && 'lg:hidden'
+        )}
+      />
+    {/if}
     {#if canvasSupported}
       <Button
         variant={canvasOpen ? 'secondary' : 'ghost'}
         size="icon-lg"
-        onclick={() => (canvasOpen = !canvasOpen)}
+        onclick={() => {
+          canvasOpen = !canvasOpen;
+          if (canvasOpen) messageSearch.query = null;
+        }}
         aria-label={canvasOpen ? 'Close canvas' : 'Open canvas'}
         aria-pressed={canvasOpen}
         title="Canvas"
@@ -613,6 +632,13 @@
       {#key channel.id}
         <CanvasPanel channelId={channel.id} onClose={() => (canvasOpen = false)} />
       {/key}
+    {:else if messageSearch.query}
+      <SearchPanel
+        query={messageSearch.query}
+        guildId={chat.activeServer}
+        {channel}
+        onClose={() => (messageSearch.query = null)}
+      />
     {/if}
   </div>
 </div>

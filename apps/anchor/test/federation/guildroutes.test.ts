@@ -180,6 +180,35 @@ describe('messages', () => {
     expect((await ch('messages', {}, fakeUser(uniqueName('stranger')))).status).toBe(403);
   });
 
+  test('search: members only, per channel or across the guild, newest first', async () => {
+    const { owner, guild, channel, member, ch } = await room();
+    await send(owner, channel.id, 'wire needle one');
+    await ch('messages/send', { content: 'wire needle two', nonce: nonce() });
+    const byChannel = await ch('messages/search', { q: 'needle' });
+    expect(byChannel.status).toBe(200);
+    expect(byChannel.json.messages.map((m: any) => m.content)).toEqual([
+      'wire needle two',
+      'wire needle one',
+    ]);
+    const guildSearch = (body: object, user: object = member) =>
+      fakeSend(1, 'a', `/federation/guilds/${guild.id}/messages/search`, { user, ...body });
+    const byGuild = await guildSearch({ q: `needle from:${member.username}`, limit: 1 });
+    expect(byGuild.json.messages).toHaveLength(1);
+    expect(byGuild.json.messages[0]).toMatchObject({
+      content: 'wire needle two',
+      channelId: channel.id,
+      channelName: expect.any(String),
+    });
+    expect(byGuild.json.nextCursor).toBeNull();
+
+    const stranger = fakeUser(uniqueName('stranger'));
+    expect((await ch('messages/search', { q: 'needle' }, stranger)).status).toBe(403);
+    expect((await guildSearch({ q: 'needle' }, stranger)).status).toBe(403);
+    expect((await guildSearch({ q: '' })).status).toBe(400);
+    expect((await guildSearch({ q: 'x', cursor: 'nope' })).status).toBe(400);
+    expect((await guildSearch({ q: 'x', limit: 51 })).status).toBe(400);
+  });
+
   test('edit and delete: own messages only', async () => {
     const { owner, channel, ch } = await room();
     const mine = (await ch('messages/send', { content: 'mine', nonce: nonce() })).json.message;
