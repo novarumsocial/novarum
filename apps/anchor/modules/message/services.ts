@@ -6,17 +6,27 @@ import { callRemote, federationChannelPath, passThrough } from '../../utils/fede
 import { attachmentPayload, maxAttachmentCount } from '../../utils/attachments';
 import { storage } from '../../utils/services/storage';
 import { mentionHandles, mentionsEveryone } from '../../utils/mentions';
-import { canAccessChannel, canSendInChannel } from '../../utils/channelAccess';
+import { canAccessChannel, canPinInChannel, canSendInChannel } from '../../utils/channelAccess';
 import { dmRecipients, notifyInBackground } from '../../utils/notify';
 import { db } from '../../src/db';
-import { createMessage, deleteMessage, editMessage, pingedUserIds } from './store';
+import {
+  createMessage,
+  deleteMessage,
+  editMessage,
+  maxPinsPerChannel,
+  pinCount,
+  pingedUserIds,
+  pinnedMessages,
+  setMessagePinned,
+} from './store';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
 import { z } from 'zod';
 import sharp from 'sharp';
 import { attachmentResponseSchema, messageResponseBaseSchema } from '../../src/db/zod';
-import { messageExtras } from '../../utils/messagePayload';
+import { messageExtras, messagePayload } from '../../utils/messagePayload';
 import { componentsSchema, embedsSchema } from '../../utils/botSchemas';
+import type { MessageEventData } from '../../utils/types';
 
 export const maxMessageLength = 4000;
 // a remote channel is walked page by page on every list, so a host that never stops paging is cut off here
@@ -35,6 +45,7 @@ const federatedMessageListResponseSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 const messageResponseSchema = z.object({ message: messageSchema });
+const pinListResponseSchema = z.object({ messages: z.array(messageSchema) });
 const successResponseSchema = z.object({ success: z.boolean() });
 
 export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
@@ -513,7 +524,176 @@ export const message = new Elysia({ prefix: '/message', tags: ['Message'] })
         502: genericResponseErrorSchema,
       },
     }
+  )
+  .get(
+    '/pins',
+    async ({ query, session, status }) => {
+      const channel = await db.query.channels.findFirst({ where: { id: query.channelId } });
+      if (!channel) return status(404, { error: 'Channel not found' });
+      if (!(await canAccessChannel(channel, session.userId))) {
+        return status(403, { error: 'Forbidden' });
+      }
+
+      const federatedChannel = parseFederatedChannelId(channel.id);
+      if (federatedChannel) {
+        const pins = await callRemote(
+          federatedChannel.homeserver,
+          federationChannelPath(federatedChannel, 'messages/pins'),
+          session,
+          {},
+          {
+            response: pinListResponseSchema,
+            forward: passThrough(401, 403, 404),
+            errors: {
+              failed: 'Remote pins failed',
+              invalid: 'Remote pins returned an invalid response',
+            },
+          }
+        );
+        if (!pins.ok) return status(pins.status, pins.error);
+        return {
+          messages: pins.data.messages.map((message) =>
+            mapFederatedMessage(message, channel.id, channel.guildId)
+          ),
+        };
+      }
+
+      return { messages: await pinnedMessagePayloads(channel) };
+    },
+    {
+      query: z.object({ channelId: z.string() }),
+      response: {
+        200: pinListResponseSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/pin',
+    async ({ body, session, status, server }) => {
+      const { channelId, messageId, pinned } = body;
+      const channel = await db.query.channels.findFirst({ where: { id: channelId } });
+      if (!channel) return status(404, { error: 'Channel not found' });
+      // like sending, pinning in a DM needs the participants to still be friends
+      if (!(await canAccessChannel(channel, session.userId, true))) {
+        return status(403, { error: 'Forbidden' });
+      }
+
+      const federatedChannel = parseFederatedChannelId(channelId);
+      if (federatedChannel) {
+        const changed = await callRemote(
+          federatedChannel.homeserver,
+          federationChannelPath(federatedChannel, 'messages/pin'),
+          session,
+          { messageId, pinned },
+          {
+            response: messageResponseSchema,
+            forward: passThrough(400, 401, 403, 404),
+            errors: {
+              failed: 'Remote pin failed',
+              invalid: 'Remote pin returned an invalid response',
+            },
+          }
+        );
+        if (!changed.ok) return status(changed.status, changed.error);
+
+        const mappedMessage = mapFederatedMessage(
+          changed.data.message,
+          channel.id,
+          channel.guildId
+        );
+        if (server) await publishPin(server, channel, mappedMessage);
+        return { message: mappedMessage };
+      }
+
+      const changed = await changePin(server, channel, session.userId, messageId, pinned);
+      if (!changed.ok) return status(changed.status, { error: changed.error });
+      return { message: changed.message };
+    },
+    {
+      body: z.object({ channelId: z.string(), messageId: z.string(), pinned: z.boolean() }),
+      response: {
+        200: messageResponseSchema,
+        400: genericResponseErrorSchema,
+        401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+        502: genericResponseErrorSchema,
+      },
+    }
   );
+
+type Publisher = Parameters<typeof publishToChannel>[0];
+
+export async function pinnedMessagePayloads(channel: { id: string; guildId: string | null }) {
+  const pins = await pinnedMessages(channel.id);
+  return pins.map((message) =>
+    messagePayload(
+      { ...message, attachments: message.attachments as Parameters<typeof attachmentPayload>[0][] },
+      channel,
+      message.author
+    )
+  );
+}
+
+const publishPin = (
+  server: Publisher,
+  channel: { id: string; guildId: string | null },
+  message: MessageEventData
+) =>
+  publishToChannel(
+    server,
+    channel,
+    message.pinned
+      ? { type: 'message.pinned', data: message }
+      : {
+          type: 'message.unpinned',
+          data: { id: message.id, channelId: channel.id, guildId: channel.guildId },
+        }
+  );
+
+/** Pins or unpins a message for someone who can already read `channel`, and tells the channel. */
+export async function changePin(
+  server: Publisher | null | undefined,
+  channel: { id: string; guildId: string | null },
+  userId: string,
+  messageId: string,
+  pinned: boolean
+) {
+  if (!(await canPinInChannel(channel, userId))) {
+    return {
+      ok: false as const,
+      status: 403 as const,
+      error: 'Only the guild owner and admins can pin messages',
+    };
+  }
+  const existing = await db.query.messages.findFirst({
+    where: { id: messageId, channelId: channel.id },
+    with: { author: true, attachments: true },
+  });
+  if (!existing) return { ok: false as const, status: 404 as const, error: 'Message not found' };
+  if (pinned && !existing.pinnedAt && (await pinCount(channel.id)) >= maxPinsPerChannel) {
+    return {
+      ok: false as const,
+      status: 400 as const,
+      error: `A channel can have at most ${maxPinsPerChannel} pinned messages`,
+    };
+  }
+
+  // pinning twice keeps the first pin time and tells nobody
+  const unchanged = pinned === !!existing.pinnedAt;
+  const updated = unchanged ? existing : await setMessagePinned(existing.id, pinned);
+  const message = messagePayload(
+    { ...updated, attachments: existing.attachments as Parameters<typeof attachmentPayload>[0][] },
+    channel,
+    existing.author
+  );
+  if (server && !unchanged) await publishPin(server, channel, message);
+  return { ok: true as const, message };
+}
 
 function fetchRemoteMessagePage(
   channel: { homeserver: string; id: string },

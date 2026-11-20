@@ -114,6 +114,8 @@ const messageEventDataSchema = z.object({
   ),
   components: componentsSchema.default([]),
   interaction: messageInteractionSchema.nullish(),
+  pinned: z.boolean().default(false),
+  pinnedAt: isoDateSchema.nullish(),
 });
 
 const ephemeralMessageSchema = messageEventDataSchema
@@ -151,6 +153,14 @@ const realtimeEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message.updated'),
     data: messageEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('message.pinned'),
+    data: messageEventDataSchema,
+  }),
+  z.object({
+    type: z.literal('message.unpinned'),
+    data: z.object({ id: z.string(), channelId: z.string(), guildId: z.string().nullable() }),
   }),
   z.object({
     type: z.literal('message.deleted'),
@@ -462,6 +472,12 @@ export const useRealtime = create<RealtimeStore>((set, get) => {
     if (event.type === 'message.updated') {
       chat().updateMessage(event.data.channelId, { ...event.data, edited: true });
       dms().handleMessageEdit(event.data.channelId, event.data.id, event.data.content ?? null);
+    }
+    if (event.type === 'message.pinned') {
+      chat().addPin(event.data);
+    }
+    if (event.type === 'message.unpinned') {
+      chat().removePin(event.data.channelId, event.data.id);
     }
     if (event.type === 'message.deleted') {
       chat().removeMessage(event.data.channelId, event.data.id);

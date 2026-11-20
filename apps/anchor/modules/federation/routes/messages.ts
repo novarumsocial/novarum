@@ -14,8 +14,10 @@ import { publicUser } from '../../../utils/publicUser';
 import { dmRecipients, notifyInBackground } from '../../../utils/notify';
 import { createMessage, deleteMessage, editMessage, pingedUserIds } from '../../message/store';
 import {
+  changePin,
   getPingRecipients,
   maxMessageLength,
+  pinnedMessagePayloads,
   messageEdited,
   pingedHandles,
   verifyPendingAttachments,
@@ -329,6 +331,52 @@ export const messageRoutes = new Elysia()
       federatedUser: true,
       response: {
         200: successResponseSchema,
+        ...federationErrors,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/channels/:id/messages/pin',
+    async ({ params, payload, remoteUser, server, status }) => {
+      const body = z.object({ messageId: z.string(), pinned: z.boolean() }).safeParse(payload);
+      if (!body.success) return status(400, { error: 'Invalid pin' });
+
+      const access = await getFederatedChannelAccess(params.id, remoteUser, true);
+      if (!access.ok) return status(access.status, { error: access.error });
+
+      const changed = await changePin(
+        server,
+        access.channel,
+        access.user.id,
+        body.data.messageId,
+        body.data.pinned
+      );
+      if (!changed.ok) return status(changed.status, { error: changed.error });
+      return { message: changed.message };
+    },
+    {
+      federatedUser: true,
+      response: {
+        200: z.object({ message: federatedMessageSchema }),
+        ...federationErrors,
+        403: genericResponseErrorSchema,
+        404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .post(
+    '/channels/:id/messages/pins',
+    async ({ params, remoteUser, status }) => {
+      const access = await getFederatedChannelAccess(params.id, remoteUser);
+      if (!access.ok) return status(access.status, { error: access.error });
+      return { messages: await pinnedMessagePayloads(access.channel) };
+    },
+    {
+      federatedUser: true,
+      response: {
+        200: z.object({ messages: z.array(federatedMessageSchema) }),
         ...federationErrors,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,

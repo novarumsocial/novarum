@@ -94,6 +94,8 @@ export const messageResponseBaseSchema = createSelectSchema(messages, {
     embeds: embedsSchema.default([]).catch([]),
     components: componentsSchema.default([]).catch([]),
     interaction: messageInteractionSchema.nullish().catch(null),
+    pinned: z.boolean().default(false),
+    pinnedAt: isoDateSchema.nullish(),
   });
 
 export const friendRelationshipResponseSchema = createSelectSchema(friendRelationships, {

@@ -51,6 +51,8 @@ export interface Message {
   components: ActionRow[];
   // "<someone> used /command", on a bot's answer to a slash command
   interaction: { id: string; name: string; user: Author } | null;
+  pinned: boolean;
+  pinnedAt: Date | null;
   // only on this screen: a bot's answer only you can see, or a bot still thinking about it
   ephemeral?: boolean;
   thinking?: boolean;

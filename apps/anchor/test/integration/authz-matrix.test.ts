@@ -232,6 +232,20 @@ const guildRoutes: Route[] = [
     body: async (fx) => ({ channelId: fx.channel.id, messageId: (await fx.ownerMessage()).id }),
     expected: [401, 403, 403, 200],
   },
+  {
+    key: 'GET /message/pins',
+    method: 'GET',
+    path: (fx) => `/message/pins?channelId=${fx.channel.id}`,
+    expected: [401, 403, 200, 200],
+  },
+  // only the owner and admins pin, even a message the member wrote
+  {
+    key: 'POST /message/pin',
+    method: 'POST',
+    path: () => '/message/pin',
+    body: (fx) => ({ channelId: fx.channel.id, messageId: fx.memberMessage.id, pinned: true }),
+    expected: [401, 403, 403, 200],
+  },
 ];
 
 // not in the table on purpose: the matrix needs each of these to have another test
@@ -377,6 +391,20 @@ describe('dm channel routes: anonymous / outsider / participant / ex-friend', ()
         method: 'POST',
         path: '/message/send',
         body: { channelId: fx.dmId, content: 'x', nonce: `n${Math.random()}` },
+      }),
+      expected: [401, 403, 200, 403],
+    },
+    {
+      name: 'GET /message/pins',
+      request: (fx) => ({ method: 'GET', path: `/message/pins?channelId=${fx.dmId}` }),
+      expected: [401, 403, 200, 200],
+    },
+    {
+      name: 'POST /message/pin',
+      request: (fx) => ({
+        method: 'POST',
+        path: '/message/pin',
+        body: { channelId: fx.dmId, messageId: fx.message.id, pinned: true },
       }),
       expected: [401, 403, 200, 403],
     },

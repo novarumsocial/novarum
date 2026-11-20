@@ -3,7 +3,8 @@ import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { connect } from '../harness/db';
 import { signup } from '../harness/users';
 import { openRealtime } from '../harness/ws';
-import { befriend } from '../harness/friends';
+import { befriend, unfriend } from '../harness/friends';
+import { addBot, createBot } from '../harness/bots';
 import { anonymous, call, createGuild, join, list, nonce, send } from '../harness/chat';
 
 let anchor: RunningAnchor;
@@ -565,5 +566,154 @@ describe('pings and unread mentions', () => {
     const sent = (await send(a, dm.id, `hi ${handle(b)}`)).body.message;
     expect(sent.pingedHandles).toEqual([]);
     expect(await pingRows(sent.id)).toHaveLength(0);
+  });
+});
+
+describe('pins', () => {
+  const pin = (user: Pick<Actor, 'fetch'>, channelId: string, messageId: string, pinned = true) =>
+    call(user, 'POST', '/message/pin', { channelId, messageId, pinned });
+  const pins = (user: Pick<Actor, 'fetch'>, channelId: string) =>
+    call(user, 'GET', `/message/pins?channelId=${channelId}`);
+
+  test('the owner pins and unpins; the message and the list show it, newest pin first', async () => {
+    const { owner, member, channel } = await world();
+    const first = (await send(member, channel.id, 'first')).body.message;
+    const second = (await send(member, channel.id, 'second')).body.message;
+    expect(first.pinned).toBe(false);
+    expect(first.pinnedAt).toBeNull();
+
+    const pinned = await pin(owner, channel.id, first.id);
+    expect(pinned.status).toBe(200);
+    expect(pinned.body.message).toMatchObject({ id: first.id, pinned: true, edited: false });
+    expect(new Date(pinned.body.message.pinnedAt).getTime()).toBeGreaterThan(0);
+    await Bun.sleep(5);
+    await pin(owner, channel.id, second.id);
+
+    const listed = await pins(member, channel.id);
+    expect(listed.status).toBe(200);
+    expect(listed.body.messages.map((m: any) => m.id)).toEqual([second.id, first.id]);
+    expect(listed.body.messages[0]).toMatchObject({
+      content: 'second',
+      author: { userId: member.user.id },
+    });
+    expect((await list(member, channel.id)).body.messages.map((m: any) => m.pinned)).toEqual([
+      true,
+      true,
+    ]);
+
+    const unpinned = await pin(owner, channel.id, first.id, false);
+    expect(unpinned.body.message).toMatchObject({ pinned: false, pinnedAt: null });
+    expect((await pins(member, channel.id)).body.messages.map((m: any) => m.id)).toEqual([
+      second.id,
+    ]);
+  });
+
+  test('pinning again keeps the first pin time', async () => {
+    const { owner, channel } = await world();
+    const msg = (await send(owner, channel.id, 'x')).body.message;
+    const once = (await pin(owner, channel.id, msg.id)).body.message;
+    await Bun.sleep(5);
+    const twice = (await pin(owner, channel.id, msg.id)).body.message;
+    expect(twice.pinnedAt).toBe(once.pinnedAt);
+  });
+
+  test('members cannot pin, an ADMIN bot can, non-members cannot read the list', async () => {
+    const { owner, member, stranger, guild, channel } = await world();
+    const msg = (await send(member, channel.id, 'mine')).body.message;
+    const denied = await pin(member, channel.id, msg.id);
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toBe('Only the guild owner and admins can pin messages');
+    expect((await pin(stranger, channel.id, msg.id)).status).toBe(403);
+    expect((await pins(stranger, channel.id)).status).toBe(403);
+
+    const admin = await createBot(owner);
+    expect((await addBot(owner, guild.id, admin.bot, 'ADMIN')).status).toBe(200);
+    expect((await pin(admin, channel.id, msg.id)).status).toBe(200);
+    expect((await pins(member, channel.id)).body.messages).toHaveLength(1);
+  });
+
+  test('unknown message, a message of another channel or an unknown channel is 404', async () => {
+    const { owner, guild, channel } = await world();
+    const other = (
+      await call(owner, 'POST', '/channel/create', { guildId: guild.id, name: 'o', type: 'TEXT' })
+    ).body;
+    const msg = (await send(owner, other.id, 'elsewhere')).body.message;
+    expect((await pin(owner, channel.id, 'nope')).status).toBe(404);
+    expect((await pin(owner, channel.id, msg.id)).status).toBe(404);
+    expect((await pin(owner, 'nope', msg.id)).status).toBe(404);
+    expect((await pins(owner, 'nope')).status).toBe(404);
+  });
+
+  test('a channel holds at most 50 pins; unpinning makes room', async () => {
+    const { owner, channel } = await world();
+    const ids: string[] = [];
+    for (let i = 0; i < 51; i++) ids.push((await send(owner, channel.id, `m${i}`)).body.message.id);
+    await sql`UPDATE message SET "pinnedAt" = now() WHERE id IN ${sql(ids.slice(0, 50))}`;
+
+    const full = await pin(owner, channel.id, ids[50]!);
+    expect(full.status).toBe(400);
+    expect(full.body.error).toBe('A channel can have at most 50 pinned messages');
+    // pinning an already pinned message is still fine
+    expect((await pin(owner, channel.id, ids[0]!)).status).toBe(200);
+
+    await pin(owner, channel.id, ids[0]!, false);
+    expect((await pin(owner, channel.id, ids[50]!)).status).toBe(200);
+    expect((await pins(owner, channel.id)).body.messages).toHaveLength(50);
+  });
+
+  test('deleting a pinned message removes it from the pins', async () => {
+    const { owner, channel } = await world();
+    const msg = (await send(owner, channel.id, 'bye')).body.message;
+    await pin(owner, channel.id, msg.id);
+    await call(owner, 'POST', '/message/delete', { channelId: channel.id, messageId: msg.id });
+    expect((await pins(owner, channel.id)).body.messages).toEqual([]);
+  });
+
+  test('editing a pinned message keeps it pinned', async () => {
+    const { owner, channel } = await world();
+    const msg = (await send(owner, channel.id, 'v1')).body.message;
+    await pin(owner, channel.id, msg.id);
+    const edited = await call(owner, 'POST', '/message/edit', {
+      channelId: channel.id,
+      messageId: msg.id,
+      content: 'v2',
+    });
+    expect(edited.body.message).toMatchObject({ pinned: true, edited: true });
+  });
+
+  test('message.pinned and message.unpinned are published, a repeat publishes nothing', async () => {
+    const { owner, member, guild, channel } = await world();
+    const msg = (await send(owner, channel.id, 'live')).body.message;
+    const ws = await openRealtime(anchor.url, member.cookie);
+    try {
+      await Bun.sleep(200);
+      await pin(owner, channel.id, msg.id);
+      const pinned = await ws.waitFor('message.pinned', (e) => e.data?.id === msg.id);
+      expect(pinned.data).toMatchObject({ pinned: true, content: 'live', channelId: channel.id });
+      await pin(owner, channel.id, msg.id);
+      await pin(owner, channel.id, msg.id, false);
+      const unpinned = await ws.waitFor('message.unpinned', (e) => e.data?.id === msg.id);
+      expect(unpinned.data).toEqual({ id: msg.id, channelId: channel.id, guildId: guild.id });
+      expect(ws.events.filter((e: any) => e.type === 'message.pinned')).toHaveLength(1);
+    } finally {
+      ws.close();
+    }
+  });
+
+  test('in a DM either participant pins; an outsider or an ex-friend cannot', async () => {
+    const [a, b, outsider] = await Promise.all([
+      signup(anchor.url),
+      signup(anchor.url),
+      signup(anchor.url),
+    ]);
+    await befriend(a, b);
+    const dm = (await call(a, 'POST', '/dm', { userId: b.user.id })).body;
+    const msg = (await send(a, dm.id, 'hi')).body.message;
+    expect((await pin(b, dm.id, msg.id)).status).toBe(200);
+    expect((await pins(a, dm.id)).body.messages.map((m: any) => m.id)).toEqual([msg.id]);
+    expect((await pin(outsider, dm.id, msg.id, false)).status).toBe(403);
+    expect((await pins(outsider, dm.id)).status).toBe(403);
+    await unfriend(a, b);
+    expect((await pin(a, dm.id, msg.id, false)).status).toBe(403);
   });
 });

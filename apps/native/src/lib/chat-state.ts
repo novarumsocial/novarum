@@ -61,6 +61,8 @@ type AddMessageInput = {
   embeds?: Embed[];
   components?: ActionRow[];
   interaction?: MessageInteraction | null;
+  pinned?: boolean;
+  pinnedAt?: string | Date | null;
   ephemeral?: boolean;
   thinking?: boolean;
 };
@@ -85,6 +87,7 @@ export type TypingInput = {
 // A file picked from the camera, gallery or document picker (the web uses `File`)
 export type PickedFile = { uri: string; name: string; mimeType: string; size: number };
 
+const apiErrorSchema = z.object({ error: z.string() });
 const typingRequestIntervalMs = 5_000;
 const typingExpiryMs = 6_000;
 const messagesPageSize = 50;
@@ -128,6 +131,8 @@ function messageFromInput(message: AddMessageInput): Message {
     interaction: message.interaction
       ? { ...message.interaction, user: authorFromInput(message.interaction.user) }
       : null,
+    pinned: message.pinned ?? false,
+    pinnedAt: message.pinnedAt ? new Date(message.pinnedAt) : null,
     ephemeral: message.ephemeral,
     thinking: message.thinking,
   };
@@ -278,6 +283,10 @@ export const selectCurrentChannel = (state: ChatStateData): Channel | null => {
 export const selectCanSendInCurrentChannel = (state: ChatStateData) =>
   !selectCurrentChannel(state)?.ownerOnly || !!selectCurrentServer(state)?.canManageChannels;
 
+// guild owners and admins pin (the same people who manage channels); in DMs everyone does
+export const selectCanPinInCurrentChannel = (state: ChatStateData) =>
+  state.route.kind === 'dms' || !!selectCurrentServer(state)?.canManageChannels;
+
 export const selectCurrentMessages = (state: ChatStateData) => {
   const channel = selectCurrentChannel(state);
   return channel ? (state.messagesByChannel[channel.id] ?? noMessages) : noMessages;
@@ -308,6 +317,8 @@ type ChatState = {
   voiceStates: Record<string, VoicePresenceInput[]>;
   typingByChannel: Record<string, TypingInput[]>;
   loadingOlderByChannel: Record<string, boolean>;
+  // newest pin first; only channels whose pins were opened
+  pinsByChannel: Record<string, Message[]>;
   loadedChannel: string | null;
   // the web derives this from the URL; the focused screen sets it: a channel screen its channel, the hub `home`
   route: ChatRoute;
@@ -339,6 +350,10 @@ type ChatState = {
   removeMember: (userId: string) => void;
   removeMessage: (channelId: string, messageId: string) => void;
   updateMessage: (channelId: string, message: AddMessageInput) => void;
+  addPin: (message: AddMessageInput) => void;
+  removePin: (channelId: string, messageId: string) => void;
+  loadPins: (channelId: string) => Promise<void>;
+  setPinned: (channelId: string, messageId: string, pinned: boolean) => Promise<void>;
   updateMemberStatus: (userId: string, status: 'ONLINE' | 'OFFLINE') => void;
   updateUserProfile: (
     userId: string,
@@ -423,6 +438,7 @@ const initialData = () => ({
   voiceStates: {},
   typingByChannel: {},
   loadingOlderByChannel: {},
+  pinsByChannel: {} as Record<string, Message[]>,
   loadedChannel: null,
   route: { kind: 'home' } as ChatRoute,
   hubServer: null as string | null,
@@ -813,6 +829,7 @@ export const useChat = create<ChatState>((set, get) => {
       set({ members: get().members.filter((member) => member.userId !== userId) }),
 
     removeMessage(channelId, messageId) {
+      get().removePin(channelId, messageId);
       const messages = get().messagesByChannel[channelId];
       if (!messages?.some((message) => message.id === messageId)) return;
 
@@ -830,6 +847,69 @@ export const useChat = create<ChatState>((set, get) => {
         channelId,
         messages.map((item) => (item.id === message.id ? messageFromInput(message) : item))
       );
+    },
+
+    addPin(message) {
+      get().updateMessage(message.channelId, message);
+      const pins = get().pinsByChannel[message.channelId];
+      if (!pins) return;
+      set({
+        pinsByChannel: {
+          ...get().pinsByChannel,
+          [message.channelId]: [
+            messageFromInput(message),
+            ...pins.filter((item) => item.id !== message.id),
+          ],
+        },
+      });
+    },
+
+    removePin(channelId, messageId) {
+      const messages = get().messagesByChannel[channelId];
+      if (messages?.some((item) => item.id === messageId && item.pinned)) {
+        setChannelMessages(
+          channelId,
+          messages.map((item) =>
+            item.id === messageId ? { ...item, pinned: false, pinnedAt: null } : item
+          )
+        );
+      }
+      const pins = get().pinsByChannel[channelId];
+      if (!pins?.some((item) => item.id === messageId)) return;
+      set({
+        pinsByChannel: {
+          ...get().pinsByChannel,
+          [channelId]: pins.filter((item) => item.id !== messageId),
+        },
+      });
+    },
+
+    async loadPins(channelId) {
+      const result = await anchor().client.message.pins.get({ query: { channelId } });
+      if (result.error || !result.data || 'error' in result.data) {
+        if (sendToGuildsIfFederatedServerDown(result.error)) return;
+        console.error('Failed to load pinned messages', result.error ?? result.data);
+        throw new Error('Failed to load pinned messages');
+      }
+      set({
+        pinsByChannel: {
+          ...get().pinsByChannel,
+          [channelId]: result.data.messages.map(messageFromInput),
+        },
+      });
+    },
+
+    async setPinned(channelId, messageId, pinned) {
+      const result = await anchor().client.message.pin.post({ channelId, messageId, pinned });
+      if (result.error || !result.data || 'error' in result.data) {
+        if (sendToGuildsIfFederatedServerDown(result.error)) return;
+        throw new Error(
+          apiErrorSchema.safeParse(result.error?.value).data?.error ??
+            `Failed to ${pinned ? 'pin' : 'unpin'} message`
+        );
+      }
+      if (pinned) get().addPin(result.data.message);
+      else get().removePin(channelId, messageId);
     },
 
     updateMemberStatus: (userId, status) =>

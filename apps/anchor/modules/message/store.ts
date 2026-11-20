@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { attachments, channelMembers, db, messagePings, messages } from '../../src/db';
 import { randomString } from '../../utils/randomString';
 import { storage } from '../../utils/services/storage';
@@ -135,3 +135,28 @@ export async function deleteMessage(message: { id: string; attachments: { object
     )
   );
 }
+
+export const maxPinsPerChannel = 50;
+
+export const pinCount = (channelId: string) =>
+  db.$count(messages, and(eq(messages.channelId, channelId), isNotNull(messages.pinnedAt)));
+
+/** Pins or unpins a message without marking it as edited. */
+export async function setMessagePinned(messageId: string, pinned: boolean) {
+  const [updated] = await db
+    .update(messages)
+    .set({ pinnedAt: pinned ? new Date() : null, updatedAt: sql`${messages.updatedAt}` })
+    .where(eq(messages.id, messageId))
+    .returning();
+  if (!updated) throw new Error('Failed to pin message');
+  return updated;
+}
+
+/** A channel's pinned messages, the most recently pinned first. */
+export const pinnedMessages = (channelId: string) =>
+  db.query.messages.findMany({
+    where: { channelId, pinnedAt: { isNotNull: true } },
+    orderBy: { pinnedAt: 'desc', id: 'desc' },
+    with: { author: true, attachments: true },
+    limit: maxPinsPerChannel,
+  });

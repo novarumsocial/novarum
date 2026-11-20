@@ -317,6 +317,21 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT id FROM message WHERE embeds IS NOT NULL`)).toHaveLength(1);
     },
   },
+  '20261118222554_massive_senator_kelly': {
+    check: async (url) => {
+      // existing messages start unpinned
+      expect(await rows(url, `SELECT id FROM message WHERE "pinnedAt" IS NOT NULL`)).toHaveLength(
+        0
+      );
+      await query(url, `UPDATE message SET "pinnedAt" = now() WHERE id = 'm1'`);
+      expect(
+        await rows(
+          url,
+          `SELECT id FROM message WHERE "channelId" = 'c1' AND "pinnedAt" IS NOT NULL`
+        )
+      ).toEqual([{ id: 'm1' }] as never);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

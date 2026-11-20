@@ -26,6 +26,7 @@
   import { session } from '$lib/session.svelte';
   import { Progress } from '$lib/components/ui/progress/index.js';
   import CanvasPanel from './canvas-panel.svelte';
+  import PinsPopover from './pins-popover.svelte';
 
   // an optimistic message: shown right away, dropped once the server has accepted it, kept for a retry if it failed
   type Pending = {
@@ -364,6 +365,9 @@
       <span class="truncate text-xs text-muted-foreground/70">{channel.topic}</span>
     {/if}
     <div class="flex-1"></div>
+    {#if channel.type !== 'VOICE'}
+      <PinsPopover channelId={channel.id} />
+    {/if}
     {#if canvasSupported}
       <Button
         variant={canvasOpen ? 'secondary' : 'ghost'}
