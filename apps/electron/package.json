@@ -16,8 +16,8 @@
     "check": "tsc --noEmit -p tsconfig.json",
     "dev": "bun run compile && electron .",
     "build": "bun run --cwd ../frontend build && bun run compile && electron-builder",
-    "build:linux-windows": "bun run --cwd ../frontend build && bun run compile && electron-builder --linux --win --x64 --config.extraMetadata.version=${DESKTOP_VERSION:-0.1.1-dev.0} --publish never",
-    "build:macos": "bun run --cwd ../frontend build && bun run compile && electron-builder --mac --config.extraMetadata.version=${DESKTOP_VERSION:-0.1.1-dev.0} --publish never",
+    "build:linux-windows": "bun run --cwd ../frontend build && bun run compile && electron-builder --linux --win --x64 --config.extraMetadata.version=${DESKTOP_VERSION:-$npm_package_version} --publish never",
+    "build:macos": "bun run --cwd ../frontend build && bun run compile && electron-builder --mac --config.extraMetadata.version=${DESKTOP_VERSION:-$npm_package_version} --publish never",
     "pack": "bun run --cwd ../frontend build && bun run compile && electron-builder --dir"
   },
   "devDependencies": {

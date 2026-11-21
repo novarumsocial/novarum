@@ -19,13 +19,33 @@ on:
 permissions:
   contents: read
 
-env:
-  # releases upload to the existing v<version> release instead of creating a prerelease
-  DESKTOP_VERSION: ${{ inputs.version || format('0.1.1-dev.{0}', github.run_number) }}
-
 jobs:
+  # releases use their version and upload to the existing v<version> release; other builds are
+  # prereleases of the next patch (0.2.1 -> 0.2.2-dev.<run>) so they sort above the last release
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$RELEASE_VERSION" ]; then
+            version="$RELEASE_VERSION"
+          else
+            IFS=. read -r major minor patch < <(jq -r .version apps/electron/package.json)
+            version="${major}.${minor}.$((patch + 1))-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   build-linux-windows:
     name: Build desktop (Linux and Windows)
+    needs: version
     runs-on: blacksmith-4vcpu-ubuntu-2404
     container: electronuserland/builder:wine
     steps:
@@ -41,6 +61,7 @@ jobs:
       - name: Build desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DESKTOP_VERSION: ${{ needs.version.outputs.version }}
           HOME: /tmp/novarum-builder
           WINEDEBUG: '-all'
           WINEPREFIX: /tmp/novarum-builder/.wine
@@ -63,6 +84,7 @@ jobs:
 
   build-macos:
     name: Build desktop (macOS)
+    needs: version
     runs-on: macos-latest
     steps:
       - name: Check out repository
@@ -77,6 +99,7 @@ jobs:
       - name: Build desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DESKTOP_VERSION: ${{ needs.version.outputs.version }}
         run: bun run --filter desktop build:macos
 
       - name: Upload build artifacts
@@ -94,6 +117,7 @@ jobs:
   release:
     name: Publish development release
     needs:
+      - version
       - build-linux-windows
       - build-macos
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -112,6 +136,7 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          DESKTOP_VERSION: ${{ needs.version.outputs.version }}
         run: |
           release_tag="v${DESKTOP_VERSION}"
           notes="Development build for commit ${GITHUB_SHA}."
