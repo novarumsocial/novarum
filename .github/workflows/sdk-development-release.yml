@@ -44,13 +44,14 @@ jobs:
           bun run build
         working-directory: apps/sdk
 
-      # e.g. 1.2.0-dev.57: every run gets a higher number, and the dev tag keeps `latest` untouched
+      # e.g. 1.2.0-dev.57: every run gets a higher number, and the dev tag keeps `latest` untouched.
+      # `npm pkg set` rather than `npm version`, which crashes reading Bun's workspace node_modules
       - name: Set development version
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           base="${RELEASE_VERSION:-$(jq -r .version package.json)}"
-          npm version "${base%%-*}-dev.${{ github.run_number }}" --no-git-tag-version
+          npm pkg set version="${base%%-*}-dev.${{ github.run_number }}"
         working-directory: apps/sdk
 
       - name: Publish to npm
