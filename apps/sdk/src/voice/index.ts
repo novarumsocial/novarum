@@ -1,3 +1,7 @@
+/**
+ * Joining calls, playing audio and hearing people. Needs `@livekit/rtc-node`.
+ * @module @novarum/sdk/voice
+ */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createReadStream } from 'node:fs';

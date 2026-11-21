@@ -1,3 +1,7 @@
+/**
+ * Bots for Novarum: the `Client`, its structures, slash commands, embeds and buttons.
+ * @module @novarum/sdk
+ */
 export { Client, type ClientEvents, type ClientOptions } from './client.js';
 export { REST, NovarumAPIError, type RESTOptions } from './rest.js';
 export {

@@ -221,7 +221,7 @@ export class Message {
   get guild() {
     return this.guildId ? this.client.guilds.get(this.guildId) : undefined;
   }
-  /** Whether this message @mentions the bot. */
+  /** Whether this message mentions the bot. */
   get mentionsMe() {
     const me = this.client.user;
     return (
