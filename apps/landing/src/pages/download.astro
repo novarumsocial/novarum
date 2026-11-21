@@ -3,8 +3,6 @@ import '../styles/global.css';
 import Footer from '../components/Footer.astro';
 
 const releases = 'https://github.com/novarumsocial/novarum/releases';
-// nightly.link serves the latest artifact of a workflow on a branch, without needing a GitHub login
-const nightly = 'https://nightly.link/novarumsocial/novarum/workflows/native-development-release/main';
 
 // Phosphor icons (regular)
 const icons = {
@@ -58,8 +56,8 @@ const groups = [
         detail: 'The new native app, built from main',
         version: 'nightly',
         files: [
-          { key: 'nightly-apk', label: 'Android', href: `${nightly}/novarum-apk.zip` },
-          { key: 'nightly-ipa', label: 'iOS', href: `${nightly}/novarum-ipa.zip` },
+          { key: 'nightly-apk', label: 'Android', href: releases },
+          { key: 'nightly-ipa', label: 'iOS', href: releases },
         ],
       },
     ],
@@ -227,6 +225,10 @@ const button =
           const mobile = releases.find((r) => /^mobile-v/.test(r.tag_name));
           const native = releases.find((r) => /^native-v/.test(r.tag_name));
 
+          // a native build can fail on one platform, so take the newest release that has the file
+          const nativeWith = (file) =>
+            releases.find((r) => /^native-v/.test(r.tag_name) && r.assets.some((x) => x.name === file));
+
           const v = desktop?.tag_name.slice(1);
           const assets = {
             windows: [desktop, `Novarum-${v}-x64.exe`],
@@ -234,6 +236,8 @@ const button =
             linux: [desktop, `Novarum-${v}-x86_64.AppImage`],
             deb: [desktop, `Novarum-${v}-amd64.deb`],
             android: [mobile, 'app-release-signed.apk'],
+            'nightly-apk': [nativeWith('novarum.apk'), 'novarum.apk'],
+            'nightly-ipa': [nativeWith('novarum-unsigned.ipa'), 'novarum-unsigned.ipa'],
           };
           Object.entries(assets).forEach(([name, [release, file]]) => {
             const asset = release?.assets.find((x) => x.name === file);
