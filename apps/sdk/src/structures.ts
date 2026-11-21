@@ -96,6 +96,10 @@ export class Channel {
   isText() {
     return this.data.type === 'TEXT';
   }
+  /** a channel with a call, joined with `joinVoiceChannel` from `@novarum/sdk/voice` */
+  isVoice() {
+    return this.data.type === 'VOICE';
+  }
   send(options: MessageOptions) {
     return this.client.sendMessage(this.id, options);
   }

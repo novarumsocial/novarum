@@ -63,8 +63,8 @@ mentions them in a message). The raw profile is in `data`.
 
 **`Guild`**: `id`, `name`, `channels` (`Map<id, Channel>`), `members()`, `leave()`.
 
-**`Channel`**: `id`, `name`, `type` (`TEXT` or `VOICE`), `guild`, `send(...)`, `sendTyping()`, `messages(amount)`,
-`members()`.
+**`Channel`**: `id`, `name`, `type` (`TEXT` or `VOICE`), `guild`, `isText()`, `isVoice()`, `send(...)`,
+`sendTyping()`, `messages(amount)`, `members()`. To join a voice channel's call, see [Voice](/bots/voice/).
 
 **Interactions** share `id`, `user`, `channelId`, `guildId`, `channel`, `guild`, and the type checks `isCommand()`,
 `isButton()`, `isAutocomplete()`.
@@ -77,6 +77,11 @@ mentions them in a message). The raw profile is in `data`.
 
 `SlashCommandBuilder`, `EmbedBuilder`, `ButtonBuilder` (with `ButtonStyle`) and `ActionRowBuilder` work like their
 discord.js namesakes. Anywhere a builder is accepted, the plain object (`toJSON()`'s output) is accepted too.
+
+## Voice
+
+Joining calls, playing audio and hearing people lives in `@novarum/sdk/voice`: `joinVoiceChannel`,
+`createAudioPlayer`, `createAudioResource` and the connection's `receiver`. See [Voice](/bots/voice/).
 
 ## Errors
 

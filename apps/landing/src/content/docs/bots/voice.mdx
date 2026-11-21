@@ -1,0 +1,57 @@
+---
+title: 'Voice'
+description: 'Join calls, play audio and hear the people talking.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Bots join the calls of voice channels and group DMs they are in, like people do. The voice API lives in
+`@novarum/sdk/voice` and works like discord.js/voice: a `VoiceConnection` per call, an `AudioPlayer`
+that plays `AudioResource`s, and a receiver for what others say.
+
+```sh
+bun add @novarum/sdk @livekit/rtc-node
+```
+
+<Aside>
+  `@livekit/rtc-node` is a native module, so it's an optional dependency you only install for voice.
+  Decoding files and URLs needs `ffmpeg` on your `PATH`.
+</Aside>
+
+## Playing audio
+
+```ts
+import { Client } from '@novarum/sdk';
+import { createAudioPlayer, createAudioResource, joinVoiceChannel } from '@novarum/sdk/voice';
+
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isCommand() || interaction.commandName !== 'play') return;
+  const connection = await joinVoiceChannel(client, interaction.options.getString('channel', true));
+  const player = createAudioPlayer();
+  connection.subscribe(player);
+  player.play(createAudioResource('song.mp3'));
+  player.on('idle', () => connection.destroy());
+  await interaction.reply('Playing!');
+});
+```
+
+`createAudioResource` takes anything ffmpeg can read: a file path, a URL or a `Readable`. If you already
+have 48kHz stereo s16le PCM, pass `{ inputType: StreamType.Raw }` to skip ffmpeg.
+
+The player has `pause()`, `unpause()` and `stop()`, a `status` (`idle`, `playing`, `paused`) and emits an
+event for each. Set `resource.volume` (0 to 2) to change the volume while it plays. One player can play
+into several calls at once.
+
+## Hearing people
+
+```ts
+connection.receiver.on('speakingStart', (userId) => {
+  const pcm = connection.receiver.subscribe(userId); // a Readable of 48kHz stereo s16le
+  pcm.pipe(someSpeechToText);
+});
+```
+
+## Leaving
+
+`connection.destroy()` leaves the call. `getVoiceConnection(client, channelId)` gives back the connection
+the bot has to a call, if any.

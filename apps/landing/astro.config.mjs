@@ -27,6 +27,7 @@ export default defineConfig({
             { label: 'Your first bot', slug: 'bots/getting-started' },
             { label: 'Slash commands', slug: 'bots/slash-commands' },
             { label: 'Embeds and buttons', slug: 'bots/embeds-and-buttons' },
+            { label: 'Voice', slug: 'bots/voice' },
             { label: 'SDK reference', slug: 'bots/sdk' },
             { label: 'HTTP API', slug: 'bots/http-api' },
             { label: 'Across homeservers', slug: 'bots/federation' },

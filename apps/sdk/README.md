@@ -36,6 +36,19 @@ client.on('interactionCreate', async (interaction) => {
 await client.login();
 ```
 
+### Voice
+
+Bots can join calls too. Install `@livekit/rtc-node` (and have `ffmpeg` around to decode files):
+
+```ts
+import { createAudioPlayer, createAudioResource, joinVoiceChannel } from '@novarum/sdk/voice';
+
+const connection = await joinVoiceChannel(client, voiceChannelId);
+const player = createAudioPlayer();
+connection.subscribe(player);
+player.play(createAudioResource('song.mp3'));
+```
+
 Works on Bun and Node.js 20+. The full guide lives in the [Novarum docs](https://novarum.me/bots/getting-started/).
 
 ## Development
@@ -44,5 +57,6 @@ Works on Bun and Node.js 20+. The full guide lives in the [Novarum docs](https:/
 bun run --filter @novarum/sdk check     # typecheck
 bun run --filter @novarum/sdk test      # unit tests
 bun run --filter @novarum/sdk test:e2e  # against a real Anchor (needs `bun run --filter anchor test:infra`)
+bun run --filter @novarum/sdk test:voice  # also needs LiveKit: `docker compose -f apps/anchor/test/compose.yml --profile livekit up -d`
 bun run --filter @novarum/sdk build     # dist/
 ```

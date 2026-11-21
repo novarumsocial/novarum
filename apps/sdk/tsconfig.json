@@ -10,5 +10,5 @@
     "types": ["bun"]
   },
   "include": ["src", "test"],
-  "exclude": ["test/e2e.test.ts"]
+  "exclude": ["test/e2e.test.ts", "test/voice.e2e.test.ts"]
 }
