@@ -39,7 +39,7 @@ rand = "0.9"
 png = "0.18"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 notify-rust = "4"
-rodio = { version = "0.21", default-features = false, features = ["playback", "vorbis"] }
+rodio = { version = "0.21", default-features = false, features = ["playback", "vorbis", "mp3", "wav", "flac"] }
 base64 = "0.22"
 regex = "1"
 

@@ -5,3 +5,4 @@ pub mod noise_floor;
 pub mod system_message;
 pub mod utils;
 pub mod voice_layout;
+pub mod zoom_pan;
