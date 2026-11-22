@@ -39,7 +39,7 @@ pub struct LoginPage {
 }
 
 /// The `loginSchema` checks, in order. `None` when the field is fine.
-fn validate_home_server(value: &str) -> Option<&'static str> {
+pub fn validate_home_server(value: &str) -> Option<&'static str> {
     let value = value.trim();
     if value.is_empty() {
         return Some("Pick a home server.");

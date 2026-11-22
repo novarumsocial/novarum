@@ -193,6 +193,25 @@ impl Session {
             .map_err(|error| api::error_message(&error.body, "Could not send the code."))
     }
 
+    /// reset-password's first step: points the app at `home_server` and mails a code to `email`.
+    pub async fn request_password_reset(home_server: String, email: String) -> Result<(), String> {
+        api::set_home_server(&home_server).await?;
+        api::post::<api::Ignored>("/auth/password-reset/request", json!({ "email": email }))
+            .await
+            .map(|_| ())
+            .map_err(|error| api::error_message(&error.body, "Could not send the reset code."))
+    }
+
+    pub async fn reset_password(email: String, new_password: String, code: u32) -> Result<(), String> {
+        api::post::<api::Ignored>(
+            "/auth/reset-password",
+            json!({ "email": email, "newPassword": new_password, "verificationCode": code }),
+        )
+        .await
+        .map(|_| ())
+        .map_err(|error| api::error_message(&error.body, "Could not reset your password."))
+    }
+
     pub fn signup(
         home_server: String,
         username: String,
