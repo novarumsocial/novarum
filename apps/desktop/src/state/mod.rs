@@ -15,7 +15,12 @@ pub mod realtime;
 pub mod router;
 pub mod session;
 pub mod settings;
+#[cfg(target_os = "linux")]
+pub mod screen_audio;
+pub mod video;
 pub mod voice;
+pub mod voice_capture;
+pub mod voice_room;
 
 use futures::future::{FutureExt, Shared};
 use gpui_kit::*;
@@ -42,6 +47,9 @@ fn init_account(cx: &mut App) {
 /// Drops everything tied to the signed-in account, for switching accounts.
 pub fn reset(cx: &mut App) {
     realtime::Realtime::disconnect(cx);
+    voice::Voice::global(cx)
+        .update(cx, |voice, cx| voice.leave(cx))
+        .detach();
     session::init(cx);
     init_account(cx);
     cx.remove_global::<BootTask>();

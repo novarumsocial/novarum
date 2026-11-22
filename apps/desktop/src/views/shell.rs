@@ -39,6 +39,8 @@ pub struct ShellState {
     pub mobile_navigation_open: bool,
     pub mobile_members_open: bool,
     pub call_expanded: bool,
+    /// the voice stage alone, filling the screen (voice-area's `fullscreen`)
+    pub call_fullscreen: bool,
     /// `window.innerWidth`, kept by the shell for the panels' breakpoints.
     pub width: f32,
 }
@@ -92,6 +94,13 @@ impl ShellState {
 
     pub fn toggle_call_expanded(cx: &mut App) {
         Self::set(cx, |shell| shell.call_expanded = !shell.call_expanded);
+    }
+
+    pub fn set_call_fullscreen(on: bool, window: &mut Window, cx: &mut App) {
+        Self::set(cx, |shell| shell.call_fullscreen = on);
+        if window.is_fullscreen() != on {
+            window.toggle_fullscreen();
+        }
     }
 
     /// `startCall`: joins the call and rings the others if nobody is in it yet.
@@ -184,6 +193,7 @@ impl AppShell {
                 mobile_navigation_open: false,
                 mobile_members_open: false,
                 call_expanded: false,
+                call_fullscreen: false,
                 width: 1100.0,
             });
             cx.set_global(GlobalShell(shell));
@@ -203,6 +213,12 @@ impl AppShell {
             // the server skips push for users with an active window, so it has to hear when this one stops being it
             cx.observe_window_activation(window, |_, window, cx| {
                 Realtime::set_window_active(window.is_window_active(), cx);
+            }),
+            // the window manager can take the window out of fullscreen on its own
+            cx.observe_window_bounds(window, |_, window, cx| {
+                if ShellState::global(cx).read(cx).call_fullscreen && !window.is_fullscreen() {
+                    ShellState::set(cx, |shell| shell.call_fullscreen = false);
+                }
             }),
         ];
 
@@ -381,6 +397,17 @@ impl Render for AppShell {
                     .when(home_like, |nav| nav.child(panels.dm_sidebar.clone())),
             )
             .child(panels.user_area.clone());
+
+        let in_voice_channel = current_channel.as_ref().is_some_and(|channel| {
+            channel.kind == ChannelType::Voice
+                && Voice::global(cx).read(cx).channel_id.as_deref() == Some(channel.id.as_str())
+        });
+        if shell.read(cx).call_fullscreen {
+            if in_voice_channel {
+                return panels.voice_area.clone().into_any_element();
+            }
+            ShellState::set_call_fullscreen(false, window, cx);
+        }
 
         let main: AnyElement = match (&route, &current_channel) {
             (ChatRoute::Home, _) => panels.friends_home.clone().into_any_element(),

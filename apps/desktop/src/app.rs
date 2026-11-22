@@ -63,7 +63,7 @@ pub fn restart_session(cx: &mut App) {
 }
 
 impl Render for AppRoot {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         div()
             .size_full()
@@ -72,7 +72,9 @@ impl Render for AppRoot {
             .bg(t.background)
             .text_color(t.foreground)
             .font_family("IBM Plex Sans")
-            .child(views::titlebar::titlebar(cx))
+            .when(!window.is_fullscreen(), |root| {
+                root.child(views::titlebar::titlebar(cx))
+            })
             .child(div().flex_1().min_h_0().children(self.view.clone()))
     }
 }

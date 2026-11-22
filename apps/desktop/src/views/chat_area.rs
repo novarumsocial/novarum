@@ -10,6 +10,7 @@ use chrono::Local;
 use uuid::Uuid;
 
 use crate::prelude::*;
+use crate::views::voice_area::VoiceArea;
 
 use crate::{
     models::{Channel, ChannelType, Message},
@@ -133,6 +134,7 @@ pub struct ChatArea {
     replying_to: Option<Message>,
     pending: Vec<Pending>,
     input: Entity<MessageInput>,
+    call: Entity<VoiceArea>,
     /// the channel the view already landed in, and the linked message it jumped to
     settled: Option<String>,
     jumped: Option<String>,
@@ -143,6 +145,7 @@ pub struct ChatArea {
 impl ChatArea {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let input = cx.new(|cx| MessageInput::new(window, cx));
+        let call = cx.new(|cx| VoiceArea::embedded(window, cx));
         let subscriptions = vec![
             cx.observe(&Chat::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&Dms::global(cx), |_, _, cx| cx.notify()),
@@ -177,6 +180,7 @@ impl ChatArea {
             replying_to: None,
             pending: vec![],
             input,
+            call,
             settled: None,
             jumped: None,
             flash: None,
@@ -775,10 +779,28 @@ impl ChatArea {
             })
     }
 
-    /// Where the DM call (voice_area, embedded) goes once voice is ported: above the messages,
-    /// resizable, or over them when expanded. Nothing yet, so the messages stay in place.
-    fn dm_call_slot(&self, _channel: &Channel, _cx: &mut Context<Self>) -> Option<AnyElement> {
-        None
+    /// The DM call (voice_area, embedded): above the messages, half of the pane, or over them
+    /// when expanded, like the web's `dmCallHeight` handling.
+    fn dm_call_slot(
+        &self,
+        channel: &Channel,
+        in_call: bool,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let expanded = ShellState::global(cx).read(cx).call_expanded;
+        let height = if expanded { tw(60.0) } else { tw(30.0) };
+        in_call
+            .then(|| {
+                div()
+                    .flex_shrink_0()
+                    .h(height)
+                    .min_h(px(160.0))
+                    .border_b_1()
+                    .border_color(theme::tokens(cx).border)
+                    .child(self.call.clone())
+                    .into_any_element()
+            })
+            .filter(|_| channel.kind == ChannelType::Dm)
     }
 
     fn render_empty(&self, channel: &Channel, cx: &mut Context<Self>) -> Div {
@@ -1084,7 +1106,7 @@ impl Render for ChatArea {
             .on_modifiers_changed(cx.listener(|_, _, _, cx| cx.notify()))
             .child(self.render_header(&channel, in_call, callers.len(), ringing, cx))
             .children(banner)
-            .children(self.dm_call_slot(&channel, cx))
+            .children(self.dm_call_slot(&channel, in_call, cx))
             .child(
                 div()
                     .relative()
