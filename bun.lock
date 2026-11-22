@@ -52,6 +52,10 @@
         "drizzle-kit": "^1.0.0-rc.4",
       },
     },
+    "apps/desktop": {
+      "name": "desktop-rs",
+      "version": "0.2.1",
+    },
     "apps/electron": {
       "name": "desktop",
       "version": "0.2.1",
@@ -2185,6 +2189,8 @@
     "dequal": ["dequal@2.0.3", "", {}, "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA=="],
 
     "desktop": ["desktop@workspace:apps/electron"],
+
+    "desktop-rs": ["desktop-rs@workspace:apps/desktop"],
 
     "destr": ["destr@2.0.5", "", {}, "sha512-ugFTXCtDZunbzasqBxrK93Ik/DRYsO6S/fedkWEMKqt04xZ4csmnmwGDBAb07QWNaGMAmnTIemsYZCksjATwsA=="],
 
