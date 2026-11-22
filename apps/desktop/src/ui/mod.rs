@@ -2,6 +2,7 @@
 // gpui-component doesn't already cover. Prefer gpui-component (button, input, dialog, popover,
 // dropdown menu, switch, slider, tabs, tooltip...) and only add here what it lacks.
 pub mod avatar;
+pub mod drag;
 pub mod image;
 
 use crate::prelude::*;
