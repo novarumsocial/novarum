@@ -48,6 +48,10 @@ pub struct Attachment {
     pub size: f64,
     pub url: String,
     pub preview_url: String,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -174,6 +178,8 @@ pub struct MessageData {
     #[serde(default)]
     pub reply_to: Option<String>,
     #[serde(default)]
+    pub edited: bool,
+    #[serde(default)]
     pub edited_time: Option<String>,
     #[serde(default)]
     pub pinged_handles: Vec<String>,
@@ -294,4 +300,117 @@ pub struct Emoji {
     pub name: String,
     pub unicode: String,
     pub url: String,
+}
+
+// apps/frontend/src/lib/types/chat.ts: what the stores keep and the views render.
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Server {
+    pub id: String,
+    pub name: String,
+    pub initials: String,
+    pub down: bool,
+    pub can_manage_channels: bool,
+    pub avatar_url: Option<String>,
+    pub description: Option<String>,
+    pub color: Option<String>,
+    pub owner_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChannelCategory {
+    pub id: String,
+    pub label: String,
+    pub channels: Vec<Channel>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Channel {
+    pub id: String,
+    pub name: String,
+    pub label: Option<String>,
+    pub topic: Option<String>,
+    pub unread: bool,
+    pub last_read_message_id: Option<String>,
+    pub mention: u32,
+    /// group DMs are DMs too (calls, ringing), with `group` set
+    pub kind: ChannelType,
+    pub group: bool,
+    pub owner_only: bool,
+    pub avatar_url: Option<String>,
+    pub avatar_color: Option<String>,
+}
+
+/// A `PublicUser` whose homeserver is called `server`, plus a guild member's status.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Author {
+    pub user_id: String,
+    pub username: String,
+    pub server: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub avatar_color: Option<String>,
+    pub speaking_ring_color: Option<String>,
+    pub banner_url: Option<String>,
+    pub about: Option<String>,
+    pub is_bot: bool,
+    pub status: Option<UserStatus>,
+}
+
+#[allow(dead_code)]
+impl Author {
+    pub fn name(&self) -> &str {
+        self.display_name.as_deref().filter(|name| !name.is_empty()).unwrap_or(&self.username)
+    }
+
+    pub fn handle(&self) -> String {
+        format!("@{}:{}", self.username, self.server)
+    }
+}
+
+impl From<&PublicUser> for Author {
+    fn from(user: &PublicUser) -> Self {
+        Self {
+            user_id: user.user_id.clone(),
+            username: user.username.clone(),
+            server: user.homeserver.clone(),
+            display_name: user.display_name.clone(),
+            avatar_url: user.avatar_url.clone(),
+            avatar_color: user.avatar_color.clone(),
+            speaking_ring_color: user.speaking_ring_color.clone(),
+            banner_url: user.banner_url.clone(),
+            about: user.about.clone(),
+            is_bot: user.is_bot,
+            status: None,
+        }
+    }
+}
+
+/// "<someone> used /command", on a bot's answer to a slash command
+#[derive(Debug, Clone, PartialEq)]
+pub struct Interaction {
+    pub id: String,
+    pub name: String,
+    pub user: Author,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Message {
+    pub id: String,
+    pub author: Author,
+    pub content: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub edited: bool,
+    pub edited_time: Option<String>,
+    pub reply_to: Option<String>,
+    pub pinged_handles: Vec<String>,
+    pub attachments: Vec<Attachment>,
+    pub embeds: Vec<Embed>,
+    pub components: Vec<ActionRow>,
+    pub interaction: Option<Interaction>,
+    /// written by the homeserver: "Ana added Leo", a call...
+    pub system: Option<SystemMessage>,
+    /// only on this screen: a bot's answer only you can see, or a bot still thinking about it
+    pub ephemeral: bool,
+    pub thinking: bool,
 }

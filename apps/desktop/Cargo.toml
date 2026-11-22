@@ -30,3 +30,8 @@ self-replace = "1"
 tar = "0.4"
 flate2 = "1"
 rand = "0.9"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+notify-rust = "4"
+rodio = { version = "0.21", default-features = false, features = ["playback", "vorbis"] }
+base64 = "0.22"
+regex = "1"
