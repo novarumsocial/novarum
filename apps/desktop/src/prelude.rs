@@ -9,3 +9,4 @@ pub use gpui_kit::*;
 
 pub use crate::theme::Tokens;
 pub use crate::ui::{icon, tw};
+pub(crate) use crate::{theme, ui};

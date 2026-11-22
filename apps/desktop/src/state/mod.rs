@@ -15,6 +15,7 @@ pub mod realtime;
 pub mod router;
 pub mod session;
 pub mod settings;
+pub mod voice;
 
 use futures::future::{FutureExt, Shared};
 use gpui_kit::*;
@@ -23,6 +24,7 @@ pub fn init(cx: &mut App) {
     router::init(cx);
     settings::init(cx);
     session::init(cx);
+    voice::init(cx);
     crate::notifications::init(cx);
     init_account(cx);
 }

@@ -1,15 +1,26 @@
 pub mod auth;
 pub mod auth_card;
 pub mod authorize;
+pub mod call_ringing;
+pub mod channel_sidebar;
+pub mod chat_area;
 pub mod constellation;
+pub mod developers_home;
+pub mod dm_sidebar;
+pub mod friends_home;
+pub mod group_members;
+pub mod guild_sidebar;
 pub mod initial_loader;
 pub mod invite;
 pub mod login;
+pub mod member_sidebar;
 pub mod register;
 pub mod reset_password;
 pub mod shell;
 pub mod titlebar;
 pub mod updater;
+pub mod user_area;
+pub mod voice_area;
 
 use crate::prelude::*;
 
