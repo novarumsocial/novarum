@@ -66,18 +66,37 @@ pub fn boot(cx: &mut App) -> Shared<Task<bool>> {
     if let Some(task) = cx.try_global::<BootTask>() {
         return task.0.clone();
     }
+    // started here rather than in the task, so the requests go out before the window opens.
+    // the session check runs against the cached base url while discovery refreshes it; if
+    // discovery moved the server, the check runs again against the new one. the lists load
+    // meanwhile, and are dropped if nobody turns out to be signed in
+    let base_url = crate::api::base_url();
+    let refresh = session::Session::refresh(cx);
+    let lists = load_lists(cx);
+    let info = crate::runtime::io(crate::api::refresh_info());
     let task = cx
         .spawn(async move |cx| {
-            crate::api::refresh_info().await;
-            let refresh = cx.update(session::Session::refresh);
-            if refresh.await.is_none() {
+            let (user, _) = futures::join!(refresh, info);
+            let (user, lists) = match user {
+                None if crate::api::base_url() != base_url => {
+                    let user = cx.update(session::Session::refresh).await;
+                    (user, cx.update(load_lists))
+                }
+                user => (user, lists),
+            };
+            if user.is_none() {
                 return false;
             }
-            let load = cx.update(|cx| {
-                realtime::Realtime::connect(cx);
-                load_signed_in(cx)
+            crate::startup::mark("signed in");
+            cx.update(realtime::Realtime::connect);
+            let (chat_lists, rest) = lists;
+            chat_lists.await;
+            let channel = cx.update(|cx| {
+                chat::Chat::global(cx).update(cx, |chat, cx| chat.open_initial_channel(cx))
             });
-            load.await;
+            channel.await;
+            rest.await;
+            crate::startup::mark("signed-in data loaded");
             true
         })
         .shared();
@@ -85,13 +104,15 @@ pub fn boot(cx: &mut App) -> Shared<Task<bool>> {
     task
 }
 
-/// `Promise.all([chat.loadInitialData(), friends.load(), notificationSettings.load()])`
-fn load_signed_in(cx: &mut App) -> Task<()> {
-    let chat = chat::Chat::global(cx).update(cx, |chat, cx| chat.load_initial_data(cx));
+/// `Promise.all([chat.loadInitialData(), friends.load(), notificationSettings.load()])`, minus
+/// the initial channel: the chat's lists, then friends and notification settings.
+fn load_lists(cx: &mut App) -> (Task<()>, Task<()>) {
+    let chat = chat::Chat::global(cx).update(cx, |chat, cx| chat.load_lists(cx));
     let friends = friends::Friends::global(cx).update(cx, |friends, cx| friends.load(cx));
     let notifications = notification_settings::NotificationSettings::global(cx)
         .update(cx, |settings, cx| settings.load(cx));
-    cx.spawn(async move |_| {
-        futures::join!(chat, friends, notifications);
-    })
+    let rest = cx.spawn(async move |_| {
+        futures::join!(friends, notifications);
+    });
+    (chat, rest)
 }

@@ -3,7 +3,7 @@ use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{api, storage};
+use crate::{api, runtime, storage};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -133,8 +133,9 @@ impl Session {
             session.error = None;
             cx.notify();
         });
+        let me = runtime::io(api::get::<MePayload>("/auth/me"));
         cx.spawn(async move |cx| {
-            let result = api::get::<MePayload>("/auth/me").await;
+            let result = me.await;
             this.update(cx, |session, cx| {
                 session.user = match &result {
                     Ok(me) => me.user.clone(),

@@ -142,6 +142,7 @@ async fn latest_release() -> Result<Option<Release>, String> {
     runtime::io(async {
         let releases: Vec<GithubRelease> = api::http()
             .get(RELEASES_URL)
+            .timeout(Duration::from_secs(10))
             .header("accept", "application/vnd.github+json")
             .send()
             .await

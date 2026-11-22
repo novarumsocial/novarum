@@ -7,7 +7,7 @@ use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{api, state::router::encode};
+use crate::{api, runtime, state::router::encode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -117,8 +117,9 @@ impl NotificationSettings {
     }
 
     pub fn load(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        let payload = runtime::io(api::get::<SettingsPayload>("/notifications/settings"));
         cx.spawn(async move |this, cx| {
-            let Ok(payload) = api::get::<SettingsPayload>("/notifications/settings").await else {
+            let Ok(payload) = payload.await else {
                 return;
             };
             let _ = this.update(cx, |store, cx| {

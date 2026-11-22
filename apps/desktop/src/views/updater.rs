@@ -1,7 +1,7 @@
 // Port of apps/frontend/src/routes/updater/+page.svelte: the launch splash. A faint novarum logo
 // lights up as the update comes in: the ground lines from the middle out, then the sun rises
 // into place and its rays come out.
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::prelude::*;
 
@@ -238,20 +238,4 @@ fn css_color(color: Hsla) -> String {
         (rgba.g * 255.0) as u8,
         (rgba.b * 255.0) as u8
     )
-}
-
-/// Waits up to 15s for the launch check. Returns whether the app is restarting into an update.
-pub async fn update_on_launch(cx: &mut AsyncApp) -> bool {
-    let check = cx.update(|cx| Updater::check(cx));
-    let timeout = cx.background_executor().timer(Duration::from_secs(15));
-    let available = futures::future::select(check, Box::pin(timeout)).await;
-    let futures::future::Either::Left((true, _)) = available else {
-        return false;
-    };
-    let download = cx.update(|cx| Updater::download(cx));
-    if download.await.is_err() {
-        return false;
-    }
-    cx.update(|cx| Updater::install(cx));
-    true
 }

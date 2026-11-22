@@ -62,7 +62,7 @@ pub fn listen(actions: Actions) {
     };
     std::thread::spawn(move || {
         for mut stream in listener.incoming().flatten() {
-            let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
             let _ = stream.write_all(HELLO);
             let mut request = String::new();
             let _ = BufReader::new(&stream).read_line(&mut request);

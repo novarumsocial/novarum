@@ -64,6 +64,8 @@ pub fn restart_session(cx: &mut App) {
 
 impl Render for AppRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        static FIRST: std::sync::Once = std::sync::Once::new();
+        FIRST.call_once(|| crate::startup::mark("first frame"));
         let t = theme::tokens(cx);
         div()
             .size_full()

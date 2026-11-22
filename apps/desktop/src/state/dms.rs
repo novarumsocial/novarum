@@ -8,6 +8,7 @@ use crate::{
     models::{
         DmChannel, DmLastMessage, DmLastMessageAuthor, DmType, DmUpdate, MessageData, PublicUser,
     },
+    runtime,
     state::{
         chat::UploadFile,
         router::{self, encode},
@@ -246,8 +247,9 @@ impl Dms {
         self.generation += 1;
         let generation = self.generation;
         cx.notify();
+        let result = runtime::io(api::get::<DmList>("/dm"));
         cx.spawn(async move |this, cx| {
-            let result = api::get::<DmList>("/dm").await;
+            let result = result.await;
             let _ = this.update(cx, |dms, cx| {
                 if generation != dms.generation {
                     return;

@@ -8,6 +8,7 @@ use serde_json::json;
 use crate::{
     api,
     models::{PublicUser, UserStatus},
+    runtime,
     state::dms::Dms,
 };
 
@@ -102,8 +103,9 @@ impl Friends {
         self.loading = true;
         self.error = None;
         cx.notify();
+        let result = runtime::io(api::get::<FriendsPayload>("/friends"));
         cx.spawn(async move |this, cx| {
-            let result = api::get::<FriendsPayload>("/friends").await;
+            let result = result.await;
             let _ = this.update(cx, |friends, cx| {
                 if generation != friends.load_generation {
                     return;

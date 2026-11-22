@@ -419,7 +419,7 @@ pub struct Chat {
     last_typing_by_channel: HashMap<String, Instant>,
     next_cursor_by_channel: HashMap<String, usize>,
     has_more_by_channel: HashMap<String, bool>,
-    /// set once `load_initial_data` ran; route changes before that don't load channels
+    /// set once `open_initial_channel` ran; route changes before that don't load channels
     initialized: bool,
     _router: Subscription,
 }
@@ -1451,28 +1451,27 @@ impl Chat {
         })
     }
 
-    pub fn load_initial_data(&mut self, cx: &mut Context<Self>) -> Task<()> {
+    /// Guilds and DMs, which don't depend on who's signed in, so they load alongside the session.
+    pub fn load_lists(&mut self, cx: &mut Context<Self>) -> Task<()> {
         let guilds = self.load_guilds(cx);
         let dms = Dms::global(cx).update(cx, |dms, cx| dms.load(cx));
-        cx.spawn(async move |this, cx| {
+        cx.spawn(async move |_, _| {
             futures::join!(guilds, dms);
-            let load = this.update(cx, |chat, cx| {
-                chat.select_initial_channel(cx);
-                chat.initialized = true;
-                chat.load_current_channel(cx)
-            });
-            if let Ok(load) = load {
-                load.await;
-            }
         })
+    }
+
+    /// The rest of `loadInitialData`, once the lists are in: lands on a channel and loads it.
+    pub fn open_initial_channel(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        self.select_initial_channel(cx);
+        self.initialized = true;
+        self.load_current_channel(cx)
     }
 
     /// After the realtime socket reconnects: whatever happened while it was down.
     pub fn recover_realtime_state(&mut self, cx: &mut Context<Self>) -> Task<()> {
-        let guilds = self.load_guilds(cx);
-        let dms = Dms::global(cx).update(cx, |dms, cx| dms.load(cx));
+        let lists = self.load_lists(cx);
         cx.spawn(async move |this, cx| {
-            futures::join!(guilds, dms);
+            lists.await;
             if let Ok(load) = this.update(cx, |chat, cx| chat.load_current_channel(cx)) {
                 load.await;
             }
@@ -1480,8 +1479,9 @@ impl Chat {
     }
 
     fn load_guilds(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        let list = runtime::io(api::get::<GuildList>("/guilds/list"));
         cx.spawn(async move |this, cx| {
-            let Ok(list) = api::get::<GuildList>("/guilds/list").await else {
+            let Ok(list) = list.await else {
                 return;
             };
             let _ = this.update(cx, |chat, cx| {

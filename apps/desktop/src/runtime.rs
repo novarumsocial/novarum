@@ -16,7 +16,10 @@ pub fn handle() -> tokio::runtime::Handle {
     RUNTIME.handle().clone()
 }
 
-/// Runs `future` on the IO runtime; the result can be awaited from a gpui task.
-pub async fn io<T: Send + 'static>(future: impl Future<Output = T> + Send + 'static) -> T {
-    RUNTIME.spawn(future).await.expect("io task panicked")
+/// Starts `future` on the IO runtime right away; the result can be awaited from a gpui task.
+pub fn io<T: Send + 'static>(
+    future: impl Future<Output = T> + Send + 'static,
+) -> impl Future<Output = T> {
+    let task = RUNTIME.spawn(future);
+    async move { task.await.expect("io task panicked") }
 }

@@ -65,3 +65,12 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSResponder",
 ] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# optimized dependencies: unoptimized wgpu/naga made opening a debug window take ~500ms
+[profile.dev.package."*"]
+opt-level = 2
