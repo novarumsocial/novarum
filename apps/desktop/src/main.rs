@@ -1,4 +1,5 @@
 // Novarum desktop: a native (GPUI) port of apps/frontend, replacing the Electron shell.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod api;
 mod app;
 mod assets;
@@ -55,11 +56,18 @@ fn open_splash(cx: &mut App) -> AnyWindowHandle {
 }
 
 fn main() {
-    gpui_kit::application().with_assets(assets::Assets).run(|cx| {
+    if !desktop::claim_single_instance() {
+        return;
+    }
+    // closing the main window hides Novarum to the tray; it quits from the tray or the dock
+    let app = gpui_kit::application().with_assets(assets::Assets).with_quit_mode(QuitMode::Explicit);
+    app.on_reopen(desktop::show_main_window);
+    app.run(|cx| {
         gpui_kit::init(cx);
         assets::load_fonts(cx);
         state::init(cx);
         updater::init(cx);
+        desktop::init(cx);
 
         let auto_update = updater::supported() && updater::launch_prefs().auto_update;
         let hidden = desktop::launch_hidden();
@@ -93,8 +101,9 @@ fn main() {
                 })
                 .detach();
             }
-            // TODO(tray): with no tray icon yet, a hidden launch would leave no way back in
-            open_main_window(cx);
+            if !hidden {
+                open_main_window(cx);
+            }
         }
 
         cx.on_app_quit(|cx| {

@@ -16,6 +16,8 @@
       "extra-files": [
         { "type": "json", "path": "apps/anchor/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "apps/electron/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/desktop/package.json", "jsonpath": "$.version" },
+        { "type": "toml", "path": "apps/desktop/Cargo.toml", "jsonpath": "$.package.version" },
         { "type": "json", "path": "apps/frontend/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "apps/landing/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "apps/mobile/package.json", "jsonpath": "$.version" },
