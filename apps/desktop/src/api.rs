@@ -297,6 +297,24 @@ pub async fn delete_with<T: DeserializeOwned + Send + 'static>(
     request(Method::DELETE, path, vec![], Some(serde_json::to_value(body).unwrap_or_default())).await
 }
 
+/// A multipart POST with one file in `field`, like Eden's `{ icon: File }` bodies.
+pub async fn post_file<T: DeserializeOwned + Send + 'static>(
+    path: impl Into<String>,
+    field: &'static str,
+    file: crate::state::chat::UploadFile,
+) -> ApiResult<T> {
+    let url = format!("{}{}", base_url(), path.into());
+    runtime::io(async move {
+        let part = reqwest::multipart::Part::bytes(file.bytes)
+            .file_name(file.name)
+            .mime_str(&file.content_type)
+            .map_err(|error| ApiError { status: 0, message: error.to_string(), body: Value::Null })?;
+        let form = reqwest::multipart::Form::new().part(field, part);
+        decode(send(HTTP.post(&url).multipart(form)).await?)
+    })
+    .await
+}
+
 /// PUTs raw bytes to a presigned upload url (no cookies needed, but harmless).
 pub async fn upload_bytes(url: String, content_type: String, bytes: Vec<u8>) -> Result<(), String> {
     runtime::io(async move {

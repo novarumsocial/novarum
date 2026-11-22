@@ -5,15 +5,20 @@ mod app;
 mod assets;
 mod desktop;
 mod models;
+#[allow(dead_code)]
+mod notifications;
 mod prelude;
 mod realtime_events;
 mod runtime;
 mod socket;
+mod sounds;
 mod state;
 mod storage;
 mod theme;
 mod ui;
 mod updater;
+#[allow(dead_code)]
+mod util;
 mod views;
 
 use std::time::Duration;
