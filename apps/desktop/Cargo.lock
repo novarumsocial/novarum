@@ -4485,6 +4485,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "cookie_store 0.21.1",
+ "cpal",
  "dirs 5.0.1",
  "flate2",
  "futures",
@@ -4496,6 +4497,7 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
  "png 0.18.1",
+ "qrcode",
  "rand 0.9.5",
  "regex",
  "reqwest",
@@ -5652,6 +5654,12 @@ checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
 ]
+
+[[package]]
+name = "qrcode"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ace1a365f55004297f2cf24acfd96d02966246ca423385273b58a7dc873ee14d"
 
 [[package]]
 name = "quick-error"

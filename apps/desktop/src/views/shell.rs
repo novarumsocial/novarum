@@ -188,6 +188,7 @@ impl AppShell {
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&Voice::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&ShellState::global(cx), |_, _, cx| cx.notify()),
+            crate::views::settings_dialog::watch(window, cx),
             // the server skips push for users with an active window, so it has to hear when this one stops being it
             cx.observe_window_activation(window, |_, window, cx| {
                 Realtime::set_window_active(window.is_window_active(), cx);
