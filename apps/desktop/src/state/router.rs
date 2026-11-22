@@ -33,6 +33,11 @@ impl Global for GlobalRouter {}
 pub fn init(cx: &mut App) {
     let router = cx.new(|_| Router { path: "/guilds".into(), query: HashMap::new() });
     cx.set_global(GlobalRouter(router));
+    // debug builds can open straight onto a page, e.g. NOVARUM_START_PATH=/guilds/dms
+    #[cfg(debug_assertions)]
+    if let Ok(path) = std::env::var("NOVARUM_START_PATH") {
+        goto(path, cx);
+    }
 }
 
 fn decode(part: &str) -> String {
