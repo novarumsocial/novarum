@@ -18,8 +18,10 @@ impl AssetSource for Assets {
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        let mut own: Vec<SharedString> =
-            Own::iter().filter(|name| name.starts_with(path)).map(|name| name.to_string().into()).collect();
+        let mut own: Vec<SharedString> = Own::iter()
+            .filter(|name| name.starts_with(path))
+            .map(|name| name.to_string().into())
+            .collect();
         own.extend(gpui_kit::assets::AllAssets.list(path)?);
         Ok(own)
     }

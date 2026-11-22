@@ -19,7 +19,11 @@ pub fn oklch(l: f32, c: f32, h: f32, a: f32) -> Hsla {
     ];
     let [r, g, b] = lin.map(|v| {
         let v = v.clamp(0.0, 1.0);
-        if v <= 0.003_130_8 { 12.92 * v } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 }
+        if v <= 0.003_130_8 {
+            12.92 * v
+        } else {
+            1.055 * v.powf(1.0 / 2.4) - 0.055
+        }
     });
     Rgba { r, g, b, a }.into()
 }
@@ -122,11 +126,23 @@ pub fn tokens(cx: &App) -> Tokens {
 
 /// Applies dark mode and rounded borders, like +layout.svelte's effect on `<html>`.
 pub fn apply(dark: bool, rounded: bool, cx: &mut App) {
-    let mut t = if dark { Tokens::dark() } else { Tokens::light() };
+    let mut t = if dark {
+        Tokens::dark()
+    } else {
+        Tokens::light()
+    };
     t.radius = if rounded { px(8.0) } else { px(0.0) };
     cx.set_global(t);
 
-    Theme::change(if dark { ThemeMode::Dark } else { ThemeMode::Light }, None, cx);
+    Theme::change(
+        if dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        },
+        None,
+        cx,
+    );
     Theme::update(cx, |theme| {
         theme.font_family = "IBM Plex Sans".into();
         theme.font_size = px(16.0);

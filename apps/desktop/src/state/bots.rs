@@ -151,11 +151,17 @@ impl Developers {
     }
 
     pub fn find(&self, id: Option<&str>) -> Option<&DeveloperBot> {
-        self.bots.iter().find(|bot| Some(bot.user.user_id.as_str()) == id)
+        self.bots
+            .iter()
+            .find(|bot| Some(bot.user.user_id.as_str()) == id)
     }
 
     fn put(&mut self, bot: DeveloperBot) {
-        match self.bots.iter_mut().find(|item| item.user.user_id == bot.user.user_id) {
+        match self
+            .bots
+            .iter_mut()
+            .find(|item| item.user.user_id == bot.user.user_id)
+        {
             Some(existing) => *existing = bot,
             None => self.bots.push(bot),
         }
@@ -174,7 +180,9 @@ impl Developers {
                         developers.bots = payload.bots;
                         developers.loaded = true;
                     }
-                    Err(error) => developers.error = Some(failed(error, "Could not load your bots.")),
+                    Err(error) => {
+                        developers.error = Some(failed(error, "Could not load your bots."))
+                    }
                 }
                 cx.notify();
             });
@@ -195,8 +203,10 @@ impl Developers {
                 .map_err(|error| failed(error, "Could not create the bot."))?;
             let bot = created.bot.clone();
             let _ = this.update(cx, |developers, cx| {
-                developers.revealed_token =
-                    Some(RevealedToken { bot_id: bot.user.user_id.clone(), token: created.token });
+                developers.revealed_token = Some(RevealedToken {
+                    bot_id: bot.user.user_id.clone(),
+                    token: created.token,
+                });
                 developers.put(created.bot);
                 cx.notify();
             });
@@ -204,7 +214,12 @@ impl Developers {
         })
     }
 
-    pub fn update(&mut self, id: String, patch: BotPatch, cx: &mut Context<Self>) -> Task<Result<(), String>> {
+    pub fn update(
+        &mut self,
+        id: String,
+        patch: BotPatch,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<(), String>> {
         let request = api::patch::<BotPayload>(format!("/developers/bots/{id}"), patch);
         self.save_bot(request, "Could not save the changes.", cx)
     }
@@ -215,7 +230,8 @@ impl Developers {
         avatar: UploadFile,
         cx: &mut Context<Self>,
     ) -> Task<Result<(), String>> {
-        let request = api::post_file::<BotPayload>(format!("/developers/bots/{id}/avatar"), "avatar", avatar);
+        let request =
+            api::post_file::<BotPayload>(format!("/developers/bots/{id}/avatar"), "avatar", avatar);
         self.save_bot(request, "Could not upload the avatar.", cx)
     }
 
@@ -235,13 +251,21 @@ impl Developers {
         })
     }
 
-    pub fn regenerate_token(&mut self, id: String, cx: &mut Context<Self>) -> Task<Result<(), String>> {
+    pub fn regenerate_token(
+        &mut self,
+        id: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<(), String>> {
         cx.spawn(async move |this, cx| {
-            let payload = api::post::<TokenPayload>(format!("/developers/bots/{id}/token"), json!({}))
-                .await
-                .map_err(|error| failed(error, "Could not make a new token."))?;
+            let payload =
+                api::post::<TokenPayload>(format!("/developers/bots/{id}/token"), json!({}))
+                    .await
+                    .map_err(|error| failed(error, "Could not make a new token."))?;
             let _ = this.update(cx, |developers, cx| {
-                developers.revealed_token = Some(RevealedToken { bot_id: id, token: payload.token });
+                developers.revealed_token = Some(RevealedToken {
+                    bot_id: id,
+                    token: payload.token,
+                });
                 cx.notify();
             });
             Ok(())
@@ -255,7 +279,11 @@ impl Developers {
                 .map_err(|error| failed(error, "Could not delete the bot."))?;
             let _ = this.update(cx, |developers, cx| {
                 developers.bots.retain(|bot| bot.user.user_id != id);
-                if developers.revealed_token.as_ref().is_some_and(|token| token.bot_id == id) {
+                if developers
+                    .revealed_token
+                    .as_ref()
+                    .is_some_and(|token| token.bot_id == id)
+                {
                     developers.revealed_token = None;
                 }
                 cx.notify();
@@ -267,7 +295,8 @@ impl Developers {
 
 /// `@name:homeserver` or `name:homeserver`: the username and homeserver.
 pub fn parse_bot_handle(handle: &str) -> Option<(String, String)> {
-    static HANDLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@?([a-zA-Z0-9._]{2,32}):(\S+)$").unwrap());
+    static HANDLE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^@?([a-zA-Z0-9._]{2,32}):(\S+)$").unwrap());
     let captures = HANDLE.captures(handle.trim())?;
     Some((captures[1].to_string(), captures[2].to_string()))
 }
@@ -279,11 +308,21 @@ pub struct BotLookup {
 }
 
 pub async fn lookup_bot(username: String, homeserver: String) -> Option<BotLookup> {
-    api::get_query("/bots/lookup", &[("username", username), ("homeserver", homeserver)]).await.ok()
+    api::get_query(
+        "/bots/lookup",
+        &[("username", username), ("homeserver", homeserver)],
+    )
+    .await
+    .ok()
 }
 
 /// `role` is `"MEMBER"` or `"ADMIN"`.
-pub async fn add_bot_to_guild(guild_id: &str, username: &str, homeserver: &str, role: &str) -> Result<(), String> {
+pub async fn add_bot_to_guild(
+    guild_id: &str,
+    username: &str,
+    homeserver: &str,
+    role: &str,
+) -> Result<(), String> {
     let body = json!({ "username": username, "homeserver": homeserver, "role": role });
     api::post::<api::Ignored>(format!("/guilds/{guild_id}/bots"), body)
         .await
@@ -344,10 +383,18 @@ struct GlobalInteractions(Entity<Interactions>);
 impl Global for GlobalInteractions {}
 
 pub fn init(cx: &mut App) {
-    let developers =
-        cx.new(|_| Developers { bots: vec![], loading: false, loaded: false, error: None, revealed_token: None });
+    let developers = cx.new(|_| Developers {
+        bots: vec![],
+        loading: false,
+        loaded: false,
+        error: None,
+        revealed_token: None,
+    });
     cx.set_global(GlobalDevelopers(developers));
-    let interactions = cx.new(|_| Interactions { commands_by_guild: HashMap::new(), pressing: None });
+    let interactions = cx.new(|_| Interactions {
+        commands_by_guild: HashMap::new(),
+        pressing: None,
+    });
     cx.set_global(GlobalInteractions(interactions));
 }
 
@@ -377,11 +424,20 @@ impl Interactions {
             return Task::ready(bots.clone());
         }
         let is_dm = Dms::global(cx).read(cx).get(&guild_id).is_some();
-        let path = if is_dm { format!("/dm/{guild_id}/commands") } else { format!("/guilds/{guild_id}/commands") };
+        let path = if is_dm {
+            format!("/dm/{guild_id}/commands")
+        } else {
+            format!("/guilds/{guild_id}/commands")
+        };
         cx.spawn(async move |this, cx| {
-            let bots = api::get::<CommandsPayload>(path).await.map(|payload| payload.bots).unwrap_or_default();
+            let bots = api::get::<CommandsPayload>(path)
+                .await
+                .map(|payload| payload.bots)
+                .unwrap_or_default();
             let _ = this.update(cx, |interactions, cx| {
-                interactions.commands_by_guild.insert(guild_id, (bots.clone(), Instant::now()));
+                interactions
+                    .commands_by_guild
+                    .insert(guild_id, (bots.clone(), Instant::now()));
                 cx.notify();
             });
             bots
@@ -415,18 +471,30 @@ impl Interactions {
             // a deferred answer shows the bot thinking until its reply arrives. A fast bot's reply
             // can come over the socket before this answer does, and then there is nothing to wait for.
             let replied = cx.update(|cx| {
-                chat.read(cx).messages_by_channel.get(&channel_id).is_some_and(|messages| {
-                    messages.iter().any(|message| message.interaction.as_ref().is_some_and(|i| i.id == result.id))
-                })
+                chat.read(cx)
+                    .messages_by_channel
+                    .get(&channel_id)
+                    .is_some_and(|messages| {
+                        messages.iter().any(|message| {
+                            message
+                                .interaction
+                                .as_ref()
+                                .is_some_and(|i| i.id == result.id)
+                        })
+                    })
             });
             if replied {
                 return Ok(());
             }
-            chat.update(cx, |chat, cx| chat.add_thinking(&channel_id, &result.id, &bot, result.ephemeral, cx));
+            chat.update(cx, |chat, cx| {
+                chat.add_thinking(&channel_id, &result.id, &bot, result.ephemeral, cx)
+            });
             let thinking_id = format!("thinking:{}", result.id);
             cx.spawn(async move |cx| {
                 cx.background_executor().timer(THINKING_TIMEOUT).await;
-                chat.update(cx, |chat, cx| chat.remove_message(&channel_id, &thinking_id, cx));
+                chat.update(cx, |chat, cx| {
+                    chat.remove_message(&channel_id, &thinking_id, cx)
+                });
             })
             .detach();
             Ok(())
@@ -451,7 +519,10 @@ impl Interactions {
                 "options": options,
                 "focused": focused,
             });
-            api::post::<InteractionResult>("/interactions", body).await.map(|result| result.choices).unwrap_or_default()
+            api::post::<InteractionResult>("/interactions", body)
+                .await
+                .map(|result| result.choices)
+                .unwrap_or_default()
         })
     }
 
@@ -476,7 +547,9 @@ impl Interactions {
                 interactions.pressing = None;
                 cx.notify();
             });
-            result.map(|_| ()).map_err(|error| failed(error, "Nothing happened. Try again."))
+            result
+                .map(|_| ())
+                .map_err(|error| failed(error, "Nothing happened. Try again."))
         })
     }
 }
@@ -487,8 +560,14 @@ mod tests {
 
     #[test]
     fn parses_bot_handles() {
-        assert_eq!(parse_bot_handle(" @helper:novarum.me "), Some(("helper".into(), "novarum.me".into())));
-        assert_eq!(parse_bot_handle("helper:localhost:5049"), Some(("helper".into(), "localhost:5049".into())));
+        assert_eq!(
+            parse_bot_handle(" @helper:novarum.me "),
+            Some(("helper".into(), "novarum.me".into()))
+        );
+        assert_eq!(
+            parse_bot_handle("helper:localhost:5049"),
+            Some(("helper".into(), "localhost:5049".into()))
+        );
         assert_eq!(parse_bot_handle("@h:x"), None);
         assert_eq!(parse_bot_handle("helper"), None);
     }

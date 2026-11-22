@@ -5,7 +5,9 @@ use serde_json::json;
 
 use crate::{
     api,
-    models::{DmChannel, DmLastMessage, DmLastMessageAuthor, DmType, DmUpdate, MessageData, PublicUser},
+    models::{
+        DmChannel, DmLastMessage, DmLastMessageAuthor, DmType, DmUpdate, MessageData, PublicUser,
+    },
     state::{
         chat::UploadFile,
         router::{self, encode},
@@ -18,19 +20,41 @@ pub type DmEntry = DmChannel;
 
 pub const RING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-fn same_user(username: &str, homeserver: &str, other_username: &str, other_homeserver: &str) -> bool {
-    username.eq_ignore_ascii_case(other_username) && homeserver.eq_ignore_ascii_case(other_homeserver)
+fn same_user(
+    username: &str,
+    homeserver: &str,
+    other_username: &str,
+    other_homeserver: &str,
+) -> bool {
+    username.eq_ignore_ascii_case(other_username)
+        && homeserver.eq_ignore_ascii_case(other_homeserver)
 }
 
 /// relayed federated messages carry the host's user ids, so authors are matched by handle to ours
 fn to_preview(dm: &DmEntry, message: &MessageData, me: Option<&SessionUser>) -> DmLastMessage {
     let author = &message.author;
     let author_id = match me {
-        Some(me) if same_user(&me.username, &me.homeserver, &author.username, &author.homeserver) => me.id.clone(),
+        Some(me)
+            if same_user(
+                &me.username,
+                &me.homeserver,
+                &author.username,
+                &author.homeserver,
+            ) =>
+        {
+            me.id.clone()
+        }
         _ => dm
             .participants
             .iter()
-            .find(|user| same_user(&user.username, &user.homeserver, &author.username, &author.homeserver))
+            .find(|user| {
+                same_user(
+                    &user.username,
+                    &user.homeserver,
+                    &author.username,
+                    &author.homeserver,
+                )
+            })
             .map(|user| user.user_id.clone())
             .unwrap_or_else(|| author.user_id.clone()),
     };
@@ -48,7 +72,10 @@ fn to_preview(dm: &DmEntry, message: &MessageData, me: Option<&SessionUser>) -> 
 }
 
 fn person_name(display_name: Option<&str>, username: &str) -> String {
-    display_name.filter(|name| !name.is_empty()).unwrap_or(username).to_string()
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(username)
+        .to_string()
 }
 
 /// "You: hi", "Ana: hi" in a group, or what the homeserver wrote ("Ana added Leo...").
@@ -63,7 +90,11 @@ pub fn dm_preview_text(dm: &DmEntry, me: Option<&SessionUser>) -> Option<String>
             .iter()
             .find(|user| user.user_id == last.author_id)
             .map(|user| (user.display_name.as_deref(), user.username.as_str()))
-            .or_else(|| last.author.as_ref().map(|author| (author.display_name.as_deref(), author.username.as_str())))
+            .or_else(|| {
+                last.author
+                    .as_ref()
+                    .map(|author| (author.display_name.as_deref(), author.username.as_str()))
+            })
     };
     if let Some(system) = &last.system {
         return author.map(|(display_name, username)| system_text(system, display_name, username));
@@ -89,7 +120,8 @@ pub fn dm_preview_text(dm: &DmEntry, me: Option<&SessionUser>) -> Option<String>
 
 /// federated DM ids look like fed:channel:<homeserver>:<id> (see anchor's federationIds.ts)
 fn is_from_homeserver(dm: &DmEntry, homeserver: &str) -> bool {
-    dm.id.starts_with(&format!("fed:channel:{}:", encode(homeserver)))
+    dm.id
+        .starts_with(&format!("fed:channel:{}:", encode(homeserver)))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,7 +156,12 @@ pub fn dm_display(dm: &DmEntry) -> DmDisplay {
         _ if !people.is_empty() => people.join(", "),
         _ => "Empty group".into(),
     };
-    DmDisplay { name, avatar_url: dm.icon_url.clone(), avatar_color: None, other: None }
+    DmDisplay {
+        name,
+        avatar_url: dm.icon_url.clone(),
+        avatar_color: None,
+        other: None,
+    }
 }
 
 pub fn dm_path(channel_id: &str, message_id: Option<&str>) -> String {
@@ -182,7 +219,9 @@ pub fn init(cx: &mut App) {
 
 /// `null` on success, the server's message otherwise.
 fn error_of<T>(result: api::ApiResult<T>, fallback: &str) -> Result<(), String> {
-    result.map(|_| ()).map_err(|error| api::error_message(&error.body, fallback))
+    result
+        .map(|_| ())
+        .map_err(|error| api::error_message(&error.body, fallback))
 }
 
 impl Dms {
@@ -196,7 +235,9 @@ impl Dms {
 
     /// the DM that already exists with this friend, if any — used to avoid opening duplicates.
     pub fn with_user(&self, user_id: &str) -> Option<&DmEntry> {
-        self.list.iter().find(|dm| dm.kind == DmType::Dm && dm.participants.iter().any(|user| user.user_id == user_id))
+        self.list.iter().find(|dm| {
+            dm.kind == DmType::Dm && dm.participants.iter().any(|user| user.user_id == user_id)
+        })
     }
 
     pub fn load(&mut self, cx: &mut Context<Self>) -> Task<()> {
@@ -218,18 +259,27 @@ impl Dms {
                     return;
                 };
                 // keep showing federated DMs until their homeserver's fetch replaces them.
-                let kept =
-                    dms.list.drain(..).filter(|dm| pending.iter().any(|homeserver| is_from_homeserver(dm, homeserver)));
+                let kept = dms.list.drain(..).filter(|dm| {
+                    pending
+                        .iter()
+                        .any(|homeserver| is_from_homeserver(dm, homeserver))
+                });
                 dms.list = list.into_iter().chain(kept.collect::<Vec<_>>()).collect();
                 for homeserver in &pending {
-                    dms.load_homeserver(homeserver.clone(), generation, cx).detach();
+                    dms.load_homeserver(homeserver.clone(), generation, cx)
+                        .detach();
                 }
                 dms.pending = pending;
             });
         })
     }
 
-    fn load_homeserver(&mut self, homeserver: String, generation: usize, cx: &mut Context<Self>) -> Task<()> {
+    fn load_homeserver(
+        &mut self,
+        homeserver: String,
+        generation: usize,
+        cx: &mut Context<Self>,
+    ) -> Task<()> {
         cx.spawn(async move |this, cx| {
             let result = api::get::<DmList>(format!("/dm/homeserver/{homeserver}")).await;
             let _ = this.update(cx, |dms, cx| {
@@ -254,7 +304,9 @@ impl Dms {
             return Task::ready(Some(existing.id.clone()));
         }
         cx.spawn(async move |this, cx| {
-            let dm = api::post::<DmEntry>("/dm", json!({ "userId": user_id })).await.ok()?;
+            let dm = api::post::<DmEntry>("/dm", json!({ "userId": user_id }))
+                .await
+                .ok()?;
             let id = dm.id.clone();
             this.update(cx, |dms, cx| dms.upsert(dm, cx)).ok()?;
             Some(id)
@@ -277,7 +329,8 @@ impl Dms {
         self.list.retain(|dm| dm.id != channel_id);
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = api::post::<api::Ignored>(format!("/dm/{channel_id}/close"), json!({})).await;
+            let result =
+                api::post::<api::Ignored>(format!("/dm/{channel_id}/close"), json!({})).await;
             if let (Err(_), Some(closed)) = (result, closed) {
                 let _ = this.update(cx, |dms, cx| dms.upsert(closed, cx));
             }
@@ -292,9 +345,12 @@ impl Dms {
         cx: &mut Context<Self>,
     ) -> Task<Result<String, String>> {
         cx.spawn(async move |this, cx| {
-            let dm = api::post::<DmEntry>("/dm/group", json!({ "userIds": user_ids, "name": name }))
-                .await
-                .map_err(|error| api::error_message(&error.body, "Could not create the group."))?;
+            let dm =
+                api::post::<DmEntry>("/dm/group", json!({ "userIds": user_ids, "name": name }))
+                    .await
+                    .map_err(|error| {
+                        api::error_message(&error.body, "Could not create the group.")
+                    })?;
             let id = dm.id.clone();
             let _ = this.update(cx, |dms, cx| dms.upsert(dm, cx));
             cx.update(|cx| router::goto(dm_path(&id, None), cx));
@@ -302,8 +358,16 @@ impl Dms {
         })
     }
 
-    pub fn add_members(&self, channel_id: &str, user_ids: Vec<String>, cx: &App) -> Task<Result<(), String>> {
-        let request = api::post::<api::Ignored>(format!("/dm/{channel_id}/members"), json!({ "userIds": user_ids }));
+    pub fn add_members(
+        &self,
+        channel_id: &str,
+        user_ids: Vec<String>,
+        cx: &App,
+    ) -> Task<Result<(), String>> {
+        let request = api::post::<api::Ignored>(
+            format!("/dm/{channel_id}/members"),
+            json!({ "userIds": user_ids }),
+        );
         cx.spawn(async move |_| error_of(request.await, "Could not add them."))
     }
 
@@ -312,30 +376,56 @@ impl Dms {
         cx.spawn(async move |_| error_of(request.await, "Could not remove them."))
     }
 
-    pub fn transfer_owner(&self, channel_id: &str, user_id: &str, cx: &App) -> Task<Result<(), String>> {
-        let request = api::post::<api::Ignored>(format!("/dm/{channel_id}/owner"), json!({ "userId": user_id }));
+    pub fn transfer_owner(
+        &self,
+        channel_id: &str,
+        user_id: &str,
+        cx: &App,
+    ) -> Task<Result<(), String>> {
+        let request = api::post::<api::Ignored>(
+            format!("/dm/{channel_id}/owner"),
+            json!({ "userId": user_id }),
+        );
         cx.spawn(async move |_| error_of(request.await, "Could not transfer the group."))
     }
 
     pub fn rename(&self, channel_id: &str, name: &str, cx: &App) -> Task<Result<(), String>> {
-        let request = api::patch::<api::Ignored>(format!("/dm/{channel_id}"), json!({ "name": name }));
+        let request =
+            api::patch::<api::Ignored>(format!("/dm/{channel_id}"), json!({ "name": name }));
         cx.spawn(async move |_| error_of(request.await, "Could not rename the group."))
     }
 
-    pub fn upload_icon(&self, channel_id: &str, icon: UploadFile, cx: &App) -> Task<Result<(), String>> {
-        let request = api::post_file::<api::Ignored>(format!("/dm/{channel_id}/icon"), "icon", icon);
+    pub fn upload_icon(
+        &self,
+        channel_id: &str,
+        icon: UploadFile,
+        cx: &App,
+    ) -> Task<Result<(), String>> {
+        let request =
+            api::post_file::<api::Ignored>(format!("/dm/{channel_id}/icon"), "icon", icon);
         cx.spawn(async move |_| error_of(request.await, "Could not upload the icon."))
     }
 
-    pub fn add_bot(&self, channel_id: &str, username: &str, homeserver: &str, cx: &App) -> Task<Result<(), String>> {
+    pub fn add_bot(
+        &self,
+        channel_id: &str,
+        username: &str,
+        homeserver: &str,
+        cx: &App,
+    ) -> Task<Result<(), String>> {
         let body = json!({ "username": username, "homeserver": homeserver });
         let request = api::post::<api::Ignored>(format!("/dm/{channel_id}/bots"), body);
         cx.spawn(async move |_| error_of(request.await, "Could not add the bot."))
     }
 
-    pub fn leave(&mut self, channel_id: String, cx: &mut Context<Self>) -> Task<Result<(), String>> {
+    pub fn leave(
+        &mut self,
+        channel_id: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<(), String>> {
         cx.spawn(async move |this, cx| {
-            let result = api::post::<api::Ignored>(format!("/dm/{channel_id}/leave"), json!({})).await;
+            let result =
+                api::post::<api::Ignored>(format!("/dm/{channel_id}/leave"), json!({})).await;
             error_of(result, "Could not leave the group.")?;
             let _ = this.update(cx, |dms, cx| dms.remove(&channel_id, cx));
             Ok(())
@@ -344,7 +434,11 @@ impl Dms {
 
     pub fn remove(&mut self, channel_id: &str, cx: &mut Context<Self>) {
         self.list.retain(|dm| dm.id != channel_id);
-        if self.incoming_call.as_ref().is_some_and(|call| call.channel_id == channel_id) {
+        if self
+            .incoming_call
+            .as_ref()
+            .is_some_and(|call| call.channel_id == channel_id)
+        {
             self.incoming_call = None;
         }
         if self.outgoing_call.as_deref() == Some(channel_id) {
@@ -390,7 +484,11 @@ impl Dms {
     pub fn handle_message_edit(&mut self, message: &MessageData, cx: &mut Context<Self>) {
         let me = Session::user(cx);
         for dm in &mut self.list {
-            if dm.last_message.as_ref().is_some_and(|last| last.id == message.id) {
+            if dm
+                .last_message
+                .as_ref()
+                .is_some_and(|last| last.id == message.id)
+            {
                 dm.last_message = Some(to_preview(dm, message, me.as_ref()));
             }
         }
@@ -399,7 +497,11 @@ impl Dms {
 
     /// the preview before a deleted newest message isn't known here, so the server picks it again
     pub fn handle_message_delete(&mut self, message_id: &str, cx: &mut Context<Self>) {
-        if self.list.iter().any(|dm| dm.last_message.as_ref().is_some_and(|last| last.id == message_id)) {
+        if self.list.iter().any(|dm| {
+            dm.last_message
+                .as_ref()
+                .is_some_and(|last| last.id == message_id)
+        }) {
             self.load(cx).detach();
         }
     }
@@ -460,7 +562,11 @@ mod tests {
         }
     }
 
-    fn dm(kind: DmType, participants: Vec<PublicUser>, last: Option<(&str, Option<&str>, u32)>) -> DmEntry {
+    fn dm(
+        kind: DmType,
+        participants: Vec<PublicUser>,
+        last: Option<(&str, Option<&str>, u32)>,
+    ) -> DmEntry {
         DmEntry {
             id: "d1".into(),
             kind,
@@ -485,32 +591,72 @@ mod tests {
     #[test]
     fn previews_say_who_wrote_what() {
         let me = me();
-        let one = dm(DmType::Dm, vec![user("leo", "Leo")], Some(("leo", Some("hi"), 0)));
+        let one = dm(
+            DmType::Dm,
+            vec![user("leo", "Leo")],
+            Some(("leo", Some("hi"), 0)),
+        );
         assert_eq!(dm_preview_text(&one, Some(&me)).as_deref(), Some("hi"));
         let mine = dm(DmType::Dm, vec![user("leo", "Leo")], Some(("me", None, 2)));
-        assert_eq!(dm_preview_text(&mine, Some(&me)).as_deref(), Some("You: Sent 2 attachments"));
-        let group = dm(DmType::GroupDm, vec![user("leo", "Leo")], Some(("leo", None, 1)));
-        assert_eq!(dm_preview_text(&group, Some(&me)).as_deref(), Some("Leo: Sent an attachment"));
-        let mut system = dm(DmType::GroupDm, vec![user("leo", "Leo")], Some(("leo", None, 0)));
+        assert_eq!(
+            dm_preview_text(&mine, Some(&me)).as_deref(),
+            Some("You: Sent 2 attachments")
+        );
+        let group = dm(
+            DmType::GroupDm,
+            vec![user("leo", "Leo")],
+            Some(("leo", None, 1)),
+        );
+        assert_eq!(
+            dm_preview_text(&group, Some(&me)).as_deref(),
+            Some("Leo: Sent an attachment")
+        );
+        let mut system = dm(
+            DmType::GroupDm,
+            vec![user("leo", "Leo")],
+            Some(("leo", None, 0)),
+        );
         system.last_message.as_mut().unwrap().system = Some(SystemMessage::MemberLeft);
-        assert_eq!(dm_preview_text(&system, Some(&me)).as_deref(), Some("Leo left the group."));
-        assert_eq!(dm_preview_text(&dm(DmType::Dm, vec![], None), Some(&me)), None);
+        assert_eq!(
+            dm_preview_text(&system, Some(&me)).as_deref(),
+            Some("Leo left the group.")
+        );
+        assert_eq!(
+            dm_preview_text(&dm(DmType::Dm, vec![], None), Some(&me)),
+            None
+        );
     }
 
     #[test]
     fn displays_people_or_groups() {
-        assert_eq!(dm_display(&dm(DmType::Dm, vec![user("leo", "Leo")], None)).name, "Leo");
-        assert_eq!(dm_display(&dm(DmType::Dm, vec![], None)).name, "Direct Message");
-        let mut group = dm(DmType::GroupDm, vec![user("leo", "Leo"), user("mia", "Mia")], None);
+        assert_eq!(
+            dm_display(&dm(DmType::Dm, vec![user("leo", "Leo")], None)).name,
+            "Leo"
+        );
+        assert_eq!(
+            dm_display(&dm(DmType::Dm, vec![], None)).name,
+            "Direct Message"
+        );
+        let mut group = dm(
+            DmType::GroupDm,
+            vec![user("leo", "Leo"), user("mia", "Mia")],
+            None,
+        );
         assert_eq!(dm_display(&group).name, "Leo, Mia");
         group.name = Some("Crew".into());
         assert_eq!(dm_display(&group).name, "Crew");
-        assert_eq!(dm_display(&dm(DmType::GroupDm, vec![], None)).name, "Empty group");
+        assert_eq!(
+            dm_display(&dm(DmType::GroupDm, vec![], None)).name,
+            "Empty group"
+        );
     }
 
     #[test]
     fn builds_dm_paths() {
-        assert_eq!(dm_path("fed:channel:a.b:1", None), "/guilds/dms/fed%3Achannel%3Aa.b%3A1");
+        assert_eq!(
+            dm_path("fed:channel:a.b:1", None),
+            "/guilds/dms/fed%3Achannel%3Aa.b%3A1"
+        );
         assert_eq!(dm_path("d", Some("m")), "/guilds/dms/d/m");
     }
 }

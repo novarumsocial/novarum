@@ -21,7 +21,10 @@ const RAYS: [&str; 5] = [
 ];
 
 fn svg_doc(paths: &[&str], extra: &str) -> String {
-    let body: String = paths.iter().map(|d| format!(r#"<path d="{d}" {extra}/>"#)).collect();
+    let body: String = paths
+        .iter()
+        .map(|d| format!(r#"<path d="{d}" {extra}/>"#))
+        .collect();
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">{body}</svg>"#
     )
@@ -67,7 +70,13 @@ impl UpdaterView {
             }
             cx.notify();
         });
-        Self { from: 0.0, to: Self::target(cx), started: Instant::now(), lit_at: None, _updater }
+        Self {
+            from: 0.0,
+            to: Self::target(cx),
+            started: Instant::now(),
+            lit_at: None,
+            _updater,
+        }
     }
 
     fn target(cx: &App) -> f32 {
@@ -105,7 +114,10 @@ impl Render for UpdaterView {
                 format!("Downloading version {version}"),
                 format!("{}%", update.percent.unwrap_or(0.0).round()),
             ),
-            Status::Downloaded => (format!("Installing version {version}"), "Novarum will reopen by itself".into()),
+            Status::Downloaded => (
+                format!("Installing version {version}"),
+                "Novarum will reopen by itself".into(),
+            ),
             _ => ("Starting Novarum".into(), String::new()),
         };
 
@@ -125,16 +137,37 @@ impl Render for UpdaterView {
         }
 
         let sun_fade = fade(0.0);
-        let sun_rise = 1.5 * (1.0 - since_lit.map_or(0.0, |ms| ease_out_cubic((ms / 500.0).min(1.0))));
+        let sun_rise =
+            1.5 * (1.0 - since_lit.map_or(0.0, |ms| ease_out_cubic((ms / 500.0).min(1.0))));
         let mut logo = div()
             .relative()
             .size(px(112.0))
-            .child(svg_layer(svg_doc(&[&[SUN][..], &RAYS[..], &GROUND[..]].concat(), ""), ghost_opacity, 0.0, 1.0, t.foreground))
-            .when(progress > 0.01, |logo| logo.child(svg_layer(ground_doc(progress), 1.0, 0.0, 1.0, t.foreground)))
-            .child(svg_layer(svg_doc(&[SUN], ""), sun_fade, sun_rise, 1.0, t.foreground));
+            .child(svg_layer(
+                svg_doc(&[&[SUN][..], &RAYS[..], &GROUND[..]].concat(), ""),
+                ghost_opacity,
+                0.0,
+                1.0,
+                t.foreground,
+            ))
+            .when(progress > 0.01, |logo| {
+                logo.child(svg_layer(ground_doc(progress), 1.0, 0.0, 1.0, t.foreground))
+            })
+            .child(svg_layer(
+                svg_doc(&[SUN], ""),
+                sun_fade,
+                sun_rise,
+                1.0,
+                t.foreground,
+            ));
         for (i, ray) in RAYS.iter().enumerate() {
             let opacity = fade(200.0 + i as f32 * 70.0);
-            logo = logo.child(svg_layer(svg_doc(&[ray], ""), opacity, 0.0, 0.7 + 0.3 * opacity, t.foreground));
+            logo = logo.child(svg_layer(
+                svg_doc(&[ray], ""),
+                opacity,
+                0.0,
+                0.7 + 0.3 * opacity,
+                t.foreground,
+            ));
         }
 
         div()
@@ -173,8 +206,17 @@ impl Render for UpdaterView {
 
 /// One stroke layer of the logo. gpui's `svg()` loads from assets, so the generated documents
 /// are rendered as images instead.
-fn svg_layer(doc: String, opacity: f32, translate_y: f32, scale: f32, color: Hsla) -> impl IntoElement {
-    let doc = doc.replace("stroke=\"white\"", &format!("stroke=\"{}\"", css_color(color)));
+fn svg_layer(
+    doc: String,
+    opacity: f32,
+    translate_y: f32,
+    scale: f32,
+    color: Hsla,
+) -> impl IntoElement {
+    let doc = doc.replace(
+        "stroke=\"white\"",
+        &format!("stroke=\"{}\"", css_color(color)),
+    );
     let image = std::sync::Arc::new(Image::from_bytes(ImageFormat::Svg, doc.into_bytes()));
     let size = 112.0 * scale;
     div()
@@ -203,7 +245,9 @@ pub async fn update_on_launch(cx: &mut AsyncApp) -> bool {
     let check = cx.update(|cx| Updater::check(cx));
     let timeout = cx.background_executor().timer(Duration::from_secs(15));
     let available = futures::future::select(check, Box::pin(timeout)).await;
-    let futures::future::Either::Left((true, _)) = available else { return false };
+    let futures::future::Either::Left((true, _)) = available else {
+        return false;
+    };
     let download = cx.update(|cx| Updater::download(cx));
     if download.await.is_err() {
         return false;

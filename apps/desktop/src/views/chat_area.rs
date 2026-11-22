@@ -34,7 +34,9 @@ use crate::{
 
 /// Messages within five minutes from the same author, with nothing in between, share a header.
 pub fn grouped(previous: Option<&Message>, message: &Message, first_unread: bool) -> bool {
-    let Some(previous) = previous else { return false };
+    let Some(previous) = previous else {
+        return false;
+    };
     !first_unread
         && message.interaction.is_none()
         && !message.ephemeral
@@ -48,7 +50,8 @@ pub fn grouped(previous: Option<&Message>, message: &Message, first_unread: bool
 /// A day divider goes above the first message and above each one sent on a new (local) day.
 pub fn starts_day(previous: Option<&Message>, message: &Message) -> bool {
     previous.is_none_or(|previous| {
-        previous.timestamp.with_timezone(&Local).date_naive() != message.timestamp.with_timezone(&Local).date_naive()
+        previous.timestamp.with_timezone(&Local).date_naive()
+            != message.timestamp.with_timezone(&Local).date_naive()
     })
 }
 
@@ -56,7 +59,9 @@ pub fn starts_day(previous: Option<&Message>, message: &Message) -> bool {
 /// `boundary` is `None` when the channel had nothing unread on opening.
 pub fn first_unread_index(messages: &[Message], boundary: Option<Option<&str>>) -> Option<usize> {
     let last_read = boundary?;
-    let Some(last_read) = last_read else { return Some(0) };
+    let Some(last_read) = last_read else {
+        return Some(0);
+    };
     match messages.iter().position(|message| message.id == last_read) {
         None => Some(0),
         Some(index) if index + 1 < messages.len() => Some(index + 1),
@@ -79,8 +84,17 @@ pub fn splice_range(old: &[String], new: &[String]) -> Option<(usize, usize, usi
         return None;
     }
     let prefix = old.iter().zip(new).take_while(|(a, b)| a == b).count();
-    let suffix = old[prefix..].iter().rev().zip(new[prefix..].iter().rev()).take_while(|(a, b)| a == b).count();
-    Some((prefix, old.len() - prefix - suffix, new.len() - prefix - suffix))
+    let suffix = old[prefix..]
+        .iter()
+        .rev()
+        .zip(new[prefix..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    Some((
+        prefix,
+        old.len() - prefix - suffix,
+        new.len() - prefix - suffix,
+    ))
 }
 
 /// An optimistic message: shown right away, dropped once the server has accepted it, kept for a
@@ -98,7 +112,12 @@ struct Pending {
 enum Row {
     /// skeletons while an older page loads
     Older,
-    Message { index: usize, grouped: bool, day: bool, unread: bool },
+    Message {
+        index: usize,
+        grouped: bool,
+        day: bool,
+        unread: bool,
+    },
     Pending(String),
 }
 
@@ -131,10 +150,15 @@ impl ChatArea {
             cx.observe(&Realtime::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&ShellState::global(cx), |_, _, cx| cx.notify()),
-            cx.subscribe(&input, |this, _, event: &MessageInputEvent, cx| match event {
-                MessageInputEvent::Send { content, files } => this.send(content.clone(), files.clone(), cx),
-                MessageInputEvent::CancelReply => this.set_reply(None, cx),
-            }),
+            cx.subscribe(
+                &input,
+                |this, _, event: &MessageInputEvent, cx| match event {
+                    MessageInputEvent::Send { content, files } => {
+                        this.send(content.clone(), files.clone(), cx)
+                    }
+                    MessageInputEvent::CancelReply => this.set_reply(None, cx),
+                },
+            ),
         ];
         let list = ListState::new(0, ListAlignment::Bottom, px(800.0));
         list.set_follow_mode(FollowMode::Tail);
@@ -170,23 +194,32 @@ impl ChatArea {
     }
 
     fn on_scroll(&mut self, event: &ListScrollEvent, cx: &mut Context<Self>) {
-        let Some(channel_id) = self.channel_id.clone() else { return };
+        let Some(channel_id) = self.channel_id.clone() else {
+            return;
+        };
         if event.visible_range.start > 1 {
             return;
         }
         let chat = Chat::global(cx);
         let read = chat.read(cx);
         if read.current_messages_loading(cx)
-            || read.loading_older_by_channel.get(&channel_id).copied().unwrap_or(false)
+            || read
+                .loading_older_by_channel
+                .get(&channel_id)
+                .copied()
+                .unwrap_or(false)
             || !read.has_more_messages(&channel_id)
         {
             return;
         }
-        chat.update(cx, |chat, cx| chat.load_older_messages(channel_id, cx)).detach();
+        chat.update(cx, |chat, cx| chat.load_older_messages(channel_id, cx))
+            .detach();
     }
 
     fn send(&mut self, content: Option<String>, files: Vec<UploadFile>, cx: &mut Context<Self>) {
-        let Some(channel_id) = self.channel_id.clone() else { return };
+        let Some(channel_id) = self.channel_id.clone() else {
+            return;
+        };
         let id = Uuid::new_v4().to_string();
         self.pending.push(Pending {
             id: id.clone(),
@@ -205,11 +238,19 @@ impl ChatArea {
     }
 
     fn retry(&mut self, id: &str, cx: &mut Context<Self>) {
-        let Some(item) = self.pending.iter_mut().find(|item| item.id == id) else { return };
+        let Some(item) = self.pending.iter_mut().find(|item| item.id == id) else {
+            return;
+        };
         item.failed = false;
-        let (channel_id, content, files, reply_to) =
-            (item.channel_id.clone(), item.content.clone(), item.files.clone(), item.reply_to.clone());
-        let task = Chat::global(cx).update(cx, |chat, cx| chat.send_message(channel_id, content, files, reply_to, cx));
+        let (channel_id, content, files, reply_to) = (
+            item.channel_id.clone(),
+            item.content.clone(),
+            item.files.clone(),
+            item.reply_to.clone(),
+        );
+        let task = Chat::global(cx).update(cx, |chat, cx| {
+            chat.send_message(channel_id, content, files, reply_to, cx)
+        });
         let id = id.to_string();
         cx.spawn(async move |this, cx| {
             let result = task.await;
@@ -234,11 +275,17 @@ impl ChatArea {
     fn sync(&mut self, channel: &Channel, cx: &mut Context<Self>) {
         let chat = Chat::global(cx).read(cx);
         let messages = chat.current_messages(cx).to_vec();
-        let older_loading = chat.loading_older_by_channel.get(&channel.id).copied().unwrap_or(false);
+        let older_loading = chat
+            .loading_older_by_channel
+            .get(&channel.id)
+            .copied()
+            .unwrap_or(false);
 
         if self.channel_id.as_deref() != Some(channel.id.as_str()) {
             self.channel_id = Some(channel.id.clone());
-            self.unread_boundary = channel.unread.then(|| (channel.id.clone(), channel.last_read_message_id.clone()));
+            self.unread_boundary = channel
+                .unread
+                .then(|| (channel.id.clone(), channel.last_read_message_id.clone()));
             self.set_reply(None, cx);
             self.views.clear();
             self.keys.clear();
@@ -253,7 +300,10 @@ impl ChatArea {
             .filter(|(channel_id, _)| *channel_id == channel.id)
             .map(|(_, last_read)| last_read.as_deref());
         let first_unread = first_unread_index(&messages, boundary);
-        let by_id: HashMap<&str, &Message> = messages.iter().map(|message| (message.id.as_str(), message)).collect();
+        let by_id: HashMap<&str, &Message> = messages
+            .iter()
+            .map(|message| (message.id.as_str(), message))
+            .collect();
 
         let mut rows = Vec::with_capacity(messages.len() + 2);
         let mut keys = Vec::with_capacity(messages.len() + 2);
@@ -265,29 +315,45 @@ impl ChatArea {
         for (index, message) in messages.iter().enumerate() {
             let previous = index.checked_sub(1).map(|previous| &messages[previous]);
             let unread = first_unread == Some(index);
-            let row = Row::Message { index, grouped: grouped(previous, message, unread), day: starts_day(previous, message), unread };
-            let Row::Message { grouped, .. } = row else { unreachable!() };
+            let row = Row::Message {
+                index,
+                grouped: grouped(previous, message, unread),
+                day: starts_day(previous, message),
+                unread,
+            };
+            let Row::Message { grouped, .. } = row else {
+                unreachable!()
+            };
             if message.system.is_none() {
-                let replied = message.reply_to.as_deref().and_then(|id| by_id.get(id).copied());
+                let replied = message
+                    .reply_to
+                    .as_deref()
+                    .and_then(|id| by_id.get(id).copied());
                 let view = match self.views.remove(&message.id) {
                     Some((view, subscription)) => {
                         view.update(cx, |view, cx| view.set(message, replied, grouped, cx));
                         (view, subscription)
                     }
                     None => {
-                        let view = cx.new(|_| MessageView::new(message.clone(), replied.cloned(), grouped));
-                        let subscription = cx.subscribe(&view, |this, view, event: &MessageEvent, cx| match event {
-                            MessageEvent::Reply => {
-                                let message = view.read(cx).message.clone();
-                                this.set_reply(Some(message), cx);
-                                let input = this.input.clone();
-                                cx.defer(move |cx| {
-                                    if let Some(window) = cx.active_window() {
-                                        let _ = window.update(cx, |_, window, cx| MessageInput::focus_entity(&input, window, cx));
-                                    }
-                                });
-                            }
-                        });
+                        let view = cx
+                            .new(|_| MessageView::new(message.clone(), replied.cloned(), grouped));
+                        let subscription = cx.subscribe(
+                            &view,
+                            |this, view, event: &MessageEvent, cx| match event {
+                                MessageEvent::Reply => {
+                                    let message = view.read(cx).message.clone();
+                                    this.set_reply(Some(message), cx);
+                                    let input = this.input.clone();
+                                    cx.defer(move |cx| {
+                                        if let Some(window) = cx.active_window() {
+                                            let _ = window.update(cx, |_, window, cx| {
+                                                MessageInput::focus_entity(&input, window, cx)
+                                            });
+                                        }
+                                    });
+                                }
+                            },
+                        );
                         (view, subscription)
                     }
                 };
@@ -296,7 +362,11 @@ impl ChatArea {
             keys.push(message.id.clone());
             rows.push(row);
         }
-        for item in self.pending.iter().filter(|item| item.channel_id == channel.id) {
+        for item in self
+            .pending
+            .iter()
+            .filter(|item| item.channel_id == channel.id)
+        {
             keys.push(format!("pending:{}", item.id));
             rows.push(Row::Pending(item.id.clone()));
         }
@@ -326,7 +396,12 @@ impl ChatArea {
                         _ => None,
                     };
                     let moved = |row: &Row| match row {
-                        Row::Message { grouped, day, unread, .. } => Some((*grouped, *day, *unread)),
+                        Row::Message {
+                            grouped,
+                            day,
+                            unread,
+                            ..
+                        } => Some((*grouped, *day, *unread)),
                         _ => None,
                     };
                     moved(old_row) != moved(row) || *old_message != message
@@ -362,13 +437,20 @@ impl ChatArea {
         self.settled = Some(channel.id.clone());
         self.jumped = active.clone();
         let target = active.as_ref().and_then(|id| {
-            self.rows.iter().position(|row| matches!(row, Row::Message { index, .. } if self.messages[*index].id == *id))
+            self.rows.iter().position(
+                |row| matches!(row, Row::Message { index, .. } if self.messages[*index].id == *id),
+            )
         });
         match (target, active) {
             (Some(row), Some(id)) => {
-                self.list.scroll_to(ListOffset { item_ix: row.saturating_sub(2), offset_in_item: px(0.0) });
+                self.list.scroll_to(ListOffset {
+                    item_ix: row.saturating_sub(2),
+                    offset_in_item: px(0.0),
+                });
                 self.flash = Some(cx.spawn(async move |_, cx| {
-                    cx.background_executor().timer(Duration::from_millis(1500)).await;
+                    cx.background_executor()
+                        .timer(Duration::from_millis(1500))
+                        .await;
                     cx.update(|cx| {
                         let chat = Chat::global(cx).read(cx);
                         if chat.active_message(cx).as_deref() == Some(id.as_str()) {
@@ -388,12 +470,21 @@ impl ChatArea {
         let gutter = if narrow { px(12.0) } else { px(16.0) };
         match self.rows.get(ix).cloned() {
             None => div().into_any_element(),
-            Some(Row::Older) => div().px(gutter).pt_4().child(skeleton_rows(2, cx)).into_any_element(),
+            Some(Row::Older) => div()
+                .px(gutter)
+                .pt_4()
+                .child(skeleton_rows(2, cx))
+                .into_any_element(),
             Some(Row::Pending(id)) => match self.pending.iter().find(|item| item.id == id) {
                 Some(item) => self.render_pending(item, gutter, cx).into_any_element(),
                 None => div().into_any_element(),
             },
-            Some(Row::Message { index, grouped, day, unread }) => {
+            Some(Row::Message {
+                index,
+                grouped,
+                day,
+                unread,
+            }) => {
                 let message = &self.messages[index];
                 let marker = |label: String, color: Hsla, line: Hsla| {
                     div()
@@ -409,7 +500,9 @@ impl ChatArea {
                         .child(label.to_uppercase())
                 };
                 let body: AnyElement = match &message.system {
-                    Some(system) => system_message(message, system, cx).px(gutter).into_any_element(),
+                    Some(system) => system_message(message, system, cx)
+                        .px(gutter)
+                        .into_any_element(),
                     None => match self.views.get(&message.id) {
                         Some((view, _)) => view.clone().into_any_element(),
                         None => div().into_any_element(),
@@ -418,10 +511,23 @@ impl ChatArea {
                 let first = index == 0;
                 div()
                     .when(day, |row| {
-                        row.child(marker(format_date(&message.timestamp.with_timezone(&Local), &Local::now()), t.muted_foreground.opacity(0.2), t.muted_foreground.opacity(0.2)))
+                        row.child(marker(
+                            format_date(&message.timestamp.with_timezone(&Local), &Local::now()),
+                            t.muted_foreground.opacity(0.2),
+                            t.muted_foreground.opacity(0.2),
+                        ))
                     })
-                    .when(unread, |row| row.child(marker("New".into(), t.destructive, t.destructive)))
-                    .child(div().when(!first, |row| if grouped { row.mt_0p5() } else { row.mt_4() }).child(body))
+                    .when(unread, |row| {
+                        row.child(marker("New".into(), t.destructive, t.destructive))
+                    })
+                    .child(
+                        div()
+                            .when(
+                                !first,
+                                |row| if grouped { row.mt_0p5() } else { row.mt_4() },
+                            )
+                            .child(body),
+                    )
                     .into_any_element()
             }
         }
@@ -430,9 +536,17 @@ impl ChatArea {
     fn render_pending(&self, item: &Pending, gutter: Pixels, cx: &mut Context<Self>) -> Div {
         let t = theme::tokens(cx);
         let user = Session::user(cx);
-        let name = user.as_ref().map(|user| user.name().to_string()).unwrap_or_else(|| "You".into());
+        let name = user
+            .as_ref()
+            .map(|user| user.name().to_string())
+            .unwrap_or_else(|| "You".into());
         let progress = {
-            let values: Vec<f32> = Chat::global(cx).read(cx).upload_progress.values().copied().collect();
+            let values: Vec<f32> = Chat::global(cx)
+                .read(cx)
+                .upload_progress
+                .values()
+                .copied()
+                .collect();
             (!values.is_empty()).then(|| values.iter().sum::<f32>() / values.len() as f32)
         };
         let id = item.id.clone();
@@ -459,25 +573,50 @@ impl ChatArea {
                     .flex_col()
                     .flex_1()
                     .min_w_0()
-                    .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(t.foreground).child(name))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(t.foreground)
+                            .child(name),
+                    )
                     .child(
                         div()
                             .when(!item.failed, |body| body.opacity(0.6))
                             .when_some(item.content.clone(), |body, content| {
-                                body.child(div().text_sm().line_height(relative(1.625)).text_color(t.foreground.opacity(0.9)).child(content))
+                                body.child(
+                                    div()
+                                        .text_sm()
+                                        .line_height(relative(1.625))
+                                        .text_color(t.foreground.opacity(0.9))
+                                        .child(content),
+                                )
                             })
                             .when(!item.files.is_empty(), |body| {
-                                body.child(div().text_xs().text_color(t.muted_foreground).child(attachment_count(item.files.len())))
-                                    .when_some(progress.filter(|_| !item.failed), |body, progress| {
+                                body.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(t.muted_foreground)
+                                        .child(attachment_count(item.files.len())),
+                                )
+                                .when_some(
+                                    progress.filter(|_| !item.failed),
+                                    |body, progress| {
                                         body.child(
                                             div()
                                                 .mt_1()
                                                 .h_0p5()
                                                 .max_w(px(320.0))
                                                 .bg(t.muted)
-                                                .child(div().h_full().w(relative(progress.clamp(0.0, 1.0))).bg(t.primary)),
+                                                .child(
+                                                    div()
+                                                        .h_full()
+                                                        .w(relative(progress.clamp(0.0, 1.0)))
+                                                        .bg(t.primary),
+                                                ),
                                         )
-                                    })
+                                    },
+                                )
                             }),
                     )
                     .when(item.failed, |body| {
@@ -498,7 +637,9 @@ impl ChatArea {
                                         .hover(|s| s.underline())
                                         .child(icon("rotate-cw").size(px(14.0)))
                                         .child("Failed to send. Click to retry")
-                                        .on_click(cx.listener(move |this, _, _, cx| this.retry(&id, cx))),
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| this.retry(&id, cx)),
+                                        ),
                                 )
                                 .child(
                                     div()
@@ -509,7 +650,9 @@ impl ChatArea {
                                         .justify_center()
                                         .cursor_pointer()
                                         .hover(|s| s.bg(t.muted))
-                                        .child(icon("x").size(px(14.0)).text_color(t.muted_foreground))
+                                        .child(
+                                            icon("x").size(px(14.0)).text_color(t.muted_foreground),
+                                        )
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             this.pending.retain(|item| item.id != discard);
                                             cx.notify();
@@ -535,15 +678,33 @@ impl ChatArea {
             .child(icon(name).size_5())
     }
 
-    fn render_header(&self, channel: &Channel, in_call: bool, callers: usize, ringing: bool, cx: &mut Context<Self>) -> Div {
+    fn render_header(
+        &self,
+        channel: &Channel,
+        in_call: bool,
+        callers: usize,
+        ringing: bool,
+        cx: &mut Context<Self>,
+    ) -> Div {
         let t = theme::tokens(cx);
         let width = ShellState::global(cx).read(cx).width;
         let channel_icon: AnyElement = match channel.kind {
-            ChannelType::Voice => icon("volume-2").size_5().text_color(t.muted_foreground).into_any_element(),
-            ChannelType::Dm => {
-                avatar(channel.avatar_url.as_deref(), &channel.name, channel.avatar_color.as_deref(), 24.0, cx).into_any_element()
-            }
-            ChannelType::Text => icon("hash").size_5().text_color(t.muted_foreground).into_any_element(),
+            ChannelType::Voice => icon("volume-2")
+                .size_5()
+                .text_color(t.muted_foreground)
+                .into_any_element(),
+            ChannelType::Dm => avatar(
+                channel.avatar_url.as_deref(),
+                &channel.name,
+                channel.avatar_color.as_deref(),
+                24.0,
+                cx,
+            )
+            .into_any_element(),
+            ChannelType::Text => icon("hash")
+                .size_5()
+                .text_color(t.muted_foreground)
+                .into_any_element(),
         };
         let id = channel.id.clone();
         let ring_id = channel.id.clone();
@@ -557,26 +718,60 @@ impl ChatArea {
             .border_color(t.border)
             .px(if width < 640.0 { px(8.0) } else { px(16.0) })
             .when(width < MD, |header| {
-                header.child(Self::header_button("open-navigation", "menu", cx).on_click(|_, _, cx| ShellState::open_navigation(cx)))
+                header.child(
+                    Self::header_button("open-navigation", "menu", cx)
+                        .on_click(|_, _, cx| ShellState::open_navigation(cx)),
+                )
             })
             .child(channel_icon)
-            .child(div().flex_shrink_0().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(t.foreground).child(channel.name.clone()))
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(t.foreground)
+                    .child(channel.name.clone()),
+            )
             .when_some(channel.topic.clone(), |header, topic| {
                 header
-                    .child(div().mx_1p5().text_color(t.muted_foreground.opacity(0.3)).child("|"))
-                    .child(div().min_w_0().truncate().text_xs().text_color(t.muted_foreground.opacity(0.7)).child(topic))
+                    .child(
+                        div()
+                            .mx_1p5()
+                            .text_color(t.muted_foreground.opacity(0.3))
+                            .child("|"),
+                    )
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_xs()
+                            .text_color(t.muted_foreground.opacity(0.7))
+                            .child(topic),
+                    )
             })
             .child(div().flex_1())
             .when(channel.kind == ChannelType::Dm && !in_call, |header| {
-                header.child(Self::header_button("start-call", "phone", cx).on_click(move |_, _, cx| ShellState::start_call(&id, cx)))
+                header.child(
+                    Self::header_button("start-call", "phone", cx)
+                        .on_click(move |_, _, cx| ShellState::start_call(&id, cx)),
+                )
             })
-            .when(channel.kind == ChannelType::Dm && in_call && callers <= 1 && !ringing, |header| {
-                header.child(Self::header_button("ring", "bell-ring", cx).on_click(move |_, _, cx| {
-                    Realtime::global(cx).update(cx, |realtime, cx| realtime.ring_call(&ring_id, true, cx));
-                }))
-            })
+            .when(
+                channel.kind == ChannelType::Dm && in_call && callers <= 1 && !ringing,
+                |header| {
+                    header.child(Self::header_button("ring", "bell-ring", cx).on_click(
+                        move |_, _, cx| {
+                            Realtime::global(cx)
+                                .update(cx, |realtime, cx| realtime.ring_call(&ring_id, true, cx));
+                        },
+                    ))
+                },
+            )
             .when(channel.kind != ChannelType::Dm || channel.group, |header| {
-                header.child(Self::header_button("toggle-members", "users", cx).on_click(|_, _, cx| ShellState::toggle_members(cx)))
+                header.child(
+                    Self::header_button("toggle-members", "users", cx)
+                        .on_click(|_, _, cx| ShellState::toggle_members(cx)),
+                )
             })
     }
 
@@ -591,7 +786,10 @@ impl ChatArea {
         let title = if channel.group {
             format!("This is the beginning of the {} group.", channel.name)
         } else if channel.kind == ChannelType::Dm {
-            format!("This is the beginning of your conversation with {}.", channel.name)
+            format!(
+                "This is the beginning of your conversation with {}.",
+                channel.name
+            )
         } else {
             "No messages yet".into()
         };
@@ -603,7 +801,13 @@ impl ChatArea {
             .items_start()
             .gap_3()
             .when(channel.kind == ChannelType::Dm, |empty| {
-                empty.child(avatar(channel.avatar_url.as_deref(), &channel.name, channel.avatar_color.as_deref(), 56.0, cx))
+                empty.child(avatar(
+                    channel.avatar_url.as_deref(),
+                    &channel.name,
+                    channel.avatar_color.as_deref(),
+                    56.0,
+                    cx,
+                ))
             })
             .child(
                 div()
@@ -611,9 +815,21 @@ impl ChatArea {
                     .border_dashed()
                     .border_color(t.border)
                     .p_4()
-                    .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(t.foreground).child(title))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(t.foreground)
+                            .child(title),
+                    )
                     .when(channel.kind != ChannelType::Dm, |card| {
-                        card.child(div().mt_1().text_sm().text_color(t.muted_foreground).child(format!("Start the conversation in #{}.", channel.name)))
+                        card.child(
+                            div()
+                                .mt_1()
+                                .text_sm()
+                                .text_color(t.muted_foreground)
+                                .child(format!("Start the conversation in #{}.", channel.name)),
+                        )
                     }),
             )
     }
@@ -622,7 +838,10 @@ impl ChatArea {
 fn skeleton_rows(count: usize, cx: &App) -> AnyElement {
     let t = theme::tokens(cx);
     let bar = |width: DefiniteLength, height: Pixels, faded: bool| {
-        div().w(width).h(height).bg(if faded { t.muted.opacity(0.7) } else { t.muted })
+        div()
+            .w(width)
+            .h(height)
+            .bg(if faded { t.muted.opacity(0.7) } else { t.muted })
     };
     let mut rows = div().flex().flex_col().gap_5();
     for index in 0..count {
@@ -639,7 +858,14 @@ fn skeleton_rows(count: usize, cx: &App) -> AnyElement {
                         .flex_1()
                         .min_w_0()
                         .gap_2()
-                        .child(div().flex().items_center().gap_2().child(bar(px(96.0).into(), px(12.0), false)).child(bar(px(40.0).into(), px(8.0), true)))
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(bar(px(96.0).into(), px(12.0), false))
+                                .child(bar(px(40.0).into(), px(8.0), true)),
+                        )
                         .child(bar(relative(0.75), px(12.0), false))
                         .child(bar(relative(0.5), px(12.0), true)),
                 ),
@@ -658,15 +884,20 @@ fn typing_dots(cx: &App) -> Div {
     let mut dots = div().mr_2p5().flex().items_center().gap_0p5();
     for (index, delay) in [0.3f32, 0.15, 0.0].into_iter().enumerate() {
         dots = dots.child(
-            div().relative().size_1().rounded_full().bg(t.muted_foreground).with_animation(
-                ("typing-dot", index),
-                Animation::new(Duration::from_secs(1)).repeat(),
-                move |dot, delta| {
-                    // animate-bounce: up a quarter of its size at the ends, resting in the middle
-                    let phase = (delta + delay).fract();
-                    dot.top(px(-((2.0 * phase - 1.0).powi(2))))
-                },
-            ),
+            div()
+                .relative()
+                .size_1()
+                .rounded_full()
+                .bg(t.muted_foreground)
+                .with_animation(
+                    ("typing-dot", index),
+                    Animation::new(Duration::from_secs(1)).repeat(),
+                    move |dot, delta| {
+                        // animate-bounce: up a quarter of its size at the ends, resting in the middle
+                        let phase = (delta + delay).fract();
+                        dot.top(px(-((2.0 * phase - 1.0).powi(2))))
+                    },
+                ),
         );
     }
     dots
@@ -676,17 +907,30 @@ impl Render for ChatArea {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let chat = Chat::global(cx).read(cx);
-        let Some(channel) = chat.current_channel(cx) else { return div().flex_1().bg(t.background).into_any_element() };
+        let Some(channel) = chat.current_channel(cx) else {
+            return div().flex_1().bg(t.background).into_any_element();
+        };
         let loading = chat.current_messages_loading(cx);
         let can_send = chat.can_send_in_current_channel(cx);
-        let typing: Vec<String> = chat.current_typing(cx).iter().map(|entry| entry.name.clone()).collect();
+        let typing: Vec<String> = chat
+            .current_typing(cx)
+            .iter()
+            .map(|entry| entry.name.clone())
+            .collect();
         let callers: Vec<String> = if channel.kind == ChannelType::Dm {
-            chat.voice_states.get(&channel.id).into_iter().flatten().map(|state| state.name.clone().unwrap_or_else(|| "Someone".into())).collect()
+            chat.voice_states
+                .get(&channel.id)
+                .into_iter()
+                .flatten()
+                .map(|state| state.name.clone().unwrap_or_else(|| "Someone".into()))
+                .collect()
         } else {
             vec![]
         };
-        let in_call = channel.kind == ChannelType::Dm && Voice::global(cx).read(cx).channel_id.as_deref() == Some(channel.id.as_str());
-        let ringing = in_call && Dms::global(cx).read(cx).outgoing_call.as_deref() == Some(channel.id.as_str());
+        let in_call = channel.kind == ChannelType::Dm
+            && Voice::global(cx).read(cx).channel_id.as_deref() == Some(channel.id.as_str());
+        let ringing = in_call
+            && Dms::global(cx).read(cx).outgoing_call.as_deref() == Some(channel.id.as_str());
 
         self.sync(&channel, cx);
         self.settle(&channel, cx);
@@ -698,22 +942,43 @@ impl Render for ChatArea {
         } else {
             format!("Message #{}", channel.name)
         };
-        self.input.update(cx, |input, cx| input.set_placeholder(placeholder, window, cx));
+        self.input.update(cx, |input, cx| {
+            input.set_placeholder(placeholder, window, cx)
+        });
 
         let narrow = window.viewport_size().width < px(640.0);
         let gutter = if narrow { px(12.0) } else { px(16.0) };
         let has_rows = !self.rows.is_empty();
         let messages: AnyElement = if loading {
-            div().flex().flex_col().flex_1().justify_end().px(gutter).py_4().child(skeleton_rows(5, cx)).into_any_element()
-        } else if !has_rows {
-            div().flex().flex_col().flex_1().justify_end().px(gutter).py_4().child(self.render_empty(&channel, cx)).into_any_element()
-        } else {
-            list(self.list.clone(), cx.processor(|this, ix, window, cx| this.render_row(ix, window, cx)))
+            div()
+                .flex()
+                .flex_col()
                 .flex_1()
-                .min_h_0()
-                .pt_4()
-                .pb_4()
+                .justify_end()
+                .px(gutter)
+                .py_4()
+                .child(skeleton_rows(5, cx))
                 .into_any_element()
+        } else if !has_rows {
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .justify_end()
+                .px(gutter)
+                .py_4()
+                .child(self.render_empty(&channel, cx))
+                .into_any_element()
+        } else {
+            list(
+                self.list.clone(),
+                cx.processor(|this, ix, window, cx| this.render_row(ix, window, cx)),
+            )
+            .flex_1()
+            .min_h_0()
+            .pt_4()
+            .pb_4()
+            .into_any_element()
         };
 
         let start_call = channel.id.clone();
@@ -729,12 +994,27 @@ impl Render for ChatArea {
                 .bg(t.primary.opacity(0.05))
                 .px_4()
                 .py_2()
-                .child(icon("phone").size_4().flex_shrink_0().text_color(rgb(0x22c55e)).with_animation(
-                    "callers-pulse",
-                    Animation::new(Duration::from_secs(2)).repeat(),
-                    |icon, delta| icon.opacity(1.0 - 0.5 * (delta * std::f32::consts::PI).sin()),
-                ))
-                .child(div().flex_1().truncate().text_sm().text_color(t.foreground).child(format!("{} {verb} in the call", callers.join(", "))))
+                .child(
+                    icon("phone")
+                        .size_4()
+                        .flex_shrink_0()
+                        .text_color(rgb(0x22c55e))
+                        .with_animation(
+                            "callers-pulse",
+                            Animation::new(Duration::from_secs(2)).repeat(),
+                            |icon, delta| {
+                                icon.opacity(1.0 - 0.5 * (delta * std::f32::consts::PI).sin())
+                            },
+                        ),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .truncate()
+                        .text_sm()
+                        .text_color(t.foreground)
+                        .child(format!("{} {verb} in the call", callers.join(", "))),
+                )
                 .child(
                     div()
                         .id("join-call")
@@ -791,7 +1071,8 @@ impl Render for ChatArea {
             .on_key_down(move |event: &KeyDownEvent, window, cx| {
                 // typing anywhere in the chat goes to the composer
                 let modifiers = event.keystroke.modifiers;
-                let typed = event.keystroke.key_char.is_some() && !modifiers.control && !modifiers.platform;
+                let typed =
+                    event.keystroke.key_char.is_some() && !modifiers.control && !modifiers.platform;
                 if typed
                     && !Chat::global(cx).read(cx).editing_message
                     && input.read(cx).takes_typing()
@@ -856,7 +1137,8 @@ mod tests {
                 status: None,
             },
             content: String::new(),
-            timestamp: Utc.with_ymd_and_hms(2026, 11, 22, 12, 0, 0).unwrap() + Duration::minutes(minute),
+            timestamp: Utc.with_ymd_and_hms(2026, 11, 22, 12, 0, 0).unwrap()
+                + Duration::minutes(minute),
             edited: false,
             edited_time: None,
             reply_to: None,
@@ -897,7 +1179,11 @@ mod tests {
 
     #[test]
     fn places_the_unread_marker() {
-        let messages = vec![message("1", "a", 0), message("2", "a", 1), message("3", "a", 2)];
+        let messages = vec![
+            message("1", "a", 0),
+            message("2", "a", 1),
+            message("3", "a", 2),
+        ];
         assert_eq!(first_unread_index(&messages, None), None);
         assert_eq!(first_unread_index(&messages, Some(None)), Some(0));
         assert_eq!(first_unread_index(&messages, Some(Some("1"))), Some(1));
@@ -909,8 +1195,14 @@ mod tests {
     fn describes_who_is_typing() {
         assert_eq!(typing_text(&[]), None);
         assert_eq!(typing_text(&["Ana".into()]).unwrap(), "Ana is typing...");
-        assert_eq!(typing_text(&["Ana".into(), "Leo".into()]).unwrap(), "Ana and Leo are typing...");
-        assert_eq!(typing_text(&["a".into(), "b".into(), "c".into()]).unwrap(), "Several people are typing...");
+        assert_eq!(
+            typing_text(&["Ana".into(), "Leo".into()]).unwrap(),
+            "Ana and Leo are typing..."
+        );
+        assert_eq!(
+            typing_text(&["a".into(), "b".into(), "c".into()]).unwrap(),
+            "Several people are typing..."
+        );
     }
 
     #[test]
@@ -918,10 +1210,19 @@ mod tests {
         let keys = |list: &[&str]| list.iter().map(|key| key.to_string()).collect::<Vec<_>>();
         assert_eq!(splice_range(&keys(&["a", "b"]), &keys(&["a", "b"])), None);
         // an older page goes in above
-        assert_eq!(splice_range(&keys(&["older", "c", "d"]), &keys(&["a", "b", "c", "d"])), Some((0, 1, 2)));
+        assert_eq!(
+            splice_range(&keys(&["older", "c", "d"]), &keys(&["a", "b", "c", "d"])),
+            Some((0, 1, 2))
+        );
         // a new message at the bottom
-        assert_eq!(splice_range(&keys(&["a", "b"]), &keys(&["a", "b", "c"])), Some((2, 0, 1)));
+        assert_eq!(
+            splice_range(&keys(&["a", "b"]), &keys(&["a", "b", "c"])),
+            Some((2, 0, 1))
+        );
         // a deleted one in the middle
-        assert_eq!(splice_range(&keys(&["a", "b", "c"]), &keys(&["a", "c"])), Some((1, 1, 0)));
+        assert_eq!(
+            splice_range(&keys(&["a", "b", "c"]), &keys(&["a", "c"])),
+            Some((1, 1, 0))
+        );
     }
 }

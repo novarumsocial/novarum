@@ -168,7 +168,11 @@ impl Realtime {
         self.reader = Some(cx.spawn(async move |this, cx| {
             while let Some(message) = incoming.next().await {
                 let closed = matches!(message, SocketMessage::Closed);
-                if this.update(cx, |realtime, cx| realtime.on_message(id, message, cx)).is_err() || closed {
+                if this
+                    .update(cx, |realtime, cx| realtime.on_message(id, message, cx))
+                    .is_err()
+                    || closed
+                {
                     break;
                 }
             }
@@ -207,7 +211,9 @@ impl Realtime {
 
         if self.should_recover {
             self.should_recover = false;
-            Chat::global(cx).update(cx, |chat, cx| chat.recover_realtime_state(cx)).detach();
+            Chat::global(cx)
+                .update(cx, |chat, cx| chat.recover_realtime_state(cx))
+                .detach();
         }
     }
 
@@ -242,7 +248,11 @@ impl Realtime {
         let dms = Dms::global(cx);
         match event {
             RealtimeEvent::EmojiQueryResults(results) => {
-                let found: HashSet<&str> = results.emojis.iter().map(|emoji| emoji.unicode.as_str()).collect();
+                let found: HashSet<&str> = results
+                    .emojis
+                    .iter()
+                    .map(|emoji| emoji.unicode.as_str())
+                    .collect();
                 for unicode in &results.unicodes {
                     self.pending_emoji_unicodes.remove(unicode);
                     if !found.contains(unicode.as_str()) {
@@ -280,8 +290,10 @@ impl Realtime {
             RealtimeEvent::MessageCreated(message) => {
                 self.notify_message(&message, cx);
                 let is_dm = message.guild_id.is_none();
-                let is_active = chat.read(cx).active_channel(cx).as_deref() == Some(message.channel_id.as_str());
-                let (channel_id, author_id) = (message.channel_id.clone(), message.author.user_id.clone());
+                let is_active = chat.read(cx).active_channel(cx).as_deref()
+                    == Some(message.channel_id.as_str());
+                let (channel_id, author_id) =
+                    (message.channel_id.clone(), message.author.user_id.clone());
                 if is_dm {
                     dms.update(cx, |dms, cx| dms.handle_message(&message, is_active, cx));
                 }
@@ -297,18 +309,26 @@ impl Realtime {
                 chat.update(cx, |chat, cx| chat.update_message(&channel_id, message, cx));
             }
             RealtimeEvent::MessageDeleted(deleted) => {
-                chat.update(cx, |chat, cx| chat.remove_message(&deleted.channel_id, &deleted.id, cx));
+                chat.update(cx, |chat, cx| {
+                    chat.remove_message(&deleted.channel_id, &deleted.id, cx)
+                });
                 dms.update(cx, |dms, cx| dms.handle_message_delete(&deleted.id, cx));
             }
             RealtimeEvent::UserStatusChanged(change) => {
-                chat.update(cx, |chat, cx| chat.update_member_status(&change.user_id, change.status, cx));
+                chat.update(cx, |chat, cx| {
+                    chat.update_member_status(&change.user_id, change.status, cx)
+                });
                 let friends = Friends::global(cx);
-                friends.update(cx, |friends, cx| friends.update_status(&change.user_id, change.status, cx));
+                friends.update(cx, |friends, cx| {
+                    friends.update_status(&change.user_id, change.status, cx)
+                });
             }
-            RealtimeEvent::MemberJoined(joined) => {
-                chat.update(cx, |chat, cx| chat.add_or_update_member(&joined.guild_id, &joined.user, cx))
+            RealtimeEvent::MemberJoined(joined) => chat.update(cx, |chat, cx| {
+                chat.add_or_update_member(&joined.guild_id, &joined.user, cx)
+            }),
+            RealtimeEvent::MemberLeft(left) => {
+                chat.update(cx, |chat, cx| chat.remove_member(&left.user_id, cx))
             }
-            RealtimeEvent::MemberLeft(left) => chat.update(cx, |chat, cx| chat.remove_member(&left.user_id, cx)),
             RealtimeEvent::MessageEphemeral(mut message) => {
                 message.ephemeral = true;
                 chat.update(cx, |chat, cx| chat.add_ephemeral(message, cx));
@@ -322,9 +342,18 @@ impl Realtime {
             RealtimeEvent::CallRinging(ring) => self.on_ring(ring, cx),
             RealtimeEvent::ChannelTyping(typing) => chat.update(cx, |chat, cx| {
                 let name = typing.display_name.as_deref().unwrap_or(&typing.username);
-                chat.set_typing(&typing.channel_id, &typing.user_id, &typing.username, &typing.homeserver, name, cx)
+                chat.set_typing(
+                    &typing.channel_id,
+                    &typing.user_id,
+                    &typing.username,
+                    &typing.homeserver,
+                    name,
+                    cx,
+                )
             }),
-            RealtimeEvent::CanvasSync(_) | RealtimeEvent::CanvasUpdate(_) | RealtimeEvent::CanvasAwareness(_) => {
+            RealtimeEvent::CanvasSync(_)
+            | RealtimeEvent::CanvasUpdate(_)
+            | RealtimeEvent::CanvasAwareness(_) => {
                 let channel_id = match &event {
                     RealtimeEvent::CanvasSync(sync) => &sync.channel_id,
                     RealtimeEvent::CanvasUpdate(update) => &update.channel_id,
@@ -335,10 +364,12 @@ impl Realtime {
                     cx.defer(move |cx| canvas.handle(&event, cx));
                 }
             }
-            RealtimeEvent::ChannelsReordered(order) => {
-                chat.update(cx, |chat, cx| chat.reorder_channels(&order.guild_id, &order.channel_ids, cx))
-            }
-            RealtimeEvent::FriendsChanged(_) => Friends::global(cx).update(cx, |friends, cx| friends.load(cx)).detach(),
+            RealtimeEvent::ChannelsReordered(order) => chat.update(cx, |chat, cx| {
+                chat.reorder_channels(&order.guild_id, &order.channel_ids, cx)
+            }),
+            RealtimeEvent::FriendsChanged(_) => Friends::global(cx)
+                .update(cx, |friends, cx| friends.load(cx))
+                .detach(),
             RealtimeEvent::UserUpdated(updated) => {
                 chat.update(cx, |chat, cx| chat.update_user_profile(&updated.user, cx))
             }
@@ -354,7 +385,9 @@ impl Realtime {
     }
 
     fn notify_message(&self, message: &crate::models::MessageData, cx: &mut Context<Self>) {
-        let Some(user) = Session::user(cx) else { return };
+        let Some(user) = Session::user(cx) else {
+            return;
+        };
         let chat = Chat::global(cx).read(cx);
         let active_channel = chat.active_channel(cx);
         let entries = &NotificationSettings::global(cx).read(cx).entries;
@@ -379,7 +412,11 @@ impl Realtime {
         }
         let is_dm = message.guild_id.is_none();
         let guild_id = message.guild_id.as_deref().unwrap_or_default();
-        let guild = chat.servers.iter().find(|server| server.id == guild_id).map(|server| server.name.as_str());
+        let guild = chat
+            .servers
+            .iter()
+            .find(|server| server.id == guild_id)
+            .map(|server| server.name.as_str());
         let channel = chat
             .channels_by_server
             .get(guild_id)
@@ -390,7 +427,10 @@ impl Realtime {
             .map(|channel| channel.name.as_str());
         let author = &message.author;
         let body = if settings.message_preview {
-            message.content.clone().unwrap_or_else(|| "Sent an attachment".into())
+            message
+                .content
+                .clone()
+                .unwrap_or_else(|| "Sent an attachment".into())
         } else if is_dm {
             "Sent you a message".into()
         } else {
@@ -421,7 +461,8 @@ impl Realtime {
         let caller = ring.user;
         let channel_id = ring.channel_id;
         let is_self = user.as_ref().is_some_and(|user| {
-            caller.username == user.username && caller.homeserver.eq_ignore_ascii_case(&user.homeserver)
+            caller.username == user.username
+                && caller.homeserver.eq_ignore_ascii_case(&user.homeserver)
         });
 
         if !ring.ringing {
@@ -431,7 +472,10 @@ impl Realtime {
                     incoming.channel_id == channel_id
                         && (is_self
                             || (incoming.user.username == caller.username
-                                && incoming.user.homeserver.eq_ignore_ascii_case(&caller.homeserver)))
+                                && incoming
+                                    .user
+                                    .homeserver
+                                    .eq_ignore_ascii_case(&caller.homeserver)))
                 });
                 if ended {
                     dms.set_incoming_call(None, cx);
@@ -446,7 +490,10 @@ impl Realtime {
             return;
         }
 
-        let call = IncomingCall { channel_id: channel_id.clone(), user: caller.clone() };
+        let call = IncomingCall {
+            channel_id: channel_id.clone(),
+            user: caller.clone(),
+        };
         dms.update(cx, |dms, cx| dms.set_incoming_call(Some(call), cx));
         if !self.window_active && SettingsStore::get(cx).push_notifications {
             notifications::notification_sound(cx);
@@ -496,7 +543,9 @@ impl Realtime {
             return;
         }
         self.emoji_query_timer = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(16)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(16))
+                .await;
             let _ = this.update(cx, |realtime, cx| realtime.flush_emoji_query(cx));
         }));
     }
@@ -526,7 +575,8 @@ impl Realtime {
 
     pub fn ring_call(&self, channel_id: &str, ringing: bool, cx: &mut App) {
         if let Some(socket) = &self.socket {
-            socket.send(json!({ "type": "call.ring", "channelId": channel_id, "ringing": ringing }));
+            socket
+                .send(json!({ "type": "call.ring", "channelId": channel_id, "ringing": ringing }));
         }
         if ringing {
             let channel_id = channel_id.to_string();
@@ -555,7 +605,11 @@ mod tests {
 
     #[test]
     fn canvas_messages_match_the_wire_format() {
-        let message = CanvasMessage::Awareness { channel_id: "c".into(), update: "u".into(), hello: None };
+        let message = CanvasMessage::Awareness {
+            channel_id: "c".into(),
+            update: "u".into(),
+            hello: None,
+        };
         assert_eq!(
             serde_json::to_value(&message).unwrap(),
             serde_json::json!({ "type": "canvas.awareness", "channelId": "c", "update": "u" })

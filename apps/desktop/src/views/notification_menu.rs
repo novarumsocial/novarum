@@ -4,7 +4,9 @@ use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 
 use crate::prelude::*;
 
-use crate::state::notification_settings::{NotificationChange, NotificationLevel, NotificationSettings, Target};
+use crate::state::notification_settings::{
+    NotificationChange, NotificationLevel, NotificationSettings, Target,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Noun {
@@ -49,9 +51,16 @@ pub fn notification_menu(
     let (level, muted, has_setting) = {
         let settings = store.read(cx);
         // a guild is its own parent here, so it falls back to the guild default (mentions)
-        let guild_id = if noun == Noun::Server { Some(target_id) } else { guild_id };
+        let guild_id = if noun == Noun::Server {
+            Some(target_id)
+        } else {
+            guild_id
+        };
         (
-            settings.level(Target { channel_id: target_id, guild_id }),
+            settings.level(Target {
+                channel_id: target_id,
+                guild_id,
+            }),
             settings.is_muted(target_id),
             settings.entries.contains_key(target_id),
         )
@@ -64,15 +73,24 @@ pub fn notification_menu(
             let unmute = {
                 let (store, target) = (store.clone(), target.clone());
                 PopupMenuItem::new("Unmute").on_click(move |_, _, cx| {
-                    store.update(cx, |store, cx| store.unmute(target.to_string(), level, cx)).detach();
+                    store
+                        .update(cx, |store, cx| store.unmute(target.to_string(), level, cx))
+                        .detach();
                 })
             };
-            MUTES.iter().fold(menu.when(muted, |menu| menu.item(unmute)), |menu, &(label, hours)| {
-                let (store, target) = (store.clone(), target.clone());
-                menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                    store.update(cx, |store, cx| store.mute(target.to_string(), hours, level, cx)).detach();
-                }))
-            })
+            MUTES.iter().fold(
+                menu.when(muted, |menu| menu.item(unmute)),
+                |menu, &(label, hours)| {
+                    let (store, target) = (store.clone(), target.clone());
+                    menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                        store
+                            .update(cx, |store, cx| {
+                                store.mute(target.to_string(), hours, level, cx)
+                            })
+                            .detach();
+                    }))
+                },
+            )
         }
     });
 
@@ -81,21 +99,37 @@ pub fn notification_menu(
         move |menu, _, _| {
             let menu = LEVELS.iter().fold(menu, |menu, &(value, label)| {
                 let (store, target) = (store.clone(), target.clone());
-                menu.item(PopupMenuItem::new(label).checked(level == value).on_click(move |_, _, cx| {
-                    let change = NotificationChange { level: Some(value), ..Default::default() };
-                    store.update(cx, |store, cx| store.set(target.to_string(), change, level, cx)).detach();
-                }))
+                menu.item(PopupMenuItem::new(label).checked(level == value).on_click(
+                    move |_, _, cx| {
+                        let change = NotificationChange {
+                            level: Some(value),
+                            ..Default::default()
+                        };
+                        store
+                            .update(cx, |store, cx| {
+                                store.set(target.to_string(), change, level, cx)
+                            })
+                            .detach();
+                    },
+                ))
             });
             let (store, target) = (store.clone(), target.clone());
             menu.when(has_setting, |menu| {
-                menu.separator().item(PopupMenuItem::new("Use Default").on_click(move |_, _, cx| {
-                    store.update(cx, |store, cx| store.reset(target.to_string(), cx)).detach();
-                }))
+                menu.separator()
+                    .item(PopupMenuItem::new("Use Default").on_click(move |_, _, cx| {
+                        store
+                            .update(cx, |store, cx| store.reset(target.to_string(), cx))
+                            .detach();
+                    }))
             })
         }
     });
 
-    let mute_label = if muted { format!("Muted {}", noun.label()) } else { format!("Mute {}", noun.label()) };
+    let mute_label = if muted {
+        format!("Muted {}", noun.label())
+    } else {
+        format!("Mute {}", noun.label())
+    };
     menu.item(PopupMenuItem::submenu(mute_label, mute_menu).icon(icon("bell-off")))
         .item(PopupMenuItem::submenu("Notify", notify_menu).icon(icon("bell")))
 }

@@ -62,11 +62,19 @@ pub struct InvitePage {
 /// used for both, like the web page.
 fn parse_invite(raw: &str) -> (String, String) {
     let (code, home_server) = raw.rsplit_once('@').unwrap_or((raw, raw));
-    (code.strip_prefix('$').unwrap_or(code).to_string(), home_server.to_string())
+    (
+        code.strip_prefix('$').unwrap_or(code).to_string(),
+        home_server.to_string(),
+    )
 }
 
 fn initials_for(name: &str) -> String {
-    name.split_whitespace().take(2).filter_map(|part| part.chars().next()).flat_map(char::to_uppercase).take(2).collect()
+    name.split_whitespace()
+        .take(2)
+        .filter_map(|part| part.chars().next())
+        .flat_map(char::to_uppercase)
+        .take(2)
+        .collect()
 }
 
 /// The invite lives on its own home server, so it is looked up there rather than on ours.
@@ -75,14 +83,25 @@ async fn lookup_invite(home_server: String, code: String) -> Result<InviteGuild,
         .await
         .map_err(|_| "Could not discover this home server.".to_string())?
         .base_url;
-    let url = format!("{}/invite/{}", base_url.trim_end_matches('/'), router::encode(&code));
+    let url = format!(
+        "{}/invite/{}",
+        base_url.trim_end_matches('/'),
+        router::encode(&code)
+    );
     runtime::io(async move {
-        let response = api::http().get(&url).send().await.ok().filter(|response| response.status().is_success());
+        let response = api::http()
+            .get(&url)
+            .send()
+            .await
+            .ok()
+            .filter(|response| response.status().is_success());
         let invite = match response {
             Some(response) => response.json::<InviteState>().await.ok(),
             None => None,
         };
-        invite.map(|invite| invite.guild).ok_or_else(|| "This invite is invalid or has expired.".to_string())
+        invite
+            .map(|invite| invite.guild)
+            .ok_or_else(|| "This invite is invalid or has expired.".to_string())
     })
     .await
 }
@@ -135,7 +154,10 @@ impl InvitePage {
     }
 
     fn login_redirect(&self) -> String {
-        format!("/login?redirect={}", router::encode(&format!("/i/{}", self.raw)))
+        format!(
+            "/login?redirect={}",
+            router::encode(&format!("/i/{}", self.raw))
+        )
     }
 
     fn accept(&mut self, cx: &mut Context<Self>) {
@@ -165,18 +187,30 @@ impl InvitePage {
             let result = api::post::<Value>("/invite/accept", body).await;
             let _ = this.update(cx, |this, cx| {
                 let (status, error) = match &result {
-                    Ok(data) => (200, data.get("error").and_then(Value::as_str).map(str::to_string)),
+                    Ok(data) => (
+                        200,
+                        data.get("error")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                    ),
                     Err(error) => (
                         error.status,
                         Some(
-                            error.body.get("error").and_then(Value::as_str).unwrap_or("Could not accept invite.").to_string(),
+                            error
+                                .body
+                                .get("error")
+                                .and_then(Value::as_str)
+                                .unwrap_or("Could not accept invite.")
+                                .to_string(),
                         ),
                     ),
                 };
                 if let Some(error) = error {
                     let lower = error.to_lowercase();
                     if status == 401
-                        || ["unauthorized", "not authenticated", "no session"].iter().any(|text| lower.contains(text))
+                        || ["unauthorized", "not authenticated", "no session"]
+                            .iter()
+                            .any(|text| lower.contains(text))
                     {
                         router::goto(this.login_redirect(), cx);
                         return;
@@ -205,11 +239,15 @@ impl InvitePage {
     }
 
     fn copy_invite(&mut self, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(self.invite_link.read(cx).value().to_string()));
+        cx.write_to_clipboard(ClipboardItem::new_string(
+            self.invite_link.read(cx).value().to_string(),
+        ));
         self.copied = true;
         cx.notify();
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(500)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(500))
+                .await;
             let _ = this.update(cx, |this, cx| {
                 this.copied = false;
                 cx.notify();
@@ -221,7 +259,10 @@ impl InvitePage {
     fn render_invite(&mut self, invite: InviteGuild, cx: &mut Context<Self>) -> Div {
         let t = Tokens::dark();
         let circle = SettingsStore::get(cx).circle_icons;
-        let avatar = invite.avatar_url.as_deref().and_then(|url| ui::image::remote_img(url, cx));
+        let avatar = invite
+            .avatar_url
+            .as_deref()
+            .and_then(|url| ui::image::remote_img(url, cx));
         let guild = div()
             .flex()
             .items_center()
@@ -256,7 +297,12 @@ impl InvitePage {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .child(div().truncate().font_weight(FontWeight::MEDIUM).child(invite.name.clone()))
+                    .child(
+                        div()
+                            .truncate()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(invite.name.clone()),
+                    )
                     .child(
                         div()
                             .flex()
@@ -285,7 +331,13 @@ impl InvitePage {
                     .flex()
                     .flex_col()
                     .gap(px(6.0))
-                    .child(div().text_xs().font_weight(FontWeight::MEDIUM).text_color(t.foreground).child("Invite Link"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(t.foreground)
+                            .child("Invite Link"),
+                    )
                     .child(
                         div()
                             .flex()
@@ -314,7 +366,14 @@ impl InvitePage {
                     .disabled(self.accepting)
                     .when(self.accepting, |b| b.loading(true).label("Joining…"))
                     .when(!self.accepting, |b| {
-                        b.child(div().flex().items_center().gap_2().child("Accept Invite").child(icon("arrow-right").size_4()))
+                        b.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child("Accept Invite")
+                                .child(icon("arrow-right").size_4()),
+                        )
                     })
                     .on_click(cx.listener(|this, _, _, cx| this.accept(cx))),
             )
@@ -342,8 +401,17 @@ impl Render for InvitePage {
                     .child(div().text_sm().child("Looking up invite…")),
             )
         } else if self.accepted {
-            let name = self.invite.as_ref().map_or("the server".to_string(), |invite| invite.name.clone());
-            card.child(card_header("You joined the server!", description(format!("Redirecting you to {name}…"))).gap_4())
+            let name = self
+                .invite
+                .as_ref()
+                .map_or("the server".to_string(), |invite| invite.name.clone());
+            card.child(
+                card_header(
+                    "You joined the server!",
+                    description(format!("Redirecting you to {name}…")),
+                )
+                .gap_4(),
+            )
         } else if !self.error.is_empty() {
             card.child(card_header("Invite not found", description(self.error.clone())).gap_4())
                 .child(div().px_6().text_sm().text_color(t.muted_foreground).child(
@@ -361,8 +429,18 @@ impl Render for InvitePage {
                     .flex_col()
                     .gap_1()
                     .text_center()
-                    .child(div().text_xl().font_weight(FontWeight::SEMIBOLD).child("You're invited!"))
-                    .child(div().text_sm().text_color(t.muted_foreground).child("Join your friends on this guild.")),
+                    .child(
+                        div()
+                            .text_xl()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("You're invited!"),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(t.muted_foreground)
+                            .child("Join your friends on this guild."),
+                    ),
             )
             .child(div().px_6().child(self.render_invite(invite, cx)))
             .child(footer_link(
@@ -384,8 +462,14 @@ mod tests {
 
     #[test]
     fn parses_invite_codes() {
-        assert_eq!(parse_invite("abc@novarum.me"), ("abc".into(), "novarum.me".into()));
-        assert_eq!(parse_invite("$abc@localhost:5049"), ("abc".into(), "localhost:5049".into()));
+        assert_eq!(
+            parse_invite("abc@novarum.me"),
+            ("abc".into(), "novarum.me".into())
+        );
+        assert_eq!(
+            parse_invite("$abc@localhost:5049"),
+            ("abc".into(), "localhost:5049".into())
+        );
         assert_eq!(parse_invite("abc"), ("abc".into(), "abc".into()));
     }
 

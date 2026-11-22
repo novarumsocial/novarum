@@ -24,11 +24,15 @@ use crate::{
 
 /// Saves `url` where the person picks, starting in their downloads folder.
 pub fn download(url: &str, filename: &str, cx: &mut App) {
-    let directory = dirs::download_dir().or_else(dirs::home_dir).unwrap_or_default();
+    let directory = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_default();
     let path = cx.prompt_for_new_path(&directory, Some(filename));
     let url = url.to_string();
     cx.spawn(async move |_| {
-        let Ok(Ok(Some(path))) = path.await else { return };
+        let Ok(Ok(Some(path))) = path.await else {
+            return;
+        };
         if let Ok(bytes) = api::fetch_bytes(url).await {
             let _ = std::fs::write(path, bytes);
         }
@@ -38,17 +42,29 @@ pub fn download(url: &str, filename: &str, cx: &mut App) {
 
 pub fn is_viewable(attachment: &Attachment) -> bool {
     let kind = attachment.content_type.as_str();
-    kind.starts_with("image/") || kind.starts_with("video/") || kind.starts_with("audio/") || kind == "application/pdf"
+    kind.starts_with("image/")
+        || kind.starts_with("video/")
+        || kind.starts_with("audio/")
+        || kind == "application/pdf"
 }
 
 /// Where an image of `natural` size sits when fitted (`object-contain`) in `area`.
 pub fn fitted(area: Size<f32>, natural: Size<f32>) -> Bounds<f32> {
     if natural.width <= 0.0 || natural.height <= 0.0 {
-        return Bounds { origin: point(0.0, 0.0), size: area };
+        return Bounds {
+            origin: point(0.0, 0.0),
+            size: area,
+        };
     }
     let scale = (area.width / natural.width).min(area.height / natural.height);
     let size = size(natural.width * scale, natural.height * scale);
-    Bounds { origin: point((area.width - size.width) / 2.0, (area.height - size.height) / 2.0), size }
+    Bounds {
+        origin: point(
+            (area.width - size.width) / 2.0,
+            (area.height - size.height) / 2.0,
+        ),
+        size,
+    }
 }
 
 pub enum ViewerEvent {
@@ -107,7 +123,14 @@ impl AttachmentViewer {
     fn step(&mut self, forward: bool, cx: &mut Context<Self>) {
         let count = self.attachments.len();
         if count > 1 {
-            self.select(if forward { self.index + 1 } else { self.index + count - 1 }, cx);
+            self.select(
+                if forward {
+                    self.index + 1
+                } else {
+                    self.index + count - 1
+                },
+                cx,
+            );
         }
     }
 
@@ -116,12 +139,16 @@ impl AttachmentViewer {
     }
 
     fn is_image(&self) -> bool {
-        self.current().is_some_and(|attachment| attachment.content_type.starts_with("image/"))
+        self.current()
+            .is_some_and(|attachment| attachment.content_type.starts_with("image/"))
     }
 
     fn local(&self, position: Point<Pixels>) -> (f32, f32) {
         let origin = self.stage.get().origin;
-        (f32::from(position.x - origin.x), f32::from(position.y - origin.y))
+        (
+            f32::from(position.x - origin.x),
+            f32::from(position.y - origin.y),
+        )
     }
 
     fn on_key(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
@@ -178,9 +205,14 @@ impl AttachmentViewer {
             self.zoom.reset();
             return cx.notify();
         }
-        let Some(attachment) = self.current().filter(|_| self.is_image()) else { return };
+        let Some(attachment) = self.current().filter(|_| self.is_image()) else {
+            return;
+        };
         let (x, y) = self.local(event.position);
-        let natural = size(attachment.width.unwrap_or(0) as f32, attachment.height.unwrap_or(0) as f32);
+        let natural = size(
+            attachment.width.unwrap_or(0) as f32,
+            attachment.height.unwrap_or(0) as f32,
+        );
         if fitted(size(self.zoom.width, self.zoom.height), natural).contains(&point(x, y)) {
             self.zoom.zoom_at(x, y, 2.0);
             cx.notify();
@@ -189,7 +221,13 @@ impl AttachmentViewer {
         }
     }
 
-    fn action(&self, id: &'static str, label: &'static str, name: &'static str, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn action(
+        &self,
+        id: &'static str,
+        label: &'static str,
+        name: &'static str,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let t = theme::tokens(cx);
         div()
             .id(id)
@@ -213,7 +251,11 @@ impl AttachmentViewer {
             format_date(&local, &Local::now()),
             format_time(&local, SettingsStore::get(cx).time_format)
         );
-        let (open_url, download_url, filename) = (attachment.url.clone(), attachment.url.clone(), attachment.filename.clone());
+        let (open_url, download_url, filename) = (
+            attachment.url.clone(),
+            attachment.url.clone(),
+            attachment.filename.clone(),
+        );
         div()
             .flex()
             .flex_shrink_0()
@@ -239,15 +281,31 @@ impl AttachmentViewer {
                                     .flex()
                                     .items_baseline()
                                     .gap_2()
-                                    .child(div().truncate().text_sm().font_weight(FontWeight::SEMIBOLD).child(name))
-                                    .child(div().flex_shrink_0().text_size(px(11.0)).text_color(t.muted_foreground).child(when)),
+                                    .child(
+                                        div()
+                                            .truncate()
+                                            .text_sm()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(name),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_shrink_0()
+                                            .text_size(px(11.0))
+                                            .text_color(t.muted_foreground)
+                                            .child(when),
+                                    ),
                             )
                             .child(
                                 div()
                                     .truncate()
                                     .text_size(px(11.0))
                                     .text_color(t.muted_foreground)
-                                    .child(format!("{}, {}", attachment.filename, format_bytes(attachment.size))),
+                                    .child(format!(
+                                        "{}, {}",
+                                        attachment.filename,
+                                        format_bytes(attachment.size)
+                                    )),
                             ),
                     )
             })
@@ -265,7 +323,10 @@ impl AttachmentViewer {
                         self.action("viewer-download", "Download", "download", cx)
                             .on_click(move |_, _, cx| download(&download_url, &filename, cx)),
                     )
-                    .child(self.action("viewer-close", "Close", "x", cx).on_click(cx.listener(|this, _, _, cx| this.close(cx)))),
+                    .child(
+                        self.action("viewer-close", "Close", "x", cx)
+                            .on_click(cx.listener(|this, _, _, cx| this.close(cx))),
+                    ),
             )
     }
 
@@ -275,7 +336,13 @@ impl AttachmentViewer {
         if kind.starts_with("image/") {
             let image = crate::ui::image::remote(&attachment.url, cx).ok().flatten();
             let Some(image) = image else {
-                return div().size_full().flex().items_center().justify_center().child(crate::ui::spinner("viewer-loading")).into_any_element();
+                return div()
+                    .size_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(crate::ui::spinner("viewer-loading"))
+                    .into_any_element();
             };
             let zoom = self.zoom;
             return div()
@@ -295,10 +362,23 @@ impl AttachmentViewer {
         }
         let centered = div().size_full().flex().items_center().justify_center();
         if kind.starts_with("video/") {
-            return centered.child(div().w_full().max_w(px(896.0)).child(video_player("viewer-video", attachment, cx))).into_any_element();
+            return centered
+                .child(div().w_full().max_w(px(896.0)).child(video_player(
+                    "viewer-video",
+                    attachment,
+                    cx,
+                )))
+                .into_any_element();
         }
         if kind.starts_with("audio/") {
-            return centered.child(div().w_full().max_w(px(576.0)).child(audio_player("viewer-audio", attachment, false, cx))).into_any_element();
+            return centered
+                .child(div().w_full().max_w(px(576.0)).child(audio_player(
+                    "viewer-audio",
+                    attachment,
+                    false,
+                    cx,
+                )))
+                .into_any_element();
         }
         let url = attachment.url.clone();
         centered
@@ -314,7 +394,12 @@ impl AttachmentViewer {
                     .bg(t.card)
                     .rounded(t.radius)
                     .child(icon("file-text").size_8().text_color(t.primary))
-                    .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(attachment.filename.clone()))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(attachment.filename.clone()),
+                    )
                     .child(
                         Button::new("viewer-open-pdf")
                             .primary()
@@ -327,7 +412,13 @@ impl AttachmentViewer {
 
     fn render_thumbnails(&self, cx: &mut Context<Self>) -> Div {
         let t = theme::tokens(cx);
-        let mut nav = div().flex().flex_shrink_0().justify_center().gap_1p5().px_3().pb_3();
+        let mut nav = div()
+            .flex()
+            .flex_shrink_0()
+            .justify_center()
+            .gap_1p5()
+            .px_3()
+            .pb_3();
         for (index, item) in self.attachments.iter().enumerate() {
             let kind = item.content_type.as_str();
             let content = if kind.starts_with("image/") {
@@ -342,7 +433,10 @@ impl AttachmentViewer {
                 } else {
                     "file-text"
                 };
-                icon(name).size_4().text_color(t.muted_foreground).into_any_element()
+                icon(name)
+                    .size_4()
+                    .text_color(t.muted_foreground)
+                    .into_any_element()
             };
             let selected = index == self.index;
             nav = nav.child(
@@ -356,7 +450,9 @@ impl AttachmentViewer {
                     .overflow_hidden()
                     .bg(t.muted)
                     .cursor_pointer()
-                    .when(!selected, |thumb| thumb.opacity(0.4).hover(|s| s.opacity(0.8)))
+                    .when(!selected, |thumb| {
+                        thumb.opacity(0.4).hover(|s| s.opacity(0.8))
+                    })
                     .when(selected, |thumb| thumb.border_2().border_color(t.primary))
                     .child(content)
                     .on_click(cx.listener(move |this, _, _, cx| this.select(index, cx))),
@@ -370,7 +466,9 @@ impl Render for AttachmentViewer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let viewport = window.viewport_size();
-        let Some(attachment) = self.current().cloned() else { return div().into_any_element() };
+        let Some(attachment) = self.current().cloned() else {
+            return div().into_any_element();
+        };
         let stage = self.stage.get();
         self.zoom.width = f32::from(stage.size.width);
         self.zoom.height = f32::from(stage.size.height);
@@ -393,7 +491,9 @@ impl Render for AttachmentViewer {
         };
         let record = {
             let stage = self.stage.clone();
-            canvas(move |bounds, _, _| stage.set(bounds), |_, _, _, _| {}).absolute().inset_0()
+            canvas(move |bounds, _, _| stage.set(bounds), |_, _, _, _| {})
+                .absolute()
+                .inset_0()
         };
 
         let body = div()
@@ -402,45 +502,75 @@ impl Render for AttachmentViewer {
             .flex_1()
             .min_h_0()
             .overflow_hidden()
-            .when(!self.zoom.zoomed(), |stage| stage.mx(if viewport.width < px(640.0) { px(12.0) } else { px(80.0) }).mb_6())
+            .when(!self.zoom.zoomed(), |stage| {
+                stage
+                    .mx(if viewport.width < px(640.0) {
+                        px(12.0)
+                    } else {
+                        px(80.0)
+                    })
+                    .mb_6()
+            })
             .child(record)
             .child(self.render_item(&attachment, cx))
             .on_scroll(cx.listener(|this, event, _, cx| this.on_wheel(event, cx)))
-            .on_mouse_down(MouseButton::Left, cx.listener(|this, event, _, cx| this.on_down(event, cx)))
-            .on_mouse_move(cx.listener(|this, event, _, cx| this.on_move(event, cx)))
-            .on_mouse_up(MouseButton::Left, cx.listener(|this, event, _, cx| this.on_up(event, cx)));
-
-        let content = div()
-            .id("attachment-viewer")
-            .track_focus(&self.focus)
-            .on_key_down(cx.listener(|this, event, _, cx| this.on_key(event, cx)))
-            .occlude()
-            .relative()
-            .flex()
-            .flex_col()
-            .w(viewport.width)
-            .h(viewport.height - TITLE_BAR_HEIGHT)
-            .bg(black().opacity(0.5))
-            .text_color(t.foreground)
-            .child(div().absolute().inset_0().bg(t.background.opacity(0.4)))
-            .child(self.render_header(&attachment, cx))
-            .child(
-                div()
-                    .relative()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_h_0()
-                    .child(body)
-                    .when(several && viewport.width >= px(640.0) && !self.zoom.zoomed(), |stage| {
-                        stage
-                            .child(arrow("viewer-previous", "arrow-left").left_4().on_click(cx.listener(|this, _, _, cx| this.step(false, cx))))
-                            .child(arrow("viewer-next", "arrow-right").right_4().on_click(cx.listener(|this, _, _, cx| this.step(true, cx))))
-                    }),
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, event, _, cx| this.on_down(event, cx)),
             )
-            .when(several, |content| content.child(self.render_thumbnails(cx)));
+            .on_mouse_move(cx.listener(|this, event, _, cx| this.on_move(event, cx)))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, event, _, cx| this.on_up(event, cx)),
+            );
 
-        deferred(anchored().position(point(px(0.0), TITLE_BAR_HEIGHT)).child(content)).with_priority(2).into_any_element()
+        let content =
+            div()
+                .id("attachment-viewer")
+                .track_focus(&self.focus)
+                .on_key_down(cx.listener(|this, event, _, cx| this.on_key(event, cx)))
+                .occlude()
+                .relative()
+                .flex()
+                .flex_col()
+                .w(viewport.width)
+                .h(viewport.height - TITLE_BAR_HEIGHT)
+                .bg(black().opacity(0.5))
+                .text_color(t.foreground)
+                .child(div().absolute().inset_0().bg(t.background.opacity(0.4)))
+                .child(self.render_header(&attachment, cx))
+                .child(
+                    div()
+                        .relative()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_h_0()
+                        .child(body)
+                        .when(
+                            several && viewport.width >= px(640.0) && !self.zoom.zoomed(),
+                            |stage| {
+                                stage
+                                    .child(
+                                        arrow("viewer-previous", "arrow-left").left_4().on_click(
+                                            cx.listener(|this, _, _, cx| this.step(false, cx)),
+                                        ),
+                                    )
+                                    .child(arrow("viewer-next", "arrow-right").right_4().on_click(
+                                        cx.listener(|this, _, _, cx| this.step(true, cx)),
+                                    ))
+                            },
+                        ),
+                )
+                .when(several, |content| content.child(self.render_thumbnails(cx)));
+
+        deferred(
+            anchored()
+                .position(point(px(0.0), TITLE_BAR_HEIGHT))
+                .child(content),
+        )
+        .with_priority(2)
+        .into_any_element()
     }
 }
 
@@ -453,9 +583,15 @@ mod tests {
     #[test]
     fn fits_images_inside_the_stage() {
         let wide = fitted(size(400.0, 300.0), size(800.0, 200.0));
-        assert_eq!((wide.origin, wide.size), (point(0.0, 100.0), size(400.0, 100.0)));
+        assert_eq!(
+            (wide.origin, wide.size),
+            (point(0.0, 100.0), size(400.0, 100.0))
+        );
         let tall = fitted(size(400.0, 300.0), size(100.0, 300.0));
-        assert_eq!((tall.origin, tall.size), (point(150.0, 0.0), size(100.0, 300.0)));
+        assert_eq!(
+            (tall.origin, tall.size),
+            (point(150.0, 0.0), size(100.0, 300.0))
+        );
         let unknown = fitted(size(400.0, 300.0), size(0.0, 0.0));
         assert_eq!(unknown.size, size(400.0, 300.0));
     }

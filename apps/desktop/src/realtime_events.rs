@@ -214,7 +214,9 @@ mod tests {
         let event = parse(
             r#"{"type":"message.created","data":{"id":"m1","channelId":"c1","guildId":null,"content":"hi","nonce":"n","attachments":[],"createdAt":"2026-01-01T00:00:00.000Z","author":{"userId":"u1","username":"ana","homeserver":"novarum.me","displayName":null,"avatarUrl":null,"avatarColor":null,"speakingRingColor":null,"isBot":false},"system":{"type":"unknown.kind"}}}"#,
         );
-        let Some(RealtimeEvent::MessageCreated(message)) = event else { panic!("{event:?}") };
+        let Some(RealtimeEvent::MessageCreated(message)) = event else {
+            panic!("{event:?}")
+        };
         assert_eq!(message.content.as_deref(), Some("hi"));
         assert!(message.system.is_none());
     }

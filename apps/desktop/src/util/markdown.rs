@@ -20,10 +20,17 @@ pub enum Inline {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     Paragraph(Vec<Inline>),
-    Heading { level: usize, children: Vec<Inline> },
+    Heading {
+        level: usize,
+        children: Vec<Inline>,
+    },
     Code(String),
     Quote(Vec<Block>),
-    List { ordered: bool, start: u64, items: Vec<Vec<Inline>> },
+    List {
+        ordered: bool,
+        start: u64,
+        items: Vec<Vec<Inline>>,
+    },
 }
 
 type Span = (&'static str, fn(Vec<Inline>) -> Inline);
@@ -46,7 +53,10 @@ fn space(c: Option<&char>) -> bool {
 }
 
 fn starts_with(src: &[char], at: usize, pattern: &str) -> bool {
-    pattern.chars().enumerate().all(|(offset, c)| src.get(at + offset) == Some(&c))
+    pattern
+        .chars()
+        .enumerate()
+        .all(|(offset, c)| src.get(at + offset) == Some(&c))
 }
 
 fn index_of(src: &[char], pattern: &str, from: usize) -> Option<usize> {
@@ -67,8 +77,9 @@ fn url_at(src: &[char], at: usize, stop: Option<char>) -> Option<usize> {
         return None;
     };
     let start = at + scheme;
-    let end =
-        (start..src.len()).find(|&index| src[index].is_whitespace() || Some(src[index]) == stop).unwrap_or(src.len());
+    let end = (start..src.len())
+        .find(|&index| src[index].is_whitespace() || Some(src[index]) == stop)
+        .unwrap_or(src.len());
     (end > start).then_some(end)
 }
 
@@ -80,7 +91,13 @@ fn link_at(src: &[char], at: usize) -> Option<(String, String, usize)> {
     }
     let url_start = close + 2;
     let end = url_at(src, url_start, Some(')'))?;
-    (src.get(end) == Some(&')')).then(|| (text(&src[at + 1..close]), text(&src[url_start..end]), end + 1))
+    (src.get(end) == Some(&')')).then(|| {
+        (
+            text(&src[at + 1..close]),
+            text(&src[url_start..end]),
+            end + 1,
+        )
+    })
 }
 
 /// `` (`{1,3})(content)\1(?!`) `` at `at`: the code and where it ends.
@@ -152,7 +169,9 @@ fn inline(src: &[char], depth: usize) -> Vec<Inline> {
             continue;
         }
         if plain(c) {
-            let end = (i..src.len()).find(|&index| !plain(src[index])).unwrap_or(src.len());
+            let end = (i..src.len())
+                .find(|&index| !plain(src[index]))
+                .unwrap_or(src.len());
             text_run.extend(&src[i..end]);
             i = end;
             continue;
@@ -187,17 +206,30 @@ fn inline(src: &[char], depth: usize) -> Vec<Inline> {
             }
         }
 
-        if let Some(&(delimiter, make)) = SPANS.iter().find(|(delimiter, _)| starts_with(src, i, delimiter)) {
+        if let Some(&(delimiter, make)) = SPANS
+            .iter()
+            .find(|(delimiter, _)| starts_with(src, i, delimiter))
+        {
             let length = delimiter.len();
             let after = src.get(i + length);
-            let opens =
-                depth < 6 && after.is_some() && !space(after) && !(delimiter == "_" && i > 0 && word(src.get(i - 1)));
-            let end = if opens && !unclosed.contains(delimiter) { closing(src, delimiter, i + length) } else { None };
+            let opens = depth < 6
+                && after.is_some()
+                && !space(after)
+                && !(delimiter == "_" && i > 0 && word(src.get(i - 1)));
+            let end = if opens && !unclosed.contains(delimiter) {
+                closing(src, delimiter, i + length)
+            } else {
+                None
+            };
             if opens && end.is_none() {
                 unclosed.insert(delimiter);
             }
             if let Some(end) = end {
-                push(&mut out, &mut text_run, make(inline(&src[i + length..end], depth + 1)));
+                push(
+                    &mut out,
+                    &mut text_run,
+                    make(inline(&src[i + length..end], depth + 1)),
+                );
                 i = end + length;
                 continue;
             }
@@ -217,7 +249,8 @@ fn is_fence(line: &str) -> bool {
     let rest = line.trim_start().strip_prefix("```");
     rest.is_some_and(|rest| {
         let info = rest.trim_end();
-        info.chars().all(|c| c.is_ascii_alphanumeric() || "_+#.-".contains(c))
+        info.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_+#.-".contains(c))
     })
 }
 
@@ -249,7 +282,11 @@ fn list_item(line: &str) -> Option<(&str, &str)> {
     let digits = trimmed.chars().take_while(|c| c.is_ascii_digit()).count();
     let marker_length = match trimmed.chars().next()? {
         '-' | '*' | '+' => 1,
-        _ if (1..=9).contains(&digits) && matches!(trimmed[digits..].chars().next(), Some('.' | ')')) => digits + 1,
+        _ if (1..=9).contains(&digits)
+            && matches!(trimmed[digits..].chars().next(), Some('.' | ')')) =>
+        {
+            digits + 1
+        }
         _ => return None,
     };
     let marker = &trimmed[..marker_length];
@@ -273,8 +310,11 @@ fn parse_blocks(lines: &[&str]) -> Vec<Block> {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i];
-        let fence =
-            if is_fence(line) { (i + 1..lines.len()).find(|&index| lines[index].trim() == "```") } else { None };
+        let fence = if is_fence(line) {
+            (i + 1..lines.len()).find(|&index| lines[index].trim() == "```")
+        } else {
+            None
+        };
 
         if let Some(fence) = fence {
             flush(&mut blocks, &mut paragraph);
@@ -282,7 +322,10 @@ fn parse_blocks(lines: &[&str]) -> Vec<Block> {
             i = fence;
         } else if let Some((level, text)) = heading(line) {
             flush(&mut blocks, &mut paragraph);
-            blocks.push(Block::Heading { level, children: parse_inline(text) });
+            blocks.push(Block::Heading {
+                level,
+                children: parse_inline(text),
+            });
         } else if is_quote(line) {
             flush(&mut blocks, &mut paragraph);
             let mut quoted = Vec::new();
@@ -304,8 +347,16 @@ fn parse_blocks(lines: &[&str]) -> Vec<Block> {
                 items.push(parse_inline(text));
                 i += 1;
             }
-            let start = if ordered { first[..first.len() - 1].parse().unwrap_or(1) } else { 1 };
-            blocks.push(Block::List { ordered, start, items });
+            let start = if ordered {
+                first[..first.len() - 1].parse().unwrap_or(1)
+            } else {
+                1
+            };
+            blocks.push(Block::List {
+                ordered,
+                start,
+                items,
+            });
             continue;
         } else {
             paragraph.push(line);
@@ -366,18 +417,30 @@ mod tests {
                 Inline::Spoiler(vec![text("spoiler")]),
             ]
         );
-        assert_eq!(parse_inline("***x***"), vec![Inline::Bold(vec![Inline::Italic(vec![text("x")])])]);
+        assert_eq!(
+            parse_inline("***x***"),
+            vec![Inline::Bold(vec![Inline::Italic(vec![text("x")])])]
+        );
         assert_eq!(
             parse_inline("*a **b** c*"),
-            vec![Inline::Italic(vec![text("a "), Inline::Bold(vec![text("b")]), text(" c")])]
+            vec![Inline::Italic(vec![
+                text("a "),
+                Inline::Bold(vec![text("b")]),
+                text(" c")
+            ])]
         );
     }
 
     #[test]
     fn leaves_ordinary_punctuation_identifiers_urls_and_handles_alone() {
-        for value in
-            ["2 * 3 * 4", "a ** b", "**unclosed", "snake_case_name", "see https://x.com/*a*_b_ now", "@foo_bar:srv.com"]
-        {
+        for value in [
+            "2 * 3 * 4",
+            "a ** b",
+            "**unclosed",
+            "snake_case_name",
+            "see https://x.com/*a*_b_ now",
+            "@foo_bar:srv.com",
+        ] {
             assert_eq!(parse_inline(value), vec![text(value)], "{value}");
         }
     }
@@ -385,7 +448,10 @@ mod tests {
     #[test]
     fn backslash_escapes_and_code_spans_are_literal() {
         assert_eq!(parse_inline("\\*no\\*"), vec![text("*no*")]);
-        assert_eq!(parse_inline("`a *b* <i>`"), vec![Inline::Code("a *b* <i>".into())]);
+        assert_eq!(
+            parse_inline("`a *b* <i>`"),
+            vec![Inline::Code("a *b* <i>".into())]
+        );
         assert_eq!(parse_inline("``a`b``"), vec![Inline::Code("a`b".into())]);
     }
 
@@ -416,14 +482,25 @@ mod tests {
             vec![
                 Block::Paragraph(vec![text("hi")]),
                 Block::Code("const a = **1**;".into()),
-                Block::Heading { level: 1, children: vec![text("Head")] },
+                Block::Heading {
+                    level: 1,
+                    children: vec![text("Head")]
+                },
                 Block::Quote(vec![Block::Paragraph(vec![
                     text("quote "),
                     Inline::Bold(vec![text("b")]),
                     text("\nmore"),
                 ])]),
-                Block::List { ordered: false, start: 1, items: vec![vec![text("one")], vec![text("two")]] },
-                Block::List { ordered: true, start: 3, items: vec![vec![text("a")], vec![text("b")]] },
+                Block::List {
+                    ordered: false,
+                    start: 1,
+                    items: vec![vec![text("one")], vec![text("two")]]
+                },
+                Block::List {
+                    ordered: true,
+                    start: 3,
+                    items: vec![vec![text("a")], vec![text("b")]]
+                },
                 Block::Paragraph(vec![text("end")]),
             ]
         );
@@ -433,7 +510,9 @@ mod tests {
     fn unclosed_fences_tags_and_deep_headings_stay_paragraphs() {
         assert_eq!(
             *parse_markdown("```\nnot closed\n#tag\n#### four"),
-            vec![Block::Paragraph(vec![text("```\nnot closed\n#tag\n#### four")])]
+            vec![Block::Paragraph(vec![text(
+                "```\nnot closed\n#tag\n#### four"
+            )])]
         );
     }
 

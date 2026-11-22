@@ -37,7 +37,12 @@ pub fn channel_slug(value: &str) -> String {
     slug.chars().take(32).collect()
 }
 
-pub fn open_create_channel(guild_id: String, category_label: Option<String>, window: &mut Window, cx: &mut App) {
+pub fn open_create_channel(
+    guild_id: String,
+    category_label: Option<String>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let label = category_label.unwrap_or_else(|| "Text Channels".into());
     let view = cx.new(|cx| CreateChannelDialog::new(guild_id, label, window, cx));
     let focus = view.read(cx).name.clone();
@@ -51,16 +56,26 @@ pub fn open_create_channel(guild_id: String, category_label: Option<String>, win
 }
 
 impl CreateChannelDialog {
-    fn new(guild_id: String, category_label: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(
+        guild_id: String,
+        category_label: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let name = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("new-channel").validate(|value, _| value.chars().count() <= 32)
+            InputState::new(window, cx)
+                .placeholder("new-channel")
+                .validate(|value, _| value.chars().count() <= 32)
         });
-        let subscriptions = vec![cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                this.submit(window, cx);
-            }
-            cx.notify();
-        })];
+        let subscriptions =
+            vec![
+                cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit(window, cx);
+                    }
+                    cx.notify();
+                }),
+            ];
         Self {
             guild_id,
             category_label,
@@ -75,13 +90,15 @@ impl CreateChannelDialog {
     fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let slug = channel_slug(&self.name.read(cx).value());
         if !(2..=32).contains(&slug.len()) {
-            self.error = Some("Channel name must be 2-32 letters, numbers, spaces, or dashes.".into());
+            self.error =
+                Some("Channel name must be 2-32 letters, numbers, spaces, or dashes.".into());
             cx.notify();
             return;
         }
         self.error = None;
-        let create =
-            Chat::global(cx).update(cx, |chat, cx| chat.create_channel(self.guild_id.clone(), slug, self.kind, cx));
+        let create = Chat::global(cx).update(cx, |chat, cx| {
+            chat.create_channel(self.guild_id.clone(), slug, self.kind, cx)
+        });
         cx.spawn(async move |_, cx| {
             if let Some(channel) = create.await {
                 cx.update(|cx| ShellState::select_channel(&channel.id, cx));
@@ -115,7 +132,10 @@ impl CreateChannelDialog {
                 if selected {
                     option.border_color(t.primary).bg(t.primary.opacity(0.1))
                 } else {
-                    option.border_color(t.border).bg(t.background).hover(|option| option.bg(t.accent))
+                    option
+                        .border_color(t.border)
+                        .bg(t.background)
+                        .hover(|option| option.bg(t.accent))
                 }
             })
             .child(icon(icon_name).size_4().text_color(t.muted_foreground))
@@ -131,7 +151,11 @@ impl Render for CreateChannelDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let empty = self.name.read(cx).value().trim().is_empty();
-        let prefix = if self.kind == ChannelType::Voice { "volume-2" } else { "hash" };
+        let prefix = if self.kind == ChannelType::Voice {
+            "volume-2"
+        } else {
+            "hash"
+        };
 
         div()
             .flex()
@@ -140,22 +164,38 @@ impl Render for CreateChannelDialog {
             .child(
                 DialogHeader::new()
                     .child(DialogTitle::new().child("Create Channel"))
-                    .child(DialogDescription::new().child(format!("Add a channel to {}.", self.category_label))),
+                    .child(
+                        DialogDescription::new()
+                            .child(format!("Add a channel to {}.", self.category_label)),
+                    ),
             )
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .gap(px(6.0))
-                    .child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Channel Name"))
-                    .child(Input::new(&self.name).prefix(icon(prefix).size_4().text_color(t.muted_foreground))),
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Channel Name"),
+                    )
+                    .child(
+                        Input::new(&self.name)
+                            .prefix(icon(prefix).size_4().text_color(t.muted_foreground)),
+                    ),
             )
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Channel Type"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Channel Type"),
+                    )
                     .child(
                         div()
                             .grid()
@@ -165,7 +205,9 @@ impl Render for CreateChannelDialog {
                             .child(self.type_option(ChannelType::Voice, "Voice", "volume-2", cx)),
                     ),
             )
-            .when_some(self.error.clone(), |this, error| this.child(ui::error_text(error, cx)))
+            .when_some(self.error.clone(), |this, error| {
+                this.child(ui::error_text(error, cx))
+            })
             .child(
                 div()
                     .flex()
@@ -175,7 +217,10 @@ impl Render for CreateChannelDialog {
                     .border_color(t.border)
                     .pt_3()
                     .child(
-                        Button::new("cancel").ghost().label("Cancel").on_click(|_, window, cx| window.close_dialog(cx)),
+                        Button::new("cancel")
+                            .ghost()
+                            .label("Cancel")
+                            .on_click(|_, window, cx| window.close_dialog(cx)),
                     )
                     .child(
                         Button::new("create")
@@ -183,7 +228,11 @@ impl Render for CreateChannelDialog {
                             .disabled(self.loading || empty)
                             .loading(self.loading)
                             .icon(icon("plus"))
-                            .label(if self.loading { "Creating…" } else { "Create Channel" })
+                            .label(if self.loading {
+                                "Creating…"
+                            } else {
+                                "Create Channel"
+                            })
                             .on_click(cx.listener(|this, _, window, cx| this.submit(window, cx))),
                     ),
             )

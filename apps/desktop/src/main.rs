@@ -57,7 +57,9 @@ fn open_splash(cx: &mut App) -> AnyWindowHandle {
         window_decorations: Some(WindowDecorations::Client),
         ..Default::default()
     };
-    gpui_kit::open_window(options, cx, |_, cx| cx.new(UpdaterView::new)).expect("splash").0
+    gpui_kit::open_window(options, cx, |_, cx| cx.new(UpdaterView::new))
+        .expect("splash")
+        .0
 }
 
 fn main() {
@@ -65,7 +67,9 @@ fn main() {
         return;
     }
     // closing the main window hides Novarum to the tray; it quits from the tray or the dock
-    let app = gpui_kit::application().with_assets(assets::Assets).with_quit_mode(QuitMode::Explicit);
+    let app = gpui_kit::application()
+        .with_assets(assets::Assets)
+        .with_quit_mode(QuitMode::Explicit);
     app.on_reopen(desktop::show_main_window);
     app.run(|cx| {
         gpui_kit::init(cx);
@@ -101,7 +105,9 @@ fn main() {
         } else {
             if auto_update && hidden {
                 cx.spawn(async move |cx| {
-                    cx.background_executor().timer(Duration::from_secs(10)).await;
+                    cx.background_executor()
+                        .timer(Duration::from_secs(10))
+                        .await;
                     let _ = cx.update(|cx| updater::Updater::check(cx));
                 })
                 .detach();

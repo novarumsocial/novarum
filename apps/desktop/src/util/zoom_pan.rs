@@ -22,7 +22,15 @@ pub struct ZoomPan {
 
 impl ZoomPan {
     pub fn new(max: f32) -> Self {
-        Self { scale: 1.0, x: 0.0, y: 0.0, width: 0.0, height: 0.0, moved: false, max }
+        Self {
+            scale: 1.0,
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+            moved: false,
+            max,
+        }
     }
 
     pub fn zoomed(&self) -> bool {
@@ -41,7 +49,10 @@ impl ZoomPan {
         let content_x = (px - self.x) / self.scale;
         let content_y = (py - self.y) / self.scale;
         self.scale = next;
-        self.pan(px - content_x * next - self.x, py - content_y * next - self.y);
+        self.pan(
+            px - content_x * next - self.x,
+            py - content_y * next - self.y,
+        );
     }
 
     /// Zooms around the middle, for keyboard shortcuts.

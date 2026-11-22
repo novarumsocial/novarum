@@ -27,7 +27,9 @@ pub fn avatar_with_fallback(
 ) -> Div {
     let t = theme::tokens(cx);
     let circle = SettingsStore::get(cx).circle_icons;
-    let image = src.filter(|src| !src.is_empty()).and_then(|src| ui::image::remote(src, cx).ok());
+    let image = src
+        .filter(|src| !src.is_empty())
+        .and_then(|src| ui::image::remote(src, cx).ok());
     let background = bg_color.and_then(ui::hex).unwrap_or(t.primary.opacity(0.2));
 
     let base = div()
@@ -50,7 +52,10 @@ pub fn avatar_with_fallback(
         Some(None) => base,
         None => {
             let letter = fallback.map(str::to_string).unwrap_or_else(|| {
-                name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or("?".into())
+                name.chars()
+                    .next()
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or("?".into())
             });
             base.child(letter)
         }

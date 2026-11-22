@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{api, runtime, storage};
 
-const RELEASES_URL: &str = "https://api.github.com/repos/novarumsocial/novarum/releases?per_page=30";
+const RELEASES_URL: &str =
+    "https://api.github.com/repos/novarumsocial/novarum/releases?per_page=30";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -44,7 +45,11 @@ pub struct LaunchPrefs {
 
 impl Default for LaunchPrefs {
     fn default() -> Self {
-        Self { auto_launch: false, start_hidden: true, auto_update: true }
+        Self {
+            auto_launch: false,
+            start_hidden: true,
+            auto_update: true,
+        }
     }
 }
 
@@ -79,9 +84,17 @@ pub fn supported() -> bool {
 }
 
 pub fn init(cx: &mut App) {
-    let status = if supported() { Status::Idle } else { Status::Unsupported };
+    let status = if supported() {
+        Status::Idle
+    } else {
+        Status::Unsupported
+    };
     let updater = cx.new(|_| Updater {
-        status: UpdateStatus { status, version: None, percent: None },
+        status: UpdateStatus {
+            status,
+            version: None,
+            percent: None,
+        },
         release: None,
         downloaded: None,
         busy: false,
@@ -91,7 +104,9 @@ pub fn init(cx: &mut App) {
     // the background check every 30 minutes
     cx.spawn(async move |cx| {
         loop {
-            cx.background_executor().timer(Duration::from_secs(30 * 60)).await;
+            cx.background_executor()
+                .timer(Duration::from_secs(30 * 60))
+                .await;
             if launch_prefs().auto_update {
                 let _ = cx.update(|cx| Updater::check(cx));
             }
@@ -136,7 +151,8 @@ async fn latest_release() -> Result<Option<Release>, String> {
             .json()
             .await
             .map_err(|error| error.to_string())?;
-        let current = semver::Version::parse(env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
+        let current =
+            semver::Version::parse(env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
         let name = asset_name();
         Ok(releases
             .into_iter()
@@ -144,8 +160,14 @@ async fn latest_release() -> Result<Option<Release>, String> {
             // desktop releases are plain `v1.2.3-dev.4`; mobile-/native- have their own prefixes
             .filter_map(|release| {
                 let version = semver::Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
-                let asset = release.assets.into_iter().find(|asset| asset.name == name)?;
-                Some(Release { version, asset_url: asset.browser_download_url })
+                let asset = release
+                    .assets
+                    .into_iter()
+                    .find(|asset| asset.name == name)?;
+                Some(Release {
+                    version,
+                    asset_url: asset.browser_download_url,
+                })
             })
             .filter(|release| release.version > current)
             .max_by(|a, b| a.version.cmp(&b.version)))
@@ -166,7 +188,10 @@ impl Updater {
         this.update(cx, |updater, cx| {
             updater.status.status = status;
             updater.status.percent = percent;
-            updater.status.version = updater.release.as_ref().map(|release| release.version.to_string());
+            updater.status.version = updater
+                .release
+                .as_ref()
+                .map(|release| release.version.to_string());
             cx.notify();
         });
         crate::desktop::update_tray(cx);
@@ -177,7 +202,13 @@ impl Updater {
     pub fn check(cx: &mut App) -> Task<bool> {
         let this = Self::global(cx);
         let state = this.read(cx);
-        if !supported() || state.busy || matches!(state.status.status, Status::Downloading | Status::Downloaded) {
+        if !supported()
+            || state.busy
+            || matches!(
+                state.status.status,
+                Status::Downloading | Status::Downloaded
+            )
+        {
             return Task::ready(state.release.is_some());
         }
         this.update(cx, |updater, _| updater.busy = true);
@@ -220,15 +251,21 @@ impl Updater {
         if state.status.status == Status::Downloaded {
             return Task::ready(Ok(()));
         }
-        let Some(release) = state.release.clone() else { return Task::ready(Err("No update".into())) };
+        let Some(release) = state.release.clone() else {
+            return Task::ready(Err("No update".into()));
+        };
         if state.status.status == Status::Downloading {
             // someone else is already downloading; wait for them
-            return cx.spawn(async move |cx| loop {
-                cx.background_executor().timer(Duration::from_millis(250)).await;
-                match cx.update(|cx| this.read(cx).status.status) {
-                    Status::Downloaded => return Ok(()),
-                    Status::Downloading => continue,
-                    _ => return Err("Download failed".into()),
+            return cx.spawn(async move |cx| {
+                loop {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(250))
+                        .await;
+                    match cx.update(|cx| this.read(cx).status.status) {
+                        Status::Downloaded => return Ok(()),
+                        Status::Downloading => continue,
+                        _ => return Err("Download failed".into()),
+                    }
                 }
             });
         }
@@ -261,7 +298,8 @@ impl Updater {
                 let cx = cx.clone();
                 async move {
                     while let Some(percent) = progress_rx.next().await {
-                        let _ = cx.update(|cx| Self::set(&this, Status::Downloading, Some(percent), cx));
+                        let _ = cx
+                            .update(|cx| Self::set(&this, Status::Downloading, Some(percent), cx));
                     }
                 }
             };
@@ -283,7 +321,9 @@ impl Updater {
 
     /// `quitAndInstall`: swaps the executable and relaunches.
     pub fn install(cx: &mut App) {
-        let Some(path) = Self::global(cx).read(cx).downloaded.clone() else { return };
+        let Some(path) = Self::global(cx).read(cx).downloaded.clone() else {
+            return;
+        };
         if let Err(error) = self_replace::self_replace(&path) {
             eprintln!("Could not install the update: {error}");
             return;
@@ -311,11 +351,19 @@ fn unpack(bytes: &[u8]) -> Result<std::path::PathBuf, String> {
     let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(bytes));
     for entry in archive.entries().map_err(|error| error.to_string())? {
         let mut entry = entry.map_err(|error| error.to_string())?;
-        let path = entry.path().map_err(|error| error.to_string())?.into_owned();
-        let name = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+        let path = entry
+            .path()
+            .map_err(|error| error.to_string())?
+            .into_owned();
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
         if name == "novarum" || name == "novarum.exe" {
             let mut data = Vec::new();
-            entry.read_to_end(&mut data).map_err(|error| error.to_string())?;
+            entry
+                .read_to_end(&mut data)
+                .map_err(|error| error.to_string())?;
             std::fs::write(&target, data).map_err(|error| error.to_string())?;
             #[cfg(unix)]
             {

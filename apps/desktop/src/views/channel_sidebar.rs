@@ -37,8 +37,8 @@ use crate::{
 
 /// Tailwind's `-600` shades the web picks from for a participant without an avatar color.
 const AVATAR_COLORS: [&str; 12] = [
-    "#e11d48", "#0284c7", "#059669", "#d97706", "#9333ea", "#0891b2", "#db2777", "#65a30d", "#4f46e5", "#0d9488",
-    "#ea580c", "#7c3aed",
+    "#e11d48", "#0284c7", "#059669", "#d97706", "#9333ea", "#0891b2", "#db2777", "#65a30d",
+    "#4f46e5", "#0d9488", "#ea580c", "#7c3aed",
 ];
 
 const ROSE_400: u32 = 0xfb7185;
@@ -91,13 +91,24 @@ impl Render for ChannelDrag {
             .bg(t.sidebar)
             .opacity(0.9)
             .text_color(t.sidebar_foreground)
-            .child(icon(if channel.kind == ChannelType::Voice { "volume-2" } else { "hash" }).size_4())
+            .child(
+                icon(if channel.kind == ChannelType::Voice {
+                    "volume-2"
+                } else {
+                    "hash"
+                })
+                .size_4(),
+            )
             .child(div().truncate().child(channel_label(channel)))
     }
 }
 
 fn channel_label(channel: &Channel) -> String {
-    channel.label.clone().filter(|label| !label.is_empty()).unwrap_or(channel.name.clone())
+    channel
+        .label
+        .clone()
+        .filter(|label| !label.is_empty())
+        .unwrap_or(channel.name.clone())
 }
 
 pub struct ChannelSidebar {
@@ -138,7 +149,11 @@ impl ChannelSidebar {
         self.orders = categories
             .iter()
             .map(|category| {
-                let incoming: Vec<String> = category.channels.iter().map(|channel| channel.id.clone()).collect();
+                let incoming: Vec<String> = category
+                    .channels
+                    .iter()
+                    .map(|channel| channel.id.clone())
+                    .collect();
                 let current = self.orders.get(&category.id).cloned().unwrap_or_default();
                 (category.id.clone(), sync_order(&current, &incoming))
             })
@@ -146,13 +161,22 @@ impl ChannelSidebar {
     }
 
     /// `handleFinalize`: every channel id in its new order, applied locally then saved.
-    fn finalize_drag(&mut self, server_id: String, categories: &[ChannelCategory], cx: &mut Context<Self>) {
-        let Some((category_id, origin)) = self.drag_origin.take() else { return };
+    fn finalize_drag(
+        &mut self,
+        server_id: String,
+        categories: &[ChannelCategory],
+        cx: &mut Context<Self>,
+    ) {
+        let Some((category_id, origin)) = self.drag_origin.take() else {
+            return;
+        };
         if self.orders.get(&category_id) == Some(&origin) {
             return;
         }
-        let channel_ids: Vec<String> =
-            categories.iter().flat_map(|category| self.orders.get(&category.id).cloned().unwrap_or_default()).collect();
+        let channel_ids: Vec<String> = categories
+            .iter()
+            .flat_map(|category| self.orders.get(&category.id).cloned().unwrap_or_default())
+            .collect();
         self.reorder_loading = true;
         let chat = Chat::global(cx);
         let save = chat.update(cx, |chat, cx| {
@@ -175,7 +199,8 @@ impl ChannelSidebar {
             return;
         }
         if !shift && self.armed_channel.as_deref() != Some(channel_id.as_str()) {
-            self.delete_text.insert(channel_id.clone(), "You sure?".into());
+            self.delete_text
+                .insert(channel_id.clone(), "You sure?".into());
             self.armed_channel = Some(channel_id.clone());
             self._delete_timer = Some(cx.spawn(async move |this, cx| {
                 cx.background_executor().timer(Duration::from_secs(3)).await;
@@ -243,16 +268,19 @@ impl ChannelSidebar {
             )
             .dropdown_menu_with_anchor(Anchor::TopCenter, move |menu, _, _| {
                 let manage = server.can_manage_channels;
-                let (invite_id, settings_server, copy_id) = (server.id.clone(), server.clone(), server.id.clone());
+                let (invite_id, settings_server, copy_id) =
+                    (server.id.clone(), server.clone(), server.id.clone());
                 menu.min_w(px(208.0))
                     .when(manage, |menu| {
-                        menu.item(
-                            shortcut("Invite", "user-round-plus", false)
-                                .on_click(move |_, window, cx| open_invite(invite_id.clone(), window, cx)),
-                        )
+                        menu.item(shortcut("Invite", "user-round-plus", false).on_click(
+                            move |_, window, cx| open_invite(invite_id.clone(), window, cx),
+                        ))
                         .item(
-                            shortcut("Settings", "settings", false)
-                                .on_click(move |_, window, cx| open_guild_settings(&settings_server, window, cx)),
+                            shortcut("Settings", "settings", false).on_click(
+                                move |_, window, cx| {
+                                    open_guild_settings(&settings_server, window, cx)
+                                },
+                            ),
                         )
                     })
                     .separator()
@@ -261,9 +289,11 @@ impl ChannelSidebar {
                     .item(shortcut("Leave Guild", "log-out", true))
                     .separator()
                     .item(
-                        shortcut("Copy Guild ID", "id-card-lanyard", false).on_click(move |_, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(copy_id.clone()))
-                        }),
+                        shortcut("Copy Guild ID", "id-card-lanyard", false).on_click(
+                            move |_, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(copy_id.clone()))
+                            },
+                        ),
                     )
             })
     }
@@ -304,9 +334,21 @@ impl ChannelSidebar {
                 })
                 .item(PopupMenuItem::new("Invite to Channel").icon(icon("user-round-plus")))
                 .item(PopupMenuItem::new("Pin Channel to Top").icon(icon("pin")))
-                .item(PopupMenuItem::new("Copy Link").icon(icon("link")).on_click(copy(channel.id.clone())))
+                .item(
+                    PopupMenuItem::new("Copy Link")
+                        .icon(icon("link"))
+                        .on_click(copy(channel.id.clone())),
+                )
                 .separator();
-            let menu = notification_menu(menu, &channel.id, Some(&server_id), Noun::Channel, window, cx).separator();
+            let menu = notification_menu(
+                menu,
+                &channel.id,
+                Some(&server_id),
+                Noun::Channel,
+                window,
+                cx,
+            )
+            .separator();
             let edit = channel.clone();
             let menu = menu.item(
                 PopupMenuItem::new("Edit Channel")
@@ -320,26 +362,31 @@ impl ChannelSidebar {
                 let label = delete_text.unwrap_or("Delete Channel".into());
                 menu.when(text, |menu| {
                     menu.item(
-                        PopupMenuItem::new("Only Owner Can Send").icon(icon("megaphone")).checked(owner_only).on_click(
-                            move |_, _, cx| {
+                        PopupMenuItem::new("Only Owner Can Send")
+                            .icon(icon("megaphone"))
+                            .checked(owner_only)
+                            .on_click(move |_, _, cx| {
                                 let (guild, channel) = (owner_guild.clone(), owner_channel.clone());
                                 Chat::global(cx)
-                                    .update(cx, |chat, cx| chat.set_owner_only(guild, channel, !owner_only, cx))
+                                    .update(cx, |chat, cx| {
+                                        chat.set_owner_only(guild, channel, !owner_only, cx)
+                                    })
                                     .detach();
-                            },
-                        ),
+                            }),
                     )
                 })
                 .item(PopupMenuItem::new("Duplicate Channel").icon(icon("copy-plus")))
                 .item(
-                    PopupMenuItem::element(move |_, _| div().text_color(t.destructive).child(label.clone()))
-                        .icon(icon("trash").text_color(t.destructive))
-                        .disabled(deleting)
-                        .on_click(move |_, window, cx| {
-                            let shift = window.modifiers().shift;
-                            let id = delete_id.clone();
-                            let _ = this.update(cx, |this, cx| this.delete_channel(id, shift, cx));
-                        }),
+                    PopupMenuItem::element(move |_, _| {
+                        div().text_color(t.destructive).child(label.clone())
+                    })
+                    .icon(icon("trash").text_color(t.destructive))
+                    .disabled(deleting)
+                    .on_click(move |_, window, cx| {
+                        let shift = window.modifiers().shift;
+                        let id = delete_id.clone();
+                        let _ = this.update(cx, |this, cx| this.delete_channel(id, shift, cx));
+                    }),
                 )
             });
             menu.separator().item(
@@ -361,7 +408,10 @@ impl ChannelSidebar {
     ) -> AnyElement {
         let t = theme::tokens(cx);
         let notifications = NotificationSettings::global(cx).read(cx);
-        let target = Target { channel_id: &channel.id, guild_id: Some(&server.id) };
+        let target = Target {
+            channel_id: &channel.id,
+            guild_id: Some(&server.id),
+        };
         let show_mention = channel.mention > 0 && notifications.shows_mentions(target);
         let show_unread = channel.unread && notifications.shows_unread(target);
         let bright = show_unread || show_mention;
@@ -380,9 +430,11 @@ impl ChannelSidebar {
             .cursor_pointer()
             .map(|row| {
                 if active {
-                    row.bg(t.primary.opacity(0.1)).text_color(t.sidebar_foreground)
+                    row.bg(t.primary.opacity(0.1))
+                        .text_color(t.sidebar_foreground)
                 } else {
-                    row.text_color(t.muted_foreground).hover(|row| row.text_color(t.sidebar_foreground))
+                    row.text_color(t.muted_foreground)
+                        .hover(|row| row.text_color(t.sidebar_foreground))
                 }
             })
             .when(self.reorder_loading, |row| row.opacity(0.7))
@@ -393,7 +445,11 @@ impl ChannelSidebar {
                     .when(bright && !voice, |icon| icon.text_color(white())),
             )
             .child(
-                div().flex_1().truncate().when(bright, |name| name.text_color(white())).child(channel_label(channel)),
+                div()
+                    .flex_1()
+                    .truncate()
+                    .when(bright, |name| name.text_color(white()))
+                    .child(channel_label(channel)),
             )
             .when(show_mention, |row| {
                 row.child(
@@ -408,7 +464,11 @@ impl ChannelSidebar {
                         .font_weight(FontWeight::BOLD)
                         .text_color(t.destructive_foreground)
                         .when(circle, |badge| badge.rounded_full())
-                        .child(if channel.mention > 99 { "99+".to_string() } else { channel.mention.to_string() }),
+                        .child(if channel.mention > 99 {
+                            "99+".to_string()
+                        } else {
+                            channel.mention.to_string()
+                        }),
                 )
             })
             .when(show_unread && !show_mention, |row| {
@@ -419,33 +479,44 @@ impl ChannelSidebar {
                         .flex_shrink_0()
                         .items_center()
                         .justify_center()
-                        .child(div().size_2().bg(t.foreground.opacity(0.8)).when(circle, |dot| dot.rounded_full())),
+                        .child(
+                            div()
+                                .size_2()
+                                .bg(t.foreground.opacity(0.8))
+                                .when(circle, |dot| dot.rounded_full()),
+                        ),
                 )
             })
             .on_click(move |_, _, cx| ShellState::select_channel(&id, cx));
 
         let row = if server.can_manage_channels {
-            let drag = ChannelDrag { category_id: category_id.to_string(), channel: channel.clone() };
+            let drag = ChannelDrag {
+                category_id: category_id.to_string(),
+                channel: channel.clone(),
+            };
             let (category, target) = (category_id.to_string(), channel.id.clone());
-            row.on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone())).on_drag_move(cx.listener(
-                move |this, event: &DragMoveEvent<ChannelDrag>, _, cx| {
-                    if !event.bounds.contains(&event.event.position) {
-                        return;
-                    }
-                    let drag = event.drag(cx);
-                    if drag.category_id != category {
-                        return;
-                    }
-                    let dragged = drag.channel.id.clone();
-                    let Some(order) = this.orders.get_mut(&category) else { return };
-                    if this.drag_origin.is_none() {
-                        this.drag_origin = Some((category.clone(), order.clone()));
-                    }
-                    if move_to(order, &dragged, &target) {
-                        cx.notify();
-                    }
-                },
-            ))
+            row.on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()))
+                .on_drag_move(cx.listener(
+                    move |this, event: &DragMoveEvent<ChannelDrag>, _, cx| {
+                        if !event.bounds.contains(&event.event.position) {
+                            return;
+                        }
+                        let drag = event.drag(cx);
+                        if drag.category_id != category {
+                            return;
+                        }
+                        let dragged = drag.channel.id.clone();
+                        let Some(order) = this.orders.get_mut(&category) else {
+                            return;
+                        };
+                        if this.drag_origin.is_none() {
+                            this.drag_origin = Some((category.clone(), order.clone()));
+                        }
+                        if move_to(order, &dragged, &target) {
+                            cx.notify();
+                        }
+                    },
+                ))
         } else {
             row
         };
@@ -453,7 +524,9 @@ impl ChannelSidebar {
         let menu = self.channel_menu(server, channel, cx);
         div()
             .child(row.context_menu(menu))
-            .when(voice, |item| item.child(self.render_voice_users(&channel.id, circle, cx)))
+            .when(voice, |item| {
+                item.child(self.render_voice_users(&channel.id, circle, cx))
+            })
             .into_any_element()
     }
 
@@ -469,29 +542,44 @@ impl ChannelSidebar {
             .map(|presence| (presence.user_id.clone(), presence.name.clone()))
             .collect();
         let voice = Voice::global(cx).read(cx);
-        let live = (voice.channel_id.as_deref() == Some(channel_id)).then(|| voice.voice_states.clone());
+        let live =
+            (voice.channel_id.as_deref() == Some(channel_id)).then(|| voice.voice_states.clone());
         let users = voice_users(&presences, live.as_ref());
         if users.is_empty() {
             return div();
         }
 
         let rows = users.into_iter().map(|(user_id, name)| {
-            let member = members.iter().find(|member| member.user_id == user_id).cloned();
+            let member = members
+                .iter()
+                .find(|member| member.user_id == user_id)
+                .cloned();
             let name = name
                 .filter(|name| !name.is_empty())
                 .or_else(|| member.as_ref().map(|member| member.name().to_string()))
                 .unwrap_or(user_id.clone());
-            let state = live.as_ref().and_then(|live| live.get(&user_id)).cloned().unwrap_or_default();
+            let state = live
+                .as_ref()
+                .and_then(|live| live.get(&user_id))
+                .cloned()
+                .unwrap_or_default();
             let ring = member
                 .as_ref()
                 .and_then(|member| member.speaking_ring_color.as_deref())
                 .and_then(ui::hex)
                 .or_else(|| ui::hex(DEFAULT_SPEAKING_RING_COLOR))
                 .unwrap_or(t.primary);
-            let bg =
-                member.as_ref().and_then(|member| member.avatar_color.clone()).unwrap_or(avatar_bg(&user_id).into());
+            let bg = member
+                .as_ref()
+                .and_then(|member| member.avatar_color.clone())
+                .unwrap_or(avatar_bg(&user_id).into());
             let avatar_url = member.as_ref().and_then(|member| member.avatar_url.clone());
-            let rose = |name: &str| icon(name).size(px(14.0)).flex_shrink_0().text_color(rgb(ROSE_400));
+            let rose = |name: &str| {
+                icon(name)
+                    .size(px(14.0))
+                    .flex_shrink_0()
+                    .text_color(rgb(ROSE_400))
+            };
 
             let row = div()
                 .flex()
@@ -543,9 +631,15 @@ impl ChannelSidebar {
                         .group_hover("voice-user", |name| name.text_color(t.sidebar_foreground))
                         .child(name.clone()),
                 )
-                .when(state.self_deafened, |row| row.child(rose("mic-off")).child(rose("headphone-off")))
-                .when(state.self_muted && !state.self_deafened, |row| row.child(rose("mic-off")))
-                .when(state.camera, |row| row.child(icon("video").size(px(14.0)).flex_shrink_0()))
+                .when(state.self_deafened, |row| {
+                    row.child(rose("mic-off")).child(rose("headphone-off"))
+                })
+                .when(state.self_muted && !state.self_deafened, |row| {
+                    row.child(rose("mic-off"))
+                })
+                .when(state.camera, |row| {
+                    row.child(icon("video").size(px(14.0)).flex_shrink_0())
+                })
                 .when(state.screen_share, |row| {
                     row.child(
                         div()
@@ -574,14 +668,25 @@ impl ChannelSidebar {
                 is_bot: false,
                 status: None,
             });
-            div().group("voice-user").flex().w_full().child(profile_card(
-                SharedString::from(format!("voice-user-{channel_id}-{user_id}")),
-                author,
-                None,
-                row,
-            ))
+            div()
+                .group("voice-user")
+                .flex()
+                .w_full()
+                .child(profile_card(
+                    SharedString::from(format!("voice-user-{channel_id}-{user_id}")),
+                    author,
+                    None,
+                    row,
+                ))
         });
-        div().ml_6().mt(px(2.0)).pb(px(2.0)).flex().flex_col().gap(px(2.0)).children(rows)
+        div()
+            .ml_6()
+            .mt(px(2.0))
+            .pb(px(2.0))
+            .flex()
+            .flex_col()
+            .gap(px(2.0))
+            .children(rows)
     }
 }
 
@@ -600,11 +705,23 @@ impl Render for ChannelSidebar {
         self.sync_orders(&categories);
         let circle = SettingsStore::get(cx).circle_icons;
 
-        let mut list =
-            div().id("channels").flex_1().min_h_0().overflow_y_scroll().px_2().py_2().flex().flex_col().gap(px(2.0));
+        let mut list = div()
+            .id("channels")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .px_2()
+            .py_2()
+            .flex()
+            .flex_col()
+            .gap(px(2.0));
         for category in &categories {
             let collapsed = self.collapsed.contains(&category.id);
-            let (toggle_id, guild_id, label) = (category.id.clone(), server.id.clone(), category.label.clone());
+            let (toggle_id, guild_id, label) = (
+                category.id.clone(),
+                server.id.clone(),
+                category.label.clone(),
+            );
             list = list.child(
                 div()
                     .flex()
@@ -626,7 +743,13 @@ impl Render for ChannelSidebar {
                             .cursor_pointer()
                             .hover(|toggle| toggle.text_color(t.sidebar_foreground))
                             .child(
-                                icon(if collapsed { "chevron-right" } else { "chevron-down" }).size_3().flex_shrink_0(),
+                                icon(if collapsed {
+                                    "chevron-right"
+                                } else {
+                                    "chevron-down"
+                                })
+                                .size_3()
+                                .flex_shrink_0(),
                             )
                             .child(category.label.to_uppercase())
                             .on_click(cx.listener(move |this, _, _, cx| {
@@ -647,7 +770,12 @@ impl Render for ChannelSidebar {
                                 .hover(|add| add.opacity(1.0).text_color(t.sidebar_foreground))
                                 .child(icon("plus").size_3())
                                 .on_click(move |_, window, cx| {
-                                    open_create_channel(guild_id.clone(), Some(label.clone()), window, cx)
+                                    open_create_channel(
+                                        guild_id.clone(),
+                                        Some(label.clone()),
+                                        window,
+                                        cx,
+                                    )
                                 }),
                         )
                     }),
@@ -700,8 +828,14 @@ mod tests {
     #[test]
     fn merges_live_participants() {
         let presences = vec![("a".to_string(), Some("Ana".to_string()))];
-        let live = HashMap::from([("a".to_string(), VoiceState::default()), ("b".to_string(), VoiceState::default())]);
+        let live = HashMap::from([
+            ("a".to_string(), VoiceState::default()),
+            ("b".to_string(), VoiceState::default()),
+        ]);
         assert_eq!(voice_users(&presences, None), presences);
-        assert_eq!(voice_users(&presences, Some(&live)), vec![("a".into(), Some("Ana".into())), ("b".into(), None)]);
+        assert_eq!(
+            voice_users(&presences, Some(&live)),
+            vec![("a".into(), Some("Ana".into())), ("b".into(), None)]
+        );
     }
 }

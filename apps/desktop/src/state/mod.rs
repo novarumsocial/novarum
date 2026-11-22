@@ -81,7 +81,8 @@ pub fn boot(cx: &mut App) -> Shared<Task<bool>> {
 fn load_signed_in(cx: &mut App) -> Task<()> {
     let chat = chat::Chat::global(cx).update(cx, |chat, cx| chat.load_initial_data(cx));
     let friends = friends::Friends::global(cx).update(cx, |friends, cx| friends.load(cx));
-    let notifications = notification_settings::NotificationSettings::global(cx).update(cx, |settings, cx| settings.load(cx));
+    let notifications = notification_settings::NotificationSettings::global(cx)
+        .update(cx, |settings, cx| settings.load(cx));
     cx.spawn(async move |_| {
         futures::join!(chat, friends, notifications);
     })

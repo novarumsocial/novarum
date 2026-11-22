@@ -35,7 +35,12 @@ pub struct InviteDialog {
 }
 
 fn name_for(entry: &FriendEntry) -> String {
-    entry.user.display_name.clone().filter(|name| !name.is_empty()).unwrap_or(entry.user.username.clone())
+    entry
+        .user
+        .display_name
+        .clone()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(entry.user.username.clone())
 }
 
 fn handle_for(entry: &FriendEntry) -> String {
@@ -43,7 +48,11 @@ fn handle_for(entry: &FriendEntry) -> String {
 }
 
 /// Friends who aren't in the guild yet, matching the search by name or handle.
-pub fn visible_friends<'a>(accepted: &'a [FriendEntry], member_ids: &[&str], query: &str) -> Vec<&'a FriendEntry> {
+pub fn visible_friends<'a>(
+    accepted: &'a [FriendEntry],
+    member_ids: &[&str],
+    query: &str,
+) -> Vec<&'a FriendEntry> {
     let query = query.trim().to_lowercase();
     accepted
         .iter()
@@ -58,7 +67,9 @@ pub fn visible_friends<'a>(accepted: &'a [FriendEntry], member_ids: &[&str], que
 
 pub fn open_invite(guild_id: String, window: &mut Window, cx: &mut App) {
     let view = cx.new(|cx| InviteDialog::new(guild_id, window, cx));
-    window.open_dialog(cx, move |dialog, _, _| dialog.w(px(448.0)).p_6().child(view.clone()));
+    window.open_dialog(cx, move |dialog, _, _| {
+        dialog.w(px(448.0)).p_6().child(view.clone())
+    });
 }
 
 impl InviteDialog {
@@ -88,12 +99,15 @@ impl InviteDialog {
     fn set_code(&mut self, code: String, window: &mut Window, cx: &mut Context<Self>) {
         self.code = code;
         let url = self.invite_url();
-        self.link.update(cx, |link, cx| link.set_value(url, window, cx));
+        self.link
+            .update(cx, |link, cx| link.set_value(url, window, cx));
     }
 
     fn fetch_invite(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.loading = true;
-        let get = Chat::global(cx).update(cx, |chat, cx| chat.get_guild_invite(self.guild_id.clone(), cx));
+        let get = Chat::global(cx).update(cx, |chat, cx| {
+            chat.get_guild_invite(self.guild_id.clone(), cx)
+        });
         cx.spawn_in(window, async move |this, cx| {
             let invite = get.await;
             let _ = this.update_in(cx, |this, window, cx| match invite {
@@ -111,7 +125,9 @@ impl InviteDialog {
     fn create_invite(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.loading = true;
         cx.notify();
-        let create = Chat::global(cx).update(cx, |chat, cx| chat.create_guild_invite(self.guild_id.clone(), cx));
+        let create = Chat::global(cx).update(cx, |chat, cx| {
+            chat.create_guild_invite(self.guild_id.clone(), cx)
+        });
         cx.spawn_in(window, async move |this, cx| {
             let invite = create.await;
             let _ = this.update_in(cx, |this, window, cx| {
@@ -136,7 +152,9 @@ impl InviteDialog {
         self.copied = true;
         cx.notify();
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(500)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(500))
+                .await;
             let _ = this.update(cx, |this, cx| {
                 this.copied = false;
                 cx.notify();
@@ -154,8 +172,9 @@ impl InviteDialog {
             let sent = match ensure.await {
                 Some(channel_id) => {
                     let send = cx.update(|cx| {
-                        Chat::global(cx)
-                            .update(cx, |chat, cx| chat.send_message(channel_id, Some(url), vec![], None, cx))
+                        Chat::global(cx).update(cx, |chat, cx| {
+                            chat.send_message(channel_id, Some(url), vec![], None, cx)
+                        })
                     });
                     let _ = send.await;
                     true
@@ -177,16 +196,29 @@ impl InviteDialog {
         let t = theme::tokens(cx);
         let friends = Friends::global(cx).read(cx).accepted.clone();
         let empty = |text: &'static str| {
-            div().py_6().text_center().text_sm().text_color(t.muted_foreground).child(text).into_any_element()
+            div()
+                .py_6()
+                .text_center()
+                .text_sm()
+                .text_color(t.muted_foreground)
+                .child(text)
+                .into_any_element()
         };
         if friends.is_empty() {
             return empty("You don't have any friends yet.");
         }
-        let members: Vec<String> =
-            Chat::global(cx).read(cx).members.iter().map(|member| member.user_id.clone()).collect();
+        let members: Vec<String> = Chat::global(cx)
+            .read(cx)
+            .members
+            .iter()
+            .map(|member| member.user_id.clone())
+            .collect();
         let member_ids: Vec<&str> = members.iter().map(String::as_str).collect();
         let query = self.query.read(cx).value().to_string();
-        let visible: Vec<FriendEntry> = visible_friends(&friends, &member_ids, &query).into_iter().cloned().collect();
+        let visible: Vec<FriendEntry> = visible_friends(&friends, &member_ids, &query)
+            .into_iter()
+            .cloned()
+            .collect();
         if visible.is_empty() {
             return empty("No matches.");
         }
@@ -207,7 +239,9 @@ impl InviteDialog {
                         button.label(if inviting { "Inviting…" } else { "Invite" })
                     }
                 })
-                .on_click(cx.listener(move |this, _, _, cx| this.invite_friend(user_id.clone(), cx)));
+                .on_click(
+                    cx.listener(move |this, _, _, cx| this.invite_friend(user_id.clone(), cx)),
+                );
             div()
                 .flex()
                 .w_full()
@@ -216,16 +250,26 @@ impl InviteDialog {
                 .px_2()
                 .py(px(6.0))
                 .text_sm()
-                .child(avatar(entry.user.avatar_url.as_deref(), &name, entry.user.avatar_color.as_deref(), 32.0, cx))
+                .child(avatar(
+                    entry.user.avatar_url.as_deref(),
+                    &name,
+                    entry.user.avatar_color.as_deref(),
+                    32.0,
+                    cx,
+                ))
                 .child(
-                    div().flex_1().min_w_0().child(div().truncate().font_weight(FontWeight::MEDIUM).child(name)).child(
-                        div()
-                            .truncate()
-                            .font_family(cx.theme().mono_font_family.clone())
-                            .text_size(px(10.0))
-                            .text_color(t.muted_foreground)
-                            .child(handle_for(&entry)),
-                    ),
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(div().truncate().font_weight(FontWeight::MEDIUM).child(name))
+                        .child(
+                            div()
+                                .truncate()
+                                .font_family(cx.theme().mono_font_family.clone())
+                                .text_size(px(10.0))
+                                .text_color(t.muted_foreground)
+                                .child(handle_for(&entry)),
+                        ),
                 )
                 .child(button)
         });
@@ -244,7 +288,8 @@ impl InviteDialog {
 impl Render for InviteDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
-        let label = |text: &'static str| div().text_xs().font_weight(FontWeight::MEDIUM).child(text);
+        let label =
+            |text: &'static str| div().text_xs().font_weight(FontWeight::MEDIUM).child(text);
 
         div()
             .flex()
@@ -327,8 +372,16 @@ mod tests {
 
     #[test]
     fn filters_members_and_search() {
-        let friends = vec![friend("1", "ana", Some("Ana B")), friend("2", "leo", None), friend("3", "max", None)];
-        let ids = |list: Vec<&FriendEntry>| list.iter().map(|entry| entry.user.user_id.clone()).collect::<Vec<_>>();
+        let friends = vec![
+            friend("1", "ana", Some("Ana B")),
+            friend("2", "leo", None),
+            friend("3", "max", None),
+        ];
+        let ids = |list: Vec<&FriendEntry>| {
+            list.iter()
+                .map(|entry| entry.user.user_id.clone())
+                .collect::<Vec<_>>()
+        };
         assert_eq!(ids(visible_friends(&friends, &["3"], "")), ["1", "2"]);
         assert_eq!(ids(visible_friends(&friends, &[], " ANA ")), ["1"]);
         assert_eq!(ids(visible_friends(&friends, &[], "@leo:novarum")), ["2"]);

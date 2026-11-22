@@ -91,11 +91,22 @@ pub fn profile_card(
 }
 
 /// The card around a trigger that fills its row, like the member lists' `class="flex w-full"`.
-pub fn profile_card_row(id: impl Into<ElementId>, user: Author, on_call: Option<OnCall>, trigger: Div) -> AnyElement {
+pub fn profile_card_row(
+    id: impl Into<ElementId>,
+    user: Author,
+    on_call: Option<OnCall>,
+    trigger: Div,
+) -> AnyElement {
     profile_popover(id.into(), user, on_call, trigger, true)
 }
 
-fn profile_popover(id: ElementId, user: Author, on_call: Option<OnCall>, trigger: Div, full: bool) -> AnyElement {
+fn profile_popover(
+    id: ElementId,
+    user: Author,
+    on_call: Option<OnCall>,
+    trigger: Div,
+    full: bool,
+) -> AnyElement {
     let draft_id = SharedString::from(format!("{id:?}-draft"));
     Popover::new(id)
         .anchor(Anchor::LeftCenter)
@@ -103,9 +114,16 @@ fn profile_popover(id: ElementId, user: Author, on_call: Option<OnCall>, trigger
         .w(px(288.0))
         .p_0()
         .overflow_hidden()
-        .when(full, |popover| popover.trigger_style(StyleRefinement::default().w_full()))
-        .trigger(Trigger { element: trigger.cursor_pointer(), open: false })
-        .content(move |state, window, cx| card(&user, on_call.clone(), draft_id.clone(), state, window, cx))
+        .when(full, |popover| {
+            popover.trigger_style(StyleRefinement::default().w_full())
+        })
+        .trigger(Trigger {
+            element: trigger.cursor_pointer(),
+            open: false,
+        })
+        .content(move |state, window, cx| {
+            card(&user, on_call.clone(), draft_id.clone(), state, window, cx)
+        })
         .into_any_element()
 }
 
@@ -119,25 +137,43 @@ pub fn friend_action_label(status: FriendStatus) -> &'static str {
     }
 }
 
-fn run_friend_action(user: &Author, status: FriendStatus, friendship: Option<String>, cx: &mut App) {
+fn run_friend_action(
+    user: &Author,
+    status: FriendStatus,
+    friendship: Option<String>,
+    cx: &mut App,
+) {
     Friends::global(cx).update(cx, |friends, cx| match (status, friendship) {
         (FriendStatus::Incoming, Some(id)) => friends.accept(id, cx).detach(),
-        (FriendStatus::Outgoing | FriendStatus::Friend, Some(id)) => friends.remove(id, cx).detach(),
-        (FriendStatus::None, _) => friends.request(user.user_id.clone(), &user.username, &user.server, cx).detach(),
+        (FriendStatus::Outgoing | FriendStatus::Friend, Some(id)) => {
+            friends.remove(id, cx).detach()
+        }
+        (FriendStatus::None, _) => friends
+            .request(user.user_id.clone(), &user.username, &user.server, cx)
+            .detach(),
         _ => {}
     });
 }
 
 /// `sendDm`: opens (or creates) the DM and sends the draft there.
-fn send_dm(input: &Entity<InputState>, friendship: Option<String>, window: &mut Window, cx: &mut App) {
+fn send_dm(
+    input: &Entity<InputState>,
+    friendship: Option<String>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let content = input.read(cx).value().trim().to_string();
-    let Some(friendship) = friendship.filter(|_| !content.is_empty()) else { return };
+    let Some(friendship) = friendship.filter(|_| !content.is_empty()) else {
+        return;
+    };
     input.update(cx, |input, cx| input.set_value("", window, cx));
     let open = Dms::global(cx).update(cx, |dms, cx| dms.open(friendship, cx));
     cx.spawn(async move |cx| {
         let Some(channel_id) = open.await else { return };
         let send = cx.update(|cx| {
-            Chat::global(cx).update(cx, |chat, cx| chat.send_message(channel_id, Some(content), vec![], None, cx))
+            Chat::global(cx).update(cx, |chat, cx| {
+                chat.send_message(channel_id, Some(content), vec![], None, cx)
+            })
         });
         let _ = send.await;
     })
@@ -160,9 +196,15 @@ fn card(
     let status = friends.status_for(&user.username, &user.server);
     let friendship = friends.user_id_for(&user.username, &user.server);
     let busy = friends.busy_user_ids.contains(&user.user_id)
-        || friendship.as_ref().is_some_and(|id| friends.busy_user_ids.contains(id));
-    let is_self = me.as_ref().is_some_and(|me| user.username == me.username && user.server == me.homeserver);
-    let can_add_friend = !user.user_id.is_empty() && me.as_ref().is_none_or(|me| me.id != user.user_id) && !user.is_bot;
+        || friendship
+            .as_ref()
+            .is_some_and(|id| friends.busy_user_ids.contains(id));
+    let is_self = me
+        .as_ref()
+        .is_some_and(|me| user.username == me.username && user.server == me.homeserver);
+    let can_add_friend = !user.user_id.is_empty()
+        && me.as_ref().is_none_or(|me| me.id != user.user_id)
+        && !user.is_bot;
     let name = user.name().to_string();
     let show_draft = !user.username.is_empty() && !is_self && status == FriendStatus::Friend;
 
@@ -171,15 +213,30 @@ fn card(
         .w_full()
         .h(px(96.0))
         .overflow_hidden()
-        .bg(user.avatar_color.as_deref().and_then(ui::hex).unwrap_or(t.muted))
-        .children(user.banner_url.as_deref().and_then(|url| ui::image::remote(url, cx).ok().flatten()).map(
-            |image| img(image).size_full().object_fit(ObjectFit::Contain),
-        ));
+        .bg(user
+            .avatar_color
+            .as_deref()
+            .and_then(ui::hex)
+            .unwrap_or(t.muted))
+        .children(
+            user.banner_url
+                .as_deref()
+                .and_then(|url| ui::image::remote(url, cx).ok().flatten())
+                .map(|image| img(image).size_full().object_fit(ObjectFit::Contain)),
+        );
 
     let friend_button = can_add_friend.then(|| {
         let user = user.clone();
         let friendship = friendship.clone();
-        let glyph = |name: &str| div().absolute().inset_0().flex().items_center().justify_center().child(icon(name).size_4());
+        let glyph = |name: &str| {
+            div()
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(icon(name).size_4())
+        };
         let icons = match status {
             FriendStatus::Incoming => div().size_full().child(glyph("user-round-arrow-left")),
             FriendStatus::Outgoing => div().size_full().child(glyph("user-round-cog")),
@@ -194,14 +251,22 @@ fn card(
                 ),
             FriendStatus::None => div().size_full().child(glyph("user-round-plus")),
         };
-        div().group("friend-action").absolute().right_3().top_1().child(
-            Button::new("friend-action")
-                .w(px(36.0)).h(px(36.0))
-                .tooltip(friend_action_label(status))
-                .disabled(busy)
-                .child(div().relative().size_4().child(icons))
-                .on_click(move |_, _, cx| run_friend_action(&user, status, friendship.clone(), cx)),
-        )
+        div()
+            .group("friend-action")
+            .absolute()
+            .right_3()
+            .top_1()
+            .child(
+                Button::new("friend-action")
+                    .w(px(36.0))
+                    .h(px(36.0))
+                    .tooltip(friend_action_label(status))
+                    .disabled(busy)
+                    .child(div().relative().size_4().child(icons))
+                    .on_click(move |_, _, cx| {
+                        run_friend_action(&user, status, friendship.clone(), cx)
+                    }),
+            )
     });
 
     let status_dot = user.status.map(|status| {
@@ -218,8 +283,13 @@ fn card(
         if status == UserStatus::Online {
             dot.bg(emerald())
         } else {
-            dot.bg(neutral_900())
-                .child(div().size_full().border(px(3.0)).border_color(neutral_500()).when(circle, |d| d.rounded_full()))
+            dot.bg(neutral_900()).child(
+                div()
+                    .size_full()
+                    .border(px(3.0))
+                    .border_color(neutral_500())
+                    .when(circle, |d| d.rounded_full()),
+            )
         }
     });
 
@@ -251,45 +321,58 @@ fn card(
             InputState::new(window, cx).placeholder(placeholder)
         });
         let entity = input.clone();
-        window.use_keyed_state(ElementId::Name(format!("{draft_id}-enter").into()), cx, move |window, cx| {
-            window.subscribe(&entity, cx, move |entity, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    send_dm(&entity, friendship.clone(), window, cx);
-                }
-            })
-        });
+        window.use_keyed_state(
+            ElementId::Name(format!("{draft_id}-enter").into()),
+            cx,
+            move |window, cx| {
+                window.subscribe(
+                    &entity,
+                    cx,
+                    move |entity, event: &InputEvent, window, cx| {
+                        if let InputEvent::PressEnter { .. } = event {
+                            send_dm(&entity, friendship.clone(), window, cx);
+                        }
+                    },
+                )
+            },
+        );
         div().mt(px(10.0)).child(Input::new(&input))
     });
 
-    let about = user.about.as_deref().map(str::trim).filter(|about| !about.is_empty()).map(|about| {
-        div()
-            .mt_3()
-            .flex()
-            .flex_col()
-            .gap(px(6.0))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(
-                        div()
-                            .text_size(px(10.0))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(t.muted_foreground)
-                            .child("BIO"),
-                    )
-                    .child(div().flex_1().h_px().bg(t.border)),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .line_height(relative(1.625))
-                    .line_clamp(6)
-                    .text_color(t.foreground.opacity(0.8))
-                    .child(about.to_string()),
-            )
-    });
+    let about = user
+        .about
+        .as_deref()
+        .map(str::trim)
+        .filter(|about| !about.is_empty())
+        .map(|about| {
+            div()
+                .mt_3()
+                .flex()
+                .flex_col()
+                .gap(px(6.0))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_size(px(10.0))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(t.muted_foreground)
+                                .child("BIO"),
+                        )
+                        .child(div().flex_1().h_px().bg(t.border)),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .line_height(relative(1.625))
+                        .line_clamp(6)
+                        .text_color(t.foreground.opacity(0.8))
+                        .child(about.to_string()),
+                )
+        });
 
     div()
         .flex()
@@ -310,7 +393,13 @@ fn card(
                         .flex()
                         .items_center()
                         .gap_2()
-                        .child(div().truncate().text_base().font_weight(FontWeight::SEMIBOLD).child(name))
+                        .child(
+                            div()
+                                .truncate()
+                                .text_base()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(name),
+                        )
                         .when(user.is_bot, |row| row.child(bot_badge(cx))),
                 )
                 .child(
@@ -348,7 +437,13 @@ mod tests {
     fn labels_the_friend_action() {
         assert_eq!(friend_action_label(FriendStatus::None), "Add friend");
         assert_eq!(friend_action_label(FriendStatus::Friend), "Remove friend");
-        assert_eq!(friend_action_label(FriendStatus::Incoming), "Accept friend request");
-        assert_eq!(friend_action_label(FriendStatus::Outgoing), "Cancel friend request");
+        assert_eq!(
+            friend_action_label(FriendStatus::Incoming),
+            "Accept friend request"
+        );
+        assert_eq!(
+            friend_action_label(FriendStatus::Outgoing),
+            "Cancel friend request"
+        );
     }
 }

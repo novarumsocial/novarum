@@ -11,7 +11,12 @@ use crate::{
 
 /// `<div class="dark ...">` with the starfield, the logo in the corner and `card` centered.
 /// `glow` adds the two radial gradients; `logo_href` makes the logo a link.
-pub fn auth_page(card: Div, glow: bool, logo_href: Option<&'static str>, cx: &mut App) -> AnyElement {
+pub fn auth_page(
+    card: Div,
+    glow: bool,
+    logo_href: Option<&'static str>,
+    cx: &mut App,
+) -> AnyElement {
     let t = Tokens::dark();
     let background = ConstellationBackground::global(cx);
     let radius = theme::tokens(cx).radius;
@@ -30,13 +35,19 @@ pub fn auth_page(card: Div, glow: bool, logo_href: Option<&'static str>, cx: &mu
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(div().size(px(240.0)).rounded_full().bg(rgba(0x82afeb10)).shadow(vec![BoxShadow {
-                        color: rgba(0x82afeb10).into(),
-                        offset: point(px(0.0), px(0.0)),
-                        blur_radius: px(320.0),
-                        spread_radius: px(160.0),
-                        inset: false,
-                    }])),
+                    .child(
+                        div()
+                            .size(px(240.0))
+                            .rounded_full()
+                            .bg(rgba(0x82afeb10))
+                            .shadow(vec![BoxShadow {
+                                color: rgba(0x82afeb10).into(),
+                                offset: point(px(0.0), px(0.0)),
+                                blur_radius: px(320.0),
+                                spread_radius: px(160.0),
+                                inset: false,
+                            }]),
+                    ),
             )
         })
         .child(
@@ -58,9 +69,15 @@ pub fn auth_page(card: Div, glow: bool, logo_href: Option<&'static str>, cx: &mu
                         .rounded(radius)
                         .child(svg().path("logo.svg").size_5().text_color(white())),
                 )
-                .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child("novarum"))
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("novarum"),
+                )
                 .when_some(logo_href, |logo, href| {
-                    logo.cursor_pointer().on_click(move |_, _, cx| router::goto(href, cx))
+                    logo.cursor_pointer()
+                        .on_click(move |_, _, cx| router::goto(href, cx))
                 }),
         )
         .child(
@@ -106,9 +123,19 @@ pub fn card_header(title: impl Into<SharedString>, description: Option<AnyElemen
         .flex()
         .flex_col()
         .gap_1()
-        .child(div().text_xl().font_weight(FontWeight::SEMIBOLD).child(title.into()))
+        .child(
+            div()
+                .text_xl()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(title.into()),
+        )
         .when_some(description, |header, description| {
-            header.child(div().text_sm().text_color(t.muted_foreground).child(description))
+            header.child(
+                div()
+                    .text_sm()
+                    .text_color(t.muted_foreground)
+                    .child(description),
+            )
         })
 }
 
@@ -182,14 +209,21 @@ pub fn validate_email(value: &str) -> Option<&'static str> {
             && !local.starts_with('.')
             && !local.ends_with('.')
             && !local.contains("..")
-            && local.chars().all(|c| c.is_ascii_alphanumeric() || "_'+-.".contains(c));
+            && local
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "_'+-.".contains(c));
         let labels: Vec<&str> = domain.split('.').collect();
         let domain_ok = labels.len() >= 2
             && labels[..labels.len() - 1].iter().all(|label| {
-                label.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
+                label
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphanumeric())
                     && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
             })
-            && labels.last().is_some_and(|tld| tld.len() >= 2 && tld.chars().all(|c| c.is_ascii_alphabetic()));
+            && labels
+                .last()
+                .is_some_and(|tld| tld.len() >= 2 && tld.chars().all(|c| c.is_ascii_alphabetic()));
         local_ok && domain_ok
     });
     (!valid).then_some("Enter a valid email.")
@@ -224,7 +258,16 @@ mod tests {
     #[test]
     fn validates_passwords() {
         assert_eq!(validate_passwords("hunter22", "hunter22"), [None, None]);
-        assert_eq!(validate_passwords("short", ""), [Some("At least 8 characters."), Some("Confirm your password.")]);
-        assert_eq!(validate_passwords("hunter22", "hunter23")[1], Some("Passwords don't match."));
+        assert_eq!(
+            validate_passwords("short", ""),
+            [
+                Some("At least 8 characters."),
+                Some("Confirm your password.")
+            ]
+        );
+        assert_eq!(
+            validate_passwords("hunter22", "hunter23")[1],
+            Some("Passwords don't match.")
+        );
     }
 }

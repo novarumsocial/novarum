@@ -9,7 +9,13 @@ const HOT: (f32, f32, f32) = (188.0, 212.0, 250.0);
 const MAX_DIST: f32 = 150.0;
 
 fn color((r, g, b): (f32, f32, f32), alpha: f32) -> Hsla {
-    Rgba { r: r / 255.0, g: g / 255.0, b: b / 255.0, a: alpha }.into()
+    Rgba {
+        r: r / 255.0,
+        g: g / 255.0,
+        b: b / 255.0,
+        a: alpha,
+    }
+    .into()
 }
 
 #[derive(Clone, Copy)]
@@ -46,7 +52,12 @@ impl ConstellationBackground {
         if let Some(global) = cx.try_global::<Global_>() {
             return global.0.clone();
         }
-        let entity = cx.new(|_| Self { nodes: vec![], packets: vec![], size: (0.0, 0.0), mouse: (0.0, 0.0, 0.0, 0.0) });
+        let entity = cx.new(|_| Self {
+            nodes: vec![],
+            packets: vec![],
+            size: (0.0, 0.0),
+            mouse: (0.0, 0.0, 0.0, 0.0),
+        });
         cx.set_global(Global_(entity.clone()));
         entity
     }
@@ -62,7 +73,11 @@ impl ConstellationBackground {
                     y: rng.random::<f32>() * height,
                     vx: (rng.random::<f32>() - 0.5) * 0.22,
                     vy: (rng.random::<f32>() - 0.5) * 0.22,
-                    r: if hub { 2.1 + rng.random::<f32>() * 1.1 } else { 0.9 + rng.random::<f32>() * 0.8 },
+                    r: if hub {
+                        2.1 + rng.random::<f32>() * 1.1
+                    } else {
+                        0.9 + rng.random::<f32>() * 0.8
+                    },
                     hub,
                     phase: rng.random::<f32>() * PI * 2.0,
                 }
@@ -84,14 +99,31 @@ impl ConstellationBackground {
             p.x += p.vx;
             p.y += p.vy;
             p.phase += 0.018;
-            if p.x < -24.0 { p.x = width + 24.0 } else if p.x > width + 24.0 { p.x = -24.0 }
-            if p.y < -24.0 { p.y = height + 24.0 } else if p.y > height + 24.0 { p.y = -24.0 }
+            if p.x < -24.0 {
+                p.x = width + 24.0
+            } else if p.x > width + 24.0 {
+                p.x = -24.0
+            }
+            if p.y < -24.0 {
+                p.y = height + 24.0
+            } else if p.y > height + 24.0 {
+                p.y = -24.0
+            }
         }
         for i in 0..self.nodes.len() {
             for j in i + 1..self.nodes.len() {
                 let (a, b) = (self.nodes[i], self.nodes[j]);
-                if a.hub && b.hub && (a.x - b.x).hypot(a.y - b.y) < MAX_DIST && rng.random::<f32>() < 0.0009 {
-                    self.packets.push(Packet { a: i, b: j, t: 0.0, speed: 0.007 + rng.random::<f32>() * 0.012 });
+                if a.hub
+                    && b.hub
+                    && (a.x - b.x).hypot(a.y - b.y) < MAX_DIST
+                    && rng.random::<f32>() < 0.0009
+                {
+                    self.packets.push(Packet {
+                        a: i,
+                        b: j,
+                        t: 0.0,
+                        speed: 0.007 + rng.random::<f32>() * 0.012,
+                    });
                 }
             }
         }
@@ -121,7 +153,8 @@ impl Render for ConstellationBackground {
         window.request_animation_frame();
 
         let nodes = self.nodes.clone();
-        let packets: Vec<(usize, usize, f32)> = self.packets.iter().map(|p| (p.a, p.b, p.t)).collect();
+        let packets: Vec<(usize, usize, f32)> =
+            self.packets.iter().map(|p| (p.a, p.b, p.t)).collect();
         let (ox, oy) = (
             (self.mouse.0 - width / 2.0) / width.max(1.0) * 10.0,
             (self.mouse.1 - height / 2.0) / height.max(1.0) * 10.0,
@@ -147,10 +180,19 @@ impl Render for ConstellationBackground {
                                     continue;
                                 }
                                 let mut path = PathBuilder::stroke(px(0.6));
-                                path.move_to(point(origin.x + px(a.x + ox), origin.y + px(a.y + oy)));
-                                path.line_to(point(origin.x + px(b.x + ox), origin.y + px(b.y + oy)));
+                                path.move_to(point(
+                                    origin.x + px(a.x + ox),
+                                    origin.y + px(a.y + oy),
+                                ));
+                                path.line_to(point(
+                                    origin.x + px(b.x + ox),
+                                    origin.y + px(b.y + oy),
+                                ));
                                 if let Ok(path) = path.build() {
-                                    window.paint_path(path, color(ACCENT, (1.0 - d / MAX_DIST) * 0.2));
+                                    window.paint_path(
+                                        path,
+                                        color(ACCENT, (1.0 - d / MAX_DIST) * 0.2),
+                                    );
                                 }
                             }
                         }

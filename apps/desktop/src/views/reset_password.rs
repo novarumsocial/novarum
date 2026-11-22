@@ -15,7 +15,10 @@ use crate::{
     ui::{self, icon},
     views::{
         auth::field,
-        auth_card::{auth_card, auth_page, card_header, emerald, footer_link, validate_email, validate_passwords},
+        auth_card::{
+            auth_card, auth_page, card_header, emerald, footer_link, validate_email,
+            validate_passwords,
+        },
         login::validate_home_server,
     },
 };
@@ -47,47 +50,69 @@ pub struct ResetPasswordPage {
 }
 
 fn validate_code(code: &str) -> Option<&'static str> {
-    (code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit())).then_some("Enter the 6-digit code.")
+    (code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()))
+        .then_some("Enter the 6-digit code.")
 }
 
 impl ResetPasswordPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let home_server = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("novarum.me").default_value(api::anchor().home_server)
+            InputState::new(window, cx)
+                .placeholder("novarum.me")
+                .default_value(api::anchor().home_server)
         });
         let email_input = cx.new(|cx| InputState::new(window, cx).placeholder("you@example.com"));
         let code = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("000000").validate(|value, _| value.chars().count() <= 6)
+            InputState::new(window, cx)
+                .placeholder("000000")
+                .validate(|value, _| value.chars().count() <= 6)
         });
-        let password = cx.new(|cx| InputState::new(window, cx).placeholder("At least 8 characters").masked(true));
-        let confirm = cx.new(|cx| InputState::new(window, cx).placeholder("Re-enter your password").masked(true));
+        let password = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("At least 8 characters")
+                .masked(true)
+        });
+        let confirm = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("Re-enter your password")
+                .masked(true)
+        });
 
         let mut subscriptions = Vec::new();
         // the request form validates on submit
         for input in [&home_server, &email_input] {
-            subscriptions.push(cx.subscribe_in(input, window, |this, _, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    this.request(window, cx);
-                }
-            }));
+            subscriptions.push(cx.subscribe_in(
+                input,
+                window,
+                |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.request(window, cx);
+                    }
+                },
+            ));
         }
         // the reset form validates as you type
         for (index, input) in [&code, &password, &confirm].into_iter().enumerate() {
-            subscriptions.push(cx.subscribe_in(input, window, move |this, _, event: &InputEvent, window, cx| {
-                match event {
+            subscriptions.push(cx.subscribe_in(
+                input,
+                window,
+                move |this, _, event: &InputEvent, window, cx| match event {
                     InputEvent::Change => {
                         this.reset_errors[index] = this.validate_reset(cx)[index].map(Into::into);
                         cx.notify();
                     }
                     InputEvent::PressEnter { .. } => this.reset(window, cx),
                     _ => {}
-                }
-            }));
+                },
+            ));
         }
 
         let redirect = Router::global(cx).read(cx).param("redirect");
         let login_href = match redirect {
-            Some(redirect) => format!("/login?redirect={}", router::encode(&router::safe_redirect(Some(&redirect)))),
+            Some(redirect) => format!(
+                "/login?redirect={}",
+                router::encode(&router::safe_redirect(Some(&redirect)))
+            ),
             None => "/login".into(),
         };
 
@@ -113,8 +138,13 @@ impl ResetPasswordPage {
 
     fn validate_reset(&self, cx: &App) -> [Option<&'static str>; 3] {
         let password = self.password.read(cx).value();
-        let [password_error, confirm_error] = validate_passwords(&password, &self.confirm.read(cx).value());
-        [validate_code(&self.code.read(cx).value()), password_error, confirm_error]
+        let [password_error, confirm_error] =
+            validate_passwords(&password, &self.confirm.read(cx).value());
+        [
+            validate_code(&self.code.read(cx).value()),
+            password_error,
+            confirm_error,
+        ]
     }
 
     fn request(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -123,8 +153,10 @@ impl ResetPasswordPage {
         }
         let home_server = self.home_server.read(cx).value().trim().to_string();
         let email = self.email_input.read(cx).value().to_string();
-        self.request_errors =
-            [validate_home_server(&home_server).map(Into::into), validate_email(&email).map(Into::into)];
+        self.request_errors = [
+            validate_home_server(&home_server).map(Into::into),
+            validate_email(&email).map(Into::into),
+        ];
         self.request_error.clear();
         if self.request_errors.iter().any(Option::is_some) {
             cx.notify();
@@ -166,7 +198,11 @@ impl ResetPasswordPage {
         cx.notify();
 
         let code = self.code.read(cx).value().parse().unwrap_or_default();
-        let reset = Session::reset_password(self.email.clone(), self.password.read(cx).value().to_string(), code);
+        let reset = Session::reset_password(
+            self.email.clone(),
+            self.password.read(cx).value().to_string(),
+            code,
+        );
         cx.spawn(async move |this, cx| {
             let result = reset.await;
             let _ = this.update(cx, |this, cx| {
@@ -184,19 +220,33 @@ impl ResetPasswordPage {
     fn toggle_password(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.show_password = !self.show_password;
         for input in [&self.password, &self.confirm] {
-            input.update(cx, |input, cx| input.set_masked(!self.show_password, window, cx));
+            input.update(cx, |input, cx| {
+                input.set_masked(!self.show_password, window, cx)
+            });
         }
         cx.notify();
     }
 
-    fn submit_button(id: &'static str, loading: bool, idle: &'static str, busy: &'static str) -> Button {
+    fn submit_button(
+        id: &'static str,
+        loading: bool,
+        idle: &'static str,
+        busy: &'static str,
+    ) -> Button {
         Button::new(id)
             .primary()
             .large()
             .disabled(loading)
             .when(loading, |b| b.loading(true).label(busy))
             .when(!loading, |b| {
-                b.child(div().flex().items_center().gap_2().child(idle).child(icon("arrow-right").size_4()))
+                b.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(idle)
+                        .child(icon("arrow-right").size_4()),
+                )
             })
     }
 
@@ -212,13 +262,26 @@ impl ResetPasswordPage {
                 &self.request_errors[0],
                 cx,
             ))
-            .child(field(ui::label("Email"), "mail", Input::new(&self.email_input), &self.request_errors[1], cx))
+            .child(field(
+                ui::label("Email"),
+                "mail",
+                Input::new(&self.email_input),
+                &self.request_errors[1],
+                cx,
+            ))
             .child(
-                Self::submit_button("send-code", self.request_loading, "Send reset code", "Sending code...")
-                    .w_full()
-                    .on_click(cx.listener(|this, _, window, cx| this.request(window, cx))),
+                Self::submit_button(
+                    "send-code",
+                    self.request_loading,
+                    "Send reset code",
+                    "Sending code...",
+                )
+                .w_full()
+                .on_click(cx.listener(|this, _, window, cx| this.request(window, cx))),
             )
-            .when(!self.request_error.is_empty(), |form| form.child(ui::error_text(self.request_error.clone(), cx)))
+            .when(!self.request_error.is_empty(), |form| {
+                form.child(ui::error_text(self.request_error.clone(), cx))
+            })
     }
 
     fn render_reset(&mut self, cx: &mut Context<Self>) -> Div {
@@ -259,21 +322,32 @@ impl ResetPasswordPage {
                 div()
                     .flex()
                     .gap_2()
-                    .child(Button::new("back").ghost().large().icon(icon("arrow-left")).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.step = Step::Request;
-                            this.reset_error.clear();
-                            cx.notify();
-                        },
-                    )))
                     .child(
-                        Self::submit_button("update", self.reset_loading, "Update password", "Updating password...")
-                            .flex_1()
-                            .min_w_0()
-                            .on_click(cx.listener(|this, _, window, cx| this.reset(window, cx))),
+                        Button::new("back")
+                            .ghost()
+                            .large()
+                            .icon(icon("arrow-left"))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.step = Step::Request;
+                                this.reset_error.clear();
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        Self::submit_button(
+                            "update",
+                            self.reset_loading,
+                            "Update password",
+                            "Updating password...",
+                        )
+                        .flex_1()
+                        .min_w_0()
+                        .on_click(cx.listener(|this, _, window, cx| this.reset(window, cx))),
                     ),
             )
-            .when(!self.reset_error.is_empty(), |form| form.child(ui::error_text(self.reset_error.clone(), cx)))
+            .when(!self.reset_error.is_empty(), |form| {
+                form.child(ui::error_text(self.reset_error.clone(), cx))
+            })
     }
 
     fn render_complete(&mut self) -> Div {
@@ -301,7 +375,14 @@ impl ResetPasswordPage {
                     .primary()
                     .large()
                     .w_full()
-                    .child(div().flex().items_center().gap_2().child("Return to sign in").child(icon("arrow-right").size_4()))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child("Return to sign in")
+                            .child(icon("arrow-right").size_4()),
+                    )
                     .on_click(move |_, _, cx| router::goto(&login_href, cx)),
             )
     }
@@ -318,7 +399,12 @@ impl Render for ResetPasswordPage {
                 .flex_col()
                 .gap_1()
                 .text_center()
-                .child(div().text_xl().font_weight(FontWeight::SEMIBOLD).child("Reset your password"))
+                .child(
+                    div()
+                        .text_xl()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("Reset your password"),
+                )
                 .child(
                     div()
                         .text_sm()
@@ -335,8 +421,12 @@ impl Render for ResetPasswordPage {
                                 self.email
                             ))
                             .with_highlights([(
-                                "Enter the code sent to ".len().."Enter the code sent to ".len() + self.email.len(),
-                                HighlightStyle { color: Some(t.foreground), ..Default::default() },
+                                "Enter the code sent to ".len()
+                                    .."Enter the code sent to ".len() + self.email.len(),
+                                HighlightStyle {
+                                    color: Some(t.foreground),
+                                    ..Default::default()
+                                },
                             )]),
                         )
                         .into_any_element(),
@@ -354,9 +444,12 @@ impl Render for ResetPasswordPage {
             .child(header)
             .child(div().px_6().child(content))
             .when(self.step != Step::Complete, |card| {
-                card.child(footer_link("Remember your password?", "sign-in", "Sign in", move |_, _, cx| {
-                    router::goto(&login_href, cx)
-                }))
+                card.child(footer_link(
+                    "Remember your password?",
+                    "sign-in",
+                    "Sign in",
+                    move |_, _, cx| router::goto(&login_href, cx),
+                ))
             });
         auth_page(card, true, None, cx)
     }

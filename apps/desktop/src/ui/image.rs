@@ -21,7 +21,21 @@ fn format_for(bytes: &[u8]) -> ImageFormat {
         [0x89, b'P', b'N', b'G', ..] => ImageFormat::Png,
         [0xFF, 0xD8, ..] => ImageFormat::Jpeg,
         [b'G', b'I', b'F', ..] => ImageFormat::Gif,
-        [b'R', b'I', b'F', b'F', _, _, _, _, b'W', b'E', b'B', b'P', ..] => ImageFormat::Webp,
+        [
+            b'R',
+            b'I',
+            b'F',
+            b'F',
+            _,
+            _,
+            _,
+            _,
+            b'W',
+            b'E',
+            b'B',
+            b'P',
+            ..,
+        ] => ImageFormat::Webp,
         [b'B', b'M', ..] => ImageFormat::Bmp,
         _ if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") => ImageFormat::Svg,
         _ => ImageFormat::Png,
@@ -56,5 +70,8 @@ pub fn remote(url: &str, cx: &mut App) -> Result<Option<Arc<Image>>, ()> {
 
 /// An `<img>` that fills its box, or nothing while it loads.
 pub fn remote_img(url: &str, cx: &mut App) -> Option<Img> {
-    remote(url, cx).ok().flatten().map(|image| img(image).size_full())
+    remote(url, cx)
+        .ok()
+        .flatten()
+        .map(|image| img(image).size_full())
 }

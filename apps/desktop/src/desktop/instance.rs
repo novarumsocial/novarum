@@ -20,8 +20,10 @@ fn port_file() -> std::path::PathBuf {
 /// Whether this launch should go on. False when another Novarum is already running; it was told
 /// to show its window, unless this is a hidden (autostart) launch.
 pub fn claim() -> bool {
-    let running =
-        std::fs::read_to_string(port_file()).ok().and_then(|port| port.trim().parse().ok()).is_some_and(knock);
+    let running = std::fs::read_to_string(port_file())
+        .ok()
+        .and_then(|port| port.trim().parse().ok())
+        .is_some_and(knock);
     if running {
         return false;
     }
@@ -37,19 +39,27 @@ pub fn claim() -> bool {
 
 fn knock(port: u16) -> bool {
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
-    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_millis(500)) else { return false };
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_millis(500)) else {
+        return false;
+    };
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     // the port might have been reused by something else since Novarum last ran
     let mut hello = [0; HELLO.len()];
     if stream.read_exact(&mut hello).is_err() || hello != HELLO {
         return false;
     }
-    let request: &[u8] = if super::launch_hidden() { b"\n" } else { b"show\n" };
+    let request: &[u8] = if super::launch_hidden() {
+        b"\n"
+    } else {
+        b"show\n"
+    };
     stream.write_all(request).is_ok()
 }
 
 pub fn listen(actions: Actions) {
-    let Some(listener) = LISTENER.get() else { return };
+    let Some(listener) = LISTENER.get() else {
+        return;
+    };
     std::thread::spawn(move || {
         for mut stream in listener.incoming().flatten() {
             let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));

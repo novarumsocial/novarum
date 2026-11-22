@@ -9,7 +9,11 @@ fn locale_uses_12_hours() -> bool {
         .iter()
         .find_map(|key| std::env::var(key).ok().filter(|value| !value.is_empty()))
         .unwrap_or_default();
-    ["en_US", "en_CA", "en_AU", "en_NZ", "en_PH", "en_IN", "hi_IN"].iter().any(|prefix| locale.starts_with(prefix))
+    [
+        "en_US", "en_CA", "en_AU", "en_NZ", "en_PH", "en_IN", "hi_IN",
+    ]
+    .iter()
+    .any(|prefix| locale.starts_with(prefix))
 }
 
 pub fn format_time<Tz: TimeZone>(date: &DateTime<Tz>, format: TimeFormat) -> String
@@ -21,7 +25,8 @@ where
         TimeFormat::H12 => true,
         TimeFormat::H24 => false,
     };
-    date.format(if twelve { "%I:%M %p" } else { "%H:%M" }).to_string()
+    date.format(if twelve { "%I:%M %p" } else { "%H:%M" })
+        .to_string()
 }
 
 /// "Today", "Yesterday" or "Nov 22, 2026".

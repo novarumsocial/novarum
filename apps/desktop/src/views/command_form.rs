@@ -12,7 +12,10 @@ use crate::prelude::*;
 
 use crate::{
     state::{
-        bots::{Choice, Command, CommandOption, CommandOptionInput, CommandOptionType, GuildBotCommands, Interactions, OptionValue},
+        bots::{
+            Choice, Command, CommandOption, CommandOptionInput, CommandOptionType,
+            GuildBotCommands, Interactions, OptionValue,
+        },
         chat::Chat,
     },
     ui::avatar::avatar,
@@ -22,7 +25,9 @@ use crate::{
 pub fn value_text(value: &OptionValue) -> String {
     match value {
         OptionValue::Bool(value) => value.to_string(),
-        OptionValue::Number(number) if number.fract() == 0.0 && number.abs() < 1e15 => format!("{}", *number as i64),
+        OptionValue::Number(number) if number.fract() == 0.0 && number.abs() < 1e15 => {
+            format!("{}", *number as i64)
+        }
         OptionValue::Number(number) => number.to_string(),
         OptionValue::Text(text) => text.clone(),
     }
@@ -33,9 +38,12 @@ pub fn to_value(option: &CommandOption, raw: &str, checked: Option<bool>) -> Opt
     match option.kind {
         CommandOptionType::Boolean => checked.map(OptionValue::Bool),
         _ if raw.is_empty() => None,
-        CommandOptionType::Integer | CommandOptionType::Number => {
-            raw.trim().parse::<f64>().ok().filter(|number| number.is_finite()).map(OptionValue::Number)
-        }
+        CommandOptionType::Integer | CommandOptionType::Number => raw
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|number| number.is_finite())
+            .map(OptionValue::Number),
         _ => Some(OptionValue::Text(raw.to_string())),
     }
 }
@@ -64,8 +72,10 @@ pub struct CommandForm {
 }
 
 fn free_text(option: &CommandOption) -> bool {
-    !matches!(option.kind, CommandOptionType::Boolean | CommandOptionType::User)
-        && option.choices.as_ref().is_none_or(Vec::is_empty)
+    !matches!(
+        option.kind,
+        CommandOptionType::Boolean | CommandOptionType::User
+    ) && option.choices.as_ref().is_none_or(Vec::is_empty)
 }
 
 impl CommandForm {
@@ -78,20 +88,31 @@ impl CommandForm {
     ) -> Self {
         let mut inputs = HashMap::new();
         let mut subscriptions = Vec::new();
-        for (index, option) in command.options.iter().enumerate().filter(|(_, option)| free_text(option)) {
+        for (index, option) in command
+            .options
+            .iter()
+            .enumerate()
+            .filter(|(_, option)| free_text(option))
+        {
             let input = cx.new(|cx| InputState::new(window, cx));
             if index == 0 {
                 input.update(cx, |input, cx| input.focus(window, cx));
             }
             let name = option.name.clone();
-            subscriptions.push(cx.subscribe_in(&input, window, move |this, _, event: &InputEvent, window, cx| {
-                match event {
-                    InputEvent::Change | InputEvent::Focus => this.ask_for_suggestions(&name, cx),
-                    InputEvent::PressEnter { .. } => this.run(window, cx),
-                    InputEvent::Blur => {}
-                }
-                cx.notify();
-            }));
+            subscriptions.push(cx.subscribe_in(
+                &input,
+                window,
+                move |this, _, event: &InputEvent, window, cx| {
+                    match event {
+                        InputEvent::Change | InputEvent::Focus => {
+                            this.ask_for_suggestions(&name, cx)
+                        }
+                        InputEvent::PressEnter { .. } => this.run(window, cx),
+                        InputEvent::Blur => {}
+                    }
+                    cx.notify();
+                },
+            ));
             inputs.insert(option.name.clone(), input);
         }
         let focus = cx.focus_handle();
@@ -122,14 +143,22 @@ impl CommandForm {
     }
 
     fn value(&self, option: &CommandOption, cx: &App) -> Option<OptionValue> {
-        to_value(option, &self.raw(option, cx), self.checked.get(&option.name).copied())
+        to_value(
+            option,
+            &self.raw(option, cx),
+            self.checked.get(&option.name).copied(),
+        )
     }
 
     fn missing(&self, cx: &App) -> Vec<String> {
         self.command
             .options
             .iter()
-            .filter(|option| option.required && option.kind != CommandOptionType::Boolean && self.raw(option, cx).is_empty())
+            .filter(|option| {
+                option.required
+                    && option.kind != CommandOptionType::Boolean
+                    && self.raw(option, cx).is_empty()
+            })
             .map(|option| option.name.clone())
             .collect()
     }
@@ -139,24 +168,52 @@ impl CommandForm {
             .options
             .iter()
             .filter(|option| Some(option.name.as_str()) != skip)
-            .filter_map(|option| self.value(option, cx).map(|value| CommandOptionInput { name: option.name.clone(), value }))
+            .filter_map(|option| {
+                self.value(option, cx).map(|value| CommandOptionInput {
+                    name: option.name.clone(),
+                    value,
+                })
+            })
             .collect()
     }
 
     fn ask_for_suggestions(&mut self, name: &str, cx: &mut Context<Self>) {
-        let Some(option) = self.command.options.iter().find(|option| option.name == name) else { return };
+        let Some(option) = self
+            .command
+            .options
+            .iter()
+            .find(|option| option.name == name)
+        else {
+            return;
+        };
         if option.autocomplete != Some(true) {
             return;
         }
         let mut options = self.filled(Some(name), cx);
-        options.push(CommandOptionInput { name: name.into(), value: OptionValue::Text(self.raw(option, cx)) });
-        let (channel_id, bot_id, command, name) =
-            (self.channel_id.clone(), self.entry.bot.user_id.clone(), self.command.name.clone(), name.to_string());
+        options.push(CommandOptionInput {
+            name: name.into(),
+            value: OptionValue::Text(self.raw(option, cx)),
+        });
+        let (channel_id, bot_id, command, name) = (
+            self.channel_id.clone(),
+            self.entry.bot.user_id.clone(),
+            self.command.name.clone(),
+            name.to_string(),
+        );
         self.autocomplete = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(250)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(250))
+                .await;
             let task = cx.update(|cx| {
                 Interactions::global(cx).update(cx, |interactions, cx| {
-                    interactions.autocomplete(channel_id, bot_id, command, options, name.clone(), cx)
+                    interactions.autocomplete(
+                        channel_id,
+                        bot_id,
+                        command,
+                        options,
+                        name.clone(),
+                        cx,
+                    )
                 })
             });
             let choices = task.await;
@@ -175,7 +232,13 @@ impl CommandForm {
         cx.notify();
         let options = self.filled(None, cx);
         let run = Interactions::global(cx).update(cx, |interactions, cx| {
-            interactions.run_command(self.channel_id.clone(), &self.entry, self.command.name.clone(), options, cx)
+            interactions.run_command(
+                self.channel_id.clone(),
+                &self.entry,
+                self.command.name.clone(),
+                options,
+                cx,
+            )
         });
         cx.spawn(async move |this, cx| {
             let result = run.await;
@@ -194,23 +257,36 @@ impl CommandForm {
     fn picker(&self, option: &CommandOption, cx: &mut Context<Self>) -> AnyElement {
         let name = option.name.clone();
         let current = self.picked.get(&name).cloned().unwrap_or_default();
-        let (label, items): (String, Vec<(String, String)>) = if option.kind == CommandOptionType::User {
-            let members = Chat::global(cx).read(cx).channel_members(cx);
-            let label = members
-                .iter()
-                .find(|member| member.user_id == current)
-                .map(|member| member.name().to_string())
-                .unwrap_or_else(|| "Pick a member".into());
-            (label, members.iter().map(|member| (member.user_id.clone(), member.name().to_string())).collect())
-        } else {
-            let choices = option.choices.clone().unwrap_or_default();
-            let label = choices
-                .iter()
-                .find(|choice| value_text(&choice.value) == current)
-                .map(|choice| choice.name.clone())
-                .unwrap_or_else(|| "Choose one".into());
-            (label, choices.iter().map(|choice| (value_text(&choice.value), choice.name.clone())).collect())
-        };
+        let (label, items): (String, Vec<(String, String)>) =
+            if option.kind == CommandOptionType::User {
+                let members = Chat::global(cx).read(cx).channel_members(cx);
+                let label = members
+                    .iter()
+                    .find(|member| member.user_id == current)
+                    .map(|member| member.name().to_string())
+                    .unwrap_or_else(|| "Pick a member".into());
+                (
+                    label,
+                    members
+                        .iter()
+                        .map(|member| (member.user_id.clone(), member.name().to_string()))
+                        .collect(),
+                )
+            } else {
+                let choices = option.choices.clone().unwrap_or_default();
+                let label = choices
+                    .iter()
+                    .find(|choice| value_text(&choice.value) == current)
+                    .map(|choice| choice.name.clone())
+                    .unwrap_or_else(|| "Choose one".into());
+                (
+                    label,
+                    choices
+                        .iter()
+                        .map(|choice| (value_text(&choice.value), choice.name.clone()))
+                        .collect(),
+                )
+            };
         let this = cx.entity().downgrade();
         Button::new(SharedString::from(format!("pick-{name}")))
             .outline()
@@ -221,12 +297,13 @@ impl CommandForm {
             .dropdown_menu(move |mut menu, _, _| {
                 for (value, label) in &items {
                     let (this, name, value) = (this.clone(), name.clone(), value.clone());
-                    menu = menu.item(PopupMenuItem::new(label.clone()).on_click(move |_, _, cx| {
-                        let _ = this.update(cx, |this, cx| {
-                            this.picked.insert(name.clone(), value.clone());
-                            cx.notify();
-                        });
-                    }));
+                    menu =
+                        menu.item(PopupMenuItem::new(label.clone()).on_click(move |_, _, cx| {
+                            let _ = this.update(cx, |this, cx| {
+                                this.picked.insert(name.clone(), value.clone());
+                                cx.notify();
+                            });
+                        }));
                 }
                 menu
             })
@@ -239,8 +316,16 @@ impl CommandForm {
             .text_xs()
             .font_weight(FontWeight::MEDIUM)
             .child(option.name.clone())
-            .when(option.required, |label| label.child(div().text_color(t.destructive).child("*")))
-            .child(div().ml_1().font_weight(FontWeight::NORMAL).text_color(t.muted_foreground).child(option.description.clone()))
+            .when(option.required, |label| {
+                label.child(div().text_color(t.destructive).child("*"))
+            })
+            .child(
+                div()
+                    .ml_1()
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(t.muted_foreground)
+                    .child(option.description.clone()),
+            )
             .flex()
             .flex_wrap();
         let name = option.name.clone();
@@ -253,34 +338,56 @@ impl CommandForm {
                 }))
                 .into_any_element()
         } else if let Some(input) = self.inputs.get(&option.name) {
-            let suggestions = (self.suggestions.0 == option.name && !self.suggestions.1.is_empty()).then(|| {
-                let mut list = div().flex().flex_col().max_h_40().border_1().border_color(t.border).bg(t.popover).p_1();
-                for (index, choice) in self.suggestions.1.iter().enumerate() {
-                    let (input, value) = (input.clone(), value_text(&choice.value));
-                    list = list.child(
-                        div()
-                            .id(SharedString::from(format!("suggestion-{name}-{index}")))
-                            .truncate()
-                            .px_2()
-                            .py_1p5()
-                            .text_xs()
-                            .cursor_pointer()
-                            .hover(|s| s.bg(t.muted))
-                            .child(choice.name.clone())
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                input.update(cx, |input, cx| input.set_value(value.clone(), window, cx));
-                                this.suggestions = (String::new(), vec![]);
-                                cx.notify();
-                            })),
-                    );
-                }
-                list
-            });
-            div().flex().flex_col().gap_1().child(Input::new(input).small()).children(suggestions).into_any_element()
+            let suggestions = (self.suggestions.0 == option.name && !self.suggestions.1.is_empty())
+                .then(|| {
+                    let mut list = div()
+                        .flex()
+                        .flex_col()
+                        .max_h_40()
+                        .border_1()
+                        .border_color(t.border)
+                        .bg(t.popover)
+                        .p_1();
+                    for (index, choice) in self.suggestions.1.iter().enumerate() {
+                        let (input, value) = (input.clone(), value_text(&choice.value));
+                        list = list.child(
+                            div()
+                                .id(SharedString::from(format!("suggestion-{name}-{index}")))
+                                .truncate()
+                                .px_2()
+                                .py_1p5()
+                                .text_xs()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(t.muted))
+                                .child(choice.name.clone())
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    input.update(cx, |input, cx| {
+                                        input.set_value(value.clone(), window, cx)
+                                    });
+                                    this.suggestions = (String::new(), vec![]);
+                                    cx.notify();
+                                })),
+                        );
+                    }
+                    list
+                });
+            div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(Input::new(input).small())
+                .children(suggestions)
+                .into_any_element()
         } else {
             self.picker(option, cx)
         };
-        div().flex().flex_col().min_w_0().gap_1().child(label).child(control)
+        div()
+            .flex()
+            .flex_col()
+            .min_w_0()
+            .gap_1()
+            .child(label)
+            .child(control)
     }
 }
 
@@ -295,7 +402,11 @@ impl Render for CommandForm {
             grid = grid.child(
                 div()
                     .min_w_0()
-                    .when(wide, |cell| cell.w(relative(0.5)).flex_basis(relative(0.48)).flex_grow(1.0))
+                    .when(wide, |cell| {
+                        cell.w(relative(0.5))
+                            .flex_basis(relative(0.48))
+                            .flex_grow(1.0)
+                    })
                     .when(!wide, |cell| cell.w_full())
                     .child(self.render_option(&option, cx)),
             );
@@ -316,9 +427,27 @@ impl Render for CommandForm {
                     .flex()
                     .items_center()
                     .gap_2()
-                    .child(avatar(bot.avatar_url.as_deref(), bot.name(), bot.avatar_color.as_deref(), 20.0, cx))
-                    .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(format!("/{}", self.command.name)))
-                    .child(div().min_w_0().truncate().text_xs().text_color(t.muted_foreground).child(self.command.description.clone()))
+                    .child(avatar(
+                        bot.avatar_url.as_deref(),
+                        bot.name(),
+                        bot.avatar_color.as_deref(),
+                        20.0,
+                        cx,
+                    ))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(format!("/{}", self.command.name)),
+                    )
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child(self.command.description.clone()),
+                    )
                     .child(
                         div()
                             .id("close-command")
@@ -335,7 +464,9 @@ impl Render for CommandForm {
                     ),
             )
             .when(!self.command.options.is_empty(), |form| form.child(grid))
-            .when_some(self.error.clone(), |form, error| form.child(div().text_xs().text_color(t.destructive).child(error)))
+            .when_some(self.error.clone(), |form, error| {
+                form.child(div().text_xs().text_color(t.destructive).child(error))
+            })
             .child(
                 div()
                     .flex()
@@ -343,7 +474,12 @@ impl Render for CommandForm {
                     .justify_end()
                     .gap_2()
                     .when(!missing.is_empty(), |row| {
-                        row.child(div().text_xs().text_color(t.muted_foreground).child(format!("Fill in {}", missing.join(", "))))
+                        row.child(
+                            div()
+                                .text_xs()
+                                .text_color(t.muted_foreground)
+                                .child(format!("Fill in {}", missing.join(", "))),
+                        )
                     })
                     .child(
                         Button::new("use-command")
@@ -382,11 +518,26 @@ mod tests {
     #[test]
     fn converts_typed_values() {
         assert_eq!(to_value(&option(CommandOptionType::String), "", None), None);
-        assert_eq!(to_value(&option(CommandOptionType::String), "hi", None), Some(OptionValue::Text("hi".into())));
-        assert_eq!(to_value(&option(CommandOptionType::Integer), "6", None), Some(OptionValue::Number(6.0)));
-        assert_eq!(to_value(&option(CommandOptionType::Number), "abc", None), None);
-        assert_eq!(to_value(&option(CommandOptionType::Boolean), "", Some(true)), Some(OptionValue::Bool(true)));
-        assert_eq!(to_value(&option(CommandOptionType::Boolean), "", None), None);
+        assert_eq!(
+            to_value(&option(CommandOptionType::String), "hi", None),
+            Some(OptionValue::Text("hi".into()))
+        );
+        assert_eq!(
+            to_value(&option(CommandOptionType::Integer), "6", None),
+            Some(OptionValue::Number(6.0))
+        );
+        assert_eq!(
+            to_value(&option(CommandOptionType::Number), "abc", None),
+            None
+        );
+        assert_eq!(
+            to_value(&option(CommandOptionType::Boolean), "", Some(true)),
+            Some(OptionValue::Bool(true))
+        );
+        assert_eq!(
+            to_value(&option(CommandOptionType::Boolean), "", None),
+            None
+        );
     }
 
     #[test]

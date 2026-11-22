@@ -14,7 +14,10 @@ pub fn rms_db(samples: &[f32]) -> f32 {
 pub fn auto_attenuation(levels_db: &[f32]) -> f32 {
     let mut sorted = levels_db.to_vec();
     sorted.sort_by(f32::total_cmp);
-    let floor = sorted.get((sorted.len() as f32 * 0.1) as usize).copied().unwrap_or(-100.0);
+    let floor = sorted
+        .get((sorted.len() as f32 * 0.1) as usize)
+        .copied()
+        .unwrap_or(-100.0);
     (floor + 90.0).clamp(12.0, 50.0).round()
 }
 
@@ -36,7 +39,10 @@ mod tests {
 
     #[test]
     fn ignores_speech_when_estimating_the_floor() {
-        assert_eq!(auto_attenuation(&room(-65.0)), auto_attenuation(&[-65.0; 80]));
+        assert_eq!(
+            auto_attenuation(&room(-65.0)),
+            auto_attenuation(&[-65.0; 80])
+        );
     }
 
     #[test]

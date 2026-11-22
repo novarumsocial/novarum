@@ -2,7 +2,10 @@
 use crate::prelude::*;
 
 use crate::{
-    state::{self, router::{Page, Router}},
+    state::{
+        self,
+        router::{Page, Router},
+    },
     theme, views,
 };
 
@@ -22,7 +25,12 @@ impl AppRoot {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let router = Router::global(cx);
         let _router = cx.observe_in(&router, window, |this, _, window, cx| this.sync(window, cx));
-        let mut this = Self { page: None, view: None, generation: 0, _router };
+        let mut this = Self {
+            page: None,
+            view: None,
+            generation: 0,
+            _router,
+        };
         this.sync(window, cx);
         this
     }

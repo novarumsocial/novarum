@@ -41,10 +41,16 @@ pub struct AnchorState {
 }
 
 static ANCHOR: LazyLock<RwLock<AnchorState>> = LazyLock::new(|| {
-    let home_server = storage::get::<String>(HOME_SERVER_KEY).unwrap_or_else(|| "novarum.me".into());
+    let home_server =
+        storage::get::<String>(HOME_SERVER_KEY).unwrap_or_else(|| "novarum.me".into());
     let base_url = storage::get::<String>(BASE_URL_KEY)
         .unwrap_or_else(|| anchor_url_from_home_server(&home_server));
-    RwLock::new(AnchorState { home_server, base_url, max_file_size: 10.0, max_group_members: 30 })
+    RwLock::new(AnchorState {
+        home_server,
+        base_url,
+        max_file_size: 10.0,
+        max_group_members: 30,
+    })
 });
 
 fn cookie_path() -> std::path::PathBuf {
@@ -126,7 +132,10 @@ pub fn anchor_url_from_home_server(home_server_url: &str) -> String {
 pub async fn get_anchor_info(home_server_url: String) -> Result<AnchorInfo, String> {
     runtime::io(async move {
         let home_server = normalize_home_server(&home_server_url);
-        let discovery = format!("{}/.well-known/anchor/info", anchor_url_from_home_server(&home_server_url));
+        let discovery = format!(
+            "{}/.well-known/anchor/info",
+            anchor_url_from_home_server(&home_server_url)
+        );
         let response = HTTP.get(&discovery).send().await.map_err(|_| {
             format!("Could not reach {home_server}. Check the server address and try again.")
         })?;
@@ -223,7 +232,11 @@ async fn send(request: reqwest::RequestBuilder) -> ApiResult<Value> {
         Ok(body)
     } else {
         let fallback = status.canonical_reason().unwrap_or("Request failed");
-        Err(ApiError { status: status.as_u16(), message: error_message(&body, fallback), body })
+        Err(ApiError {
+            status: status.as_u16(),
+            message: error_message(&body, fallback),
+            body,
+        })
     }
 }
 
@@ -261,7 +274,10 @@ pub async fn get_query<T: DeserializeOwned + Send + 'static>(
     path: impl Into<String>,
     query: &[(&str, String)],
 ) -> ApiResult<T> {
-    let query = query.iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
+    let query = query
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
     request(Method::GET, path, query, None).await
 }
 
@@ -269,21 +285,39 @@ pub async fn post<T: DeserializeOwned + Send + 'static>(
     path: impl Into<String>,
     body: impl Serialize,
 ) -> ApiResult<T> {
-    request(Method::POST, path, vec![], Some(serde_json::to_value(body).unwrap_or_default())).await
+    request(
+        Method::POST,
+        path,
+        vec![],
+        Some(serde_json::to_value(body).unwrap_or_default()),
+    )
+    .await
 }
 
 pub async fn patch<T: DeserializeOwned + Send + 'static>(
     path: impl Into<String>,
     body: impl Serialize,
 ) -> ApiResult<T> {
-    request(Method::PATCH, path, vec![], Some(serde_json::to_value(body).unwrap_or_default())).await
+    request(
+        Method::PATCH,
+        path,
+        vec![],
+        Some(serde_json::to_value(body).unwrap_or_default()),
+    )
+    .await
 }
 
 pub async fn put<T: DeserializeOwned + Send + 'static>(
     path: impl Into<String>,
     body: impl Serialize,
 ) -> ApiResult<T> {
-    request(Method::PUT, path, vec![], Some(serde_json::to_value(body).unwrap_or_default())).await
+    request(
+        Method::PUT,
+        path,
+        vec![],
+        Some(serde_json::to_value(body).unwrap_or_default()),
+    )
+    .await
 }
 
 pub async fn delete<T: DeserializeOwned + Send + 'static>(path: impl Into<String>) -> ApiResult<T> {
@@ -294,7 +328,13 @@ pub async fn delete_with<T: DeserializeOwned + Send + 'static>(
     path: impl Into<String>,
     body: impl Serialize,
 ) -> ApiResult<T> {
-    request(Method::DELETE, path, vec![], Some(serde_json::to_value(body).unwrap_or_default())).await
+    request(
+        Method::DELETE,
+        path,
+        vec![],
+        Some(serde_json::to_value(body).unwrap_or_default()),
+    )
+    .await
 }
 
 /// A multipart POST with one file in `field`, like Eden's `{ icon: File }` bodies.
@@ -308,7 +348,11 @@ pub async fn post_file<T: DeserializeOwned + Send + 'static>(
         let part = reqwest::multipart::Part::bytes(file.bytes)
             .file_name(file.name)
             .mime_str(&file.content_type)
-            .map_err(|error| ApiError { status: 0, message: error.to_string(), body: Value::Null })?;
+            .map_err(|error| ApiError {
+                status: 0,
+                message: error.to_string(),
+                body: Value::Null,
+            })?;
         let form = reqwest::multipart::Form::new().part(field, part);
         decode(send(HTTP.post(&url).multipart(form)).await?)
     })
@@ -325,7 +369,11 @@ pub async fn upload_bytes(url: String, content_type: String, bytes: Vec<u8>) -> 
             .send()
             .await
             .map_err(|error| error.to_string())?;
-        if response.status().is_success() { Ok(()) } else { Err(format!("Upload failed ({})", response.status())) }
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!("Upload failed ({})", response.status()))
+        }
     })
     .await
 }
@@ -333,11 +381,19 @@ pub async fn upload_bytes(url: String, content_type: String, bytes: Vec<u8>) -> 
 /// Downloads bytes (images, attachments) with the session cookie.
 pub async fn fetch_bytes(url: String) -> Result<Vec<u8>, String> {
     runtime::io(async move {
-        let response = HTTP.get(&url).send().await.map_err(|error| error.to_string())?;
+        let response = HTTP
+            .get(&url)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
         if response.status() != StatusCode::OK {
             return Err(format!("{}", response.status()));
         }
-        response.bytes().await.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string())
+        response
+            .bytes()
+            .await
+            .map(|bytes| bytes.to_vec())
+            .map_err(|error| error.to_string())
     })
     .await
 }

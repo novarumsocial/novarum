@@ -57,7 +57,9 @@ impl UserArea {
             cx.observe(&Dms::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
         ];
-        Self { _subscriptions: subscriptions }
+        Self {
+            _subscriptions: subscriptions,
+        }
     }
 
     fn voice_channel_name(channel_id: &str, cx: &App) -> Option<String> {
@@ -68,7 +70,12 @@ impl UserArea {
             .flat_map(|category| &category.channels)
             .find(|channel| channel.id == channel_id)
             .map(|channel| channel.name.clone())
-            .or_else(|| Dms::global(cx).read(cx).get(channel_id).map(|dm| dm_display(dm).name))
+            .or_else(|| {
+                Dms::global(cx)
+                    .read(cx)
+                    .get(channel_id)
+                    .map(|dm| dm_display(dm).name)
+            })
     }
 
     fn render_voice_panel(&self, cx: &mut Context<Self>) -> Div {
@@ -76,40 +83,61 @@ impl UserArea {
         let circle = SettingsStore::get(cx).circle_icons;
         let voice = Voice::global(cx).read(cx);
         let (connecting, connected) = (voice.connecting(), voice.connected());
-        let (camera, screen, noise) = (voice.self_camera, voice.self_screen_share, voice.noise_cancellation_enabled);
+        let (camera, screen, noise) = (
+            voice.self_camera,
+            voice.self_screen_share,
+            voice.noise_cancellation_enabled,
+        );
         let channel_id = voice.channel_id.clone().unwrap_or_default();
-        let channel_name = Self::voice_channel_name(&channel_id, cx).unwrap_or("Voice channel".into());
+        let channel_name =
+            Self::voice_channel_name(&channel_id, cx).unwrap_or("Voice channel".into());
         let (tier_icon, tier_bg, tier_text) = signal_tier(connecting, None);
 
-        let media_toggle =
-            |id: &'static str, on: bool, label: &'static str, text: &'static str, icon_name: &'static str| {
-                div()
-                    .id(id)
-                    .flex()
-                    .h_8()
-                    .items_center()
-                    .justify_center()
-                    .gap(px(6.0))
-                    .text_xs()
-                    .font_weight(FontWeight::MEDIUM)
-                    .when(circle, |toggle| toggle.rounded_full())
-                    .map(|toggle| {
-                        if on {
-                            toggle
-                                .bg(t.primary)
-                                .text_color(t.primary_foreground)
-                                .hover(|toggle| toggle.bg(t.primary.opacity(0.85)))
-                        } else {
-                            toggle.bg(t.sidebar_accent).text_color(t.sidebar_foreground.opacity(0.8)).hover(|toggle| {
-                                toggle.bg(t.sidebar_accent.opacity(0.7)).text_color(t.sidebar_foreground)
+        let media_toggle = |id: &'static str,
+                            on: bool,
+                            label: &'static str,
+                            text: &'static str,
+                            icon_name: &'static str| {
+            div()
+                .id(id)
+                .flex()
+                .h_8()
+                .items_center()
+                .justify_center()
+                .gap(px(6.0))
+                .text_xs()
+                .font_weight(FontWeight::MEDIUM)
+                .when(circle, |toggle| toggle.rounded_full())
+                .map(|toggle| {
+                    if on {
+                        toggle
+                            .bg(t.primary)
+                            .text_color(t.primary_foreground)
+                            .hover(|toggle| toggle.bg(t.primary.opacity(0.85)))
+                    } else {
+                        toggle
+                            .bg(t.sidebar_accent)
+                            .text_color(t.sidebar_foreground.opacity(0.8))
+                            .hover(|toggle| {
+                                toggle
+                                    .bg(t.sidebar_accent.opacity(0.7))
+                                    .text_color(t.sidebar_foreground)
                             })
-                        }
-                    })
-                    .map(|toggle| if connected { toggle.cursor_pointer() } else { toggle.opacity(0.5) })
-                    .child(icon(icon_name).size_4())
-                    .child(text)
-                    .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(label).build(window, cx))
-            };
+                    }
+                })
+                .map(|toggle| {
+                    if connected {
+                        toggle.cursor_pointer()
+                    } else {
+                        toggle.opacity(0.5)
+                    }
+                })
+                .child(icon(icon_name).size_4())
+                .child(text)
+                .tooltip(move |window, cx| {
+                    gpui_kit::component::tooltip::Tooltip::new(label).build(window, cx)
+                })
+        };
 
         let settings_popover = Popover::new("voice-processing")
             .anchor(Anchor::BottomRight)
@@ -126,7 +154,9 @@ impl UserArea {
                     .cursor_pointer()
                     .map(|button| {
                         if noise {
-                            button.text_color(t.primary).hover(|button| button.text_color(t.primary.opacity(0.8)))
+                            button
+                                .text_color(t.primary)
+                                .hover(|button| button.text_color(t.primary.opacity(0.8)))
                         } else {
                             button
                                 .text_color(t.muted_foreground)
@@ -135,7 +165,8 @@ impl UserArea {
                     })
                     .child(icon("audio-waveform").size_4())
                     .tooltip(|window, cx| {
-                        gpui_kit::component::tooltip::Tooltip::new("Voice processing settings").build(window, cx)
+                        gpui_kit::component::tooltip::Tooltip::new("Voice processing settings")
+                            .build(window, cx)
                     }),
             )
             .content(|_, _, cx| voice_processing(cx));
@@ -170,8 +201,16 @@ impl UserArea {
                                     .truncate()
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(rgb(if connecting { AMBER_400 } else { EMERALD_400 }))
-                                    .child(if connecting { "VOICE CONNECTING" } else { "VOICE CONNECTED" }),
+                                    .text_color(rgb(if connecting {
+                                        AMBER_400
+                                    } else {
+                                        EMERALD_400
+                                    }))
+                                    .child(if connecting {
+                                        "VOICE CONNECTING"
+                                    } else {
+                                        "VOICE CONNECTED"
+                                    }),
                             )
                             .child(
                                 div()
@@ -183,7 +222,9 @@ impl UserArea {
                                     .hover(|name| name.underline())
                                     .child(channel_name)
                                     .on_click(move |_, _, cx| {
-                                        Chat::global(cx).update(cx, |chat, cx| chat.select_channel(&channel_id, cx))
+                                        Chat::global(cx).update(cx, |chat, cx| {
+                                            chat.select_channel(&channel_id, cx)
+                                        })
                                     }),
                             ),
                     )
@@ -199,10 +240,15 @@ impl UserArea {
                             .text_color(t.muted_foreground)
                             .cursor_pointer()
                             .when(circle, |button| button.rounded_full())
-                            .hover(|button| button.bg(rgb(ROSE_500).opacity(0.1)).text_color(rgb(ROSE_300)))
+                            .hover(|button| {
+                                button
+                                    .bg(rgb(ROSE_500).opacity(0.1))
+                                    .text_color(rgb(ROSE_300))
+                            })
                             .child(icon("phone-off").size_4())
                             .tooltip(|window, cx| {
-                                gpui_kit::component::tooltip::Tooltip::new("Leave call").build(window, cx)
+                                gpui_kit::component::tooltip::Tooltip::new("Leave call")
+                                    .build(window, cx)
                             })
                             .on_click(|_, _, cx| ShellState::leave_voice(cx)),
                     ),
@@ -217,13 +263,18 @@ impl UserArea {
                         media_toggle(
                             "camera-toggle",
                             camera,
-                            if camera { "Turn off camera" } else { "Turn on camera" },
+                            if camera {
+                                "Turn off camera"
+                            } else {
+                                "Turn on camera"
+                            },
                             "Camera",
                             if camera { "video" } else { "video-off" },
                         )
                         .when(connected, |toggle| {
                             toggle.on_click(move |_, _, cx| {
-                                Voice::global(cx).update(cx, |voice, cx| voice.set_camera(!camera, cx))
+                                Voice::global(cx)
+                                    .update(cx, |voice, cx| voice.set_camera(!camera, cx))
                             })
                         }),
                     )
@@ -231,13 +282,18 @@ impl UserArea {
                         media_toggle(
                             "screen-toggle",
                             screen,
-                            if screen { "Stop sharing your screen" } else { "Share your screen" },
+                            if screen {
+                                "Stop sharing your screen"
+                            } else {
+                                "Share your screen"
+                            },
                             "Screen",
                             "monitor-up",
                         )
                         .when(connected, |toggle| {
                             toggle.on_click(move |_, _, cx| {
-                                Voice::global(cx).update(cx, |voice, cx| voice.set_screen_share(!screen, cx))
+                                Voice::global(cx)
+                                    .update(cx, |voice, cx| voice.set_screen_share(!screen, cx))
                             })
                         }),
                     ),
@@ -247,7 +303,9 @@ impl UserArea {
     fn render_account(&self, cx: &mut Context<Self>) -> AnyElement {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
-        let Some(user) = Session::user(cx) else { return div().into_any_element() };
+        let Some(user) = Session::user(cx) else {
+            return div().into_any_element();
+        };
         let name = user.name().to_string();
 
         let trigger = trigger("account-switcher")
@@ -265,7 +323,16 @@ impl UserArea {
                 div()
                     .relative()
                     .flex_shrink_0()
-                    .child(avatar(user.avatar_url.as_deref(), &name, user.avatar_color.as_deref(), 32.0, cx).text_xs())
+                    .child(
+                        avatar(
+                            user.avatar_url.as_deref(),
+                            &name,
+                            user.avatar_color.as_deref(),
+                            32.0,
+                            cx,
+                        )
+                        .text_xs(),
+                    )
                     .child(
                         div()
                             .absolute()
@@ -328,7 +395,9 @@ impl UserArea {
             .text_color(color)
             .hover(|button| button.text_color(hover))
             .child(icon(icon_name).size_4())
-            .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(label).build(window, cx))
+            .tooltip(move |window, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(label).build(window, cx)
+            })
     }
 }
 
@@ -336,7 +405,10 @@ impl UserArea {
 fn voice_processing(cx: &mut App) -> Div {
     let t = theme::tokens(cx);
     let voice = Voice::global(cx).read(cx);
-    let (enabled, testing) = (voice.noise_cancellation_enabled, voice.audio_loopback_testing);
+    let (enabled, testing) = (
+        voice.noise_cancellation_enabled,
+        voice.audio_loopback_testing,
+    );
     let model = SettingsStore::get(cx).noise_suppression_model;
     div()
         .flex()
@@ -350,21 +422,33 @@ fn voice_processing(cx: &mut App) -> Div {
                 .px(px(14.0))
                 .py_3()
                 .child(
-                    div().child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Noise suppression")).child(
-                        div()
-                            .mt(px(2.0))
-                            .max_w(px(208.0))
-                            .text_size(px(11.0))
-                            .text_color(t.muted_foreground)
-                            .child("Removes steady background noise"),
-                    ),
+                    div()
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child("Noise suppression"),
+                        )
+                        .child(
+                            div()
+                                .mt(px(2.0))
+                                .max_w(px(208.0))
+                                .text_size(px(11.0))
+                                .text_color(t.muted_foreground)
+                                .child("Removes steady background noise"),
+                        ),
                 )
-                .child(Switch::new("noise-cancellation").mt(px(2.0)).checked(enabled).disabled(testing).on_click(
-                    |checked, _, cx| {
-                        let checked = *checked;
-                        Voice::global(cx).update(cx, |voice, cx| voice.set_noise_cancellation(checked, cx))
-                    },
-                )),
+                .child(
+                    Switch::new("noise-cancellation")
+                        .mt(px(2.0))
+                        .checked(enabled)
+                        .disabled(testing)
+                        .on_click(|checked, _, cx| {
+                            let checked = *checked;
+                            Voice::global(cx)
+                                .update(cx, |voice, cx| voice.set_noise_cancellation(checked, cx))
+                        }),
+                ),
         )
         .when(enabled, |panel| {
             panel.child(
@@ -375,7 +459,12 @@ fn voice_processing(cx: &mut App) -> Div {
                     .gap_4()
                     .px(px(14.0))
                     .pb_3()
-                    .child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Model"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Model"),
+                    )
                     .child(
                         Button::new("noise-model")
                             .outline()
@@ -385,55 +474,74 @@ fn voice_processing(cx: &mut App) -> Div {
                             .label(model.label())
                             .dropdown_caret(true)
                             .dropdown_menu(move |menu, _, _| {
-                                [NoiseSuppressionModel::Deepfilternet, NoiseSuppressionModel::Rnnoise].into_iter().fold(
-                                    menu,
-                                    |menu, option| {
-                                        menu.item(PopupMenuItem::new(option.label()).checked(option == model).on_click(
-                                            move |_, _, cx| {
+                                [
+                                    NoiseSuppressionModel::Deepfilternet,
+                                    NoiseSuppressionModel::Rnnoise,
+                                ]
+                                .into_iter()
+                                .fold(menu, |menu, option| {
+                                    menu.item(
+                                        PopupMenuItem::new(option.label())
+                                            .checked(option == model)
+                                            .on_click(move |_, _, cx| {
                                                 Voice::global(cx).update(cx, |voice, cx| {
                                                     voice.set_noise_suppression_model(option, cx)
                                                 })
-                                            },
-                                        ))
-                                    },
-                                )
+                                            }),
+                                    )
+                                })
                             }),
                     ),
             )
         })
         .child(
-            div().border_t_1().border_color(t.border).bg(t.muted.opacity(0.2)).px(px(14.0)).py_3().child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap_3()
-                    .child(
-                        div().child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Microphone output")).child(
+            div()
+                .border_t_1()
+                .border_color(t.border)
+                .bg(t.muted.opacity(0.2))
+                .px(px(14.0))
+                .py_3()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap_3()
+                        .child(
                             div()
-                                .mt(px(2.0))
-                                .text_size(px(11.0))
-                                .text_color(t.muted_foreground)
-                                .child("Make sure it sounds how you like!"),
-                        ),
-                    )
-                    .when(testing, |row| {
-                        row.child(
-                            div()
-                                .text_size(px(10.0))
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(t.destructive)
-                                .child("Listening"),
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child("Microphone output"),
+                                )
+                                .child(
+                                    div()
+                                        .mt(px(2.0))
+                                        .text_size(px(11.0))
+                                        .text_color(t.muted_foreground)
+                                        .child("Make sure it sounds how you like!"),
+                                ),
                         )
-                    }),
-            ),
+                        .when(testing, |row| {
+                            row.child(
+                                div()
+                                    .text_size(px(10.0))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(t.destructive)
+                                    .child("Listening"),
+                            )
+                        }),
+                ),
         )
 }
 
 /// The account switcher: this account, the others you're signed into, add one, sign out.
 fn account_menu(cx: &mut Context<gpui_kit::component::popover::PopoverState>) -> Div {
     let t = theme::tokens(cx);
-    let Some(user) = Session::user(cx) else { return div() };
+    let Some(user) = Session::user(cx) else {
+        return div();
+    };
     let popover = cx.entity();
     let name = user.name().to_string();
     let home_server = api::anchor().home_server;
@@ -460,8 +568,20 @@ fn account_menu(cx: &mut Context<gpui_kit::component::popover::PopoverState>) ->
         div()
             .min_w_0()
             .flex_1()
-            .child(div().truncate().text_xs().font_weight(FontWeight::MEDIUM).child(title))
-            .child(div().truncate().text_size(px(11.0)).text_color(t.muted_foreground).child(subtitle))
+            .child(
+                div()
+                    .truncate()
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(title),
+            )
+            .child(
+                div()
+                    .truncate()
+                    .text_size(px(11.0))
+                    .text_color(t.muted_foreground)
+                    .child(subtitle),
+            )
     };
 
     let mut menu = div()
@@ -485,21 +605,36 @@ fn account_menu(cx: &mut Context<gpui_kit::component::popover::PopoverState>) ->
                 .px_2()
                 .py(px(6.0))
                 .child(
-                    avatar(user.avatar_url.as_deref(), &name, user.avatar_color.as_deref(), 28.0, cx)
-                        .text_size(px(11.0)),
+                    avatar(
+                        user.avatar_url.as_deref(),
+                        &name,
+                        user.avatar_color.as_deref(),
+                        28.0,
+                        cx,
+                    )
+                    .text_size(px(11.0)),
                 )
                 .child(detail(name.clone(), user.homeserver.clone()))
                 .child(icon("check").size_4().text_color(t.primary)),
         );
     for account in others {
-        let account_name =
-            account.display_name.clone().filter(|name| !name.is_empty()).unwrap_or(account.username.clone());
+        let account_name = account
+            .display_name
+            .clone()
+            .filter(|name| !name.is_empty())
+            .unwrap_or(account.username.clone());
         let (switch_to, popover) = (account.home_server.clone(), popover.clone());
         menu = menu.child(
             row(format!("account-{}", account.home_server).into())
                 .child(
-                    avatar(account.avatar_url.as_deref(), &account_name, account.avatar_color.as_deref(), 28.0, cx)
-                        .text_size(px(11.0)),
+                    avatar(
+                        account.avatar_url.as_deref(),
+                        &account_name,
+                        account.avatar_color.as_deref(),
+                        28.0,
+                        cx,
+                    )
+                    .text_size(px(11.0)),
                 )
                 .child(detail(account_name, account.home_server.clone()))
                 .on_click(move |_, window, cx| {
@@ -524,19 +659,23 @@ fn account_menu(cx: &mut Context<gpui_kit::component::popover::PopoverState>) ->
     };
     let add_popover = popover.clone();
     menu.child(div().my_1().border_t_1().border_color(t.border))
-        .child(action("add-account", "plus", "Add account").on_click(move |_, window, cx| {
-            add_popover.update(cx, |popover, cx| popover.dismiss(window, cx));
-            router::goto("/login?add=1", cx);
-        }))
-        .child(action("sign-out", "log-out", "Sign out").on_click(move |_, window, cx| {
-            popover.update(cx, |popover, cx| popover.dismiss(window, cx));
-            let logout = Session::logout(cx);
-            cx.spawn(async move |cx| {
-                logout.await;
-                cx.update(|cx| router::goto("/login", cx));
-            })
-            .detach();
-        }))
+        .child(
+            action("add-account", "plus", "Add account").on_click(move |_, window, cx| {
+                add_popover.update(cx, |popover, cx| popover.dismiss(window, cx));
+                router::goto("/login?add=1", cx);
+            }),
+        )
+        .child(
+            action("sign-out", "log-out", "Sign out").on_click(move |_, window, cx| {
+                popover.update(cx, |popover, cx| popover.dismiss(window, cx));
+                let logout = Session::logout(cx);
+                cx.spawn(async move |cx| {
+                    logout.await;
+                    cx.update(|cx| router::goto("/login", cx));
+                })
+                .detach();
+            }),
+        )
 }
 
 impl Render for UserArea {
@@ -544,7 +683,11 @@ impl Render for UserArea {
         let t = theme::tokens(cx);
         let voice = Voice::global(cx).read(cx);
         let in_call = voice.connected() || voice.connecting();
-        let (muted, deafened, testing) = (voice.self_muted, voice.self_deafened, voice.audio_loopback_testing);
+        let (muted, deafened, testing) = (
+            voice.self_muted,
+            voice.self_deafened,
+            voice.audio_loopback_testing,
+        );
         let rose = (rgb(ROSE_400).into(), rgb(ROSE_300).into());
         let plain = (t.muted_foreground, t.sidebar_foreground);
 
@@ -564,23 +707,38 @@ impl Render for UserArea {
         )
         .on_click(move |_, _, cx| {
             Voice::global(cx).update(cx, |voice, cx| {
-                if deafened { voice.set_deafened(false, cx) } else { voice.set_muted(!muted, cx) }
+                if deafened {
+                    voice.set_deafened(false, cx)
+                } else {
+                    voice.set_muted(!muted, cx)
+                }
             })
         });
         let (deafen_color, deafen_hover) = if deafened { rose } else { plain };
         let deafen = Self::icon_button(
             "deafen",
-            if deafened { "headphone-off" } else { "headphones" },
+            if deafened {
+                "headphone-off"
+            } else {
+                "headphones"
+            },
             deafen_color,
             deafen_hover,
             if deafened { "Undeafen" } else { "Deafen" },
         )
         .when(!testing, |button| {
-            button.on_click(move |_, _, cx| Voice::global(cx).update(cx, |voice, cx| voice.set_deafened(!deafened, cx)))
+            button.on_click(move |_, _, cx| {
+                Voice::global(cx).update(cx, |voice, cx| voice.set_deafened(!deafened, cx))
+            })
         });
-        let settings =
-            Self::icon_button("user-settings", "settings", t.muted_foreground, t.sidebar_foreground, "User settings")
-                .on_click(|_, _, cx| SettingsStore::set_dialog_open(true, cx));
+        let settings = Self::icon_button(
+            "user-settings",
+            "settings",
+            t.muted_foreground,
+            t.sidebar_foreground,
+            "User settings",
+        )
+        .on_click(|_, _, cx| SettingsStore::set_dialog_open(true, cx));
 
         div()
             .w(tw(74.0))
@@ -597,7 +755,15 @@ impl Render for UserArea {
                     .gap(px(10.0))
                     .px_3()
                     .child(self.render_account(cx))
-                    .child(div().flex().items_center().gap(px(2.0)).child(mute).child(deafen).child(settings)),
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(2.0))
+                            .child(mute)
+                            .child(deafen)
+                            .child(settings),
+                    ),
             )
     }
 }

@@ -33,9 +33,17 @@ const MESSAGES_PAGE_SIZE: usize = 50;
 pub const MAX_MESSAGE_LENGTH: usize = 4000;
 
 fn initials_for(name: &str) -> String {
-    let initials: String =
-        name.split_whitespace().take(2).filter_map(|part| part.chars().next()).flat_map(char::to_uppercase).collect();
-    if initials.is_empty() { name.chars().take(1).flat_map(char::to_uppercase).collect() } else { initials }
+    let initials: String = name
+        .split_whitespace()
+        .take(2)
+        .filter_map(|part| part.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect();
+    if initials.is_empty() {
+        name.chars().take(1).flat_map(char::to_uppercase).collect()
+    } else {
+        initials
+    }
 }
 
 /// A file picked for upload: a message attachment, a group icon or an avatar.
@@ -48,14 +56,24 @@ pub struct UploadFile {
 
 impl UploadFile {
     pub fn from_path(path: &Path) -> std::io::Result<Self> {
-        let name = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
-        Ok(Self { content_type: content_type_for(&name).into(), bytes: std::fs::read(path)?, name })
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "file".into());
+        Ok(Self {
+            content_type: content_type_for(&name).into(),
+            bytes: std::fs::read(path)?,
+            name,
+        })
     }
 }
 
 /// What a browser would put in `File.type` for these names.
 pub fn content_type_for(name: &str) -> &'static str {
-    let extension = name.rsplit_once('.').map(|(_, extension)| extension.to_lowercase()).unwrap_or_default();
+    let extension = name
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_lowercase())
+        .unwrap_or_default();
     match extension.as_str() {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -90,7 +108,9 @@ pub fn strip_image_metadata(file: UploadFile) -> Result<UploadFile, String> {
         _ => return Ok(file),
     };
     let failed = |_| format!("Could not process {}", file.name);
-    let mut decoder = ImageReader::with_format(Cursor::new(&file.bytes), format).into_decoder().map_err(failed)?;
+    let mut decoder = ImageReader::with_format(Cursor::new(&file.bytes), format)
+        .into_decoder()
+        .map_err(failed)?;
     // browsers apply the EXIF rotation when drawing, so the picture keeps its orientation
     let orientation = decoder.orientation().ok();
     let mut image = DynamicImage::from_decoder(decoder).map_err(failed)?;
@@ -106,7 +126,10 @@ pub fn strip_image_metadata(file: UploadFile) -> Result<UploadFile, String> {
         image.write_to(&mut bytes, format)
     };
     written.map_err(failed)?;
-    Ok(UploadFile { bytes: bytes.into_inner(), ..file })
+    Ok(UploadFile {
+        bytes: bytes.into_inner(),
+        ..file
+    })
 }
 
 fn message_from_input(message: MessageData, thinking: bool) -> Message {
@@ -136,7 +159,10 @@ fn message_from_input(message: MessageData, thinking: bool) -> Message {
 }
 
 fn member_from_input(member: &MemberUser) -> Author {
-    Author { status: Some(member.status), ..Author::from(&member.user) }
+    Author {
+        status: Some(member.status),
+        ..Author::from(&member.user)
+    }
 }
 
 /// builds the synthetic Channel the UI expects out of a DM's participants.
@@ -158,8 +184,14 @@ fn dm_channel(entry: &DmEntry) -> Channel {
     }
 }
 
-pub fn guild_path(server_id: Option<&str>, channel_id: Option<&str>, message_id: Option<&str>) -> String {
-    let Some(server_id) = server_id.filter(|id| !id.is_empty()) else { return "/guilds".into() };
+pub fn guild_path(
+    server_id: Option<&str>,
+    channel_id: Option<&str>,
+    message_id: Option<&str>,
+) -> String {
+    let Some(server_id) = server_id.filter(|id| !id.is_empty()) else {
+        return "/guilds".into();
+    };
     let parts: Vec<String> = [Some(server_id), channel_id, message_id]
         .into_iter()
         .flatten()
@@ -171,8 +203,10 @@ pub fn guild_path(server_id: Option<&str>, channel_id: Option<&str>, message_id:
 
 /// Older messages go first; ones already on screen aren't repeated. `None` when nothing is new.
 pub fn merge_older(existing: &[Message], loaded: Vec<Message>) -> Option<Vec<Message>> {
-    let older: Vec<Message> =
-        loaded.into_iter().filter(|message| !existing.iter().any(|item| item.id == message.id)).collect();
+    let older: Vec<Message> = loaded
+        .into_iter()
+        .filter(|message| !existing.iter().any(|item| item.id == message.id))
+        .collect();
     (!older.is_empty()).then(|| older.into_iter().chain(existing.iter().cloned()).collect())
 }
 
@@ -187,17 +221,24 @@ pub fn merge_voice_states(
         .iter()
         .filter(|(channel_id, channel_states)| {
             !dm_ids.contains(channel_id)
-                && channel_states
-                    .iter()
-                    .any(|state| state.guild_id.as_ref().is_none_or(|guild| !guild_ids.contains(guild)))
+                && channel_states.iter().any(|state| {
+                    state
+                        .guild_id
+                        .as_ref()
+                        .is_none_or(|guild| !guild_ids.contains(guild))
+                })
         })
         .map(|(channel_id, states)| (channel_id.clone(), states.clone()))
         .collect();
     for state in states {
-        next.entry(state.channel_id.clone()).or_default().retain(|item| item.user_id != state.user_id);
+        next.entry(state.channel_id.clone())
+            .or_default()
+            .retain(|item| item.user_id != state.user_id);
     }
     for state in states {
-        next.entry(state.channel_id.clone()).or_default().push(state.clone());
+        next.entry(state.channel_id.clone())
+            .or_default()
+            .push(state.clone());
     }
     next
 }
@@ -338,8 +379,15 @@ async fn put_with_progress(
         for (name, value) in headers {
             request = request.header(name, value);
         }
-        let response = request.send().await.map_err(|_| "Upload failed".to_string())?;
-        if response.status().is_success() { Ok(()) } else { Err("Upload failed".into()) }
+        let response = request
+            .send()
+            .await
+            .map_err(|_| "Upload failed".to_string())?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err("Upload failed".into())
+        }
     })
     .await
 }
@@ -400,7 +448,9 @@ pub fn init(cx: &mut App) {
         has_more_by_channel: HashMap::new(),
         initialized: false,
         // the web app's `$effect(() => chat.syncActiveChannel())`
-        _router: cx.observe(&router, |chat: &mut Chat, _, cx| chat.sync_active_channel(cx)),
+        _router: cx.observe(&router, |chat: &mut Chat, _, cx| {
+            chat.sync_active_channel(cx)
+        }),
     });
     cx.set_global(GlobalChat(chat));
 }
@@ -438,7 +488,10 @@ impl Chat {
     /// where slash commands come from: the guild, or the group DM (1:1 DMs have no bots)
     pub fn command_scope(&self, cx: &App) -> Option<String> {
         self.active_server(cx).or_else(|| match Router::route(cx) {
-            ChatRoute::Dms { channel_id: Some(channel_id), .. } => Dms::global(cx)
+            ChatRoute::Dms {
+                channel_id: Some(channel_id),
+                ..
+            } => Dms::global(cx)
                 .read(cx)
                 .get(&channel_id)
                 .is_some_and(|dm| dm.kind == DmType::GroupDm)
@@ -449,9 +502,13 @@ impl Chat {
 
     /// Who is in the current channel: the guild's members, or everyone in the group DM.
     pub fn channel_members(&self, cx: &App) -> Vec<Author> {
-        let ChatRoute::Dms { channel_id, .. } = Router::route(cx) else { return self.members.clone() };
+        let ChatRoute::Dms { channel_id, .. } = Router::route(cx) else {
+            return self.members.clone();
+        };
         let dms = Dms::global(cx);
-        let Some(group) = channel_id.and_then(|id| dms.read(cx).get(&id).cloned()) else { return vec![] };
+        let Some(group) = channel_id.and_then(|id| dms.read(cx).get(&id).cloned()) else {
+            return vec![];
+        };
         if group.kind != DmType::GroupDm {
             return vec![];
         }
@@ -488,8 +545,12 @@ impl Chat {
 
     /// owner-only channels only take messages from the guild owner, the one who can manage channels
     pub fn can_send_in_current_channel(&self, cx: &App) -> bool {
-        !self.current_channel(cx).is_some_and(|channel| channel.owner_only)
-            || self.current_server(cx).is_some_and(|server| server.can_manage_channels)
+        !self
+            .current_channel(cx)
+            .is_some_and(|channel| channel.owner_only)
+            || self
+                .current_server(cx)
+                .is_some_and(|server| server.can_manage_channels)
     }
 
     pub fn current_messages(&self, cx: &App) -> &[Message] {
@@ -501,7 +562,10 @@ impl Chat {
 
     pub fn current_messages_loading(&self, cx: &App) -> bool {
         self.current_channel(cx).is_some_and(|channel| {
-            self.messages_loading_by_channel.get(&channel.id).copied().unwrap_or(false)
+            self.messages_loading_by_channel
+                .get(&channel.id)
+                .copied()
+                .unwrap_or(false)
                 || self.loaded_channel.as_deref() != Some(channel.id.as_str())
         })
     }
@@ -514,7 +578,9 @@ impl Chat {
     }
 
     pub fn select_server(&mut self, id: Option<&str>, cx: &mut Context<Self>) {
-        let channel = self.first_channel_for_server(id).map(|channel| channel.id.clone());
+        let channel = self
+            .first_channel_for_server(id)
+            .map(|channel| channel.id.clone());
         router::goto(guild_path(id, channel.as_deref(), None), cx);
     }
 
@@ -525,7 +591,11 @@ impl Chat {
         let server = self
             .channels_by_server
             .iter()
-            .find(|(_, categories)| categories.iter().any(|category| category.channels.iter().any(|c| c.id == id)))
+            .find(|(_, categories)| {
+                categories
+                    .iter()
+                    .any(|category| category.channels.iter().any(|c| c.id == id))
+            })
             .map(|(server, _)| server.clone())
             .or_else(|| self.active_server(cx));
         if let Some(server) = server {
@@ -538,7 +608,11 @@ impl Chat {
         if let (ChatRoute::Dms { .. }, Some(channel)) = (Router::route(cx), &channel) {
             return dm_path(channel, Some(id));
         }
-        guild_path(self.active_server(cx).as_deref(), channel.as_deref(), Some(id))
+        guild_path(
+            self.active_server(cx).as_deref(),
+            channel.as_deref(),
+            Some(id),
+        )
     }
 
     pub fn existing_channel_path(&self, cx: &App) -> String {
@@ -561,8 +635,9 @@ impl Chat {
 
     pub fn add_guild(&mut self, guild: GuildInput, cx: &mut Context<Self>) {
         let me = Session::user(cx).map(|user| user.id);
-        let can_manage_channels =
-            guild.can_manage_channels.unwrap_or_else(|| guild.owner_id.is_some() && guild.owner_id == me);
+        let can_manage_channels = guild
+            .can_manage_channels
+            .unwrap_or_else(|| guild.owner_id.is_some() && guild.owner_id == me);
         match self.servers.iter_mut().find(|server| server.id == guild.id) {
             Some(server) => {
                 server.initials = initials_for(&guild.name);
@@ -587,12 +662,22 @@ impl Chat {
         cx.notify();
     }
 
-    pub fn set_guild_categories(&mut self, guild_id: &str, categories: Vec<ChannelCategory>, cx: &mut Context<Self>) {
+    pub fn set_guild_categories(
+        &mut self,
+        guild_id: &str,
+        categories: Vec<ChannelCategory>,
+        cx: &mut Context<Self>,
+    ) {
         self.channels_by_server.insert(guild_id.into(), categories);
         cx.notify();
     }
 
-    pub fn add_channel(&mut self, channel: &ChannelData, read: Option<ChannelRead>, cx: &mut Context<Self>) -> Channel {
+    pub fn add_channel(
+        &mut self,
+        channel: &ChannelData,
+        read: Option<ChannelRead>,
+        cx: &mut Context<Self>,
+    ) -> Channel {
         let existing = self
             .channels_by_server
             .get(&channel.guild_id)
@@ -619,15 +704,24 @@ impl Chat {
             label: None,
             topic: None,
             unread: read.as_ref().is_some_and(|read| read.unread),
-            last_read_message_id: read.as_ref().and_then(|read| read.last_read_message_id.clone()),
+            last_read_message_id: read
+                .as_ref()
+                .and_then(|read| read.last_read_message_id.clone()),
             mention: read.as_ref().map_or(0, |read| read.mention),
-            kind: if channel.kind == ChannelType::Voice { ChannelType::Voice } else { ChannelType::Text },
+            kind: if channel.kind == ChannelType::Voice {
+                ChannelType::Voice
+            } else {
+                ChannelType::Text
+            },
             group: false,
             owner_only: channel.owner_only,
             avatar_url: None,
             avatar_color: None,
         };
-        let categories = self.channels_by_server.entry(channel.guild_id.clone()).or_default();
+        let categories = self
+            .channels_by_server
+            .entry(channel.guild_id.clone())
+            .or_default();
         match categories.iter_mut().find(|category| category.id == "text") {
             Some(text) => {
                 let position = (channel.position.max(0) as usize).min(text.channels.len());
@@ -643,8 +737,16 @@ impl Chat {
         next
     }
 
-    pub fn set_messages(&mut self, channel_id: &str, messages: Vec<MessageData>, cx: &mut Context<Self>) {
-        let messages = messages.into_iter().map(|message| message_from_input(message, false)).collect();
+    pub fn set_messages(
+        &mut self,
+        channel_id: &str,
+        messages: Vec<MessageData>,
+        cx: &mut Context<Self>,
+    ) {
+        let messages = messages
+            .into_iter()
+            .map(|message| message_from_input(message, false))
+            .collect();
         self.messages_by_channel.insert(channel_id.into(), messages);
         cx.notify();
     }
@@ -652,8 +754,18 @@ impl Chat {
     pub fn add_message(&mut self, message: MessageData, cx: &mut Context<Self>) {
         let pinged = self.pings_me(&message, cx);
         let (channel_id, created_at) = (message.channel_id.clone(), message.created_at.clone());
-        let interaction = message.interaction.as_ref().map(|interaction| interaction.id.clone());
-        self.push_message(&channel_id, message_from_input(message, false), interaction, pinged, created_at, cx);
+        let interaction = message
+            .interaction
+            .as_ref()
+            .map(|interaction| interaction.id.clone());
+        self.push_message(
+            &channel_id,
+            message_from_input(message, false),
+            interaction,
+            pinged,
+            created_at,
+            cx,
+        );
     }
 
     /// A bot's "thinking…" until its answer to interaction `interaction_id` arrives.
@@ -688,7 +800,12 @@ impl Chat {
     fn pings_me(&self, message: &MessageData, cx: &App) -> bool {
         let handle = Session::user(cx).map(|user| user.handle.to_lowercase());
         (message.guild_id.is_some() && mentions_everyone(message.content.as_deref()))
-            || handle.is_some_and(|handle| message.pinged_handles.iter().any(|pinged| pinged.to_lowercase() == handle))
+            || handle.is_some_and(|handle| {
+                message
+                    .pinged_handles
+                    .iter()
+                    .any(|pinged| pinged.to_lowercase() == handle)
+            })
     }
 
     fn push_message(
@@ -702,7 +819,10 @@ impl Chat {
     ) {
         // a bot's answer takes the place of its "thinking…"
         let thinking_id = interaction_id.map(|id| format!("thinking:{id}"));
-        let messages = self.messages_by_channel.entry(channel_id.into()).or_default();
+        let messages = self
+            .messages_by_channel
+            .entry(channel_id.into())
+            .or_default();
         messages.retain(|item| Some(&item.id) != thinking_id.as_ref());
         cx.notify();
         if messages.iter().any(|item| item.id == message.id) {
@@ -721,7 +841,8 @@ impl Chat {
                 self.increment_channel_mention(channel_id, cx);
             }
         } else {
-            self.mark_read(channel_id.into(), id, created_at, cx).detach();
+            self.mark_read(channel_id.into(), id, created_at, cx)
+                .detach();
         }
     }
 
@@ -749,16 +870,32 @@ impl Chat {
         }
     }
 
-    pub fn update_message(&mut self, channel_id: &str, message: MessageData, cx: &mut Context<Self>) {
+    pub fn update_message(
+        &mut self,
+        channel_id: &str,
+        message: MessageData,
+        cx: &mut Context<Self>,
+    ) {
         let messages = self.messages_by_channel.get_mut(channel_id);
-        if let Some(existing) = messages.and_then(|messages| messages.iter_mut().find(|item| item.id == message.id)) {
+        if let Some(existing) =
+            messages.and_then(|messages| messages.iter_mut().find(|item| item.id == message.id))
+        {
             *existing = message_from_input(message, false);
             cx.notify();
         }
     }
 
-    pub fn update_member_status(&mut self, user_id: &str, status: UserStatus, cx: &mut Context<Self>) {
-        for member in self.members.iter_mut().filter(|member| member.user_id == user_id) {
+    pub fn update_member_status(
+        &mut self,
+        user_id: &str,
+        status: UserStatus,
+        cx: &mut Context<Self>,
+    ) {
+        for member in self
+            .members
+            .iter_mut()
+            .filter(|member| member.user_id == user_id)
+        {
             member.status = Some(status);
         }
         cx.notify();
@@ -777,16 +914,28 @@ impl Chat {
             }
         };
         self.members.iter_mut().for_each(apply);
-        self.messages_by_channel.values_mut().flatten().for_each(|message| apply(&mut message.author));
+        self.messages_by_channel
+            .values_mut()
+            .flatten()
+            .for_each(|message| apply(&mut message.author));
         cx.notify();
     }
 
-    pub fn add_or_update_member(&mut self, guild_id: &str, member: &MemberUser, cx: &mut Context<Self>) {
+    pub fn add_or_update_member(
+        &mut self,
+        guild_id: &str,
+        member: &MemberUser,
+        cx: &mut Context<Self>,
+    ) {
         if self.active_server(cx).as_deref() != Some(guild_id) {
             return;
         }
         let next = member_from_input(member);
-        match self.members.iter_mut().find(|item| item.user_id == next.user_id) {
+        match self
+            .members
+            .iter_mut()
+            .find(|item| item.user_id == next.user_id)
+        {
             Some(existing) => *existing = next,
             None => self.members.push(next),
         }
@@ -812,7 +961,10 @@ impl Chat {
             states.len() == before || !states.is_empty()
         });
         if state.connected {
-            self.voice_states.entry(state.presence.channel_id.clone()).or_default().push(state.presence.clone());
+            self.voice_states
+                .entry(state.presence.channel_id.clone())
+                .or_default()
+                .push(state.presence.clone());
         }
         cx.notify();
     }
@@ -829,7 +981,9 @@ impl Chat {
             let nonce = message_nonce();
             let mut attachment_ids = vec![];
             for (index, file) in files.into_iter().enumerate() {
-                let file = cx.background_spawn(async move { strip_image_metadata(file) }).await?;
+                let file = cx
+                    .background_spawn(async move { strip_image_metadata(file) })
+                    .await?;
                 let uploaded = Self::upload_attachment(&this, &channel_id, file, index, cx).await;
                 let _ = this.update(cx, |chat, cx| {
                     chat.upload_progress.remove(&index);
@@ -849,7 +1003,11 @@ impl Chat {
             }
             match api::post::<api::Ignored>("/message/send", body).await {
                 Ok(_) => Ok(()),
-                Err(error) if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) => Ok(()),
+                Err(error)
+                    if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) =>
+                {
+                    Ok(())
+                }
                 Err(_) => Err("Failed to send message".into()),
             }
         })
@@ -899,10 +1057,16 @@ impl Chat {
             let body = json!({ "channelId": channel_id, "messageId": message_id });
             match api::post::<api::Ignored>("/message/delete", body).await {
                 Ok(_) => {
-                    let _ = this.update(cx, |chat, cx| chat.remove_message(&channel_id, &message_id, cx));
+                    let _ = this.update(cx, |chat, cx| {
+                        chat.remove_message(&channel_id, &message_id, cx)
+                    });
                     Ok(())
                 }
-                Err(error) if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) => Ok(()),
+                Err(error)
+                    if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) =>
+                {
+                    Ok(())
+                }
                 Err(_) => Err("Failed to delete message".into()),
             }
         })
@@ -916,19 +1080,29 @@ impl Chat {
         cx: &mut Context<Self>,
     ) -> Task<Result<(), String>> {
         cx.spawn(async move |this, cx| {
-            let body = json!({ "channelId": channel_id, "messageId": message_id, "content": content });
+            let body =
+                json!({ "channelId": channel_id, "messageId": message_id, "content": content });
             match api::post::<MessagePayload>("/message/edit", body).await {
                 Ok(payload) => {
-                    let _ = this.update(cx, |chat, cx| chat.update_message(&channel_id, payload.message, cx));
+                    let _ = this.update(cx, |chat, cx| {
+                        chat.update_message(&channel_id, payload.message, cx)
+                    });
                     Ok(())
                 }
-                Err(error) if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) => Ok(()),
+                Err(error)
+                    if cx.update(|cx| send_to_guilds_if_federated_server_down(&error, cx)) =>
+                {
+                    Ok(())
+                }
                 Err(_) => Err("Failed to edit message".into()),
             }
         })
     }
 
-    fn list_messages(channel_id: &str, cursor: usize) -> impl Future<Output = api::ApiResult<MessageList>> + use<> {
+    fn list_messages(
+        channel_id: &str,
+        cursor: usize,
+    ) -> impl Future<Output = api::ApiResult<MessageList>> + use<> {
         let query = [
             ("channelId", channel_id.to_string()),
             ("cursor", cursor.to_string()),
@@ -938,19 +1112,26 @@ impl Chat {
     }
 
     /// The newest page of `channel_id`. Resolves to its newest message.
-    pub fn load_messages(&mut self, channel_id: String, cx: &mut Context<Self>) -> Task<Option<MessageData>> {
-        self.messages_loading_by_channel.insert(channel_id.clone(), true);
+    pub fn load_messages(
+        &mut self,
+        channel_id: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Option<MessageData>> {
+        self.messages_loading_by_channel
+            .insert(channel_id.clone(), true);
         self.next_cursor_by_channel.insert(channel_id.clone(), 0);
         cx.notify();
         let request = Self::list_messages(&channel_id, 0);
         cx.spawn(async move |this, cx| {
             let result = request.await;
             this.update(cx, |chat, cx| {
-                chat.messages_loading_by_channel.insert(channel_id.clone(), false);
+                chat.messages_loading_by_channel
+                    .insert(channel_id.clone(), false);
                 cx.notify();
                 match result {
                     Ok(MessageList { messages }) => {
-                        chat.has_more_by_channel.insert(channel_id.clone(), messages.len() == MESSAGES_PAGE_SIZE);
+                        chat.has_more_by_channel
+                            .insert(channel_id.clone(), messages.len() == MESSAGES_PAGE_SIZE);
                         let last = messages.last().cloned();
                         chat.set_messages(&channel_id, messages, cx);
                         last
@@ -974,14 +1155,20 @@ impl Chat {
         {
             return Task::ready(());
         }
-        self.loading_older_by_channel.insert(channel_id.clone(), true);
+        self.loading_older_by_channel
+            .insert(channel_id.clone(), true);
         cx.notify();
-        let cursor = self.next_cursor_by_channel.get(&channel_id).copied().unwrap_or(0);
+        let cursor = self
+            .next_cursor_by_channel
+            .get(&channel_id)
+            .copied()
+            .unwrap_or(0);
         let request = Self::list_messages(&channel_id, cursor);
         cx.spawn(async move |this, cx| {
             let result = request.await;
             let _ = this.update(cx, |chat, cx| {
-                chat.loading_older_by_channel.insert(channel_id.clone(), false);
+                chat.loading_older_by_channel
+                    .insert(channel_id.clone(), false);
                 cx.notify();
                 let messages = match result {
                     Ok(MessageList { messages }) => messages,
@@ -991,31 +1178,50 @@ impl Chat {
                     }
                 };
                 let count = messages.len();
-                let loaded = messages.into_iter().map(|message| message_from_input(message, false)).collect();
-                let existing = chat.messages_by_channel.get(&channel_id).map(Vec::as_slice).unwrap_or_default();
+                let loaded = messages
+                    .into_iter()
+                    .map(|message| message_from_input(message, false))
+                    .collect();
+                let existing = chat
+                    .messages_by_channel
+                    .get(&channel_id)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default();
                 if let Some(merged) = merge_older(existing, loaded) {
                     chat.messages_by_channel.insert(channel_id.clone(), merged);
                 }
-                chat.next_cursor_by_channel.insert(channel_id.clone(), cursor + count);
-                chat.has_more_by_channel.insert(channel_id, count == MESSAGES_PAGE_SIZE);
+                chat.next_cursor_by_channel
+                    .insert(channel_id.clone(), cursor + count);
+                chat.has_more_by_channel
+                    .insert(channel_id, count == MESSAGES_PAGE_SIZE);
             });
         })
     }
 
     pub fn has_more_messages(&self, channel_id: &str) -> bool {
-        self.has_more_by_channel.get(channel_id).copied().unwrap_or(false)
+        self.has_more_by_channel
+            .get(channel_id)
+            .copied()
+            .unwrap_or(false)
     }
 
     /// Tells the channel we're typing, at most every few seconds.
     pub fn on_typing(&mut self, cx: &mut Context<Self>) -> Task<()> {
-        let Some(channel_id) = self.active_channel(cx) else { return Task::ready(()) };
+        let Some(channel_id) = self.active_channel(cx) else {
+            return Task::ready(());
+        };
         let now = Instant::now();
-        if self.last_typing_by_channel.get(&channel_id).is_some_and(|last| now - *last < TYPING_REQUEST_INTERVAL) {
+        if self
+            .last_typing_by_channel
+            .get(&channel_id)
+            .is_some_and(|last| now - *last < TYPING_REQUEST_INTERVAL)
+        {
             return Task::ready(());
         }
         self.last_typing_by_channel.insert(channel_id.clone(), now);
         cx.spawn(async move |_, _| {
-            let _ = api::post::<api::Ignored>(format!("/channel/{channel_id}/typing"), json!({})).await;
+            let _ =
+                api::post::<api::Ignored>(format!("/channel/{channel_id}/typing"), json!({})).await;
         })
     }
 
@@ -1029,14 +1235,20 @@ impl Chat {
         cx: &mut Context<Self>,
     ) {
         let Some(me) = Session::user(cx) else { return };
-        if user_id == me.id || (username == me.username && homeserver.eq_ignore_ascii_case(&me.homeserver)) {
+        if user_id == me.id
+            || (username == me.username && homeserver.eq_ignore_ascii_case(&me.homeserver))
+        {
             return;
         }
 
         let expires_at = Instant::now() + TYPING_EXPIRY;
         let typing = self.typing_by_channel.entry(channel_id.into()).or_default();
         typing.retain(|item| item.user_id != user_id);
-        typing.push(TypingEntry { user_id: user_id.into(), name: name.into(), expires_at });
+        typing.push(TypingEntry {
+            user_id: user_id.into(),
+            name: name.into(),
+            expires_at,
+        });
         cx.notify();
 
         let (channel_id, user_id) = (channel_id.to_string(), user_id.to_string());
@@ -1063,8 +1275,9 @@ impl Chat {
         cx.spawn(async move |this, cx| {
             let result = api::get::<Users>(format!("/channel/{channel_id}/users")).await;
             let _ = this.update(cx, |chat, cx| {
-                chat.members =
-                    result.map(|users| users.users.iter().map(member_from_input).collect()).unwrap_or_default();
+                chat.members = result
+                    .map(|users| users.users.iter().map(member_from_input).collect())
+                    .unwrap_or_default();
                 cx.notify();
             });
         })
@@ -1079,7 +1292,11 @@ impl Chat {
         mention: Option<u32>,
         cx: &mut Context<Self>,
     ) {
-        let channels = self.channels_by_server.values_mut().flatten().flat_map(|category| &mut category.channels);
+        let channels = self
+            .channels_by_server
+            .values_mut()
+            .flatten()
+            .flat_map(|category| &mut category.channels);
         for channel in channels.filter(|channel| channel.id == channel_id) {
             channel.unread = unread;
             if let Some(mention) = mention {
@@ -1113,15 +1330,24 @@ impl Chat {
         cx: &mut Context<Self>,
     ) -> Task<()> {
         let created_at = DateTime::parse_from_rfc3339(&created_at)
-            .map(|date| date.with_timezone(&Utc).to_rfc3339_opts(SecondsFormat::Millis, true))
+            .map(|date| {
+                date.with_timezone(&Utc)
+                    .to_rfc3339_opts(SecondsFormat::Millis, true)
+            })
             .unwrap_or(created_at);
         cx.spawn(async move |this, cx| {
             let body = json!({ "messageId": message_id, "createdAt": created_at });
-            if api::post::<api::Ignored>(format!("/channel/{channel_id}/read"), body).await.is_err() {
+            if api::post::<api::Ignored>(format!("/channel/{channel_id}/read"), body)
+                .await
+                .is_err()
+            {
                 return;
             }
             let _ = this.update(cx, |chat, cx| {
-                let latest = chat.messages_by_channel.get(&channel_id).and_then(|messages| messages.last());
+                let latest = chat
+                    .messages_by_channel
+                    .get(&channel_id)
+                    .and_then(|messages| messages.last());
                 if latest.is_none_or(|latest| latest.id != message_id) {
                     return;
                 }
@@ -1129,7 +1355,13 @@ impl Chat {
                 if dms.read(cx).get(&channel_id).is_some() {
                     dms.update(cx, |dms, cx| dms.mark_read(&channel_id, cx));
                 } else {
-                    chat.set_channel_unread(&channel_id, false, Some(Some(message_id)), Some(0), cx);
+                    chat.set_channel_unread(
+                        &channel_id,
+                        false,
+                        Some(Some(message_id)),
+                        Some(0),
+                        cx,
+                    );
                 }
             });
         })
@@ -1141,17 +1373,34 @@ impl Chat {
         })
     }
 
-    pub fn update_guild_avatar(&mut self, guild_id: &str, avatar_url: String, cx: &mut Context<Self>) {
+    pub fn update_guild_avatar(
+        &mut self,
+        guild_id: &str,
+        avatar_url: String,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(server) = self.servers.iter_mut().find(|server| server.id == guild_id) {
             server.avatar_url = Some(avatar_url);
             cx.notify();
         }
     }
 
-    pub fn create_local_channel(&mut self, category_id: &str, channel: Channel, cx: &mut Context<Self>) {
-        let Some(server) = self.active_server(cx) else { return };
+    pub fn create_local_channel(
+        &mut self,
+        category_id: &str,
+        channel: Channel,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(server) = self.active_server(cx) else {
+            return;
+        };
         let categories = self.channels_by_server.entry(server).or_default();
-        let Some(category) = categories.iter_mut().find(|category| category.id == category_id) else { return };
+        let Some(category) = categories
+            .iter_mut()
+            .find(|category| category.id == category_id)
+        else {
+            return;
+        };
         let id = channel.id.clone();
         category.channels.push(channel);
         cx.notify();
@@ -1167,7 +1416,9 @@ impl Chat {
     ) -> Task<Option<Channel>> {
         cx.spawn(async move |this, cx| {
             let body = json!({ "name": name, "type": kind, "guildId": guild_id });
-            let created = api::post::<ChannelData>("/channel/create", body).await.ok()?;
+            let created = api::post::<ChannelData>("/channel/create", body)
+                .await
+                .ok()?;
             this.update(cx, |chat, cx| {
                 let channel = chat.add_channel(&created, None, cx);
                 chat.select_channel(&channel.id, cx);
@@ -1177,14 +1428,23 @@ impl Chat {
         })
     }
 
-    pub fn create_guild_invite(&mut self, guild_id: String, cx: &mut Context<Self>) -> Task<Option<GuildInvite>> {
+    pub fn create_guild_invite(
+        &mut self,
+        guild_id: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Option<GuildInvite>> {
         cx.spawn(async move |_, _| {
-            let payload = api::post::<InvitePayload>(format!("/guilds/{guild_id}/invites"), json!({})).await;
+            let payload =
+                api::post::<InvitePayload>(format!("/guilds/{guild_id}/invites"), json!({})).await;
             payload.ok().map(|payload| payload.invite)
         })
     }
 
-    pub fn get_guild_invite(&mut self, guild_id: String, cx: &mut Context<Self>) -> Task<Option<GuildInvite>> {
+    pub fn get_guild_invite(
+        &mut self,
+        guild_id: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Option<GuildInvite>> {
         cx.spawn(async move |_, _| {
             let payload = api::get::<InvitePayload>(format!("/guilds/{guild_id}/invites")).await;
             payload.ok().map(|payload| payload.invite)
@@ -1221,7 +1481,9 @@ impl Chat {
 
     fn load_guilds(&mut self, cx: &mut Context<Self>) -> Task<()> {
         cx.spawn(async move |this, cx| {
-            let Ok(list) = api::get::<GuildList>("/guilds/list").await else { return };
+            let Ok(list) = api::get::<GuildList>("/guilds/list").await else {
+                return;
+            };
             let _ = this.update(cx, |chat, cx| {
                 for guild in list.guilds {
                     let input = GuildInput {
@@ -1262,8 +1524,12 @@ impl Chat {
                 }
             });
             let _ = this.update(cx, |chat, cx| match last {
-                Some(last) => chat.mark_read(channel_id, last.id, last.created_at, cx).detach(),
-                None if is_dm => Dms::global(cx).update(cx, |dms, cx| dms.mark_read(&channel_id, cx)),
+                Some(last) => chat
+                    .mark_read(channel_id, last.id, last.created_at, cx)
+                    .detach(),
+                None if is_dm => {
+                    Dms::global(cx).update(cx, |dms, cx| dms.mark_read(&channel_id, cx))
+                }
                 None => chat.set_channel_unread(&channel_id, false, None, Some(0), cx),
             });
         })
@@ -1279,7 +1545,9 @@ impl Chat {
     }
 
     fn select_initial_channel(&mut self, cx: &mut Context<Self>) {
-        let Some(active) = self.active_server(cx) else { return };
+        let Some(active) = self.active_server(cx) else {
+            return;
+        };
         if self.current_server(cx).is_some_and(|server| server.down) {
             return router::goto("/guilds", cx);
         }
@@ -1287,22 +1555,46 @@ impl Chat {
         let channel_id = self
             .current_channel(cx)
             .map(|channel| channel.id)
-            .or_else(|| self.first_channel_for_server(server_id.as_deref()).map(|channel| channel.id.clone()));
+            .or_else(|| {
+                self.first_channel_for_server(server_id.as_deref())
+                    .map(|channel| channel.id.clone())
+            });
         if server_id.as_deref() != Some(active.as_str()) || channel_id != self.active_channel(cx) {
-            router::goto(guild_path(server_id.as_deref(), channel_id.as_deref(), None), cx);
+            router::goto(
+                guild_path(server_id.as_deref(), channel_id.as_deref(), None),
+                cx,
+            );
         }
     }
 
     pub fn reorder_guilds(&mut self, guild_ids: Vec<String>, cx: &mut Context<Self>) -> Task<()> {
         cx.spawn(async move |_, _| {
-            let _ = api::patch::<api::Ignored>("/guilds/order", json!({ "guildIds": guild_ids })).await;
+            let _ =
+                api::patch::<api::Ignored>("/guilds/order", json!({ "guildIds": guild_ids })).await;
         })
     }
 
-    pub fn reorder_channels(&mut self, guild_id: &str, channel_ids: &[String], cx: &mut Context<Self>) {
-        let position = |id: &str| channel_ids.iter().position(|item| item == id).unwrap_or(usize::MAX);
-        for category in self.channels_by_server.get_mut(guild_id).into_iter().flatten() {
-            category.channels.sort_by_key(|channel| position(&channel.id));
+    pub fn reorder_channels(
+        &mut self,
+        guild_id: &str,
+        channel_ids: &[String],
+        cx: &mut Context<Self>,
+    ) {
+        let position = |id: &str| {
+            channel_ids
+                .iter()
+                .position(|item| item == id)
+                .unwrap_or(usize::MAX)
+        };
+        for category in self
+            .channels_by_server
+            .get_mut(guild_id)
+            .into_iter()
+            .flatten()
+        {
+            category
+                .channels
+                .sort_by_key(|channel| position(&channel.id));
         }
         cx.notify();
     }
@@ -1315,7 +1607,10 @@ impl Chat {
         cx: &mut Context<Self>,
     ) {
         let categories = self.channels_by_server.entry(guild_id.into()).or_default();
-        for channel in categories.iter_mut().flat_map(|category| &mut category.channels) {
+        for channel in categories
+            .iter_mut()
+            .flat_map(|category| &mut category.channels)
+        {
             if channel.id == channel_id {
                 channel.owner_only = owner_only;
             }
@@ -1332,9 +1627,14 @@ impl Chat {
     ) -> Task<()> {
         cx.spawn(async move |this, cx| {
             let body = json!({ "ownerOnly": owner_only });
-            let Ok(channel) = api::patch::<ChannelData>(format!("/channel/{channel_id}"), body).await else { return };
-            let _ =
-                this.update(cx, |chat, cx| chat.set_channel_owner_only(&guild_id, &channel_id, channel.owner_only, cx));
+            let Ok(channel) =
+                api::patch::<ChannelData>(format!("/channel/{channel_id}"), body).await
+            else {
+                return;
+            };
+            let _ = this.update(cx, |chat, cx| {
+                chat.set_channel_owner_only(&guild_id, &channel_id, channel.owner_only, cx)
+            });
         })
     }
 
@@ -1369,7 +1669,10 @@ mod tests {
 
     use chrono::Utc;
 
-    use super::{content_type_for, guild_path, initials_for, merge_older, merge_voice_states, strip_image_metadata};
+    use super::{
+        content_type_for, guild_path, initials_for, merge_older, merge_voice_states,
+        strip_image_metadata,
+    };
     use crate::{
         models::{Author, Message, VoicePresence},
         state::chat::UploadFile,
@@ -1414,7 +1717,8 @@ mod tests {
     #[test]
     fn older_pages_go_first_without_repeats() {
         let existing = vec![message("3"), message("4")];
-        let merged = merge_older(&existing, vec![message("1"), message("2"), message("3")]).unwrap();
+        let merged =
+            merge_older(&existing, vec![message("1"), message("2"), message("3")]).unwrap();
         assert_eq!(ids(&merged), ["1", "2", "3", "4"]);
         assert!(merge_older(&existing, vec![message("4")]).is_none());
     }
@@ -1423,7 +1727,10 @@ mod tests {
     fn builds_guild_paths() {
         assert_eq!(guild_path(None, Some("c"), None), "/guilds");
         assert_eq!(guild_path(Some("g"), None, None), "/guilds/g");
-        assert_eq!(guild_path(Some("fed:guild:a:1"), Some("c"), Some("m")), "/guilds/fed%3Aguild%3Aa%3A1/c/m");
+        assert_eq!(
+            guild_path(Some("fed:guild:a:1"), Some("c"), Some("m")),
+            "/guilds/fed%3Aguild%3Aa%3A1/c/m"
+        );
     }
 
     #[test]
@@ -1449,7 +1756,12 @@ mod tests {
             ("b".to_string(), vec![presence(Some("g2"), "b", "u2")]),
             ("d".to_string(), vec![presence(None, "d", "u3")]),
         ]);
-        let next = merge_voice_states(&current, &["g1".into()], &[presence(Some("g1"), "c", "u1")], &["d".into()]);
+        let next = merge_voice_states(
+            &current,
+            &["g1".into()],
+            &[presence(Some("g1"), "c", "u1")],
+            &["d".into()],
+        );
         assert!(!next.contains_key("a") && !next.contains_key("d"));
         assert_eq!(next["b"].len(), 1);
         assert_eq!(next["c"][0].user_id, "u1");
@@ -1458,7 +1770,9 @@ mod tests {
     #[test]
     fn strips_image_metadata_by_re_encoding() {
         let mut png = std::io::Cursor::new(Vec::new());
-        image::DynamicImage::new_rgba8(2, 2).write_to(&mut png, image::ImageFormat::Png).unwrap();
+        image::DynamicImage::new_rgba8(2, 2)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
         let file = UploadFile {
             name: "a.png".into(),
             content_type: content_type_for("a.png").into(),
@@ -1466,7 +1780,11 @@ mod tests {
         };
         let stripped = strip_image_metadata(file).unwrap();
         assert!(image::load_from_memory(&stripped.bytes).is_ok());
-        let text = UploadFile { name: "a.txt".into(), content_type: "text/plain".into(), bytes: b"hi".to_vec() };
+        let text = UploadFile {
+            name: "a.txt".into(),
+            content_type: "text/plain".into(),
+            bytes: b"hi".to_vec(),
+        };
         assert_eq!(strip_image_metadata(text).unwrap().bytes, b"hi");
     }
 }

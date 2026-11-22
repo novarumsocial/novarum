@@ -158,7 +158,11 @@ impl Voice {
         cx.notify();
     }
 
-    pub fn set_noise_suppression_model(&mut self, model: NoiseSuppressionModel, cx: &mut Context<Self>) {
+    pub fn set_noise_suppression_model(
+        &mut self,
+        model: NoiseSuppressionModel,
+        cx: &mut Context<Self>,
+    ) {
         SettingsStore::update(cx, |settings| settings.noise_suppression_model = model);
         cx.notify();
     }

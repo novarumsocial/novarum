@@ -11,7 +11,12 @@ const HORIZON: &str = r#"<path d="M2 15a1 1 0 0 0 0 2h20a1 1 0 0 0 0-2Z"/><path 
 
 fn hex(color: Hsla) -> String {
     let c = color.to_rgb();
-    format!("#{:02x}{:02x}{:02x}", (c.r * 255.0) as u8, (c.g * 255.0) as u8, (c.b * 255.0) as u8)
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        (c.r * 255.0) as u8,
+        (c.g * 255.0) as u8,
+        (c.b * 255.0) as u8
+    )
 }
 
 /// The logo with the sun `offset` viewBox units below its resting place, clipped at the horizon.
@@ -30,7 +35,10 @@ pub struct InitialLoader {
 
 impl InitialLoader {
     pub fn new() -> Self {
-        Self { started: Instant::now(), finished_at: None }
+        Self {
+            started: Instant::now(),
+            finished_at: None,
+        }
     }
 
     pub fn finish(&mut self, cx: &mut Context<Self>) {
@@ -62,7 +70,9 @@ impl Render for InitialLoader {
                 4.0 - 4.0 * ease_out_quint(p)
             }
         };
-        let settled = self.finished_at.is_some_and(|at| at.elapsed().as_secs_f32() >= 0.55);
+        let settled = self
+            .finished_at
+            .is_some_and(|at| at.elapsed().as_secs_f32() >= 0.55);
         if !settled {
             window.request_animation_frame();
         }
@@ -89,7 +99,7 @@ impl Render for InitialLoader {
                         offset: point(px(0.0), px(0.0)),
                         blur_radius: px(320.0),
                         spread_radius: px(160.0),
-                    inset: false,
+                        inset: false,
                     }]),
             )
             .child(

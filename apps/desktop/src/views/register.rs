@@ -42,7 +42,9 @@ fn validate(field: usize, values: &[String; 6]) -> Option<&'static str> {
     match field {
         USERNAME => validate_username(&values[USERNAME]),
         HOME_SERVER => validate_home_server(&values[HOME_SERVER]),
-        DISPLAY_NAME => (values[DISPLAY_NAME].trim().chars().count() > 64).then_some("At most 64 characters."),
+        DISPLAY_NAME => {
+            (values[DISPLAY_NAME].trim().chars().count() > 64).then_some("At most 64 characters.")
+        }
         EMAIL => validate_email(&values[EMAIL]),
         PASSWORD => validate_passwords(&values[PASSWORD], &values[CONFIRM])[0],
         _ => validate_passwords(&values[PASSWORD], &values[CONFIRM])[1],
@@ -57,28 +59,46 @@ impl RegisterPage {
         };
         let inputs = [
             input("alice", window, cx),
-            cx.new(|cx| InputState::new(window, cx).placeholder("novarum.me").default_value(api::anchor().home_server)),
             cx.new(|cx| {
-                InputState::new(window, cx).placeholder("Alice").validate(|value, _| value.chars().count() <= 64)
+                InputState::new(window, cx)
+                    .placeholder("novarum.me")
+                    .default_value(api::anchor().home_server)
+            }),
+            cx.new(|cx| {
+                InputState::new(window, cx)
+                    .placeholder("Alice")
+                    .validate(|value, _| value.chars().count() <= 64)
             }),
             input("you@example.com", window, cx),
-            cx.new(|cx| InputState::new(window, cx).placeholder("At least 8 characters").masked(true)),
-            cx.new(|cx| InputState::new(window, cx).placeholder("Re-enter your password").masked(true)),
+            cx.new(|cx| {
+                InputState::new(window, cx)
+                    .placeholder("At least 8 characters")
+                    .masked(true)
+            }),
+            cx.new(|cx| {
+                InputState::new(window, cx)
+                    .placeholder("Re-enter your password")
+                    .masked(true)
+            }),
         ];
 
         let subscriptions = inputs
             .iter()
             .enumerate()
             .map(|(index, input)| {
-                cx.subscribe_in(input, window, move |this, _, event: &InputEvent, window, cx| match event {
-                    // `validationMethod: 'oninput'`
-                    InputEvent::Change => {
-                        this.errors[index] = validate(index, &this.values(cx)).map(Into::into);
-                        cx.notify();
-                    }
-                    InputEvent::PressEnter { .. } => this.submit(window, cx),
-                    _ => {}
-                })
+                cx.subscribe_in(
+                    input,
+                    window,
+                    move |this, _, event: &InputEvent, window, cx| match event {
+                        // `validationMethod: 'oninput'`
+                        InputEvent::Change => {
+                            this.errors[index] = validate(index, &this.values(cx)).map(Into::into);
+                            cx.notify();
+                        }
+                        InputEvent::PressEnter { .. } => this.submit(window, cx),
+                        _ => {}
+                    },
+                )
             })
             .collect();
 
@@ -94,7 +114,9 @@ impl RegisterPage {
     }
 
     fn values(&self, cx: &App) -> [String; 6] {
-        self.inputs.each_ref().map(|input| input.read(cx).value().to_string())
+        self.inputs
+            .each_ref()
+            .map(|input| input.read(cx).value().to_string())
     }
 
     fn submit(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
@@ -141,16 +163,20 @@ impl RegisterPage {
     fn toggle_password(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.show_password = !self.show_password;
         for input in [&self.inputs[PASSWORD], &self.inputs[CONFIRM]] {
-            input.update(cx, |input, cx| input.set_masked(!self.show_password, window, cx));
+            input.update(cx, |input, cx| {
+                input.set_masked(!self.show_password, window, cx)
+            });
         }
         cx.notify();
     }
 
     /// A label with the red `*` of required fields.
     fn required(text: &str, cx: &App) -> Div {
-        ui::label(text.to_string()).flex().items_center().gap_2().child(
-            div().text_color(theme::tokens(cx).destructive).child("*"),
-        )
+        ui::label(text.to_string())
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(div().text_color(theme::tokens(cx).destructive).child("*"))
     }
 }
 
@@ -160,8 +186,16 @@ impl Render for RegisterPage {
         let values = self.values(cx);
         let handle = format!(
             "@{}:{}",
-            if values[USERNAME].is_empty() { "username" } else { &values[USERNAME] },
-            if values[HOME_SERVER].is_empty() { "server" } else { &values[HOME_SERVER] },
+            if values[USERNAME].is_empty() {
+                "username"
+            } else {
+                &values[USERNAME]
+            },
+            if values[HOME_SERVER].is_empty() {
+                "server"
+            } else {
+                &values[HOME_SERVER]
+            },
         );
         let eye = div()
             .id("toggle-password")
@@ -249,7 +283,9 @@ impl Render for RegisterPage {
                     &self.errors[PASSWORD],
                     cx,
                 )
-                .when(values[PASSWORD].chars().count() >= 8, |field| field.child(check_hint("Looks good"))),
+                .when(values[PASSWORD].chars().count() >= 8, |field| {
+                    field.child(check_hint("Looks good"))
+                }),
             )
             .child(
                 field(
@@ -259,9 +295,10 @@ impl Render for RegisterPage {
                     &self.errors[CONFIRM],
                     cx,
                 )
-                .when(!values[CONFIRM].is_empty() && values[CONFIRM] == values[PASSWORD], |field| {
-                    field.child(check_hint("Matches"))
-                }),
+                .when(
+                    !values[CONFIRM].is_empty() && values[CONFIRM] == values[PASSWORD],
+                    |field| field.child(check_hint("Matches")),
+                ),
             )
             .child(
                 Button::new("create-account")
@@ -271,11 +308,20 @@ impl Render for RegisterPage {
                     .disabled(self.loading)
                     .when(self.loading, |b| b.loading(true).label("Creating account…"))
                     .when(!self.loading, |b| {
-                        b.child(div().flex().items_center().gap_2().child("Create account").child(icon("arrow-right").size_4()))
+                        b.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child("Create account")
+                                .child(icon("arrow-right").size_4()),
+                        )
                     })
                     .on_click(cx.listener(|this, _, window, cx| this.submit(window, cx))),
             )
-            .when(!self.submit_error.is_empty(), |form| form.child(ui::error_text(self.submit_error.clone(), cx)));
+            .when(!self.submit_error.is_empty(), |form| {
+                form.child(ui::error_text(self.submit_error.clone(), cx))
+            });
 
         let footer = div().flex().child("Already have an account?").child(
             div()

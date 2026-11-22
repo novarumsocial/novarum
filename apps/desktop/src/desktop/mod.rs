@@ -69,7 +69,9 @@ pub fn open_url(url: &str, cx: &App) {
 }
 
 fn external_url(url: &str) -> Option<url::Url> {
-    url::Url::parse(url).ok().filter(|url| matches!(url.scheme(), "http" | "https"))
+    url::Url::parse(url)
+        .ok()
+        .filter(|url| matches!(url.scheme(), "http" | "https"))
 }
 
 /// `--hidden` from the autostart entry, when the user wants to start hidden.
@@ -92,25 +94,39 @@ pub fn apply_auto_launch(enabled: bool) {
         }
         let exec = std::env::var("APPIMAGE")
             .ok()
-            .or_else(|| std::env::current_exe().ok().map(|path| path.display().to_string()))
+            .or_else(|| {
+                std::env::current_exe()
+                    .ok()
+                    .map(|path| path.display().to_string())
+            })
             .unwrap_or_default();
         let _ = std::fs::create_dir_all(entry.parent().unwrap());
         let _ = std::fs::write(
             entry,
-            format!("[Desktop Entry]\nType=Application\nName=Novarum\nExec=\"{exec}\" --hidden\nIcon=novarum\n"),
+            format!(
+                "[Desktop Entry]\nType=Application\nName=Novarum\nExec=\"{exec}\" --hidden\nIcon=novarum\n"
+            ),
         );
     }
     // `app.setLoginItemSettings`: a launch agent on macOS, the Run key on Windows
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
-        let Ok(exe) = std::env::current_exe() else { return };
+        let Ok(exe) = std::env::current_exe() else {
+            return;
+        };
         let launcher = auto_launch::AutoLaunchBuilder::new()
             .set_app_name("Novarum")
             .set_app_path(&exe.to_string_lossy())
             .set_args(&["--hidden"])
             .set_windows_enable_mode(auto_launch::WindowsEnableMode::CurrentUser)
             .build();
-        let result = launcher.and_then(|launcher| if enabled { launcher.enable() } else { launcher.disable() });
+        let result = launcher.and_then(|launcher| {
+            if enabled {
+                launcher.enable()
+            } else {
+                launcher.disable()
+            }
+        });
         if let Err(error) = result {
             eprintln!("Could not change the launch at login setting: {error}");
         }

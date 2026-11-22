@@ -30,8 +30,10 @@ pub fn sync_order(current: &[String], incoming: &[String]) -> Vec<String> {
 
 /// svelte-dnd-action's "consider": the dragged item takes the hovered item's place.
 pub fn move_to(order: &mut Vec<String>, dragged: &str, target: &str) -> bool {
-    let (Some(from), Some(to)) = (order.iter().position(|id| id == dragged), order.iter().position(|id| id == target))
-    else {
+    let (Some(from), Some(to)) = (
+        order.iter().position(|id| id == dragged),
+        order.iter().position(|id| id == target),
+    ) else {
         return false;
     };
     if from == to {
@@ -75,7 +77,11 @@ fn count_badge(count: usize, circle: bool, t: Tokens) -> Div {
         .font_weight(FontWeight::BOLD)
         .text_color(t.destructive_foreground)
         .when(circle, |badge| badge.rounded_full())
-        .child(if count > 99 { "99+".to_string() } else { count.to_string() })
+        .child(if count > 99 {
+            "99+".to_string()
+        } else {
+            count.to_string()
+        })
 }
 
 /// The server being dragged, which is also its own drag preview.
@@ -93,7 +99,11 @@ impl Render for ServerDrag {
             .size_10()
             .overflow_hidden()
             .opacity(0.8)
-            .bg(if server.down { t.destructive } else { t.primary })
+            .bg(if server.down {
+                t.destructive
+            } else {
+                t.primary
+            })
             .when(self.circle, |div| div.rounded_full())
             .child(
                 avatar_with_fallback(
@@ -129,17 +139,25 @@ impl GuildSidebar {
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&router::Router::global(cx), |_, _, cx| cx.notify()),
         ];
-        Self { order: Vec::new(), drag_origin: None, reordering: false, _subscriptions: subscriptions }
+        Self {
+            order: Vec::new(),
+            drag_origin: None,
+            reordering: false,
+            _subscriptions: subscriptions,
+        }
     }
 
     /// Saves the order once a drag ends (`handleFinalize`), wherever the server was let go.
     fn finalize_drag(&mut self, cx: &mut Context<Self>) {
-        let Some(origin) = self.drag_origin.take() else { return };
+        let Some(origin) = self.drag_origin.take() else {
+            return;
+        };
         if origin == self.order {
             return;
         }
         self.reordering = true;
-        let save = Chat::global(cx).update(cx, |chat, cx| chat.reorder_guilds(self.order.clone(), cx));
+        let save =
+            Chat::global(cx).update(cx, |chat, cx| chat.reorder_guilds(self.order.clone(), cx));
         cx.spawn(async move |this, cx| {
             save.await;
             let _ = this.update(cx, |this, cx| {
@@ -160,7 +178,10 @@ impl GuildSidebar {
             .flatten()
             .flat_map(|category| &category.channels)
             .filter(|channel| {
-                notifications.shows_mentions(Target { channel_id: &channel.id, guild_id: Some(guild_id) })
+                notifications.shows_mentions(Target {
+                    channel_id: &channel.id,
+                    guild_id: Some(guild_id),
+                })
             })
             .map(|channel| channel.mention as usize)
             .sum()
@@ -172,7 +193,13 @@ impl GuildSidebar {
             .read(cx)
             .list
             .iter()
-            .filter(|dm| dm.unread && notifications.shows_unread(Target { channel_id: &dm.id, guild_id: None }))
+            .filter(|dm| {
+                dm.unread
+                    && notifications.shows_unread(Target {
+                        channel_id: &dm.id,
+                        guild_id: None,
+                    })
+            })
             .cloned()
             .collect();
         unread.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
@@ -197,8 +224,12 @@ impl GuildSidebar {
             .when(!active, |home| home.opacity(0.7))
             .child(icon("home-sunrise").size(px(26.0)))
             .when(active, |home| home.child(focus_ring(t.primary, circle)))
-            .when(requests > 0, |home| home.child(count_badge(requests, circle, t)))
-            .on_click(|_, _, cx| Chat::global(cx).update(cx, |chat, cx| chat.select_server(None, cx)))
+            .when(requests > 0, |home| {
+                home.child(count_badge(requests, circle, t))
+            })
+            .on_click(|_, _, cx| {
+                Chat::global(cx).update(cx, |chat, cx| chat.select_server(None, cx))
+            })
             .into_any_element()
     }
 
@@ -214,7 +245,13 @@ impl GuildSidebar {
             .flex_shrink_0()
             .cursor_pointer()
             .hover(|button| button.opacity(0.9))
-            .child(avatar(display.avatar_url.as_deref(), &display.name, display.avatar_color.as_deref(), 40.0, cx))
+            .child(avatar(
+                display.avatar_url.as_deref(),
+                &display.name,
+                display.avatar_color.as_deref(),
+                40.0,
+                cx,
+            ))
             .child(
                 div()
                     .absolute()
@@ -231,12 +268,21 @@ impl GuildSidebar {
             .into_any_element()
     }
 
-    fn render_server(&self, server: &Server, active: bool, circle: bool, cx: &mut Context<Self>) -> AnyElement {
+    fn render_server(
+        &self,
+        server: &Server,
+        active: bool,
+        circle: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let t = theme::tokens(cx);
         let mentions = Self::mentions(&server.id, cx);
         let id = server.id.clone();
         let menu_id = server.id.clone();
-        let drag = ServerDrag { server: server.clone(), circle };
+        let drag = ServerDrag {
+            server: server.clone(),
+            circle,
+        };
         let opacity = if server.down {
             0.4
         } else if active {
@@ -256,27 +302,39 @@ impl GuildSidebar {
             .text_xs()
             .font_weight(FontWeight::BOLD)
             .text_color(white())
-            .bg(if server.down { t.destructive } else { t.primary })
+            .bg(if server.down {
+                t.destructive
+            } else {
+                t.primary
+            })
             .when(circle, |button| button.rounded_full())
             .opacity(opacity)
-            .when(!server.down, |button| button.hover(|button| button.opacity(0.9)))
+            .when(!server.down, |button| {
+                button.hover(|button| button.opacity(0.9))
+            })
             .child(
-                div().size_full().overflow_hidden().when(circle, |inner| inner.rounded_full()).child(
-                    avatar_with_fallback(
-                        server.avatar_url.as_deref(),
-                        &server.name,
-                        Some(&server.initials),
-                        None,
-                        40.0,
-                        cx,
-                    )
-                    .bg(transparent_black())
-                    .text_xs()
-                    .text_color(t.primary_foreground),
-                ),
+                div()
+                    .size_full()
+                    .overflow_hidden()
+                    .when(circle, |inner| inner.rounded_full())
+                    .child(
+                        avatar_with_fallback(
+                            server.avatar_url.as_deref(),
+                            &server.name,
+                            Some(&server.initials),
+                            None,
+                            40.0,
+                            cx,
+                        )
+                        .bg(transparent_black())
+                        .text_xs()
+                        .text_color(t.primary_foreground),
+                    ),
             )
             .when(active, |button| button.child(focus_ring(t.primary, circle)))
-            .when(mentions > 0, |button| button.child(count_badge(mentions, circle, t)))
+            .when(mentions > 0, |button| {
+                button.child(count_badge(mentions, circle, t))
+            })
             .map(|button| {
                 if server.down {
                     button.cursor(CursorStyle::OperationNotAllowed)
@@ -301,7 +359,14 @@ impl GuildSidebar {
                 }
             }))
             .context_menu(move |menu, window, cx| {
-                notification_menu(menu.min_w(px(224.0)), &menu_id, None, Noun::Server, window, cx)
+                notification_menu(
+                    menu.min_w(px(224.0)),
+                    &menu_id,
+                    None,
+                    Noun::Server,
+                    window,
+                    cx,
+                )
             })
             .into_any_element()
     }
@@ -316,13 +381,21 @@ impl Render for GuildSidebar {
         let circle = SettingsStore::get(cx).circle_icons;
         let chat = Chat::global(cx).read(cx);
         let active = chat.active_server(cx);
-        let servers: Vec<Server> = chat.servers.iter().filter(|server| server.id != "home").cloned().collect();
+        let servers: Vec<Server> = chat
+            .servers
+            .iter()
+            .filter(|server| server.id != "home")
+            .cloned()
+            .collect();
         let ids: Vec<String> = servers.iter().map(|server| server.id.clone()).collect();
         self.order = sync_order(&self.order, &ids);
 
         let unread_dms = Self::unread_dms(cx);
         let home = self.render_home(active.is_none(), circle, cx);
-        let dms: Vec<_> = unread_dms.iter().map(|dm| self.render_unread_dm(dm, cx)).collect();
+        let dms: Vec<_> = unread_dms
+            .iter()
+            .map(|dm| self.render_unread_dm(dm, cx))
+            .collect();
         let order = self.order.clone();
         let server_buttons: Vec<_> = order
             .iter()
@@ -347,7 +420,14 @@ impl Render for GuildSidebar {
             .py_3()
             .child(home)
             .children(dms)
-            .child(div().my(px(2.0)).h_px().w_7().flex_shrink_0().bg(t.border.opacity(0.5)))
+            .child(
+                div()
+                    .my(px(2.0))
+                    .h_px()
+                    .w_7()
+                    .flex_shrink_0()
+                    .bg(t.border.opacity(0.5)),
+            )
             .child(
                 div()
                     .id("servers")
@@ -364,24 +444,34 @@ impl Render for GuildSidebar {
                     .children(server_buttons),
             )
             .child(
-                div().mt_auto().flex().flex_col().items_center().gap(px(6.0)).child(
-                    div()
-                        .id("add-server")
-                        .flex()
-                        .size_10()
-                        .items_center()
-                        .justify_center()
-                        .border_1()
-                        .border_dashed()
-                        .border_color(t.muted_foreground.opacity(0.3))
-                        .text_color(t.muted_foreground)
-                        .cursor_pointer()
-                        .when(circle, |button| button.rounded_full())
-                        .hover(|button| button.border_color(t.muted_foreground).text_color(t.foreground))
-                        .child(icon("plus").size_4())
-                        .tooltip(|window, cx| Tooltip::new("Add server").build(window, cx))
-                        .on_click(|_, window, cx| open_create_server(window, cx)),
-                ),
+                div()
+                    .mt_auto()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap(px(6.0))
+                    .child(
+                        div()
+                            .id("add-server")
+                            .flex()
+                            .size_10()
+                            .items_center()
+                            .justify_center()
+                            .border_1()
+                            .border_dashed()
+                            .border_color(t.muted_foreground.opacity(0.3))
+                            .text_color(t.muted_foreground)
+                            .cursor_pointer()
+                            .when(circle, |button| button.rounded_full())
+                            .hover(|button| {
+                                button
+                                    .border_color(t.muted_foreground)
+                                    .text_color(t.foreground)
+                            })
+                            .child(icon("plus").size_4())
+                            .tooltip(|window, cx| Tooltip::new("Add server").build(window, cx))
+                            .on_click(|_, window, cx| open_create_server(window, cx)),
+                    ),
             )
     }
 }
@@ -396,8 +486,14 @@ mod tests {
 
     #[test]
     fn sync_keeps_local_order() {
-        assert_eq!(sync_order(&ids(&["b", "a"]), &ids(&["a", "b", "c"])), ids(&["b", "a", "c"]));
-        assert_eq!(sync_order(&ids(&["b", "x", "a"]), &ids(&["a", "b"])), ids(&["b", "a"]));
+        assert_eq!(
+            sync_order(&ids(&["b", "a"]), &ids(&["a", "b", "c"])),
+            ids(&["b", "a", "c"])
+        );
+        assert_eq!(
+            sync_order(&ids(&["b", "x", "a"]), &ids(&["a", "b"])),
+            ids(&["b", "a"])
+        );
         assert_eq!(sync_order(&[], &ids(&["a"])), ids(&["a"]));
     }
 

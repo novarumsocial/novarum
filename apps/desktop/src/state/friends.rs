@@ -72,7 +72,10 @@ impl Friends {
     }
 
     pub fn status_for(&self, username: &str, homeserver: &str) -> FriendStatus {
-        let has = |list: &[FriendEntry]| list.iter().any(|friend| matches(friend, username, homeserver));
+        let has = |list: &[FriendEntry]| {
+            list.iter()
+                .any(|friend| matches(friend, username, homeserver))
+        };
         if has(&self.accepted) {
             FriendStatus::Friend
         } else if has(&self.incoming) {
@@ -113,7 +116,10 @@ impl Friends {
                         friends.outgoing = payload.outgoing;
                     }
                     Err(error) => {
-                        friends.error = Some(api::error_message(&error.body, "Could not load your friends."));
+                        friends.error = Some(api::error_message(
+                            &error.body,
+                            "Could not load your friends.",
+                        ));
                     }
                 }
                 cx.notify();
@@ -122,34 +128,57 @@ impl Friends {
     }
 
     pub fn is_friend(&self, user_id: &str) -> bool {
-        self.accepted.iter().any(|entry| entry.user.user_id == user_id)
+        self.accepted
+            .iter()
+            .any(|entry| entry.user.user_id == user_id)
     }
 
     pub fn is_online(&self, user_id: &str) -> bool {
-        self.accepted.iter().any(|entry| entry.user.user_id == user_id && entry.status == UserStatus::Online)
+        self.accepted
+            .iter()
+            .any(|entry| entry.user.user_id == user_id && entry.status == UserStatus::Online)
     }
 
     pub fn update_status(&mut self, user_id: &str, status: UserStatus, cx: &mut Context<Self>) {
-        for entry in self.accepted.iter_mut().filter(|entry| entry.user.user_id == user_id) {
+        for entry in self
+            .accepted
+            .iter_mut()
+            .filter(|entry| entry.user.user_id == user_id)
+        {
             entry.status = status;
         }
         cx.notify();
     }
 
-    pub fn request(&mut self, user_id: String, username: &str, homeserver: &str, cx: &mut Context<Self>) -> Task<bool> {
-        let request =
-            api::post::<api::Ignored>("/friends/request", json!({ "username": username, "homeserver": homeserver }));
+    pub fn request(
+        &mut self,
+        user_id: String,
+        username: &str,
+        homeserver: &str,
+        cx: &mut Context<Self>,
+    ) -> Task<bool> {
+        let request = api::post::<api::Ignored>(
+            "/friends/request",
+            json!({ "username": username, "homeserver": homeserver }),
+        );
         self.mutate(user_id, request, "Could not send the friend request.", cx)
     }
 
     pub fn accept(&mut self, user_id: String, cx: &mut Context<Self>) -> Task<bool> {
-        let request = api::post::<api::Ignored>(format!("/friends/requests/{user_id}/accept"), json!({}));
-        let accepted = self.mutate(user_id.clone(), request, "Could not accept the friend request.", cx);
+        let request =
+            api::post::<api::Ignored>(format!("/friends/requests/{user_id}/accept"), json!({}));
+        let accepted = self.mutate(
+            user_id.clone(),
+            request,
+            "Could not accept the friend request.",
+            cx,
+        );
         cx.spawn(async move |_, cx| {
             let accepted = accepted.await;
             // jump straight into a conversation with the new friend
             if accepted {
-                let open = cx.update(|cx| Dms::global(cx).update(cx, |dms, cx| dms.open(user_id, cx)));
+                let open =
+                    cx.update(|cx| Dms::global(cx).update(cx, |dms, cx| dms.open(user_id, cx)));
                 open.await;
             }
             accepted
@@ -157,8 +186,14 @@ impl Friends {
     }
 
     pub fn decline(&mut self, user_id: String, cx: &mut Context<Self>) -> Task<bool> {
-        let request = api::post::<api::Ignored>(format!("/friends/requests/{user_id}/decline"), json!({}));
-        self.mutate(user_id, request, "Could not decline the friend request.", cx)
+        let request =
+            api::post::<api::Ignored>(format!("/friends/requests/{user_id}/decline"), json!({}));
+        self.mutate(
+            user_id,
+            request,
+            "Could not decline the friend request.",
+            cx,
+        )
     }
 
     pub fn remove(&mut self, user_id: String, cx: &mut Context<Self>) -> Task<bool> {

@@ -30,17 +30,30 @@ pub fn open_edit_channel(channel: Channel, window: &mut Window, cx: &mut App) {
 
 impl EditChannelDialog {
     fn new(channel: Channel, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let current = channel.label.clone().filter(|label| !label.is_empty()).unwrap_or(channel.name.clone());
+        let current = channel
+            .label
+            .clone()
+            .filter(|label| !label.is_empty())
+            .unwrap_or(channel.name.clone());
         let name = cx.new(|cx| {
-            InputState::new(window, cx).default_value(current).validate(|value, _| value.chars().count() <= 32)
+            InputState::new(window, cx)
+                .default_value(current)
+                .validate(|value, _| value.chars().count() <= 32)
         });
-        let subscriptions = vec![cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                this.submit(window, cx);
-            }
-            cx.notify();
-        })];
-        Self { channel, name, _subscriptions: subscriptions }
+        let subscriptions =
+            vec![
+                cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit(window, cx);
+                    }
+                    cx.notify();
+                }),
+            ];
+        Self {
+            channel,
+            name,
+            _subscriptions: subscriptions,
+        }
     }
 
     fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -54,8 +67,17 @@ impl Render for EditChannelDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let empty = self.name.read(cx).value().trim().is_empty();
-        let shown = self.channel.label.clone().filter(|label| !label.is_empty()).unwrap_or(self.channel.name.clone());
-        let prefix = if self.channel.kind == ChannelType::Voice { "volume-2" } else { "hash" };
+        let shown = self
+            .channel
+            .label
+            .clone()
+            .filter(|label| !label.is_empty())
+            .unwrap_or(self.channel.name.clone());
+        let prefix = if self.channel.kind == ChannelType::Voice {
+            "volume-2"
+        } else {
+            "hash"
+        };
 
         div()
             .flex()
@@ -71,8 +93,16 @@ impl Render for EditChannelDialog {
                     .flex()
                     .flex_col()
                     .gap(px(6.0))
-                    .child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Channel Name"))
-                    .child(Input::new(&self.name).prefix(icon(prefix).size_4().text_color(t.muted_foreground))),
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Channel Name"),
+                    )
+                    .child(
+                        Input::new(&self.name)
+                            .prefix(icon(prefix).size_4().text_color(t.muted_foreground)),
+                    ),
             )
             .child(
                 div()
@@ -83,7 +113,10 @@ impl Render for EditChannelDialog {
                     .border_color(t.border)
                     .pt_3()
                     .child(
-                        Button::new("cancel").ghost().label("Cancel").on_click(|_, window, cx| window.close_dialog(cx)),
+                        Button::new("cancel")
+                            .ghost()
+                            .label("Cancel")
+                            .on_click(|_, window, cx| window.close_dialog(cx)),
                     )
                     .child(
                         Button::new("save")

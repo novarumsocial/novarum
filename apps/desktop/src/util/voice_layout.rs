@@ -8,7 +8,12 @@ pub struct TileLayout {
     pub height: f32,
 }
 
-const EMPTY: TileLayout = TileLayout { cols: 1, rows: 1, width: 0.0, height: 0.0 };
+const EMPTY: TileLayout = TileLayout {
+    cols: 1,
+    rows: 1,
+    width: 0.0,
+    height: 0.0,
+};
 
 /// Picks the arrangement that gives every tile the largest possible area inside `width` x `height`.
 ///
@@ -46,17 +51,31 @@ pub fn fit_tiles_with(
         if tile_width * (tile_width / aspect) <= best.width * best.height {
             continue;
         }
-        best = TileLayout { cols, rows, width: tile_width, height: tile_width / aspect };
+        best = TileLayout {
+            cols,
+            rows,
+            width: tile_width,
+            height: tile_width / aspect,
+        };
     }
 
     if best.width < min_width {
         let cols = (((width + gap) / (min_width + gap)).floor() as usize).max(1);
         let tile_width = (width - gap * (cols - 1) as f32) / cols as f32;
-        best = TileLayout { cols, rows: count.div_ceil(cols), width: tile_width, height: tile_width * 9.0 / 16.0 };
+        best = TileLayout {
+            cols,
+            rows: count.div_ceil(cols),
+            width: tile_width,
+            height: tile_width * 9.0 / 16.0,
+        };
     }
 
     // floor so sub-pixel rounding can never push a tile onto the next row
-    TileLayout { width: best.width.floor(), height: best.height.floor(), ..best }
+    TileLayout {
+        width: best.width.floor(),
+        height: best.height.floor(),
+        ..best
+    }
 }
 
 pub fn fit_tiles(width: f32, height: f32, count: usize) -> TileLayout {

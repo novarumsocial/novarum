@@ -12,7 +12,10 @@ pub struct Trigger {
 
 /// `div().id(id)` to style as the trigger.
 pub fn trigger(id: impl Into<ElementId>) -> Trigger {
-    Trigger { base: div().id(id), open: false }
+    Trigger {
+        base: div().id(id),
+        open: false,
+    }
 }
 
 impl Selectable for Trigger {

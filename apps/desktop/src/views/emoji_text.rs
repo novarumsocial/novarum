@@ -30,8 +30,9 @@ pub struct Part {
     pub kind: PartKind,
 }
 
-static HANDLE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?").unwrap());
+static HANDLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"@[a-zA-Z0-9._]+:[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?").unwrap()
+});
 
 fn handle_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '.' || c == '_'
@@ -87,7 +88,11 @@ fn joins(c: char) -> bool {
 fn emoji_at(chars: &[char], at: usize) -> Option<usize> {
     let c = chars[at];
     if regional(c) {
-        return Some(if chars.get(at + 1).copied().is_some_and(regional) { 2 } else { 1 });
+        return Some(if chars.get(at + 1).copied().is_some_and(regional) {
+            2
+        } else {
+            1
+        });
     }
     // keycaps: 1️⃣ is `1`, an optional VS16 and the enclosing keycap
     if c.is_ascii_digit() || c == '#' || c == '*' {
@@ -102,7 +107,9 @@ fn emoji_at(chars: &[char], at: usize) -> Option<usize> {
         while chars.get(end).copied().is_some_and(joins) {
             end += 1;
         }
-        if chars.get(end) == Some(&'\u{200D}') && chars.get(end + 1).copied().is_some_and(pictographic) {
+        if chars.get(end) == Some(&'\u{200D}')
+            && chars.get(end + 1).copied().is_some_and(pictographic)
+        {
             end += 2;
         } else {
             return Some(end - at);
@@ -111,7 +118,11 @@ fn emoji_at(chars: &[char], at: usize) -> Option<usize> {
 }
 
 fn unicode_key(grapheme: &str) -> String {
-    grapheme.chars().map(|c| format!("{:X}", c as u32)).collect::<Vec<_>>().join("-")
+    grapheme
+        .chars()
+        .map(|c| format!("{:X}", c as u32))
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 fn push_text(parts: &mut Vec<Part>, text: &str) {
@@ -121,10 +132,16 @@ fn push_text(parts: &mut Vec<Part>, text: &str) {
     while i < chars.len() {
         if let Some(length) = emoji_at(&chars, i) {
             if !run.is_empty() {
-                parts.push(Part { text: std::mem::take(&mut run), kind: PartKind::Text });
+                parts.push(Part {
+                    text: std::mem::take(&mut run),
+                    kind: PartKind::Text,
+                });
             }
             let grapheme: String = chars[i..i + length].iter().collect();
-            parts.push(Part { kind: PartKind::Emoji(unicode_key(&grapheme)), text: grapheme });
+            parts.push(Part {
+                kind: PartKind::Emoji(unicode_key(&grapheme)),
+                text: grapheme,
+            });
             i += length;
         } else {
             run.push(chars[i]);
@@ -132,7 +149,10 @@ fn push_text(parts: &mut Vec<Part>, text: &str) {
         }
     }
     if !run.is_empty() {
-        parts.push(Part { text: run, kind: PartKind::Text });
+        parts.push(Part {
+            text: run,
+            kind: PartKind::Text,
+        });
     }
 }
 
@@ -140,7 +160,10 @@ fn push_mentions(parts: &mut Vec<Part>, text: &str) {
     let mut last = 0;
     for (start, end) in mentions(text) {
         push_text(parts, &text[last..start]);
-        parts.push(Part { text: text[start..end].to_string(), kind: PartKind::Mention });
+        parts.push(Part {
+            text: text[start..end].to_string(),
+            kind: PartKind::Mention,
+        });
         last = end;
     }
     push_text(parts, &text[last..]);
@@ -155,7 +178,10 @@ pub fn parts(content: &str, links: bool) -> Vec<Part> {
             continue;
         }
         push_mentions(&mut parts, &content[last..found.start()]);
-        parts.push(Part { text: found.as_str().to_string(), kind: PartKind::Url });
+        parts.push(Part {
+            text: found.as_str().to_string(),
+            kind: PartKind::Url,
+        });
         last = found.end();
     }
     push_mentions(&mut parts, &content[last..]);
@@ -204,7 +230,10 @@ pub fn spans_for(text: &str, links: bool, style: &SpanStyle) -> Vec<Span> {
                 PartKind::Mention => style.mention = true,
                 PartKind::Emoji(unicode) => style.emoji = Some(unicode),
             }
-            Span { text: part.text, style }
+            Span {
+                text: part.text,
+                style,
+            }
         })
         .collect()
 }
@@ -221,7 +250,12 @@ pub struct TextOptions {
 
 impl TextOptions {
     pub fn new(size: Pixels, color: Hsla) -> Self {
-        Self { size, weight: FontWeight::NORMAL, color, truncate: false }
+        Self {
+            size,
+            weight: FontWeight::NORMAL,
+            color,
+            truncate: false,
+        }
     }
 }
 
@@ -233,10 +267,24 @@ struct Look {
     strike: bool,
 }
 
-fn look(style: &SpanStyle, options: &TextOptions, revealed: &HashSet<usize>, text: &str, cx: &App) -> Look {
+fn look(
+    style: &SpanStyle,
+    options: &TextOptions,
+    revealed: &HashSet<usize>,
+    text: &str,
+    cx: &App,
+) -> Look {
     let t = theme::tokens(cx);
-    let mut font = font(if style.code { cx.theme().mono_font_family.clone() } else { "IBM Plex Sans".into() });
-    font.weight = if style.bold { FontWeight::SEMIBOLD } else { options.weight };
+    let mut font = font(if style.code {
+        cx.theme().mono_font_family.clone()
+    } else {
+        "IBM Plex Sans".into()
+    });
+    font.weight = if style.bold {
+        FontWeight::SEMIBOLD
+    } else {
+        options.weight
+    };
     if style.mention {
         font.weight = FontWeight::MEDIUM;
     }
@@ -245,7 +293,11 @@ fn look(style: &SpanStyle, options: &TextOptions, revealed: &HashSet<usize>, tex
     }
     let mut look = Look {
         font,
-        color: if style.link.is_some() { t.link } else { options.color },
+        color: if style.link.is_some() {
+            t.link
+        } else {
+            options.color
+        },
         background: None,
         underline: style.underline,
         strike: style.strike,
@@ -255,7 +307,10 @@ fn look(style: &SpanStyle, options: &TextOptions, revealed: &HashSet<usize>, tex
     }
     if style.mention {
         look.color = t.link;
-        look.background = Some(t.link.opacity(if me_mentioned(text, cx) { 0.25 } else { 0.12 }));
+        look.background = Some(
+            t.link
+                .opacity(if me_mentioned(text, cx) { 0.25 } else { 0.12 }),
+        );
     }
     if style.trailing.is_some() {
         look.color = t.muted_foreground.opacity(0.6);
@@ -273,7 +328,8 @@ fn look(style: &SpanStyle, options: &TextOptions, revealed: &HashSet<usize>, tex
 
 fn me_mentioned(text: &str, cx: &App) -> bool {
     text == "@everyone"
-        || Session::user(cx).is_some_and(|user| text == format!("@{}:{}", user.username, user.homeserver))
+        || Session::user(cx)
+            .is_some_and(|user| text == format!("@{}:{}", user.username, user.homeserver))
 }
 
 fn run(text: &str, look: &Look) -> TextRun {
@@ -282,10 +338,15 @@ fn run(text: &str, look: &Look) -> TextRun {
         font: look.font.clone(),
         color: look.color,
         background_color: look.background,
-        underline: look
-            .underline
-            .then(|| UnderlineStyle { thickness: px(1.0), color: Some(look.color), wavy: false }),
-        strikethrough: look.strike.then(|| StrikethroughStyle { thickness: px(1.0), color: Some(look.color) }),
+        underline: look.underline.then(|| UnderlineStyle {
+            thickness: px(1.0),
+            color: Some(look.color),
+            wavy: false,
+        }),
+        strikethrough: look.strike.then(|| StrikethroughStyle {
+            thickness: px(1.0),
+            color: Some(look.color),
+        }),
     }
 }
 
@@ -314,7 +375,13 @@ fn on_click(click: &Click, spoilers: &Entity<HashSet<usize>>, cx: &mut App) {
 }
 
 /// Draws `spans` as one paragraph. `id` keys its spoilers' revealed state.
-pub fn rich_text(id: ElementId, spans: Vec<Span>, options: TextOptions, window: &mut Window, cx: &mut App) -> AnyElement {
+pub fn rich_text(
+    id: ElementId,
+    spans: Vec<Span>,
+    options: TextOptions,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let realtime = Realtime::global(cx);
     let wanted: Vec<String> = spans
         .iter()
@@ -327,7 +394,12 @@ pub fn rich_text(id: ElementId, spans: Vec<Span>, options: TextOptions, window: 
     let emoji_urls = &realtime.read(cx).emoji_urls;
     let images: Vec<Option<String>> = spans
         .iter()
-        .map(|span| span.style.emoji.as_ref().and_then(|unicode| emoji_urls.get(unicode).cloned()))
+        .map(|span| {
+            span.style
+                .emoji
+                .as_ref()
+                .and_then(|unicode| emoji_urls.get(unicode).cloned())
+        })
         .collect();
     let spoilers = window.use_keyed_state(id.clone(), cx, |_, _| HashSet::<usize>::new());
     let revealed = spoilers.read(cx).clone();
@@ -435,12 +507,19 @@ fn flowing_paragraph(
             for piece in line.split_inclusive(' ') {
                 let text = piece.to_string();
                 let styled = StyledText::new(text.clone()).with_runs(vec![run(&text, &look)]);
-                let token = div().id(sub_id(&id, word)).flex_shrink_0().whitespace_nowrap().child(styled);
+                let token = div()
+                    .id(sub_id(&id, word))
+                    .flex_shrink_0()
+                    .whitespace_nowrap()
+                    .child(styled);
                 word += 1;
                 row = row.child(match click.clone() {
                     Some(click) => {
                         let spoilers = spoilers.clone();
-                        token.cursor_pointer().on_click(move |_, _, cx| on_click(&click, &spoilers, cx)).into_any_element()
+                        token
+                            .cursor_pointer()
+                            .on_click(move |_, _, cx| on_click(&click, &spoilers, cx))
+                            .into_any_element()
                     }
                     None => token.into_any_element(),
                 });
@@ -465,7 +544,13 @@ pub fn emoji_text(
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
-    rich_text(id.into(), spans_for(content, links, &SpanStyle::default()), options, window, cx)
+    rich_text(
+        id.into(),
+        spans_for(content, links, &SpanStyle::default()),
+        options,
+        window,
+        cx,
+    )
 }
 
 #[cfg(test)]
@@ -473,7 +558,10 @@ mod tests {
     use super::{Part, PartKind, handles, parts};
 
     fn kinds(content: &str, links: bool) -> Vec<(String, PartKind)> {
-        parts(content, links).into_iter().map(|Part { text, kind }| (text, kind)).collect()
+        parts(content, links)
+            .into_iter()
+            .map(|Part { text, kind }| (text, kind))
+            .collect()
     }
 
     #[test]
@@ -487,13 +575,25 @@ mod tests {
                 ("https://x.com/a".into(), PartKind::Url),
             ]
         );
-        assert_eq!(kinds("https://x.com", false), vec![("https://x.com".into(), PartKind::Text)]);
-        assert_eq!(kinds("me@ana:x.com", true), vec![("me@ana:x.com".into(), PartKind::Text)]);
+        assert_eq!(
+            kinds("https://x.com", false),
+            vec![("https://x.com".into(), PartKind::Text)]
+        );
+        assert_eq!(
+            kinds("me@ana:x.com", true),
+            vec![("me@ana:x.com".into(), PartKind::Text)]
+        );
         assert_eq!(
             kinds("@everyone!", true),
-            vec![("@everyone".into(), PartKind::Mention), ("!".into(), PartKind::Text)]
+            vec![
+                ("@everyone".into(), PartKind::Mention),
+                ("!".into(), PartKind::Text)
+            ]
         );
-        assert_eq!(kinds("@everyone:x.com", true), vec![("@everyone:x.com".into(), PartKind::Mention)]);
+        assert_eq!(
+            kinds("@everyone:x.com", true),
+            vec![("@everyone:x.com".into(), PartKind::Mention)]
+        );
     }
 
     #[test]
@@ -517,6 +617,9 @@ mod tests {
 
     #[test]
     fn lists_handles_but_not_everyone() {
-        assert_eq!(handles("@a:x.com and @everyone and @b.c:y.org."), ["@a:x.com", "@b.c:y.org"]);
+        assert_eq!(
+            handles("@a:x.com and @everyone and @b.c:y.org."),
+            ["@a:x.com", "@b.c:y.org"]
+        );
     }
 }

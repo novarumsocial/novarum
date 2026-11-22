@@ -24,7 +24,10 @@ pub struct PublicUser {
 
 impl PublicUser {
     pub fn name(&self) -> &str {
-        self.display_name.as_deref().filter(|name| !name.is_empty()).unwrap_or(&self.username)
+        self.display_name
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or(&self.username)
     }
 
     pub fn handle(&self) -> String {
@@ -151,7 +154,10 @@ pub enum SystemMessage {
     #[serde(rename = "group.renamed")]
     GroupRenamed { name: String },
     #[serde(rename = "call", rename_all = "camelCase")]
-    Call { duration_seconds: Option<u64>, missed: bool },
+    Call {
+        duration_seconds: Option<u64>,
+        missed: bool,
+    },
 }
 
 /// Lenient: an unknown system message from a newer homeserver is dropped, not fatal.
@@ -360,7 +366,10 @@ pub struct Author {
 #[allow(dead_code)]
 impl Author {
     pub fn name(&self) -> &str {
-        self.display_name.as_deref().filter(|name| !name.is_empty()).unwrap_or(&self.username)
+        self.display_name
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or(&self.username)
     }
 
     pub fn handle(&self) -> String {

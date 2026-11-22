@@ -56,24 +56,41 @@ pub fn attachment_count(count: usize) -> String {
 
 /// Whether `message` should be highlighted for the signed-in user: a reply to them, @everyone in a
 /// guild, or their handle in the text.
-pub fn mentions_me(message: &Message, replied: Option<&Message>, my_handle: &str, in_guild: bool, is_mine: bool) -> bool {
+pub fn mentions_me(
+    message: &Message,
+    replied: Option<&Message>,
+    my_handle: &str,
+    in_guild: bool,
+    is_mine: bool,
+) -> bool {
     if is_mine {
         return false;
     }
     let my_handle = my_handle.to_lowercase();
     replied.is_some_and(|replied| replied.author.handle().to_lowercase() == my_handle)
         || (in_guild && mentions_everyone(Some(&message.content)))
-        || handles(&message.content).iter().any(|handle| handle.to_lowercase() == my_handle)
+        || handles(&message.content)
+            .iter()
+            .any(|handle| handle.to_lowercase() == my_handle)
 }
 
 /// The box an image attachment gets: its own size scaled into `max` (keeping at least
 /// `min_width`), or `fallback` when the homeserver didn't say.
-pub fn image_box(width: Option<u32>, height: Option<u32>, max: Size<f32>, min_width: f32, fallback: Size<f32>) -> Size<f32> {
+pub fn image_box(
+    width: Option<u32>,
+    height: Option<u32>,
+    max: Size<f32>,
+    min_width: f32,
+    fallback: Size<f32>,
+) -> Size<f32> {
     match (width, height) {
         (Some(width), Some(height)) if width > 0 && height > 0 => {
             let (width, height) = (width as f32, height as f32);
             let scale = (max.width / width).min(max.height / height).min(1.0);
-            size((width * scale).max(min_width).min(max.width), height * scale)
+            size(
+                (width * scale).max(min_width).min(max.width),
+                height * scale,
+            )
         }
         _ => fallback,
     }
@@ -139,7 +156,13 @@ impl MessageView {
         }
     }
 
-    pub fn set(&mut self, message: &Message, replied: Option<&Message>, grouped: bool, cx: &mut Context<Self>) {
+    pub fn set(
+        &mut self,
+        message: &Message,
+        replied: Option<&Message>,
+        grouped: bool,
+        cx: &mut Context<Self>,
+    ) {
         if self.message != *message || self.replied.as_ref() != replied || self.grouped != grouped {
             self.message = message.clone();
             self.replied = replied.cloned();
@@ -153,7 +176,11 @@ impl MessageView {
     }
 
     fn is_mine(&self, cx: &App) -> bool {
-        is_self(&self.message.author.username, &self.message.author.server, cx)
+        is_self(
+            &self.message.author.username,
+            &self.message.author.server,
+            cx,
+        )
     }
 
     fn channel_id(cx: &App) -> String {
@@ -188,7 +215,9 @@ impl MessageView {
         self.deleting = Deleting::Busy;
         cx.notify();
         let (channel_id, message_id) = (Self::channel_id(cx), self.message.id.clone());
-        let task = Chat::global(cx).update(cx, |chat, cx| chat.delete_message(channel_id, message_id, cx));
+        let task = Chat::global(cx).update(cx, |chat, cx| {
+            chat.delete_message(channel_id, message_id, cx)
+        });
         cx.spawn(async move |this, cx| {
             let _ = task.await;
             let _ = this.update(cx, |this, cx| {
@@ -231,7 +260,9 @@ impl MessageView {
         cx.notify();
         let (channel_id, message_id) = (Self::channel_id(cx), self.message.id.clone());
         let content = (!next.is_empty()).then_some(next);
-        let task = chat.update(cx, |chat, cx| chat.edit_message(channel_id, message_id, content, cx));
+        let task = chat.update(cx, |chat, cx| {
+            chat.edit_message(channel_id, message_id, content, cx)
+        });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
@@ -248,27 +279,34 @@ impl MessageView {
     /// Opens or closes the inline editor to follow `chat.editingMessageId`.
     fn sync_editing(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let chat = Chat::global(cx).read(cx);
-        let editing = chat.editing_message && chat.editing_message_id.as_deref() == Some(self.message.id.as_str());
+        let editing = chat.editing_message
+            && chat.editing_message_id.as_deref() == Some(self.message.id.as_str());
         match (editing, self.edit.is_some()) {
             (true, false) => {
                 let content = self.message.content.clone();
                 let input = cx.new(|cx| {
-                    TextareaState::new(window, cx).auto_grow(3, 12).submit_on_enter(true).default_value(content)
+                    TextareaState::new(window, cx)
+                        .auto_grow(3, 12)
+                        .submit_on_enter(true)
+                        .default_value(content)
                 });
                 input.update(cx, |input, cx| input.focus(window, cx));
-                let subscription = cx.subscribe_in(&input, window, |this, input, event: &InputEvent, window, cx| {
-                    match event {
+                let subscription = cx.subscribe_in(
+                    &input,
+                    window,
+                    |this, input, event: &InputEvent, window, cx| match event {
                         InputEvent::PressEnter { shift: false, .. } => this.save_edit(cx),
                         InputEvent::Change => {
                             let value = input.read(cx).value();
                             if value.chars().count() > MAX_MESSAGE_LENGTH {
-                                let clipped: String = value.chars().take(MAX_MESSAGE_LENGTH).collect();
+                                let clipped: String =
+                                    value.chars().take(MAX_MESSAGE_LENGTH).collect();
                                 input.update(cx, |input, cx| input.set_value(clipped, window, cx));
                             }
                         }
                         _ => {}
-                    }
-                });
+                    },
+                );
                 self.edit = Some((input, subscription));
             }
             (false, true) => self.edit = None,
@@ -278,10 +316,20 @@ impl MessageView {
     }
 
     fn view(&mut self, attachment: &Attachment, window: &mut Window, cx: &mut Context<Self>) {
-        let viewable: Vec<Attachment> = self.message.attachments.iter().filter(|a| is_viewable(a)).cloned().collect();
-        let index = viewable.iter().position(|item| item.id == attachment.id).unwrap_or(0);
+        let viewable: Vec<Attachment> = self
+            .message
+            .attachments
+            .iter()
+            .filter(|a| is_viewable(a))
+            .cloned()
+            .collect();
+        let index = viewable
+            .iter()
+            .position(|item| item.id == attachment.id)
+            .unwrap_or(0);
         let (author, timestamp) = (self.message.author.clone(), self.message.timestamp);
-        let viewer = cx.new(|cx| AttachmentViewer::new(viewable, index, author, timestamp, window, cx));
+        let viewer =
+            cx.new(|cx| AttachmentViewer::new(viewable, index, author, timestamp, window, cx));
         let subscription = cx.subscribe(&viewer, |this, _, event: &ViewerEvent, cx| match event {
             ViewerEvent::Close => {
                 this.viewer = None;
@@ -294,14 +342,20 @@ impl MessageView {
 
     /// The menu's items, as the dropdown and the right-click menu both show them.
     fn menu(this: WeakEntity<Self>, menu: PopupMenu, cx: &App) -> PopupMenu {
-        let Some(view) = this.upgrade() else { return menu };
+        let Some(view) = this.upgrade() else {
+            return menu;
+        };
         let view = view.read(cx);
         let t = theme::tokens(cx);
-        let item = |label: &'static str, name: &'static str, action: fn(&mut MessageView, &mut Context<MessageView>)| {
+        let item = |label: &'static str,
+                    name: &'static str,
+                    action: fn(&mut MessageView, &mut Context<MessageView>)| {
             let this = this.clone();
-            PopupMenuItem::new(label).icon(icon(name)).on_click(move |_, _, cx| {
-                let _ = this.update(cx, action);
-            })
+            PopupMenuItem::new(label)
+                .icon(icon(name))
+                .on_click(move |_, _, cx| {
+                    let _ = this.update(cx, action);
+                })
         };
         let copy_text = item("Copy Text", "copy", |view, cx| view.copy_text(cx));
         if view.local_only() {
@@ -310,9 +364,15 @@ impl MessageView {
         let mine = view.is_mine(cx);
         let mut menu = menu.item(item("Reply", "reply", |_, cx| cx.emit(MessageEvent::Reply)));
         if mine {
-            menu = menu.item(item("Edit Message", "pencil", |view, cx| view.start_editing(cx)));
+            menu = menu.item(item("Edit Message", "pencil", |view, cx| {
+                view.start_editing(cx)
+            }));
         }
-        menu = menu.item(copy_text).item(item("Copy Message Link", "link", |view, cx| view.copy_link(cx)));
+        menu = menu
+            .item(copy_text)
+            .item(item("Copy Message Link", "link", |view, cx| {
+                view.copy_link(cx)
+            }));
         if mine {
             let busy = view.deleting == Deleting::Busy;
             let label_source = this.clone();
@@ -321,7 +381,9 @@ impl MessageView {
             // and a click on it doesn't reach the menu (which would close it)
             menu = menu.item(
                 PopupMenuItem::element(move |_, cx| {
-                    let label = label_source.upgrade().map_or("Delete", |view| view.read(cx).delete_label());
+                    let label = label_source
+                        .upgrade()
+                        .map_or("Delete", |view| view.read(cx).delete_label());
                     let this = label_source.clone();
                     div()
                         .id("delete-message")
@@ -347,12 +409,16 @@ impl MessageView {
             );
         }
         let this = this.clone();
-        menu.item(PopupMenuItem::new("Copy Message ID").icon(icon("id-card-lanyard")).on_click(move |_, _, cx| {
-            if let Some(view) = this.upgrade() {
-                let id = view.read(cx).message.id.clone();
-                cx.write_to_clipboard(ClipboardItem::new_string(id));
-            }
-        }))
+        menu.item(
+            PopupMenuItem::new("Copy Message ID")
+                .icon(icon("id-card-lanyard"))
+                .on_click(move |_, _, cx| {
+                    if let Some(view) = this.upgrade() {
+                        let id = view.read(cx).message.id.clone();
+                        cx.write_to_clipboard(ClipboardItem::new_string(id));
+                    }
+                }),
+        )
     }
 
     fn render_toolbar(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
@@ -366,28 +432,44 @@ impl MessageView {
             .right_0()
             .flex()
             .text_color(t.foreground)
-            .child(icon_button("reply", "reply", cx).on_click(cx.listener(|_, _, _, cx| cx.emit(MessageEvent::Reply))));
+            .child(
+                icon_button("reply", "reply", cx)
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(MessageEvent::Reply))),
+            );
         if mine {
-            toolbar = toolbar.child(icon_button("edit", "pencil", cx).on_click(cx.listener(|this, _, _, cx| this.start_editing(cx))));
+            toolbar = toolbar.child(
+                icon_button("edit", "pencil", cx)
+                    .on_click(cx.listener(|this, _, _, cx| this.start_editing(cx))),
+            );
         }
         if shift {
             // shift shows the menu's other actions as buttons, and deletes without asking
             toolbar = toolbar
-                .child(icon_button("copy", "copy", cx).on_click(cx.listener(|this, _, _, cx| this.copy_text(cx))))
-                .child(icon_button("link", "link", cx).on_click(cx.listener(|this, _, _, cx| this.copy_link(cx))));
+                .child(
+                    icon_button("copy", "copy", cx)
+                        .on_click(cx.listener(|this, _, _, cx| this.copy_text(cx))),
+                )
+                .child(
+                    icon_button("link", "link", cx)
+                        .on_click(cx.listener(|this, _, _, cx| this.copy_link(cx))),
+                );
             if mine {
                 toolbar = toolbar.child(
                     icon_button("delete", "trash", cx)
                         .bg(t.destructive.opacity(0.2))
                         .text_color(t.destructive)
-                        .when(self.deleting == Deleting::Busy, |button| button.opacity(0.5))
+                        .when(self.deleting == Deleting::Busy, |button| {
+                            button.opacity(0.5)
+                        })
                         .on_click(cx.listener(|this, _, _, cx| this.delete(true, cx))),
                 );
             }
             let id = self.message.id.clone();
-            toolbar = toolbar.child(icon_button("copy-id", "id-card-lanyard", cx).on_click(move |_, _, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(id.clone()));
-            }));
+            toolbar = toolbar.child(icon_button("copy-id", "id-card-lanyard", cx).on_click(
+                move |_, _, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(id.clone()));
+                },
+            ));
         } else {
             let open_change = this.clone();
             toolbar = toolbar.child(
@@ -395,7 +477,9 @@ impl MessageView {
                     .ghost()
                     .with_size(px(24.0))
                     .icon(icon("ellipsis"))
-                    .dropdown_menu_with_anchor(Anchor::TopRight, move |menu, _, cx| Self::menu(this.clone(), menu, cx))
+                    .dropdown_menu_with_anchor(Anchor::TopRight, move |menu, _, cx| {
+                        Self::menu(this.clone(), menu, cx)
+                    })
                     .on_open_change(move |open, _, cx| {
                         let _ = open_change.update(cx, |view, cx| {
                             view.menu_open = *open;
@@ -413,35 +497,72 @@ impl MessageView {
             return None;
         }
         let t = theme::tokens(cx);
-        let kind = |attachment: &Attachment, prefix: &str| attachment.content_type.starts_with(prefix);
+        let kind =
+            |attachment: &Attachment, prefix: &str| attachment.content_type.starts_with(prefix);
         let mut column = div().flex().flex_col();
         for attachment in attachments.iter().filter(|a| kind(a, "video/")) {
             let id = SharedString::from(format!("video-{}", attachment.id));
-            column = column.child(div().mt_2().max_w(px(448.0)).child(video_player(id, attachment, cx)));
+            column = column.child(
+                div()
+                    .mt_2()
+                    .max_w(px(448.0))
+                    .child(video_player(id, attachment, cx)),
+            );
         }
         for attachment in attachments.iter().filter(|a| kind(a, "audio/")) {
             let id = SharedString::from(format!("audio-{}", attachment.id));
-            column = column.child(div().mt_2().max_w(px(448.0)).child(audio_player(id, attachment, self.hovered, cx)));
+            column = column.child(div().mt_2().max_w(px(448.0)).child(audio_player(
+                id,
+                attachment,
+                self.hovered,
+                cx,
+            )));
         }
-        let grid: Vec<&Attachment> = attachments.iter().filter(|a| !kind(a, "video/") && !kind(a, "audio/")).collect();
+        let grid: Vec<&Attachment> = attachments
+            .iter()
+            .filter(|a| !kind(a, "video/") && !kind(a, "audio/"))
+            .collect();
         if grid.is_empty() {
             return Some(column);
         }
         let single_image = grid.len() == 1 && kind(grid[0], "image/");
-        let columns = if window.viewport_size().width >= px(640.0) { 3.0 } else { 2.0 };
+        let columns = if window.viewport_size().width >= px(640.0) {
+            3.0
+        } else {
+            2.0
+        };
         let cell = (320.0 - 4.0 * (columns - 1.0)) / columns;
-        let mut cells = div().mt_2().flex().flex_wrap().gap_1().when(!single_image, |grid| grid.max_w(px(320.0)));
+        let mut cells = div()
+            .mt_2()
+            .flex()
+            .flex_wrap()
+            .gap_1()
+            .when(!single_image, |grid| grid.max_w(px(320.0)));
         for attachment in grid {
             let attachment = attachment.clone();
             let id = SharedString::from(format!("attachment-{}", attachment.id));
             let element = if kind(&attachment, "image/") {
                 let frame = if single_image {
-                    let max_width = if window.viewport_size().width >= px(640.0) { 320.0 } else { 280.0 };
-                    image_box(attachment.width, attachment.height, size(max_width, 256.0), 128.0, size(max_width, 192.0))
+                    let max_width = if window.viewport_size().width >= px(640.0) {
+                        320.0
+                    } else {
+                        280.0
+                    };
+                    image_box(
+                        attachment.width,
+                        attachment.height,
+                        size(max_width, 256.0),
+                        128.0,
+                        size(max_width, 192.0),
+                    )
                 } else {
                     size(cell, cell)
                 };
-                let fit = if single_image { ObjectFit::Contain } else { ObjectFit::Cover };
+                let fit = if single_image {
+                    ObjectFit::Contain
+                } else {
+                    ObjectFit::Cover
+                };
                 let clicked = attachment.clone();
                 div()
                     .id(id)
@@ -458,7 +579,9 @@ impl MessageView {
                         let label = format!("View {}", attachment.filename);
                         move |window, cx| Tooltip::new(label.clone()).build(window, cx)
                     })
-                    .on_click(cx.listener(move |this, _, window, cx| this.view(&clicked, window, cx)))
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| this.view(&clicked, window, cx)),
+                    )
                     .into_any_element()
             } else {
                 let pdf = attachment.content_type == "application/pdf";
@@ -500,15 +623,27 @@ impl MessageView {
                                 div()
                                     .text_size(px(if pdf { 9.0 } else { 10.0 }))
                                     .text_color(t.muted_foreground)
-                                    .child(if pdf { "VIEW".to_string() } else { format_bytes(attachment.size).to_uppercase() }),
+                                    .child(if pdf {
+                                        "VIEW".to_string()
+                                    } else {
+                                        format_bytes(attachment.size).to_uppercase()
+                                    }),
                             ),
                     );
                 if pdf {
-                    file.on_click(cx.listener(move |this, _, window, cx| this.view(&clicked, window, cx))).into_any_element()
+                    file.on_click(
+                        cx.listener(move |this, _, window, cx| this.view(&clicked, window, cx)),
+                    )
+                    .into_any_element()
                 } else {
-                    file.child(icon("download").size(px(14.0)).flex_shrink_0().text_color(t.muted_foreground))
-                        .on_click(move |_, _, cx| download(&clicked.url, &clicked.filename, cx))
-                        .into_any_element()
+                    file.child(
+                        icon("download")
+                            .size(px(14.0))
+                            .flex_shrink_0()
+                            .text_color(t.muted_foreground),
+                    )
+                    .on_click(move |_, _, cx| download(&clicked.url, &clicked.filename, cx))
+                    .into_any_element()
                 }
             };
             cells = cells.child(element);
@@ -516,7 +651,12 @@ impl MessageView {
         Some(column.child(cells))
     }
 
-    fn render_reply(&self, reply_to: &str, window: &mut Window, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn render_reply(
+        &self,
+        reply_to: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let t = theme::tokens(cx);
         let path = Chat::global(cx).read(cx).message_path(reply_to, cx);
         let preview: AnyElement = match &self.replied {
@@ -524,22 +664,45 @@ impl MessageView {
                 .flex()
                 .min_w_0()
                 .gap_1()
-                .child(div().flex_shrink_0().font_weight(FontWeight::MEDIUM).text_color(t.foreground.opacity(0.75)).child(replied.author.name().to_string()))
+                .child(
+                    div()
+                        .flex_shrink_0()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(t.foreground.opacity(0.75))
+                        .child(replied.author.name().to_string()),
+                )
                 .child(div().text_color(t.muted_foreground.opacity(0.4)).child("·"))
-                .child(div().flex_1().min_w_0().overflow_hidden().text_color(t.muted_foreground).child(if replied.content.is_empty() {
-                    div().truncate().child(attachment_count(replied.attachments.len())).into_any_element()
-                } else {
-                    markdown(
-                        SharedString::from(format!("reply-{}", self.message.id)),
-                        &replied.content,
-                        MarkdownOptions { inline: true, ..Default::default() },
-                        TextOptions::new(px(11.0), t.muted_foreground),
-                        window,
-                        cx,
-                    )
-                }))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .text_color(t.muted_foreground)
+                        .child(if replied.content.is_empty() {
+                            div()
+                                .truncate()
+                                .child(attachment_count(replied.attachments.len()))
+                                .into_any_element()
+                        } else {
+                            markdown(
+                                SharedString::from(format!("reply-{}", self.message.id)),
+                                &replied.content,
+                                MarkdownOptions {
+                                    inline: true,
+                                    ..Default::default()
+                                },
+                                TextOptions::new(px(11.0), t.muted_foreground),
+                                window,
+                                cx,
+                            )
+                        }),
+                )
                 .into_any_element(),
-            None => div().italic().text_color(t.muted_foreground.opacity(0.7)).child("Original message unavailable").into_any_element(),
+            None => div()
+                .italic()
+                .text_color(t.muted_foreground.opacity(0.7))
+                .child("Original message unavailable")
+                .into_any_element(),
         };
         div()
             .id("reply")
@@ -556,7 +719,14 @@ impl MessageView {
             .line_height(px(16.0))
             .cursor_pointer()
             .hover(|s| s.border_color(t.primary).bg(t.muted.opacity(0.4)))
-            .child(div().mt(px(2.0)).child(icon("reply").size_3().flex_shrink_0().text_color(t.primary.opacity(0.6))))
+            .child(
+                div().mt(px(2.0)).child(
+                    icon("reply")
+                        .size_3()
+                        .flex_shrink_0()
+                        .text_color(t.primary.opacity(0.6)),
+                ),
+            )
             .child(preview)
             .on_click(move |_, _, cx| router::goto(&path, cx))
     }
@@ -572,7 +742,9 @@ impl Render for MessageView {
         let in_guild = matches!(chat.route(cx), ChatRoute::Guild { .. });
         let channel_id = chat.active_channel(cx).unwrap_or_default();
         let mine = self.is_mine(cx);
-        let my_handle = Session::user(cx).map(|user| user.handle).unwrap_or_default();
+        let my_handle = Session::user(cx)
+            .map(|user| user.handle)
+            .unwrap_or_default();
         let mentioned = mentions_me(&message, self.replied.as_ref(), &my_handle, in_guild, mine);
         let time_format = SettingsStore::get(cx).time_format;
         let author_name = message.author.name().to_string();
@@ -583,9 +755,15 @@ impl Render for MessageView {
         let avatar_column = if self.grouped {
             div().w_9().flex_shrink_0().into_any_element()
         } else {
-            let picture = avatar(message.author.avatar_url.as_deref(), &author_name, message.author.avatar_color.as_deref(), 36.0, cx)
-                .when(message.interaction.is_some(), |avatar| avatar.mt_5())
-                .when(message.interaction.is_none(), |avatar| avatar.mt_0p5());
+            let picture = avatar(
+                message.author.avatar_url.as_deref(),
+                &author_name,
+                message.author.avatar_color.as_deref(),
+                36.0,
+                cx,
+            )
+            .when(message.interaction.is_some(), |avatar| avatar.mt_5())
+            .when(message.interaction.is_none(), |avatar| avatar.mt_0p5());
             div()
                 .flex_shrink_0()
                 .child(profile_card(
@@ -609,15 +787,30 @@ impl Render for MessageView {
                     .text_size(px(11.0))
                     .line_height(px(16.0))
                     .text_color(t.muted_foreground)
-                    .child(icon("square-slash").size_3().flex_shrink_0().text_color(t.primary.opacity(0.7)))
+                    .child(
+                        icon("square-slash")
+                            .size_3()
+                            .flex_shrink_0()
+                            .text_color(t.primary.opacity(0.7)),
+                    )
                     .child(
                         div()
                             .flex()
                             .gap_1()
                             .truncate()
-                            .child(div().font_weight(FontWeight::MEDIUM).text_color(t.foreground.opacity(0.75)).child(interaction.user.name().to_string()))
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(t.foreground.opacity(0.75))
+                                    .child(interaction.user.name().to_string()),
+                            )
                             .child("used")
-                            .child(div().font_weight(FontWeight::MEDIUM).text_color(t.foreground.opacity(0.75)).child(format!("/{}", interaction.name))),
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(t.foreground.opacity(0.75))
+                                    .child(format!("/{}", interaction.name)),
+                            ),
                     ),
             );
         }
@@ -632,10 +825,23 @@ impl Render for MessageView {
                         SharedString::from(format!("name-{}", message.id)),
                         message.author.clone(),
                         Some(on_call),
-                        div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(t.foreground).cursor_pointer().hover(|s| s.underline()).child(author_name.clone()),
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(t.foreground)
+                            .cursor_pointer()
+                            .hover(|s| s.underline())
+                            .child(author_name.clone()),
                     ))
-                    .when(message.author.is_bot, |row| row.child(bot_badge("bot", cx).self_center()))
-                    .child(div().text_size(px(11.0)).text_color(t.muted_foreground).child(time)),
+                    .when(message.author.is_bot, |row| {
+                        row.child(bot_badge("bot", cx).self_center())
+                    })
+                    .child(
+                        div()
+                            .text_size(px(11.0))
+                            .text_color(t.muted_foreground)
+                            .child(time),
+                    ),
             );
         }
         if let Some(reply_to) = &message.reply_to {
@@ -665,13 +871,23 @@ impl Render for MessageView {
                                         .label(if saving { "Saving..." } else { "Save" })
                                         .on_click(cx.listener(|this, _, _, cx| this.save_edit(cx))),
                                 )
-                                .child(Button::new("cancel-edit").ghost().xsmall().label("Cancel").on_click(|_, _, cx| {
-                                    Chat::global(cx).update(cx, |chat, cx| chat.set_editing_message(None, cx));
-                                })),
+                                .child(
+                                    Button::new("cancel-edit")
+                                        .ghost()
+                                        .xsmall()
+                                        .label("Cancel")
+                                        .on_click(|_, _, cx| {
+                                            Chat::global(cx).update(cx, |chat, cx| {
+                                                chat.set_editing_message(None, cx)
+                                            });
+                                        }),
+                                ),
                         ),
                 );
             }
-        } else if !message.content.trim().is_empty() || (message.edited && message.embeds.is_empty()) {
+        } else if !message.content.trim().is_empty()
+            || (message.edited && message.embeds.is_empty())
+        {
             let trailing = message.edited.then(|| {
                 let when = message
                     .edited_time
@@ -679,16 +895,28 @@ impl Render for MessageView {
                     .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
                     .map(|time| {
                         let time = time.with_timezone(&Local);
-                        format!("{} at {}", format_date(&time, &Local::now()).to_lowercase(), format_time(&time, time_format))
+                        format!(
+                            "{} at {}",
+                            format_date(&time, &Local::now()).to_lowercase(),
+                            format_time(&time, time_format)
+                        )
                     })
                     .unwrap_or_default();
                 ("(edited)".to_string(), when)
             });
-            let body = if message.content.trim().is_empty() { String::new() } else { message.content.clone() };
+            let body = if message.content.trim().is_empty() {
+                String::new()
+            } else {
+                message.content.clone()
+            };
             content = content.child(div().line_height(relative(1.625)).child(markdown(
                 SharedString::from(format!("content-{}", message.id)),
                 &body,
-                MarkdownOptions { links: true, trailing, ..Default::default() },
+                MarkdownOptions {
+                    links: true,
+                    trailing,
+                    ..Default::default()
+                },
                 TextOptions::new(px(14.0), t.foreground.opacity(0.9)),
                 window,
                 cx,
@@ -707,7 +935,12 @@ impl Render for MessageView {
             );
         }
         for (index, embed) in message.embeds.iter().enumerate() {
-            content = content.child(message_embed(SharedString::from(format!("embed-{}-{index}", message.id)), embed, window, cx));
+            content = content.child(message_embed(
+                SharedString::from(format!("embed-{}-{index}", message.id)),
+                embed,
+                window,
+                cx,
+            ));
         }
         if !message.components.is_empty() {
             let this = cx.entity().downgrade();
@@ -746,7 +979,9 @@ impl Render for MessageView {
                             .hover(|s| s.underline())
                             .child("Dismiss")
                             .on_click(move |_, _, cx| {
-                                Chat::global(cx).update(cx, |chat, cx| chat.remove_message(&channel_id, &message_id, cx));
+                                Chat::global(cx).update(cx, |chat, cx| {
+                                    chat.remove_message(&channel_id, &message_id, cx)
+                                });
                             }),
                     ),
             );
@@ -765,7 +1000,10 @@ impl Render for MessageView {
             .gap_3()
             .px(if narrow { px(12.0) } else { px(16.0) })
             .py_0p5()
-            .when(mentioned, |row| row.bg(amber.opacity(0.1)).hover(|s| s.bg(amber.opacity(0.15))))
+            .when(mentioned, |row| {
+                row.bg(amber.opacity(0.1))
+                    .hover(|s| s.bg(amber.opacity(0.15)))
+            })
             .when(!mentioned, |row| row.hover(|s| s.bg(t.muted.opacity(0.3))))
             .on_hover(cx.listener(|this, hovered: &bool, _, cx| {
                 this.hovered = *hovered;
@@ -773,24 +1011,38 @@ impl Render for MessageView {
             }))
             .when(flashing, |row| {
                 let primary = t.primary;
+                row.child(div().absolute().inset_0().with_animation(
+                    SharedString::from(format!("flash-{}", message.id)),
+                    Animation::new(Duration::from_millis(1500)),
+                    move |overlay, delta| {
+                        let strength = if delta < 0.2 {
+                            1.0
+                        } else {
+                            1.0 - ease_out_quad((delta - 0.2) / 0.8)
+                        };
+                        overlay.bg(primary.opacity(0.18 * strength))
+                    },
+                ))
+            })
+            .when(mentioned, |row| {
                 row.child(
-                    div().absolute().inset_0().with_animation(
-                        SharedString::from(format!("flash-{}", message.id)),
-                        Animation::new(Duration::from_millis(1500)),
-                        move |overlay, delta| {
-                            let strength = if delta < 0.2 { 1.0 } else { 1.0 - ease_out_quad((delta - 0.2) / 0.8) };
-                            overlay.bg(primary.opacity(0.18 * strength))
-                        },
-                    ),
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .left_0()
+                        .w_0p5()
+                        .bg(amber),
                 )
             })
-            .when(mentioned, |row| row.child(div().absolute().top_0().bottom_0().left_0().w_0p5().bg(amber)))
             .child(avatar_column)
             .child(content)
             .children(toolbar)
             .context_menu(move |menu, _, cx| Self::menu(this.clone(), menu, cx));
 
-        div().child(row).children(self.viewer.as_ref().map(|(viewer, _)| viewer.clone()))
+        div()
+            .child(row)
+            .children(self.viewer.as_ref().map(|(viewer, _)| viewer.clone()))
     }
 }
 
@@ -841,20 +1093,65 @@ mod tests {
     #[test]
     fn highlights_messages_that_mention_me() {
         let me = "@me:x.com";
-        assert!(mentions_me(&message("ana", "hey @ME:x.com"), None, me, false, false));
-        assert!(mentions_me(&message("ana", "@everyone"), None, me, true, false));
-        assert!(!mentions_me(&message("ana", "@everyone"), None, me, false, false));
-        assert!(mentions_me(&message("ana", "sure"), Some(&message("me", "q?")), me, false, false));
-        assert!(!mentions_me(&message("me", "@me:x.com"), None, me, true, true));
-        assert!(!mentions_me(&message("ana", "hello"), None, me, true, false));
+        assert!(mentions_me(
+            &message("ana", "hey @ME:x.com"),
+            None,
+            me,
+            false,
+            false
+        ));
+        assert!(mentions_me(
+            &message("ana", "@everyone"),
+            None,
+            me,
+            true,
+            false
+        ));
+        assert!(!mentions_me(
+            &message("ana", "@everyone"),
+            None,
+            me,
+            false,
+            false
+        ));
+        assert!(mentions_me(
+            &message("ana", "sure"),
+            Some(&message("me", "q?")),
+            me,
+            false,
+            false
+        ));
+        assert!(!mentions_me(
+            &message("me", "@me:x.com"),
+            None,
+            me,
+            true,
+            true
+        ));
+        assert!(!mentions_me(
+            &message("ana", "hello"),
+            None,
+            me,
+            true,
+            false
+        ));
     }
 
     #[test]
     fn sizes_single_images_into_their_box() {
         let max = size(320.0, 256.0);
-        assert_eq!(image_box(Some(640), Some(256), max, 128.0, max), size(320.0, 128.0));
-        assert_eq!(image_box(Some(100), Some(100), max, 128.0, max), size(128.0, 100.0));
-        assert_eq!(image_box(None, Some(5), max, 128.0, size(1.0, 1.0)), size(1.0, 1.0));
+        assert_eq!(
+            image_box(Some(640), Some(256), max, 128.0, max),
+            size(320.0, 128.0)
+        );
+        assert_eq!(
+            image_box(Some(100), Some(100), max, 128.0, max),
+            size(128.0, 100.0)
+        );
+        assert_eq!(
+            image_box(None, Some(5), max, 128.0, size(1.0, 1.0)),
+            size(1.0, 1.0)
+        );
     }
 
     #[test]

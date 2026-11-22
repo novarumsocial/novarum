@@ -61,9 +61,15 @@ pub fn page_view(page: &Page, window: &mut Window, cx: &mut App) -> AnyView {
     match page {
         Page::Login => cx.new(|cx| login::LoginPage::new(window, cx)).into(),
         Page::Register => cx.new(|cx| register::RegisterPage::new(window, cx)).into(),
-        Page::ResetPassword => cx.new(|cx| reset_password::ResetPasswordPage::new(window, cx)).into(),
-        Page::Authorize => cx.new(|cx| authorize::AuthorizePage::new(window, cx)).into(),
-        Page::Invite(code) => cx.new(|cx| invite::InvitePage::new(code.clone(), window, cx)).into(),
+        Page::ResetPassword => cx
+            .new(|cx| reset_password::ResetPasswordPage::new(window, cx))
+            .into(),
+        Page::Authorize => cx
+            .new(|cx| authorize::AuthorizePage::new(window, cx))
+            .into(),
+        Page::Invite(code) => cx
+            .new(|cx| invite::InvitePage::new(code.clone(), window, cx))
+            .into(),
         Page::Guilds(_) => cx.new(|cx| shell::AppShell::new(window, cx)).into(),
         // ported in its own milestone; until then it lands on sign-in
         Page::Updater => cx.new(|cx| login::LoginPage::new(window, cx)).into(),

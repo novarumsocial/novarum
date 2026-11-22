@@ -24,13 +24,19 @@ use crate::{
 };
 
 fn timestamp(date: &str) -> i64 {
-    DateTime::parse_from_rfc3339(date).map(|date| date.timestamp_millis()).unwrap_or(0)
+    DateTime::parse_from_rfc3339(date)
+        .map(|date| date.timestamp_millis())
+        .unwrap_or(0)
 }
 
 /// Newest conversation first: by its last message, or when you joined it.
 pub fn sorted_entries(list: &[DmEntry]) -> Vec<DmEntry> {
     let mut entries = list.to_vec();
-    entries.sort_by_key(|dm| std::cmp::Reverse(timestamp(dm.last_message_at.as_deref().unwrap_or(&dm.joined_at))));
+    entries.sort_by_key(|dm| {
+        std::cmp::Reverse(timestamp(
+            dm.last_message_at.as_deref().unwrap_or(&dm.joined_at),
+        ))
+    });
     entries
 }
 
@@ -65,13 +71,21 @@ fn item(id: impl Into<ElementId>, active: bool, cx: &App) -> Stateful<Div> {
         .py_1()
         .text_sm()
         .cursor_pointer()
-        .when(active, |item| item.bg(t.primary.opacity(0.1)).text_color(t.sidebar_foreground))
-        .when(!active, |item| item.text_color(t.muted_foreground).hover(|s| s.text_color(t.sidebar_foreground)))
+        .when(active, |item| {
+            item.bg(t.primary.opacity(0.1))
+                .text_color(t.sidebar_foreground)
+        })
+        .when(!active, |item| {
+            item.text_color(t.muted_foreground)
+                .hover(|s| s.text_color(t.sidebar_foreground))
+        })
 }
 
 fn close_dm(id: &str, active: bool, cx: &mut App) {
     let id = id.to_string();
-    Dms::global(cx).update(cx, |dms, cx| dms.close(id, cx)).detach();
+    Dms::global(cx)
+        .update(cx, |dms, cx| dms.close(id, cx))
+        .detach();
     if active {
         router::goto("/guilds/dms", cx);
     }
@@ -255,90 +269,115 @@ impl Render for DmSidebar {
             .collect();
 
         let empty = entries.is_empty() && pending.is_empty();
-        div().flex().flex_col().w(px(240.0)).h_full().bg(t.sidebar).child(
-            div()
-                .id("dm-list")
-                .flex()
-                .flex_col()
-                .flex_1()
-                .gap(px(2.0))
-                .overflow_y_scroll()
-                .mt_2()
-                .p_2()
-                .child(
-                    item("friends", route == ChatRoute::Home, cx)
-                        .child(icon("users").size_4().flex_shrink_0())
-                        .child(div().flex_1().truncate().child("Friends"))
-                        .on_click(|_, _, cx| router::goto("/guilds", cx)),
-                )
-                .child(
-                    item("developers", matches!(route, ChatRoute::Developers { .. }), cx)
+        div()
+            .flex()
+            .flex_col()
+            .w(px(240.0))
+            .h_full()
+            .bg(t.sidebar)
+            .child(
+                div()
+                    .id("dm-list")
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .gap(px(2.0))
+                    .overflow_y_scroll()
+                    .mt_2()
+                    .p_2()
+                    .child(
+                        item("friends", route == ChatRoute::Home, cx)
+                            .child(icon("users").size_4().flex_shrink_0())
+                            .child(div().flex_1().truncate().child("Friends"))
+                            .on_click(|_, _, cx| router::goto("/guilds", cx)),
+                    )
+                    .child(
+                        item(
+                            "developers",
+                            matches!(route, ChatRoute::Developers { .. }),
+                            cx,
+                        )
                         .child(icon("bot").size_4().flex_shrink_0())
                         .child(div().flex_1().truncate().child("Developers"))
                         .on_click(|_, _, cx| router::goto("/guilds/developers", cx)),
-                )
-                .child(div().mt_3().h_px().flex_shrink_0().bg(t.border))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .px_2()
-                        .pt_3()
-                        .pb_1()
-                        .child(
-                            div()
-                                .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(t.muted_foreground)
-                                .child("DIRECT MESSAGES"),
-                        )
-                        .child(
-                            div()
-                                .id("new-dm")
-                                .cursor_pointer()
-                                .text_color(t.muted_foreground)
-                                .hover(|s| s.text_color(t.sidebar_foreground))
-                                .tooltip(|window, cx| {
-                                    gpui_kit::component::tooltip::Tooltip::new("Start a direct message").build(window, cx)
-                                })
-                                .on_click(|_, window, cx| open_new_dm_dialog(None, window, cx))
-                                .child(icon("plus").size(px(14.0))),
-                        ),
-                )
-                .children(rows)
-                .children(pending.into_iter().map(|homeserver| {
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(6.0))
-                        .px_2()
-                        .py_1()
-                        .text_xs()
-                        .text_color(t.muted_foreground)
-                        .child(
-                            icon("loader-circle").size(px(14.0)).flex_shrink_0().with_animation(
-                                SharedString::from(format!("pending-{homeserver}")),
-                                Animation::new(std::time::Duration::from_secs(1)).repeat(),
-                                |icon, delta| icon.transform(Transformation::rotate(percentage(delta))),
-                            ),
-                        )
-                        .child(div().flex_1().truncate().child(format!("Waiting for {homeserver}…")))
-                }))
-                .when(empty, |list| {
-                    list.child(
+                    )
+                    .child(div().mt_3().h_px().flex_shrink_0().bg(t.border))
+                    .child(
                         div()
-                            .mt_4()
-                            .px_2()
                             .flex()
-                            .justify_center()
-                            .text_center()
+                            .items_center()
+                            .justify_between()
+                            .px_2()
+                            .pt_3()
+                            .pb_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(t.muted_foreground)
+                                    .child("DIRECT MESSAGES"),
+                            )
+                            .child(
+                                div()
+                                    .id("new-dm")
+                                    .cursor_pointer()
+                                    .text_color(t.muted_foreground)
+                                    .hover(|s| s.text_color(t.sidebar_foreground))
+                                    .tooltip(|window, cx| {
+                                        gpui_kit::component::tooltip::Tooltip::new(
+                                            "Start a direct message",
+                                        )
+                                        .build(window, cx)
+                                    })
+                                    .on_click(|_, window, cx| open_new_dm_dialog(None, window, cx))
+                                    .child(icon("plus").size(px(14.0))),
+                            ),
+                    )
+                    .children(rows)
+                    .children(pending.into_iter().map(|homeserver| {
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px_2()
+                            .py_1()
                             .text_xs()
                             .text_color(t.muted_foreground)
-                            .child("No direct messages yet :("),
-                    )
-                }),
-        )
+                            .child(
+                                icon("loader-circle")
+                                    .size(px(14.0))
+                                    .flex_shrink_0()
+                                    .with_animation(
+                                        SharedString::from(format!("pending-{homeserver}")),
+                                        Animation::new(std::time::Duration::from_secs(1)).repeat(),
+                                        |icon, delta| {
+                                            icon.transform(Transformation::rotate(percentage(
+                                                delta,
+                                            )))
+                                        },
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .truncate()
+                                    .child(format!("Waiting for {homeserver}…")),
+                            )
+                    }))
+                    .when(empty, |list| {
+                        list.child(
+                            div()
+                                .mt_4()
+                                .px_2()
+                                .flex()
+                                .justify_center()
+                                .text_center()
+                                .text_xs()
+                                .text_color(t.muted_foreground)
+                                .child("No direct messages yet :("),
+                        )
+                    }),
+            )
     }
 }
 
@@ -365,9 +404,17 @@ mod tests {
     #[test]
     fn sorts_newest_conversations_first() {
         let list = [
-            dm("old", Some("2026-01-01T00:00:00.000Z"), "2025-01-01T00:00:00.000Z"),
+            dm(
+                "old",
+                Some("2026-01-01T00:00:00.000Z"),
+                "2025-01-01T00:00:00.000Z",
+            ),
             dm("joined", None, "2026-03-01T00:00:00.000Z"),
-            dm("new", Some("2026-05-01T10:00:00.000Z"), "2025-01-01T00:00:00.000Z"),
+            dm(
+                "new",
+                Some("2026-05-01T10:00:00.000Z"),
+                "2025-01-01T00:00:00.000Z",
+            ),
         ];
         let ids: Vec<String> = sorted_entries(&list).into_iter().map(|dm| dm.id).collect();
         assert_eq!(ids, ["new", "joined", "old"]);

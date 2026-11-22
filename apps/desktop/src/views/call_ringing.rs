@@ -44,7 +44,12 @@ impl CallRinging {
             cx.observe(&Voice::global(cx), |this, _, cx| this.sync(cx)),
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
         ];
-        Self { incoming: None, outgoing: None, caller_seen: false, _subscriptions }
+        Self {
+            incoming: None,
+            outgoing: None,
+            caller_seen: false,
+            _subscriptions,
+        }
     }
 
     fn ring(channel_id: String, incoming: bool, cx: &mut Context<Self>) -> Ring {
@@ -70,7 +75,10 @@ impl CallRinging {
                 })
             });
         });
-        Ring { channel_id: channel_id.clone(), _task }
+        Ring {
+            channel_id: channel_id.clone(),
+            _task,
+        }
     }
 
     /// The web's `$effect`s: who's still ringing, and the ringtones that go with them.
@@ -81,7 +89,12 @@ impl CallRinging {
         let count = |id: &str| chat.voice_states.get(id).map_or(0, Vec::len);
         let (incoming, outgoing) = {
             let dms = dms.read(cx);
-            (dms.incoming_call.as_ref().map(|call| call.channel_id.clone()), dms.outgoing_call.clone())
+            (
+                dms.incoming_call
+                    .as_ref()
+                    .map(|call| call.channel_id.clone()),
+                dms.outgoing_call.clone(),
+            )
         };
         let caller_count = incoming.as_deref().map_or(0, count);
         let outgoing_count = outgoing.as_deref().map_or(0, count);
@@ -94,8 +107,9 @@ impl CallRinging {
             Some(_) if self.caller_seen => clear_incoming = true,
             Some(_) => {}
         }
-        let clear_outgoing =
-            outgoing.as_deref().is_some_and(|id| outgoing_ended(id, voice_channel.as_deref(), outgoing_count));
+        let clear_outgoing = outgoing
+            .as_deref()
+            .is_some_and(|id| outgoing_ended(id, voice_channel.as_deref(), outgoing_count));
         if clear_incoming || clear_outgoing {
             dms.update(cx, |dms, cx| {
                 if clear_incoming {
@@ -119,16 +133,22 @@ impl CallRinging {
 
     fn accept(&mut self, cx: &mut Context<Self>) {
         let dms = Dms::global(cx);
-        let Some(call) = dms.read(cx).incoming_call.clone() else { return };
+        let Some(call) = dms.read(cx).incoming_call.clone() else {
+            return;
+        };
         dms.update(cx, |dms, cx| dms.set_incoming_call(None, cx));
         ShellState::accept_call(&call.channel_id, cx);
     }
 
     fn decline(&mut self, cx: &mut Context<Self>) {
         let dms = Dms::global(cx);
-        let Some(call) = dms.read(cx).incoming_call.clone() else { return };
+        let Some(call) = dms.read(cx).incoming_call.clone() else {
+            return;
+        };
         // stops my other devices; the homeserver only ends the whole ring for a 1:1
-        Realtime::global(cx).update(cx, |realtime, cx| realtime.ring_call(&call.channel_id, false, cx));
+        Realtime::global(cx).update(cx, |realtime, cx| {
+            realtime.ring_call(&call.channel_id, false, cx)
+        });
         dms.update(cx, |dms, cx| dms.set_incoming_call(None, cx));
     }
 }
@@ -137,15 +157,34 @@ impl Render for CallRinging {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let dms = Dms::global(cx).read(cx);
-        let Some(call) = dms.incoming_call.clone() else { return div().absolute().size_0() };
+        let Some(call) = dms.incoming_call.clone() else {
+            return div().absolute().size_0();
+        };
         let circle = SettingsStore::get(cx).circle_icons;
         let name = call.user.name().to_string();
-        let group_name =
-            dms.get(&call.channel_id).filter(|dm| dm.kind == DmType::GroupDm).map(|group| dm_display(group).name);
+        let group_name = dms
+            .get(&call.channel_id)
+            .filter(|dm| dm.kind == DmType::GroupDm)
+            .map(|group| dm_display(group).name);
 
-        let round = |button: Stateful<Div>| if circle { button.rounded_full() } else { button.rounded(t.radius) };
+        let round = |button: Stateful<Div>| {
+            if circle {
+                button.rounded_full()
+            } else {
+                button.rounded(t.radius)
+            }
+        };
         let button = |id: &'static str| {
-            round(div().id(id).flex().items_center().justify_center().size_10().flex_shrink_0().cursor_pointer())
+            round(
+                div()
+                    .id(id)
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .size_10()
+                    .flex_shrink_0()
+                    .cursor_pointer(),
+            )
         };
 
         let card = div()
@@ -164,11 +203,19 @@ impl Render for CallRinging {
             .when(circle, |card| card.rounded_xl())
             .child(
                 div()
-                    .child(ui::avatar::avatar(call.user.avatar_url.as_deref(), &name, call.user.avatar_color.as_deref(), 40.0, cx))
+                    .child(ui::avatar::avatar(
+                        call.user.avatar_url.as_deref(),
+                        &name,
+                        call.user.avatar_color.as_deref(),
+                        40.0,
+                        cx,
+                    ))
                     .with_animation(
                         "pulse",
                         Animation::new(Duration::from_secs(2)).repeat(),
-                        |avatar, delta| avatar.opacity(1.0 - 0.5 * (delta * std::f32::consts::PI).sin()),
+                        |avatar, delta| {
+                            avatar.opacity(1.0 - 0.5 * (delta * std::f32::consts::PI).sin())
+                        },
                     ),
             )
             .child(
@@ -185,10 +232,16 @@ impl Render for CallRinging {
                             .text_color(t.foreground)
                             .child(name),
                     )
-                    .child(div().truncate().text_xs().text_color(t.muted_foreground).child(match group_name {
-                        Some(group) => format!("Calling {group}…"),
-                        None => "Incoming call…".into(),
-                    })),
+                    .child(
+                        div()
+                            .truncate()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child(match group_name {
+                                Some(group) => format!("Calling {group}…"),
+                                None => "Incoming call…".into(),
+                            }),
+                    ),
             )
             .child(
                 button("decline")
@@ -207,13 +260,18 @@ impl Render for CallRinging {
                     .on_click(cx.listener(|this, _, _, cx| this.accept(cx))),
             );
 
-        div().absolute().top_4().left_4().right_4().flex().justify_center().child(
-            card.with_animation(
+        div()
+            .absolute()
+            .top_4()
+            .left_4()
+            .right_4()
+            .flex()
+            .justify_center()
+            .child(card.with_animation(
                 SharedString::from(format!("fly-{}", call.channel_id)),
                 Animation::new(Duration::from_millis(200)),
                 |card, delta| card.mt(px(-16.0 * (1.0 - delta))).opacity(delta),
-            ),
-        )
+            ))
     }
 }
 

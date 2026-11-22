@@ -18,7 +18,11 @@ pub struct CreateServerDialog {
 
 /// Up to two initials, one per word.
 pub fn initials(name: &str) -> String {
-    name.split_whitespace().take(2).filter_map(|word| word.chars().next()).flat_map(char::to_uppercase).collect()
+    name.split_whitespace()
+        .take(2)
+        .filter_map(|word| word.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect()
 }
 
 pub fn validate_server_name(name: &str) -> Option<&'static str> {
@@ -42,15 +46,25 @@ pub fn open_create_server(window: &mut Window, cx: &mut App) {
 impl CreateServerDialog {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("My Server").validate(|value, _| value.chars().count() <= 32)
+            InputState::new(window, cx)
+                .placeholder("My Server")
+                .validate(|value, _| value.chars().count() <= 32)
         });
-        let subscriptions = vec![cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = event {
-                this.submit(window, cx);
-            }
-            cx.notify();
-        })];
-        Self { name, loading: false, error: None, _subscriptions: subscriptions }
+        let subscriptions =
+            vec![
+                cx.subscribe_in(&name, window, |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit(window, cx);
+                    }
+                    cx.notify();
+                }),
+            ];
+        Self {
+            name,
+            loading: false,
+            error: None,
+            _subscriptions: subscriptions,
+        }
     }
 
     fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -62,7 +76,9 @@ impl CreateServerDialog {
         }
         self.loading = true;
         self.error = None;
-        Chat::global(cx).update(cx, |chat, cx| chat.create_server(name, cx)).detach();
+        Chat::global(cx)
+            .update(cx, |chat, cx| chat.create_server(name, cx))
+            .detach();
         self.loading = false;
         window.close_dialog(cx);
     }
@@ -73,7 +89,9 @@ impl Render for CreateServerDialog {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
         let name = self.name.read(cx).value().to_string();
-        let preview = Some(initials(&name)).filter(|initials| !initials.is_empty()).unwrap_or("N".into());
+        let preview = Some(initials(&name))
+            .filter(|initials| !initials.is_empty())
+            .unwrap_or("N".into());
 
         div()
             .flex()
@@ -82,7 +100,10 @@ impl Render for CreateServerDialog {
             .child(
                 DialogHeader::new()
                     .child(DialogTitle::new().child("Create Server"))
-                    .child(DialogDescription::new().child("Give your server a name and upload a picture.")),
+                    .child(
+                        DialogDescription::new()
+                            .child("Give your server a name and upload a picture."),
+                    ),
             )
             .child(
                 div()
@@ -109,13 +130,21 @@ impl Render for CreateServerDialog {
                             .flex()
                             .flex_col()
                             .gap(px(6.0))
-                            .child(div().text_xs().font_weight(FontWeight::MEDIUM).child("Server Name"))
                             .child(
-                                Input::new(&self.name).prefix(icon("users").size_4().text_color(t.muted_foreground)),
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child("Server Name"),
+                            )
+                            .child(
+                                Input::new(&self.name)
+                                    .prefix(icon("users").size_4().text_color(t.muted_foreground)),
                             ),
                     ),
             )
-            .when_some(self.error.clone(), |this, error| this.child(ui::error_text(error, cx)))
+            .when_some(self.error.clone(), |this, error| {
+                this.child(ui::error_text(error, cx))
+            })
             .child(
                 div()
                     .flex()
@@ -125,7 +154,10 @@ impl Render for CreateServerDialog {
                     .border_color(t.border)
                     .pt_3()
                     .child(
-                        Button::new("cancel").ghost().label("Cancel").on_click(|_, window, cx| window.close_dialog(cx)),
+                        Button::new("cancel")
+                            .ghost()
+                            .label("Cancel")
+                            .on_click(|_, window, cx| window.close_dialog(cx)),
                     )
                     .child(
                         Button::new("create")
@@ -133,7 +165,11 @@ impl Render for CreateServerDialog {
                             .disabled(self.loading || name.trim().is_empty())
                             .loading(self.loading)
                             .icon(icon("plus"))
-                            .label(if self.loading { "Creating…" } else { "Create Server" })
+                            .label(if self.loading {
+                                "Creating…"
+                            } else {
+                                "Create Server"
+                            })
                             .on_click(cx.listener(|this, _, window, cx| this.submit(window, cx))),
                     ),
             )

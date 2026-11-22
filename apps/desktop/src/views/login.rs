@@ -44,20 +44,31 @@ pub fn validate_home_server(value: &str) -> Option<&'static str> {
     if value.is_empty() {
         return Some("Pick a home server.");
     }
-    let host = value.strip_prefix("https://").or_else(|| value.strip_prefix("http://")).unwrap_or(value);
+    let host = value
+        .strip_prefix("https://")
+        .or_else(|| value.strip_prefix("http://"))
+        .unwrap_or(value);
     let (host, port) = match host.rsplit_once(':') {
         Some((host, port)) if !host.ends_with(']') || host.starts_with('[') => (host, Some(port)),
         _ => (host, None),
     };
-    let port_ok = port.is_none_or(|port| (1..=5).contains(&port.len()) && port.chars().all(|c| c.is_ascii_digit()));
+    let port_ok = port.is_none_or(|port| {
+        (1..=5).contains(&port.len()) && port.chars().all(|c| c.is_ascii_digit())
+    });
     let named = host.rsplit_once('.').is_some_and(|(name, tld)| {
         !name.is_empty()
-            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
             && tld.len() >= 2
             && tld.chars().all(|c| c.is_ascii_alphabetic())
     });
     let local = matches!(host, "localhost" | "127.0.0.1" | "[::1]");
-    if (named || local) && port_ok { None } else { Some("Enter a valid server address.") }
+    if (named || local) && port_ok {
+        None
+    } else {
+        Some("Enter a valid server address.")
+    }
 }
 
 pub fn validate_username(value: &str) -> Option<&'static str> {
@@ -66,7 +77,10 @@ pub fn validate_username(value: &str) -> Option<&'static str> {
         Some("At least 2 characters.")
     } else if value.chars().count() > 32 {
         Some("At most 32 characters.")
-    } else if !value.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_') {
+    } else if !value
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_')
+    {
         Some("Letters, numbers, dots, underscores only.")
     } else {
         None
@@ -76,26 +90,40 @@ pub fn validate_username(value: &str) -> Option<&'static str> {
 impl LoginPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let home_server = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("novarum.me").default_value(api::anchor().home_server)
+            InputState::new(window, cx)
+                .placeholder("novarum.me")
+                .default_value(api::anchor().home_server)
         });
         let username = cx.new(|cx| InputState::new(window, cx).placeholder("alice"));
-        let password = cx.new(|cx| InputState::new(window, cx).placeholder("••••••••").masked(true));
+        let password = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("••••••••")
+                .masked(true)
+        });
         let otp = cx.new(|cx| OtpState::new(6, window, cx));
 
         let mut subscriptions = Vec::new();
         for input in [&home_server, &username, &password] {
-            subscriptions.push(cx.subscribe_in(input, window, |this, _, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    this.submit(window, cx);
-                }
-            }));
+            subscriptions.push(cx.subscribe_in(
+                input,
+                window,
+                |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.submit(window, cx);
+                    }
+                },
+            ));
         }
-        subscriptions.push(cx.subscribe_in(&otp, window, |this, otp, event: &OtpEvent, window, cx| {
-            if *event == OtpEvent::Complete && otp.read(cx).value().len() == 6 {
-                this.verify_mfa(window, cx);
-            }
-            cx.notify();
-        }));
+        subscriptions.push(cx.subscribe_in(
+            &otp,
+            window,
+            |this, otp, event: &OtpEvent, window, cx| {
+                if *event == OtpEvent::Complete && otp.read(cx).value().len() == 6 {
+                    this.verify_mfa(window, cx);
+                }
+                cx.notify();
+            },
+        ));
 
         let router = Router::global(cx).read(cx);
         let redirect = router.param("redirect");
@@ -106,7 +134,8 @@ impl LoginPage {
             let refresh = Session::refresh(cx);
             cx.spawn(async move |_, cx| {
                 if refresh.await.is_some() {
-                    let _ = cx.update(|cx| router::goto(router::safe_redirect(redirect.as_deref()), cx));
+                    let _ = cx
+                        .update(|cx| router::goto(router::safe_redirect(redirect.as_deref()), cx));
                 }
             })
             .detach();
@@ -158,7 +187,11 @@ impl LoginPage {
                 match result {
                     LoginResult::Err(error) => this.submit_error = error,
                     LoginResult::Mfa { challenge, methods } => {
-                        this.mfa_method = if methods.contains(&MfaMethod::Totp) { MfaMethod::Totp } else { MfaMethod::Email };
+                        this.mfa_method = if methods.contains(&MfaMethod::Totp) {
+                            MfaMethod::Totp
+                        } else {
+                            MfaMethod::Email
+                        };
                         this.mfa_challenge = challenge;
                         this.mfa_methods = methods;
                     }
@@ -228,7 +261,12 @@ impl LoginPage {
         .detach();
     }
 
-    fn select_mfa_method(&mut self, method: MfaMethod, window: &mut Window, cx: &mut Context<Self>) {
+    fn select_mfa_method(
+        &mut self,
+        method: MfaMethod,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.mfa_method = method;
         self.otp.update(cx, |otp, cx| otp.set_value("", window, cx));
         self.submit_error.clear();
@@ -258,31 +296,39 @@ impl LoginPage {
                 .bg(t.background.opacity(0.35))
                 .rounded(t.radius)
         };
-        let option = |id: &'static str, icon_name: &str, title: &str, detail: &str, method: MfaMethod| {
-            Button::new(id)
-                .ghost()
-                .w_full()
-                .h_auto()
-                .px_3()
-                .py(px(10.0))
-                .justify_start()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_3()
-                        .child(icon(icon_name).size_4())
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .items_start()
-                                .child(div().text_sm().child(title.to_string()))
-                                .child(div().text_xs().text_color(t.muted_foreground).child(detail.to_string())),
-                        ),
-                )
-                .on_click(cx.listener(move |this, _, window, cx| this.select_mfa_method(method, window, cx)))
-        };
+        let option =
+            |id: &'static str, icon_name: &str, title: &str, detail: &str, method: MfaMethod| {
+                Button::new(id)
+                    .ghost()
+                    .w_full()
+                    .h_auto()
+                    .px_3()
+                    .py(px(10.0))
+                    .justify_start()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .child(icon(icon_name).size_4())
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .items_start()
+                                    .child(div().text_sm().child(title.to_string()))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(t.muted_foreground)
+                                            .child(detail.to_string()),
+                                    ),
+                            ),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.select_mfa_method(method, window, cx)
+                    }))
+            };
 
         let mut form = div().flex().flex_col().gap_5();
         if self.show_login_options {
@@ -300,10 +346,22 @@ impl LoginPage {
                             .child("Choose how to verify"),
                     )
                     .when(self.mfa_methods.contains(&MfaMethod::Totp), |panel| {
-                        panel.child(option("totp", "smartphone", "Authenticator app", "Use a rotating code", MfaMethod::Totp))
+                        panel.child(option(
+                            "totp",
+                            "smartphone",
+                            "Authenticator app",
+                            "Use a rotating code",
+                            MfaMethod::Totp,
+                        ))
                     })
                     .when(self.mfa_methods.contains(&MfaMethod::Email), |panel| {
-                        panel.child(option("email", "mail", "Email code", "Send a one-time code", MfaMethod::Email))
+                        panel.child(option(
+                            "email",
+                            "mail",
+                            "Email code",
+                            "Send a one-time code",
+                            MfaMethod::Email,
+                        ))
                     }),
             );
         } else if self.mfa_method == MfaMethod::Email && !self.email_sent {
@@ -336,7 +394,12 @@ impl LoginPage {
                         .flex_col()
                         .gap_3()
                         .items_center()
-                        .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("Verification code"))
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child("Verification code"),
+                        )
                         .child(OtpInput::new(&self.otp).disabled(self.loading)),
                 )
                 .child(
@@ -347,7 +410,14 @@ impl LoginPage {
                         .disabled(self.loading || code_len != 6)
                         .when(self.loading, |b| b.loading(true).label("Verifying…"))
                         .when(!self.loading, |b| {
-                            b.child(div().flex().items_center().gap_2().child("Verify and sign in").child(icon("arrow-right").size_4()))
+                            b.child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child("Verify and sign in")
+                                    .child(icon("arrow-right").size_4()),
+                            )
                         })
                         .on_click(cx.listener(|this, _, window, cx| this.verify_mfa(window, cx))),
                 )
@@ -359,24 +429,33 @@ impl LoginPage {
                             .w_full()
                             .text_color(t.muted_foreground)
                             .disabled(self.sending_email)
-                            .label(if self.sending_email { "Sending…" } else { "Send a new code" })
-                            .on_click(cx.listener(|this, _, window, cx| this.send_email_code(window, cx))),
+                            .label(if self.sending_email {
+                                "Sending…"
+                            } else {
+                                "Send a new code"
+                            })
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.send_email_code(window, cx)),
+                            ),
                     )
                 });
         }
 
-        form.when(self.mfa_methods.len() > 1 && !self.show_login_options, |form| {
-            form.child(
-                Button::new("another-way")
-                    .outline()
-                    .w_full()
-                    .label("Try another way")
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.show_login_options = true;
-                        cx.notify();
-                    })),
-            )
-        })
+        form.when(
+            self.mfa_methods.len() > 1 && !self.show_login_options,
+            |form| {
+                form.child(
+                    Button::new("another-way")
+                        .outline()
+                        .w_full()
+                        .label("Try another way")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.show_login_options = true;
+                            cx.notify();
+                        })),
+                )
+            },
+        )
         .when(!self.submit_error.is_empty(), |form| {
             form.child(ui::error_text(self.submit_error.clone(), cx).text_center())
         })
@@ -389,8 +468,20 @@ impl LoginPage {
             .flex()
             .flex_col()
             .gap_4()
-            .child(field(ui::label("Home server"), "server", Input::new(&self.home_server), &self.errors[0], cx))
-            .child(field(ui::label("Username"), "at-sign", Input::new(&self.username), &self.errors[1], cx))
+            .child(field(
+                ui::label("Home server"),
+                "server",
+                Input::new(&self.home_server),
+                &self.errors[0],
+                cx,
+            ))
+            .child(field(
+                ui::label("Username"),
+                "at-sign",
+                Input::new(&self.username),
+                &self.errors[1],
+                cx,
+            ))
             .child(field(
                 div()
                     .flex()
@@ -406,13 +497,16 @@ impl LoginPage {
                             .cursor_pointer()
                             .child("Forgot password?")
                             .on_click(move |_, _, cx| {
-                                router::goto(match &redirect {
-                                    Some(redirect) => format!(
-                                        "/reset-password?redirect={}",
-                                        router::encode(&router::safe_redirect(Some(redirect)))
-                                    ),
-                                    None => "/reset-password".into(),
-                                }, cx)
+                                router::goto(
+                                    match &redirect {
+                                        Some(redirect) => format!(
+                                            "/reset-password?redirect={}",
+                                            router::encode(&router::safe_redirect(Some(redirect)))
+                                        ),
+                                        None => "/reset-password".into(),
+                                    },
+                                    cx,
+                                )
                             }),
                     ),
                 "lock",
@@ -428,11 +522,20 @@ impl LoginPage {
                     .disabled(self.loading)
                     .when(self.loading, |b| b.loading(true).label("Signing in…"))
                     .when(!self.loading, |b| {
-                        b.child(div().flex().items_center().gap_2().child("Sign in").child(icon("log-in").size_4()))
+                        b.child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child("Sign in")
+                                .child(icon("log-in").size_4()),
+                        )
                     })
                     .on_click(cx.listener(|this, _, window, cx| this.submit(window, cx))),
             )
-            .when(!self.submit_error.is_empty(), |form| form.child(ui::error_text(self.submit_error.clone(), cx)))
+            .when(!self.submit_error.is_empty(), |form| {
+                form.child(ui::error_text(self.submit_error.clone(), cx))
+            })
     }
 }
 
@@ -443,13 +546,19 @@ impl Render for LoginPage {
         let description = if mfa {
             match (self.mfa_method, self.email_sent) {
                 (MfaMethod::Email, true) => "Enter the code sent to the email on your account.",
-                (MfaMethod::Email, false) => "Get a one-time code sent to the email on your account.",
+                (MfaMethod::Email, false) => {
+                    "Get a one-time code sent to the email on your account."
+                }
                 (MfaMethod::Totp, _) => "Enter the current code from your authenticator app.",
             }
         } else {
             "Sign in to your home server to continue."
         };
-        let content = if mfa { self.render_mfa(cx) } else { self.render_form(cx) };
+        let content = if mfa {
+            self.render_mfa(cx)
+        } else {
+            self.render_form(cx)
+        };
         let redirect = router::safe_redirect(self.redirect.as_deref());
 
         let footer = if mfa {
@@ -475,12 +584,18 @@ impl Render for LoginPage {
                     .cursor_pointer()
                     .hover(|s| s.underline())
                     .child("Register")
-                    .on_click(move |_, _, cx| router::goto(format!("/register?redirect={redirect}"), cx)),
+                    .on_click(move |_, _, cx| {
+                        router::goto(format!("/register?redirect={redirect}"), cx)
+                    }),
             )
         };
 
         auth_backdrop(
-            if mfa { "Verify it’s you" } else { "Welcome back" },
+            if mfa {
+                "Verify it’s you"
+            } else {
+                "Welcome back"
+            },
             description,
             content,
             footer,

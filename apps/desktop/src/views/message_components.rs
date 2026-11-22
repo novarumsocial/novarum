@@ -24,13 +24,22 @@ pub fn message_components(
     for (row_index, row) in rows.iter().enumerate() {
         let mut buttons = div().flex().flex_wrap().gap_1p5();
         for (index, button) in row.components.iter().enumerate() {
-            let base = Button::new(sub_id(&id, format!("{row_index}-{index}"))).small().text_xs();
+            let base = Button::new(sub_id(&id, format!("{row_index}-{index}")))
+                .small()
+                .text_xs();
             if button.style == "link" {
                 let url = button.url.clone();
                 buttons = buttons.child(
                     base.outline()
                         .disabled(button.disabled)
-                        .child(div().flex().items_center().gap_1().child(button.label.clone()).child(icon("external-link").size_3()))
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .child(button.label.clone())
+                                .child(icon("external-link").size_3()),
+                        )
                         .on_click(move |_, _, cx| {
                             if let Some(url) = &url {
                                 desktop::open_url(url, cx);
@@ -41,7 +50,9 @@ pub fn message_components(
             }
             let custom_id = button.custom_id.clone().unwrap_or_default();
             let busy = pressing.as_deref() == Some(format!("{message_id}:{custom_id}").as_str());
-            let any_busy = pressing.as_ref().is_some_and(|pressing| pressing.starts_with(&format!("{message_id}:")));
+            let any_busy = pressing
+                .as_ref()
+                .is_some_and(|pressing| pressing.starts_with(&format!("{message_id}:")));
             let base = match button.style.as_str() {
                 "secondary" => base.secondary(),
                 // bg-emerald-600 text-white
@@ -69,7 +80,12 @@ pub fn message_components(
                     .label(button.label.clone())
                     .on_click(move |_, _, cx| {
                         let press = Interactions::global(cx).update(cx, |interactions, cx| {
-                            interactions.press_button(channel_id.clone(), message_id.clone(), custom_id.clone(), cx)
+                            interactions.press_button(
+                                channel_id.clone(),
+                                message_id.clone(),
+                                custom_id.clone(),
+                                cx,
+                            )
                         });
                         let on_pressed = on_pressed.clone();
                         cx.spawn(async move |cx| {
@@ -83,6 +99,11 @@ pub fn message_components(
         column = column.child(buttons);
     }
     column.when_some(error, |column, error| {
-        column.child(div().text_xs().text_color(t.destructive).child(error.to_string()))
+        column.child(
+            div()
+                .text_xs()
+                .text_color(t.destructive)
+                .child(error.to_string()),
+        )
     })
 }

@@ -34,9 +34,18 @@ pub fn should_notify(message: &MessageData, context: &NotifyContext) -> bool {
     let is_dm = message.guild_id.is_none();
     let mentioned = is_dm
         || mentions_everyone(message.content.as_deref())
-        || message.pinged_handles.iter().any(|handle| handle.eq_ignore_ascii_case(context.handle));
-    let target = Target { channel_id: &message.channel_id, guild_id: message.guild_id.as_deref() };
-    level_allows(effective_level(context.entries, target, chrono::Utc::now()), mentioned)
+        || message
+            .pinged_handles
+            .iter()
+            .any(|handle| handle.eq_ignore_ascii_case(context.handle));
+    let target = Target {
+        channel_id: &message.channel_id,
+        guild_id: message.guild_id.as_deref(),
+    };
+    level_allows(
+        effective_level(context.entries, target, chrono::Utc::now()),
+        mentioned,
+    )
 }
 
 /// "Ana (#general · Rustaceans)", or just "Ana" in a DM (`names` is `None`).
@@ -45,10 +54,16 @@ pub fn message_notification_title(
     username: &str,
     names: Option<(Option<&str>, Option<&str>)>,
 ) -> String {
-    let name = display_name.filter(|name| !name.is_empty()).unwrap_or(username);
+    let name = display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(username);
     match names {
         Some((channel, guild)) => {
-            format!("{name} (#{} · {})", channel.unwrap_or("channel"), guild.unwrap_or("server"))
+            format!(
+                "{name} (#{} · {})",
+                channel.unwrap_or("channel"),
+                guild.unwrap_or("server")
+            )
         }
         None => name.to_string(),
     }
@@ -179,15 +194,26 @@ mod tests {
         };
         assert!(should_notify(&message(None, "hi", &[]), &context));
         assert!(!should_notify(&message(Some("g"), "hi", &[]), &context));
-        assert!(should_notify(&message(Some("g"), "hi", &["@ANA:x"]), &context));
-        assert!(should_notify(&message(Some("g"), "hi @everyone", &[]), &context));
+        assert!(should_notify(
+            &message(Some("g"), "hi", &["@ANA:x"]),
+            &context
+        ));
+        assert!(should_notify(
+            &message(Some("g"), "hi @everyone", &[]),
+            &context
+        ));
     }
 
     #[test]
     fn stays_quiet_in_the_open_channel_and_for_own_messages() {
         let entries = HashMap::new();
-        let silenced =
-            HashMap::from([("c".to_string(), NotificationEntry { level: NotificationLevel::None, muted_until: None })]);
+        let silenced = HashMap::from([(
+            "c".to_string(),
+            NotificationEntry {
+                level: NotificationLevel::None,
+                muted_until: None,
+            },
+        )]);
         let mut context = NotifyContext {
             user_id: "other",
             handle: "@ana:x",
@@ -208,6 +234,9 @@ mod tests {
     #[test]
     fn titles_name_the_channel_and_guild() {
         assert_eq!(message_notification_title(Some("Ana"), "ana", None), "Ana");
-        assert_eq!(message_notification_title(None, "ana", Some((Some("general"), None))), "ana (#general · server)");
+        assert_eq!(
+            message_notification_title(None, "ana", Some((Some("general"), None))),
+            "ana (#general · server)"
+        );
     }
 }

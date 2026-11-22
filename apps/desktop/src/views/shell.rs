@@ -82,7 +82,9 @@ impl ShellState {
 
     pub fn toggle_members(cx: &mut App) {
         if Self::global(cx).read(cx).width >= LG {
-            SettingsStore::update(cx, |settings| settings.show_member_list = !settings.show_member_list);
+            SettingsStore::update(cx, |settings| {
+                settings.show_member_list = !settings.show_member_list
+            });
         } else {
             Self::open_members(cx);
         }
@@ -94,7 +96,11 @@ impl ShellState {
 
     /// `startCall`: joins the call and rings the others if nobody is in it yet.
     pub fn start_call(id: &str, cx: &mut App) {
-        let ring = Chat::global(cx).read(cx).voice_states.get(id).is_none_or(Vec::is_empty);
+        let ring = Chat::global(cx)
+            .read(cx)
+            .voice_states
+            .get(id)
+            .is_none_or(Vec::is_empty);
         let voice = Voice::global(cx);
         let join = voice.update(cx, |voice, cx| voice.join(id, cx));
         let id = id.to_string();
@@ -102,7 +108,8 @@ impl ShellState {
             if join.await.is_ok() && ring {
                 cx.update(|cx| {
                     if voice.read(cx).channel_id.as_deref() == Some(&id) {
-                        Realtime::global(cx).update(cx, |realtime, cx| realtime.ring_call(&id, true, cx));
+                        Realtime::global(cx)
+                            .update(cx, |realtime, cx| realtime.ring_call(&id, true, cx));
                     }
                 });
             }
@@ -112,7 +119,9 @@ impl ShellState {
 
     pub fn leave_voice(cx: &mut App) {
         Self::set(cx, |shell| shell.call_expanded = false);
-        Voice::global(cx).update(cx, |voice, cx| voice.leave(cx)).detach();
+        Voice::global(cx)
+            .update(cx, |voice, cx| voice.leave(cx))
+            .detach();
     }
 
     /// `selectChannel`: voice channels join the call; the chat only opens once you're in it.
@@ -133,7 +142,9 @@ impl ShellState {
             chat.update(cx, |chat, cx| chat.select_channel(id, cx));
         }
         if kind == Some(ChannelType::Voice) {
-            Voice::global(cx).update(cx, |voice, cx| voice.join(id, cx)).detach();
+            Voice::global(cx)
+                .update(cx, |voice, cx| voice.join(id, cx))
+                .detach();
         }
     }
 
@@ -204,8 +215,12 @@ impl AppShell {
                 return;
             }
             if !behind_splash {
-                let _ = this.update(cx, |this, cx| this.loader.update(cx, |loader, cx| loader.finish(cx)));
-                cx.background_executor().timer(Duration::from_millis(100)).await;
+                let _ = this.update(cx, |this, cx| {
+                    this.loader.update(cx, |loader, cx| loader.finish(cx))
+                });
+                cx.background_executor()
+                    .timer(Duration::from_millis(100))
+                    .await;
             }
             let _ = this.update_in(cx, |this, window, cx| {
                 this.booting = false;
@@ -227,7 +242,13 @@ impl AppShell {
         })
         .detach();
 
-        Self { booting: !behind_splash, loader, panels: None, unread_total: 0, _subscriptions: subscriptions }
+        Self {
+            booting: !behind_splash,
+            loader,
+            panels: None,
+            unread_total: 0,
+            _subscriptions: subscriptions,
+        }
     }
 
     /// Mentions across guilds plus unread DMs: the title and the launcher badge.
@@ -238,10 +259,16 @@ impl AppShell {
             .channels_by_server
             .iter()
             .flat_map(|(guild_id, categories)| {
-                categories.iter().flat_map(|category| &category.channels).map(move |channel| (guild_id, channel))
+                categories
+                    .iter()
+                    .flat_map(|category| &category.channels)
+                    .map(move |channel| (guild_id, channel))
             })
             .filter(|(guild_id, channel)| {
-                notifications.shows_mentions(Target { channel_id: &channel.id, guild_id: Some(guild_id) })
+                notifications.shows_mentions(Target {
+                    channel_id: &channel.id,
+                    guild_id: Some(guild_id),
+                })
             })
             .map(|(_, channel)| channel.mention)
             .sum();
@@ -249,23 +276,39 @@ impl AppShell {
             .read(cx)
             .list
             .iter()
-            .filter(|dm| dm.unread && notifications.shows_unread(Target { channel_id: &dm.id, guild_id: None }))
+            .filter(|dm| {
+                dm.unread
+                    && notifications.shows_unread(Target {
+                        channel_id: &dm.id,
+                        guild_id: None,
+                    })
+            })
             .count();
         mentions as usize + unread_dms
     }
 }
 
 fn scrim(id: &'static str, on_click: fn(&mut App)) -> Stateful<Div> {
-    div().id(id).absolute().inset_0().bg(black().opacity(0.6)).on_click(move |_, _, cx| on_click(cx))
+    div()
+        .id(id)
+        .absolute()
+        .inset_0()
+        .bg(black().opacity(0.6))
+        .on_click(move |_, _, cx| on_click(cx))
 }
 
 impl Render for AppShell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.booting {
-            return div().size_full().child(self.loader.clone()).into_any_element();
+            return div()
+                .size_full()
+                .child(self.loader.clone())
+                .into_any_element();
         }
         let t = theme::tokens(cx);
-        let Some(panels) = &self.panels else { return div().size_full().bg(t.background).into_any_element() };
+        let Some(panels) = &self.panels else {
+            return div().size_full().bg(t.background).into_any_element();
+        };
         if Session::user(cx).is_none() {
             return div().size_full().bg(t.background).into_any_element();
         }
@@ -283,7 +326,11 @@ impl Render for AppShell {
         let unread = Self::unread_total(cx);
         if unread != self.unread_total {
             self.unread_total = unread;
-            window.set_window_title(&if unread > 0 { format!("({unread}) Novarum") } else { "Novarum".into() });
+            window.set_window_title(&if unread > 0 {
+                format!("({unread}) Novarum")
+            } else {
+                "Novarum".into()
+            });
             crate::desktop::set_badge_count(unread, cx);
         }
 
@@ -292,17 +339,26 @@ impl Render for AppShell {
         let has_server = chat.current_server(cx).is_some();
         let current_channel = chat.current_channel(cx);
         let current_group = match &route {
-            ChatRoute::Dms { channel_id: Some(id), .. } => {
-                Dms::global(cx).read(cx).get(id).is_some_and(|dm| dm.kind == DmType::GroupDm)
-            }
+            ChatRoute::Dms {
+                channel_id: Some(id),
+                ..
+            } => Dms::global(cx)
+                .read(cx)
+                .get(id)
+                .is_some_and(|dm| dm.kind == DmType::GroupDm),
             _ => false,
         };
         // a voice channel's call takes the whole width, so it has no member list
         let show_members = (matches!(route, ChatRoute::Guild { .. })
-            && current_channel.as_ref().is_some_and(|channel| channel.kind != ChannelType::Voice))
+            && current_channel
+                .as_ref()
+                .is_some_and(|channel| channel.kind != ChannelType::Voice))
             || current_group;
         let show_member_list = SettingsStore::get(cx).show_member_list;
-        let home_like = matches!(route, ChatRoute::Home | ChatRoute::Dms { .. } | ChatRoute::Developers { .. });
+        let home_like = matches!(
+            route,
+            ChatRoute::Home | ChatRoute::Dms { .. } | ChatRoute::Developers { .. }
+        );
         let narrow = width < MD;
         let below_lg = width < LG;
 
@@ -312,7 +368,9 @@ impl Render for AppShell {
             .flex_shrink_0()
             .h_full()
             .bg(t.sidebar)
-            .when(narrow, |nav| nav.absolute().top_0().left_0().max_w(px(width - 48.0)))
+            .when(narrow, |nav| {
+                nav.absolute().top_0().left_0().max_w(px(width - 48.0))
+            })
             .child(
                 div()
                     .flex()
@@ -327,7 +385,9 @@ impl Render for AppShell {
         let main: AnyElement = match (&route, &current_channel) {
             (ChatRoute::Home, _) => panels.friends_home.clone().into_any_element(),
             (ChatRoute::Developers { .. }, _) => panels.developers_home.clone().into_any_element(),
-            (_, Some(channel)) if channel.kind != ChannelType::Voice => panels.chat_area.clone().into_any_element(),
+            (_, Some(channel)) if channel.kind != ChannelType::Voice => {
+                panels.chat_area.clone().into_any_element()
+            }
             (_, Some(_)) => panels.voice_area.clone().into_any_element(),
             _ => {
                 let dms_route = matches!(route, ChatRoute::Dms { .. });
@@ -366,14 +426,24 @@ impl Render for AppShell {
                             .flex()
                             .flex_col()
                             .items_center()
-                            .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(t.foreground).child(
-                                if dms_route { "No conversation selected" } else { "No channel selected" },
-                            ))
-                            .child(div().mt_1().text_sm().text_color(t.muted_foreground).child(if dms_route {
-                                "Pick a direct message to begin."
-                            } else {
-                                "Pick a server or create one to begin."
-                            })),
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(t.foreground)
+                                    .child(if dms_route {
+                                        "No conversation selected"
+                                    } else {
+                                        "No channel selected"
+                                    }),
+                            )
+                            .child(div().mt_1().text_sm().text_color(t.muted_foreground).child(
+                                if dms_route {
+                                    "Pick a direct message to begin."
+                                } else {
+                                    "Pick a server or create one to begin."
+                                },
+                            )),
                     )
                     .into_any_element()
             }
@@ -390,7 +460,12 @@ impl Render for AppShell {
                 panels.member_sidebar.clone().into_any_element()
             });
 
-        let mut root = div().relative().flex().size_full().overflow_hidden().bg(t.background);
+        let mut root = div()
+            .relative()
+            .flex()
+            .size_full()
+            .overflow_hidden()
+            .bg(t.background);
         let mut drawer = None;
         if !narrow {
             root = root.child(navigation);
@@ -401,10 +476,14 @@ impl Render for AppShell {
         if show_members && !below_lg && show_member_list {
             root = root.child(members);
         } else if show_members && below_lg && members_open {
-            root = root.child(scrim("close-members", ShellState::close_members)).child(members);
+            root = root
+                .child(scrim("close-members", ShellState::close_members))
+                .child(members);
         }
         if let Some(navigation) = drawer {
-            root = root.child(scrim("close-navigation", ShellState::close_navigation)).child(navigation);
+            root = root
+                .child(scrim("close-navigation", ShellState::close_navigation))
+                .child(navigation);
         }
         root.child(panels.call_ringing.clone()).into_any_element()
     }

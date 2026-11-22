@@ -21,7 +21,10 @@ use crate::{
 
 /// Online members first, then everyone marked offline.
 pub fn split_by_status(members: &[Author]) -> (Vec<Author>, Vec<Author>) {
-    members.iter().cloned().partition(|member| member.status != Some(UserStatus::Offline))
+    members
+        .iter()
+        .cloned()
+        .partition(|member| member.status != Some(UserStatus::Offline))
 }
 
 pub struct MemberSidebar {
@@ -42,7 +45,10 @@ impl MemberSidebar {
 
 /// `openDm`: only friends have a DM to open; resolves to its channel.
 fn open_dm(member: &Author, cx: &mut App) -> Task<Option<String>> {
-    let Some(user_id) = Friends::global(cx).read(cx).user_id_for(&member.username, &member.server) else {
+    let Some(user_id) = Friends::global(cx)
+        .read(cx)
+        .user_id_for(&member.username, &member.server)
+    else {
         return Task::ready(None);
     };
     Dms::global(cx).update(cx, |dms, cx| dms.open(user_id, cx))
@@ -50,28 +56,43 @@ fn open_dm(member: &Author, cx: &mut App) -> Task<Option<String>> {
 
 fn member_menu(menu: PopupMenu, member: &Author, can_manage: bool, cx: &App) -> PopupMenu {
     let destructive = theme::tokens(cx).destructive;
-    let danger = move |label: String| PopupMenuItem::element(move |_, _| div().text_color(destructive).child(label.clone()));
-    let friend = Friends::global(cx).read(cx).status_for(&member.username, &member.server) == FriendStatus::Friend;
+    let danger = move |label: String| {
+        PopupMenuItem::element(move |_, _| div().text_color(destructive).child(label.clone()))
+    };
+    let friend = Friends::global(cx)
+        .read(cx)
+        .status_for(&member.username, &member.server)
+        == FriendStatus::Friend;
     let mention = member.clone();
-    let mut menu = menu.item(PopupMenuItem::new("Profile")).item(PopupMenuItem::new("Mention").on_click(move |_, _, cx| {
-        let member = mention.clone();
-        Chat::global(cx).update(cx, |chat, cx| chat.request_mention(member, cx));
-    }));
+    let mut menu =
+        menu.item(PopupMenuItem::new("Profile"))
+            .item(PopupMenuItem::new("Mention").on_click(move |_, _, cx| {
+                let member = mention.clone();
+                Chat::global(cx).update(cx, |chat, cx| chat.request_mention(member, cx));
+            }));
     if friend {
         let (message, call) = (member.clone(), member.clone());
         menu = menu
-            .item(PopupMenuItem::new("Message").on_click(move |_, _, cx| open_dm(&message, cx).detach()))
-            .item(PopupMenuItem::new("Start a Call").on_click(move |_, _, cx| {
-                let open = open_dm(&call, cx);
-                cx.spawn(async move |cx| {
-                    if let Some(channel_id) = open.await {
-                        cx.update(|cx| ShellState::start_call(&channel_id, cx));
-                    }
-                })
-                .detach();
-            }));
+            .item(
+                PopupMenuItem::new("Message")
+                    .on_click(move |_, _, cx| open_dm(&message, cx).detach()),
+            )
+            .item(
+                PopupMenuItem::new("Start a Call").on_click(move |_, _, cx| {
+                    let open = open_dm(&call, cx);
+                    cx.spawn(async move |cx| {
+                        if let Some(channel_id) = open.await {
+                            cx.update(|cx| ShellState::start_call(&channel_id, cx));
+                        }
+                    })
+                    .detach();
+                }),
+            );
     }
-    menu = menu.separator().item(PopupMenuItem::new("Mute")).item(danger("Block".into()));
+    menu = menu
+        .separator()
+        .item(PopupMenuItem::new("Mute"))
+        .item(danger("Block".into()));
     if can_manage {
         menu = menu
             .separator()
@@ -88,7 +109,9 @@ impl Render for MemberSidebar {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
         let chat = Chat::global(cx).read(cx);
-        let can_manage = chat.current_server(cx).is_some_and(|server| server.can_manage_channels);
+        let can_manage = chat
+            .current_server(cx)
+            .is_some_and(|server| server.can_manage_channels);
         let (online, offline) = split_by_status(&chat.members);
         let on_call: OnCall = Rc::new(|id, _, cx| ShellState::start_call(id, cx));
 
@@ -96,7 +119,13 @@ impl Render for MemberSidebar {
             let name = member.name().to_string();
             let avatar = div()
                 .relative()
-                .child(ui::avatar::avatar(member.avatar_url.as_deref(), &name, member.avatar_color.as_deref(), 28.0, cx))
+                .child(ui::avatar::avatar(
+                    member.avatar_url.as_deref(),
+                    &name,
+                    member.avatar_color.as_deref(),
+                    28.0,
+                    cx,
+                ))
                 .when(is_online, |avatar| {
                     let size = if circle { 11.0 } else { 10.0 };
                     avatar.child(
@@ -125,8 +154,16 @@ impl Render for MemberSidebar {
                         .flex()
                         .flex_1()
                         .min_w_0()
-                        .child(div().truncate().text_sm().text_color(t.foreground).child(name))
-                        .when(is_online && member.is_bot, |row| row.child(bot_badge(cx).mt(px(2.0)).ml(px(6.0))))
+                        .child(
+                            div()
+                                .truncate()
+                                .text_sm()
+                                .text_color(t.foreground)
+                                .child(name),
+                        )
+                        .when(is_online && member.is_bot, |row| {
+                            row.child(bot_badge(cx).mt(px(2.0)).ml(px(6.0)))
+                        })
                         .child(
                             div()
                                 .min_w_0()
@@ -152,14 +189,23 @@ impl Render for MemberSidebar {
                 .context_menu(move |menu, _, cx| member_menu(menu, &menu_member, can_manage, cx))
         };
         let online_rows: Vec<_> = online.iter().map(|member| row(member, true, cx)).collect();
-        let offline_rows: Vec<_> = offline.iter().map(|member| row(member, false, cx)).collect();
+        let offline_rows: Vec<_> = offline
+            .iter()
+            .map(|member| row(member, false, cx))
+            .collect();
 
         div()
             .flex()
             .flex_col()
             .size_full()
             .bg(t.sidebar)
-            .child(div().h_12().flex_shrink_0().border_b_1().border_color(t.border))
+            .child(
+                div()
+                    .h_12()
+                    .flex_shrink_0()
+                    .border_b_1()
+                    .border_color(t.border),
+            )
             .child(
                 div()
                     .id("members")
@@ -191,7 +237,14 @@ impl Render for MemberSidebar {
                                 .text_color(t.muted_foreground)
                                 .child(format!("Offline - {}", offline.len())),
                         )
-                        .child(div().flex().flex_col().gap(px(2.0)).opacity(0.5).children(offline_rows))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(2.0))
+                                .opacity(0.5)
+                                .children(offline_rows),
+                        )
                     }),
             )
     }
@@ -220,10 +273,25 @@ mod tests {
 
     #[test]
     fn splits_online_and_offline() {
-        let members =
-            [member("a", Some(UserStatus::Online)), member("b", Some(UserStatus::Offline)), member("c", None)];
+        let members = [
+            member("a", Some(UserStatus::Online)),
+            member("b", Some(UserStatus::Offline)),
+            member("c", None),
+        ];
         let (online, offline) = split_by_status(&members);
-        assert_eq!(online.iter().map(|m| m.user_id.as_str()).collect::<Vec<_>>(), ["a", "c"]);
-        assert_eq!(offline.iter().map(|m| m.user_id.as_str()).collect::<Vec<_>>(), ["b"]);
+        assert_eq!(
+            online
+                .iter()
+                .map(|m| m.user_id.as_str())
+                .collect::<Vec<_>>(),
+            ["a", "c"]
+        );
+        assert_eq!(
+            offline
+                .iter()
+                .map(|m| m.user_id.as_str())
+                .collect::<Vec<_>>(),
+            ["b"]
+        );
     }
 }

@@ -23,7 +23,9 @@ pub fn field(label: Div, icon_name: &str, input: Input, error: &Option<String>, 
 
 pub fn field_errors(error: &Option<String>, cx: &App) -> impl IntoElement {
     let t = theme::tokens(cx);
-    div().when_some(error.clone(), |div, error| div.text_xs().text_color(t.destructive).child(error))
+    div().when_some(error.clone(), |div, error| {
+        div.text_xs().text_color(t.destructive).child(error)
+    })
 }
 
 /// Card.Root with its header (title + description), content and footer, on the `dark` backdrop.
@@ -52,13 +54,19 @@ pub fn auth_backdrop(
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(div().size(px(240.0)).rounded_full().bg(rgba(0x82afeb10)).shadow(vec![BoxShadow {
-                    color: rgba(0x82afeb10).into(),
-                    offset: point(px(0.0), px(0.0)),
-                    blur_radius: px(320.0),
-                    spread_radius: px(160.0),
-                    inset: false,
-                }])),
+                .child(
+                    div()
+                        .size(px(240.0))
+                        .rounded_full()
+                        .bg(rgba(0x82afeb10))
+                        .shadow(vec![BoxShadow {
+                            color: rgba(0x82afeb10).into(),
+                            offset: point(px(0.0), px(0.0)),
+                            blur_radius: px(320.0),
+                            spread_radius: px(160.0),
+                            inset: false,
+                        }]),
+                ),
         )
         .child(
             div()
@@ -78,7 +86,12 @@ pub fn auth_backdrop(
                         .rounded(theme::tokens(cx).radius)
                         .child(svg().path("logo.svg").size_5().text_color(white())),
                 )
-                .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child("novarum")),
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("novarum"),
+                ),
         )
         .child(
             div()
@@ -103,7 +116,7 @@ pub fn auth_backdrop(
                             offset: point(px(0.0), px(25.0)),
                             blur_radius: px(50.0),
                             spread_radius: px(-12.0),
-                    inset: false,
+                            inset: false,
                         }])
                         .child(
                             div()

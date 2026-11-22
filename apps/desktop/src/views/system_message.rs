@@ -31,7 +31,10 @@ pub fn system_message(message: &Message, system: &SystemMessage, cx: &App) -> Di
         SystemMessage::Call { .. } => rgb(0x22c55e).into(),
         _ => t.muted_foreground,
     };
-    let time = format_time(&message.timestamp.with_timezone(&Local), SettingsStore::get(cx).time_format);
+    let time = format_time(
+        &message.timestamp.with_timezone(&Local),
+        SettingsStore::get(cx).time_format,
+    );
     div()
         .flex()
         .items_center()
@@ -54,7 +57,17 @@ pub fn system_message(message: &Message, system: &SystemMessage, cx: &App) -> Di
                 .flex_wrap()
                 .items_baseline()
                 .min_w_0()
-                .child(system_text(system, message.author.display_name.as_deref(), &message.author.username))
-                .child(div().ml_1().text_size(px(10.0)).text_color(t.muted_foreground.opacity(0.6)).child(time)),
+                .child(system_text(
+                    system,
+                    message.author.display_name.as_deref(),
+                    &message.author.username,
+                ))
+                .child(
+                    div()
+                        .ml_1()
+                        .text_size(px(10.0))
+                        .text_color(t.muted_foreground.opacity(0.6))
+                        .child(time),
+                ),
         )
 }

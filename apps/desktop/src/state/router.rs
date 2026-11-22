@@ -6,9 +6,18 @@ use gpui_kit::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatRoute {
     Home,
-    Developers { bot_id: Option<String> },
-    Dms { channel_id: Option<String>, message_id: Option<String> },
-    Guild { server_id: Option<String>, channel_id: Option<String>, message_id: Option<String> },
+    Developers {
+        bot_id: Option<String>,
+    },
+    Dms {
+        channel_id: Option<String>,
+        message_id: Option<String>,
+    },
+    Guild {
+        server_id: Option<String>,
+        channel_id: Option<String>,
+        message_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,7 +40,10 @@ struct GlobalRouter(Entity<Router>);
 impl Global for GlobalRouter {}
 
 pub fn init(cx: &mut App) {
-    let router = cx.new(|_| Router { path: "/guilds".into(), query: HashMap::new() });
+    let router = cx.new(|_| Router {
+        path: "/guilds".into(),
+        query: HashMap::new(),
+    });
     cx.set_global(GlobalRouter(router));
     // debug builds can open straight onto a page, e.g. NOVARUM_START_PATH=/guilds/dms
     #[cfg(debug_assertions)]
@@ -48,17 +60,30 @@ fn decode(part: &str) -> String {
 }
 
 pub fn encode(part: &str) -> String {
-    url::form_urlencoded::byte_serialize(part.as_bytes()).collect::<String>().replace('+', "%20")
+    url::form_urlencoded::byte_serialize(part.as_bytes())
+        .collect::<String>()
+        .replace('+', "%20")
 }
 
 pub fn parse_chat_route(rest: &str) -> ChatRoute {
-    let parts: Vec<String> = rest.split('/').filter(|part| !part.is_empty()).map(decode).collect();
+    let parts: Vec<String> = rest
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .map(decode)
+        .collect();
     let get = |index: usize| parts.get(index).cloned();
     match parts.first().map(String::as_str) {
         None => ChatRoute::Home,
         Some("developers") => ChatRoute::Developers { bot_id: get(1) },
-        Some("dms") => ChatRoute::Dms { channel_id: get(1), message_id: get(2) },
-        Some(_) => ChatRoute::Guild { server_id: get(0), channel_id: get(1), message_id: get(2) },
+        Some("dms") => ChatRoute::Dms {
+            channel_id: get(1),
+            message_id: get(2),
+        },
+        Some(_) => ChatRoute::Guild {
+            server_id: get(0),
+            channel_id: get(1),
+            message_id: get(2),
+        },
     }
 }
 
@@ -96,8 +121,14 @@ impl Router {
 pub fn goto(url: impl AsRef<str>, cx: &mut App) {
     let url = url.as_ref();
     let (path, query) = url.split_once('?').unwrap_or((url, ""));
-    let path = if path.is_empty() || path == "/" { "/guilds" } else { path };
-    let query = url::form_urlencoded::parse(query.as_bytes()).into_owned().collect();
+    let path = if path.is_empty() || path == "/" {
+        "/guilds"
+    } else {
+        path
+    };
+    let query = url::form_urlencoded::parse(query.as_bytes())
+        .into_owned()
+        .collect();
     Router::global(cx).update(cx, |router, cx| {
         if router.path != path || router.query != query {
             router.path = path.into();
@@ -110,7 +141,11 @@ pub fn goto(url: impl AsRef<str>, cx: &mut App) {
 /// safeRedirect.ts: only same-app paths, never `//host` or a full url.
 pub fn safe_redirect(target: Option<&str>) -> String {
     match target {
-        Some(target) if target.starts_with('/') && !target.starts_with("//") && !target.starts_with("/\\") => {
+        Some(target)
+            if target.starts_with('/')
+                && !target.starts_with("//")
+                && !target.starts_with("/\\") =>
+        {
             target.into()
         }
         _ => "/guilds".into(),
@@ -126,7 +161,10 @@ mod tests {
         assert_eq!(parse_chat_route(""), ChatRoute::Home);
         assert_eq!(
             parse_chat_route("/dms/abc"),
-            ChatRoute::Dms { channel_id: Some("abc".into()), message_id: None }
+            ChatRoute::Dms {
+                channel_id: Some("abc".into()),
+                message_id: None
+            }
         );
         assert_eq!(
             parse_chat_route("/g%3Ax/c/m"),

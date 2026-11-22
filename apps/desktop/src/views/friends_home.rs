@@ -44,7 +44,9 @@ pub fn matches_query(entry: &FriendEntry, query: &str) -> bool {
 pub fn friend_list(accepted: &[FriendEntry], online_only: bool, query: &str) -> Vec<FriendEntry> {
     let mut list: Vec<FriendEntry> = accepted
         .iter()
-        .filter(|entry| (!online_only || entry.status == UserStatus::Online) && matches_query(entry, query))
+        .filter(|entry| {
+            (!online_only || entry.status == UserStatus::Online) && matches_query(entry, query)
+        })
         .cloned()
         .collect();
     list.sort_by_key(|entry| entry.status != UserStatus::Online);
@@ -58,7 +60,10 @@ pub fn parse_handle(handle: &str) -> Result<(String, String), &'static str> {
     if !HANDLE.is_match(handle) {
         return Err("Use a full handle, like @name:server.");
     }
-    let (username, homeserver) = handle.trim_start_matches('@').split_once(':').unwrap_or_default();
+    let (username, homeserver) = handle
+        .trim_start_matches('@')
+        .split_once(':')
+        .unwrap_or_default();
     Ok((username.into(), homeserver.into()))
 }
 
@@ -79,16 +84,26 @@ impl FriendsHome {
             cx.observe(&SettingsStore::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&ShellState::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&query, |_, _, cx| cx.notify()),
-            cx.subscribe_in(&handle, window, |this, _, event: &InputEvent, window, cx| match event {
-                InputEvent::PressEnter { .. } => this.send_request(window, cx),
-                InputEvent::Change => {
-                    this.add_result = None;
-                    cx.notify();
-                }
-                _ => cx.notify(),
-            }),
+            cx.subscribe_in(
+                &handle,
+                window,
+                |this, _, event: &InputEvent, window, cx| match event {
+                    InputEvent::PressEnter { .. } => this.send_request(window, cx),
+                    InputEvent::Change => {
+                        this.add_result = None;
+                        cx.notify();
+                    }
+                    _ => cx.notify(),
+                },
+            ),
         ];
-        Self { tab: Tab::Online, query, handle, add_result: None, _subscriptions }
+        Self {
+            tab: Tab::Online,
+            query,
+            handle,
+            add_result: None,
+            _subscriptions,
+        }
     }
 
     fn set_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
@@ -110,16 +125,25 @@ impl FriendsHome {
             }
         };
         let friends = Friends::global(cx);
-        let request = friends.update(cx, |friends, cx| friends.request(handle, &username, &homeserver, cx));
+        let request = friends.update(cx, |friends, cx| {
+            friends.request(handle, &username, &homeserver, cx)
+        });
         cx.spawn_in(window, async move |this, cx| {
             let sent = request.await;
             let _ = this.update_in(cx, |this, window, cx| {
                 this.add_result = Some(if sent {
-                    this.handle.update(cx, |input, cx| input.set_value("", window, cx));
-                    (true, format!("Friend request sent to @{username}:{homeserver}."))
+                    this.handle
+                        .update(cx, |input, cx| input.set_value("", window, cx));
+                    (
+                        true,
+                        format!("Friend request sent to @{username}:{homeserver}."),
+                    )
                 } else {
                     let error = friends.read(cx).error.clone();
-                    (false, error.unwrap_or_else(|| "Could not send the friend request.".into()))
+                    (
+                        false,
+                        error.unwrap_or_else(|| "Could not send the friend request.".into()),
+                    )
                 });
                 cx.notify();
             });
@@ -128,14 +152,26 @@ impl FriendsHome {
     }
 
     /// The `person` snippet: avatar with a presence dot, name and subtitle.
-    fn person(entry: &FriendEntry, subtitle: &str, size: f32, group: &'static str, cx: &mut App) -> [Div; 2] {
+    fn person(
+        entry: &FriendEntry,
+        subtitle: &str,
+        size: f32,
+        group: &'static str,
+        cx: &mut App,
+    ) -> [Div; 2] {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
         let name = entry.user.name().to_string();
         let avatar = div()
             .relative()
             .flex_shrink_0()
-            .child(ui::avatar::avatar(entry.user.avatar_url.as_deref(), &name, entry.user.avatar_color.as_deref(), size, cx))
+            .child(ui::avatar::avatar(
+                entry.user.avatar_url.as_deref(),
+                &name,
+                entry.user.avatar_color.as_deref(),
+                size,
+                cx,
+            ))
             .child(
                 div()
                     .absolute()
@@ -145,7 +181,11 @@ impl FriendsHome {
                     .border(px(3.0))
                     .border_color(t.background)
                     .group_hover(group, |s| s.border_color(t.card))
-                    .bg(if entry.status == UserStatus::Online { emerald() } else { neutral_500() })
+                    .bg(if entry.status == UserStatus::Online {
+                        emerald()
+                    } else {
+                        neutral_500()
+                    })
                     .when(circle, |dot| dot.rounded_full()),
             );
         let text = div()
@@ -173,7 +213,14 @@ impl FriendsHome {
                             .child(format!("({})", entry.user.homeserver)),
                     ),
             )
-            .child(div().mt(px(2.0)).truncate().text_xs().text_color(t.muted_foreground).child(subtitle.to_string()));
+            .child(
+                div()
+                    .mt(px(2.0))
+                    .truncate()
+                    .text_xs()
+                    .text_color(t.muted_foreground)
+                    .child(subtitle.to_string()),
+            );
         [avatar, text]
     }
 
@@ -206,7 +253,9 @@ impl FriendsHome {
                     .hover(move |s| s.text_color(tone.unwrap_or(t.foreground)).bg(t.accent))
                     .on_click(move |_, _, cx| on_click(cx))
             })
-            .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(id.clone()).build(window, cx))
+            .tooltip(move |window, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(id.clone()).build(window, cx)
+            })
             .child(icon(icon_name).size_4())
     }
 
@@ -220,8 +269,18 @@ impl FriendsHome {
             .justify_center()
             .px_6()
             .py_16()
-            .child(icon("users").size_10().text_color(t.muted_foreground.opacity(0.5)))
-            .child(div().mt_4().text_sm().font_weight(FontWeight::MEDIUM).child(title.to_string()))
+            .child(
+                icon("users")
+                    .size_10()
+                    .text_color(t.muted_foreground.opacity(0.5)),
+            )
+            .child(
+                div()
+                    .mt_4()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(title.to_string()),
+            )
             .child(
                 div()
                     .mt_1()
@@ -263,10 +322,22 @@ impl FriendsHome {
 
     fn render_friends(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let friends = Friends::global(cx).read(cx);
-        let (loading, accepted, busy_ids) = (friends.loading, friends.accepted.clone(), friends.busy_user_ids.clone());
-        let online_count = accepted.iter().filter(|entry| entry.status == UserStatus::Online).count();
+        let (loading, accepted, busy_ids) = (
+            friends.loading,
+            friends.accepted.clone(),
+            friends.busy_user_ids.clone(),
+        );
+        let online_count = accepted
+            .iter()
+            .filter(|entry| entry.status == UserStatus::Online)
+            .count();
         if loading && accepted.is_empty() {
-            return vec![ui::muted("Loading friends…", cx).px_3().py_8().into_any_element()];
+            return vec![
+                ui::muted("Loading friends…", cx)
+                    .px_3()
+                    .py_8()
+                    .into_any_element(),
+            ];
         }
         if accepted.is_empty() {
             return vec![
@@ -285,22 +356,36 @@ impl FriendsHome {
                         Button::new("add-first")
                             .primary()
                             .label("Add friend")
-                            .on_click(cx.listener(|this, _, window, cx| this.set_tab(Tab::Add, window, cx))),
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.set_tab(Tab::Add, window, cx)
+                            })),
                     )
                     .into_any_element(),
             ];
         }
         if self.tab == Tab::Online && online_count == 0 {
             return vec![
-                Self::empty("No one’s around right now", "Friends who come online will show up here.", cx)
-                    .into_any_element(),
+                Self::empty(
+                    "No one’s around right now",
+                    "Friends who come online will show up here.",
+                    cx,
+                )
+                .into_any_element(),
             ];
         }
 
         let t = theme::tokens(cx);
         let query = self.query.read(cx).value().to_string();
         let list = friend_list(&accepted, self.tab == Tab::Online, &query);
-        let label = format!("{} — {}", if self.tab == Tab::Online { "Online" } else { "All friends" }, list.len());
+        let label = format!(
+            "{} — {}",
+            if self.tab == Tab::Online {
+                "Online"
+            } else {
+                "All friends"
+            },
+            list.len()
+        );
 
         let search = div()
             .flex()
@@ -311,11 +396,20 @@ impl FriendsHome {
             .bg(t.sidebar)
             .rounded(t.radius)
             .text_sm()
-            .child(div().flex_1().child(Input::new(&self.query).appearance(false)))
+            .child(
+                div()
+                    .flex_1()
+                    .child(Input::new(&self.query).appearance(false)),
+            )
             .child(icon("search").size_4().text_color(t.muted_foreground));
 
         let rows: Vec<AnyElement> = if list.is_empty() {
-            vec![ui::muted(format!("No friends match “{}”.", query.trim()), cx).px_3().py_8().into_any_element()]
+            vec![
+                ui::muted(format!("No friends match “{}”.", query.trim()), cx)
+                    .px_3()
+                    .py_8()
+                    .into_any_element(),
+            ]
         } else {
             list.iter()
                 .map(|entry| {
@@ -326,14 +420,20 @@ impl FriendsHome {
                         let user_id = user_id.clone();
                         move |cx: &mut App| {
                             let user_id = user_id.clone();
-                            Dms::global(cx).update(cx, |dms, cx| dms.open(user_id, cx)).detach();
+                            Dms::global(cx)
+                                .update(cx, |dms, cx| dms.open(user_id, cx))
+                                .detach();
                         }
                     };
                     let open_row = open.clone();
                     let remove_id = user_id.clone();
                     let [avatar, text] = Self::person(
                         entry,
-                        if entry.status == UserStatus::Online { "Online" } else { "Offline" },
+                        if entry.status == UserStatus::Online {
+                            "Online"
+                        } else {
+                            "Offline"
+                        },
                         32.0,
                         "friend-row",
                         cx,
@@ -348,7 +448,16 @@ impl FriendsHome {
                                 .cursor_pointer()
                                 .on_click(move |_, _, cx| open_row(cx)),
                         )
-                        .child(div().flex().flex_1().min_w_0().items_center().gap_3().child(avatar).child(text))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_1()
+                                .min_w_0()
+                                .items_center()
+                                .gap_3()
+                                .child(avatar)
+                                .child(text),
+                        )
                         .child(
                             div()
                                 .relative()
@@ -374,22 +483,29 @@ impl FriendsHome {
                                         .bg(t.card)
                                         .text_color(t.muted_foreground)
                                         .tooltip("More")
-                                        .dropdown_menu_with_anchor(Anchor::TopRight, move |menu, _, cx| {
-                                            let t = theme::tokens(cx);
-                                            let remove_id = remove_id.clone();
-                                            menu.min_w(px(192.0)).item(
-                                                PopupMenuItem::element(move |_, _| {
-                                                    div().text_color(t.destructive).child("Remove friend")
-                                                })
-                                                .disabled(busy)
-                                                .on_click(move |_, _, cx| {
-                                                    let user_id = remove_id.clone();
-                                                    Friends::global(cx)
-                                                        .update(cx, |friends, cx| friends.remove(user_id, cx))
-                                                        .detach();
-                                                }),
-                                            )
-                                        }),
+                                        .dropdown_menu_with_anchor(
+                                            Anchor::TopRight,
+                                            move |menu, _, cx| {
+                                                let t = theme::tokens(cx);
+                                                let remove_id = remove_id.clone();
+                                                menu.min_w(px(192.0)).item(
+                                                    PopupMenuItem::element(move |_, _| {
+                                                        div()
+                                                            .text_color(t.destructive)
+                                                            .child("Remove friend")
+                                                    })
+                                                    .disabled(busy)
+                                                    .on_click(move |_, _, cx| {
+                                                        let user_id = remove_id.clone();
+                                                        Friends::global(cx)
+                                                            .update(cx, |friends, cx| {
+                                                                friends.remove(user_id, cx)
+                                                            })
+                                                            .detach();
+                                                    }),
+                                                )
+                                            },
+                                        ),
                                 ),
                         )
                         .into_any_element()
@@ -425,61 +541,77 @@ impl FriendsHome {
         }
         let t = theme::tokens(cx);
         let label = format!("Pending — {}", pending.len());
-        let rows: Vec<_> = pending.into_iter().map(|(entry, incoming)| {
-            let user_id = entry.user.user_id.clone();
-            let name = entry.user.name().to_string();
-            let busy = busy_ids.contains(&user_id);
-            let [avatar, text] = Self::person(
-                &entry,
-                if incoming { "Incoming friend request" } else { "Outgoing friend request" },
-                32.0,
-                "friend-row",
-                cx,
-            );
-            let act = |run: fn(&mut Friends, String, &mut Context<Friends>) -> Task<bool>| {
-                let user_id = user_id.clone();
-                move |cx: &mut App| {
+        let rows: Vec<_> = pending
+            .into_iter()
+            .map(|(entry, incoming)| {
+                let user_id = entry.user.user_id.clone();
+                let name = entry.user.name().to_string();
+                let busy = busy_ids.contains(&user_id);
+                let [avatar, text] = Self::person(
+                    &entry,
+                    if incoming {
+                        "Incoming friend request"
+                    } else {
+                        "Outgoing friend request"
+                    },
+                    32.0,
+                    "friend-row",
+                    cx,
+                );
+                let act = |run: fn(&mut Friends, String, &mut Context<Friends>) -> Task<bool>| {
                     let user_id = user_id.clone();
-                    Friends::global(cx).update(cx, |friends, cx| run(friends, user_id, cx)).detach();
-                }
-            };
-            let actions = if incoming {
-                vec![
-                    Self::action(
-                        format!("Accept {name}").into(),
-                        "check",
-                        Some(emerald()),
-                        busy,
-                        "friend-row",
-                        act(Friends::accept),
-                        cx,
-                    ),
-                    Self::action(
-                        format!("Ignore {name}").into(),
+                    move |cx: &mut App| {
+                        let user_id = user_id.clone();
+                        Friends::global(cx)
+                            .update(cx, |friends, cx| run(friends, user_id, cx))
+                            .detach();
+                    }
+                };
+                let actions = if incoming {
+                    vec![
+                        Self::action(
+                            format!("Accept {name}").into(),
+                            "check",
+                            Some(emerald()),
+                            busy,
+                            "friend-row",
+                            act(Friends::accept),
+                            cx,
+                        ),
+                        Self::action(
+                            format!("Ignore {name}").into(),
+                            "x",
+                            Some(t.destructive),
+                            busy,
+                            "friend-row",
+                            act(Friends::decline),
+                            cx,
+                        ),
+                    ]
+                } else {
+                    vec![Self::action(
+                        format!("Cancel request to {name}").into(),
                         "x",
                         Some(t.destructive),
                         busy,
                         "friend-row",
-                        act(Friends::decline),
+                        act(Friends::remove),
                         cx,
-                    ),
-                ]
-            } else {
-                vec![Self::action(
-                    format!("Cancel request to {name}").into(),
-                    "x",
-                    Some(t.destructive),
-                    busy,
-                    "friend-row",
-                    act(Friends::remove),
-                    cx,
-                )]
-            };
-            Self::row(SharedString::from(format!("pending-{user_id}")), cx)
-                .child(avatar)
-                .child(text)
-                .child(div().flex().flex_shrink_0().items_center().gap_2().children(actions))
-        }).collect();
+                    )]
+                };
+                Self::row(SharedString::from(format!("pending-{user_id}")), cx)
+                    .child(avatar)
+                    .child(text)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_shrink_0()
+                            .items_center()
+                            .gap_2()
+                            .children(actions),
+                    )
+            })
+            .collect();
         vec![
             Self::section_label(label, cx).into_any_element(),
             div().flex().flex_col().children(rows).into_any_element(),
@@ -508,7 +640,16 @@ impl FriendsHome {
             .bg(t.sidebar)
             .p(px(6.0))
             .pl_3()
-            .child(div().flex_1().min_w_0().h_8().flex().items_center().text_sm().child(Input::new(&self.handle).appearance(false)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .h_8()
+                    .flex()
+                    .items_center()
+                    .text_sm()
+                    .child(Input::new(&self.handle).appearance(false)),
+            )
             .child(
                 Button::new("send-request")
                     .primary()
@@ -551,7 +692,12 @@ impl FriendsHome {
             div()
                 .mt_4()
                 .text_center()
-                .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("It’s quiet for now…"))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child("It’s quiet for now…"),
+                )
                 .child(
                     div()
                         .mt_1()
@@ -561,29 +707,36 @@ impl FriendsHome {
                         .child("When friends come online, they’ll show up here."),
                 )
         } else {
-            div().mt_4().flex().flex_col().gap_2().children(online.iter().map(|entry| {
-                let user_id = entry.user.user_id.clone();
-                let [avatar, text] = Self::person(entry, "Online", 40.0, "active-now", cx);
-                div()
-                    .id(SharedString::from(format!("active-{user_id}")))
-                    .group("active-now")
-                    .flex()
-                    .w_full()
-                    .items_center()
-                    .gap_3()
-                    .border_1()
-                    .border_color(t.border)
-                    .bg(t.sidebar)
-                    .p_3()
-                    .cursor_pointer()
-                    .hover(|s| s.bg(t.card))
-                    .on_click(move |_, _, cx| {
-                        let user_id = user_id.clone();
-                        Dms::global(cx).update(cx, |dms, cx| dms.open(user_id, cx)).detach();
-                    })
-                    .child(avatar)
-                    .child(text)
-            }))
+            div()
+                .mt_4()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .children(online.iter().map(|entry| {
+                    let user_id = entry.user.user_id.clone();
+                    let [avatar, text] = Self::person(entry, "Online", 40.0, "active-now", cx);
+                    div()
+                        .id(SharedString::from(format!("active-{user_id}")))
+                        .group("active-now")
+                        .flex()
+                        .w_full()
+                        .items_center()
+                        .gap_3()
+                        .border_1()
+                        .border_color(t.border)
+                        .bg(t.sidebar)
+                        .p_3()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(t.card))
+                        .on_click(move |_, _, cx| {
+                            let user_id = user_id.clone();
+                            Dms::global(cx)
+                                .update(cx, |dms, cx| dms.open(user_id, cx))
+                                .detach();
+                        })
+                        .child(avatar)
+                        .child(text)
+                }))
         };
         div()
             .w_80()
@@ -591,7 +744,12 @@ impl FriendsHome {
             .border_l_1()
             .border_color(t.border)
             .p_4()
-            .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child("Active now"))
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child("Active now"),
+            )
             .child(body)
     }
 }
@@ -620,7 +778,8 @@ impl Render for FriendsHome {
                 .cursor_pointer()
                 .when(active, |tab| tab.bg(t.muted).text_color(t.foreground))
                 .when(!active, |tab| {
-                    tab.text_color(t.muted_foreground).hover(|s| s.bg(t.muted).text_color(t.foreground))
+                    tab.text_color(t.muted_foreground)
+                        .hover(|s| s.bg(t.muted).text_color(t.foreground))
                 })
                 .child(label)
                 .when(tab == Tab::Pending && incoming > 0, |tab| {
@@ -635,7 +794,11 @@ impl Render for FriendsHome {
                             .text_color(white())
                             .text_center()
                             .when(circle, |badge| badge.rounded_full())
-                            .child(if incoming > 99 { "99+".to_string() } else { incoming.to_string() }),
+                            .child(if incoming > 99 {
+                                "99+".to_string()
+                            } else {
+                                incoming.to_string()
+                            }),
                     )
                 })
                 .on_click(cx.listener(move |this, _, window, cx| this.set_tab(tab, window, cx)))
@@ -654,7 +817,9 @@ impl Render for FriendsHome {
             .cursor_pointer()
             .when(add_active, |tab| tab.text_color(t.sidebar_primary))
             .when(!add_active, |tab| {
-                tab.bg(t.primary).text_color(t.primary_foreground).hover(|s| s.bg(t.primary.opacity(0.85)))
+                tab.bg(t.primary)
+                    .text_color(t.primary_foreground)
+                    .hover(|s| s.bg(t.primary.opacity(0.85)))
             })
             .child("Add friend")
             .on_click(cx.listener(|this, _, window, cx| this.set_tab(Tab::Add, window, cx)));
@@ -783,7 +948,12 @@ mod tests {
             friend("b", "Bea", UserStatus::Online),
             friend("c", "Cai", UserStatus::Offline),
         ];
-        let ids = |found: Vec<FriendEntry>| found.into_iter().map(|f| f.user.user_id).collect::<Vec<_>>();
+        let ids = |found: Vec<FriendEntry>| {
+            found
+                .into_iter()
+                .map(|f| f.user.user_id)
+                .collect::<Vec<_>>()
+        };
         assert_eq!(ids(friend_list(&list, false, "")), ["b", "a", "c"]);
         assert_eq!(ids(friend_list(&list, true, "")), ["b"]);
         assert_eq!(ids(friend_list(&list, false, " CAI ")), ["c"]);
@@ -792,8 +962,14 @@ mod tests {
 
     #[test]
     fn parses_handles() {
-        assert_eq!(parse_handle(" @ana:novarum.me "), Ok(("ana".into(), "novarum.me".into())));
-        assert_eq!(parse_handle("ana:localhost:5049"), Ok(("ana".into(), "localhost:5049".into())));
+        assert_eq!(
+            parse_handle(" @ana:novarum.me "),
+            Ok(("ana".into(), "novarum.me".into()))
+        );
+        assert_eq!(
+            parse_handle("ana:localhost:5049"),
+            Ok(("ana".into(), "localhost:5049".into()))
+        );
         assert!(parse_handle("ana").is_err());
         assert!(parse_handle("@ana@x:y").is_err());
     }

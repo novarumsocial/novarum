@@ -20,11 +20,16 @@ pub fn mentions_everyone(content: Option<&str>) -> bool {
     (0..chars.len()).any(|start| {
         let end = start + target.len();
         chars.get(start..end) == Some(&target[..])
-            && !start.checked_sub(1).is_some_and(|before| word(chars[before]) || chars[before] == '.')
+            && !start
+                .checked_sub(1)
+                .is_some_and(|before| word(chars[before]) || chars[before] == '.')
             && !chars.get(end).is_some_and(|&after| {
                 word(after)
                     || after == ':'
-                    || (after == '.' && chars.get(end + 1).is_some_and(|c| c.is_ascii_alphanumeric()))
+                    || (after == '.'
+                        && chars
+                            .get(end + 1)
+                            .is_some_and(|c| c.is_ascii_alphanumeric()))
             })
     })
 }

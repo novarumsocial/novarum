@@ -102,7 +102,10 @@ pub fn init(cx: &mut App) {
     let value: Settings = storage::get("settings").unwrap_or_default();
     // the web app's `circleIcons` drives `data-rounded`, which rounds every border
     theme::apply(value.dark_mode, value.circle_icons, cx);
-    let store = cx.new(|_| SettingsStore { value, dialog_open: false });
+    let store = cx.new(|_| SettingsStore {
+        value,
+        dialog_open: false,
+    });
     cx.set_global(GlobalSettings(store));
 }
 

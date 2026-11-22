@@ -28,7 +28,10 @@ pub struct SessionUser {
 
 impl SessionUser {
     pub fn name(&self) -> &str {
-        self.display_name.as_deref().filter(|name| !name.is_empty()).unwrap_or(&self.username)
+        self.display_name
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or(&self.username)
     }
 
     pub fn as_public(&self) -> crate::models::PublicUser {
@@ -66,7 +69,10 @@ pub enum MfaMethod {
 
 pub enum LoginResult {
     Ok(SessionUser),
-    Mfa { challenge: String, methods: Vec<MfaMethod> },
+    Mfa {
+        challenge: String,
+        methods: Vec<MfaMethod>,
+    },
     Err(String),
 }
 
@@ -149,7 +155,12 @@ impl Session {
         })
     }
 
-    pub fn login(home_server: String, username: String, password: String, cx: &mut App) -> Task<LoginResult> {
+    pub fn login(
+        home_server: String,
+        username: String,
+        password: String,
+        cx: &mut App,
+    ) -> Task<LoginResult> {
         let this = Self::global(cx);
         cx.spawn(async move |cx| {
             if let Err(error) = api::set_home_server(&home_server).await {
@@ -161,7 +172,9 @@ impl Session {
             )
             .await;
             match response {
-                Err(error) => LoginResult::Err(api::error_message(&error.body, "Could not sign you in.")),
+                Err(error) => {
+                    LoginResult::Err(api::error_message(&error.body, "Could not sign you in."))
+                }
                 Ok(data) if data.mfa_required => LoginResult::Mfa {
                     challenge: data.challenge.unwrap_or_default(),
                     methods: data.methods,
@@ -171,7 +184,12 @@ impl Session {
         })
     }
 
-    pub fn complete_mfa(challenge: String, method: MfaMethod, code: String, cx: &mut App) -> Task<LoginResult> {
+    pub fn complete_mfa(
+        challenge: String,
+        method: MfaMethod,
+        code: String,
+        cx: &mut App,
+    ) -> Task<LoginResult> {
         let this = Self::global(cx);
         cx.spawn(async move |cx| {
             let result = api::post::<api::Ignored>(
@@ -180,7 +198,10 @@ impl Session {
             )
             .await;
             match result {
-                Err(error) => LoginResult::Err(api::error_message(&error.body, "Could not verify that code.")),
+                Err(error) => LoginResult::Err(api::error_message(
+                    &error.body,
+                    "Could not verify that code.",
+                )),
                 Ok(_) => Self::verify_new_session(this, "Verification", cx).await,
             }
         })
@@ -202,7 +223,11 @@ impl Session {
             .map_err(|error| api::error_message(&error.body, "Could not send the reset code."))
     }
 
-    pub async fn reset_password(email: String, new_password: String, code: u32) -> Result<(), String> {
+    pub async fn reset_password(
+        email: String,
+        new_password: String,
+        code: u32,
+    ) -> Result<(), String> {
         api::post::<api::Ignored>(
             "/auth/reset-password",
             json!({ "email": email, "newPassword": new_password, "verificationCode": code }),
@@ -236,16 +261,25 @@ impl Session {
             )
             .await;
             match result {
-                Err(error) => LoginResult::Err(api::error_message(&error.body, "Could not create your account.")),
+                Err(error) => LoginResult::Err(api::error_message(
+                    &error.body,
+                    "Could not create your account.",
+                )),
                 Ok(_) => Self::verify_new_session(this, "Account creation", cx).await,
             }
         })
     }
 
-    async fn verify_new_session(this: Entity<Self>, action: &str, cx: &mut AsyncApp) -> LoginResult {
+    async fn verify_new_session(
+        this: Entity<Self>,
+        action: &str,
+        cx: &mut AsyncApp,
+    ) -> LoginResult {
         for attempt in 0..2 {
             if attempt > 0 {
-                cx.background_executor().timer(std::time::Duration::from_secs(1)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_secs(1))
+                    .await;
             }
             match api::get::<MePayload>("/auth/me").await {
                 Ok(MePayload { user: Some(user) }) => {
@@ -264,11 +298,15 @@ impl Session {
                 }
                 Err(error) if attempt == 1 => {
                     return LoginResult::Err(if error.status == 401 {
-                        format!("{action} succeeded, but the server could not verify the new session. Try again.")
+                        format!(
+                            "{action} succeeded, but the server could not verify the new session. Try again."
+                        )
                     } else {
                         api::error_message(
                             &error.body,
-                            &format!("{action} succeeded, but the server could not verify the new session."),
+                            &format!(
+                                "{action} succeeded, but the server could not verify the new session."
+                            ),
                         )
                     });
                 }
@@ -288,14 +326,16 @@ impl Session {
     }
 
     pub fn forget(&mut self, home_server: &str, cx: &mut Context<Self>) {
-        self.accounts.retain(|account| account.home_server != home_server);
+        self.accounts
+            .retain(|account| account.home_server != home_server);
         storage::set(ACCOUNTS_KEY, &self.accounts);
         cx.notify();
     }
 
     fn remember(&mut self, user: &SessionUser) {
         let home_server = api::anchor().home_server;
-        self.accounts.retain(|account| account.home_server != home_server);
+        self.accounts
+            .retain(|account| account.home_server != home_server);
         self.accounts.push(Account {
             home_server,
             username: user.username.clone(),
