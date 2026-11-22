@@ -764,7 +764,6 @@ impl Render for MessageInput {
                     .flex_1()
                     .min_w_0()
                     .min_h_10()
-                    .px_1()
                     .py(px(10.0))
                     .text_sm()
                     .line_height(px(20.0))
@@ -787,8 +786,10 @@ impl Render for MessageInput {
                         }),
                     )
                     .child(
+                        // the wrapper has the web's `py-2.5`; xsmall keeps the editor's own padding to the web's `px-1`
                         Textarea::new(&self.input)
                             .appearance(false)
+                            .xsmall()
                             .text_sm()
                             .on_paste(move |item, _, cx| this.update(cx, |this, cx| this.paste(item, cx)).unwrap_or(false)),
                     ),
