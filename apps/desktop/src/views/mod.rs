@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod auth_card;
 pub mod authorize;
+pub mod avatar_crop_dialog;
 pub mod call_ringing;
 pub mod channel_sidebar;
 pub mod chat_area;
@@ -14,6 +15,8 @@ pub mod initial_loader;
 pub mod invite;
 pub mod login;
 pub mod member_sidebar;
+pub mod notification_menu;
+pub mod profile_card;
 pub mod register;
 pub mod reset_password;
 pub mod shell;
