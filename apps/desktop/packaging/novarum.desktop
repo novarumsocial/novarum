@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Novarum
+Comment=Novarum desktop client
+Exec=novarum %U
+Icon=novarum
+Terminal=false
+Categories=Network;InstantMessaging;
+StartupWMClass=novarum

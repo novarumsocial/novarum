@@ -14,6 +14,7 @@ on:
     paths:
       - 'apps/electron/**'
       - 'apps/frontend/**'
+      - 'apps/desktop/**'
       - '.github/workflows/desktop-development-release.yml'
 
 permissions:
@@ -27,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      desktop_rs_version: ${{ steps.version.outputs.desktop_rs_version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,13 +37,20 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
+          next_dev() {
+            IFS=. read -r major minor patch <<< "$1"
+            echo "${major}.${minor}.$((patch + 1))-dev.${GITHUB_RUN_NUMBER}"
+          }
           if [ -n "$RELEASE_VERSION" ]; then
             version="$RELEASE_VERSION"
+            desktop_rs_version="$RELEASE_VERSION"
           else
-            IFS=. read -r major minor patch < <(jq -r .version apps/electron/package.json)
-            version="${major}.${minor}.$((patch + 1))-dev.${GITHUB_RUN_NUMBER}"
+            version=$(next_dev "$(jq -r .version apps/electron/package.json)")
+            # the GPUI app (apps/desktop) goes by the first `version =` in its Cargo.toml
+            desktop_rs_version=$(next_dev "$(sed -n 's/^version = "\(.*\)"/\1/p' apps/desktop/Cargo.toml | head -n 1)")
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "desktop_rs_version=$desktop_rs_version" >> "$GITHUB_OUTPUT"
 
   build-linux-windows:
     name: Build desktop (Linux and Windows)
@@ -114,6 +123,75 @@ jobs:
             apps/electron/dist/latest*.yml
           if-no-files-found: error
 
+  # the native GPUI app (apps/desktop): a tarball per platform with the `novarum` binary, which
+  # its updater looks for as novarum-desktop-<os>-<arch>.tar.gz
+  build-desktop-rs:
+    name: Build desktop-rs (${{ matrix.os }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: blacksmith-4vcpu-ubuntu-2404
+          - os: macos
+            runner: macos-latest
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev
+
+      - name: Set version
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: perl -pi -e '$done ||= s/^version = "[^"]*"/version = "$ENV{DESKTOP_RS_VERSION}"/' Cargo.toml
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package
+        run: |
+          arch=$(rustc -vV | sed -n 's/^host: \([^-]*\)-.*/\1/p')
+          mkdir -p package dist
+          if [ "${{ matrix.os }}" = windows ]; then
+            cp target/release/novarum.exe package/
+          else
+            cp target/release/novarum package/
+          fi
+          if [ "${{ matrix.os }}" = linux ]; then
+            cp packaging/novarum.desktop package/
+            cp packaging/icons/512x512.png package/novarum.png
+          fi
+          tar -czf "dist/novarum-desktop-${{ matrix.os }}-${arch}.tar.gz" -C package .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-rs-${{ matrix.os }}
+          path: apps/desktop/dist/*.tar.gz
+          if-no-files-found: error
+
   release:
     name: Publish development release
     needs:
@@ -131,6 +209,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          pattern: desktop-{linux-windows,macos}
           merge-multiple: true
 
       - name: Publish prerelease
@@ -148,5 +227,44 @@ jobs:
               --target "$GITHUB_SHA" \
               --title "$release_tag" \
               --notes "$notes" \
+              --prerelease
+          fi
+
+  # after the Electron release, so the two don't race to create the same v<version> release
+  release-desktop-rs:
+    name: Publish desktop-rs builds
+    needs:
+      - version
+      - build-desktop-rs
+      - release
+    if: ${{ !cancelled() && needs.build-desktop-rs.result == 'success' }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: desktop-rs-*
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: |
+          release_tag="v${DESKTOP_RS_VERSION}"
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" release-assets/* --clobber
+          else
+            gh release create "$release_tag" release-assets/* \
+              --target "$GITHUB_SHA" \
+              --title "$release_tag" \
+              --notes "Development build for commit ${GITHUB_SHA}." \
               --prerelease
           fi
