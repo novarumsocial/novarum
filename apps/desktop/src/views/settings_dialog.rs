@@ -60,8 +60,13 @@ const PAGES: [(Page, &str, &str, &str); 8] = [
     (Page::Desktop, "This computer", "Desktop app", "monitor"),
 ];
 
-const LANGUAGES: [(&str, &str); 5] =
-    [("en", "English"), ("es", "Español"), ("fr", "Français"), ("de", "Deutsch"), ("la", "Latin")];
+const LANGUAGES: [(&str, &str); 5] = [
+    ("en", "English"),
+    ("es", "Español"),
+    ("fr", "Français"),
+    ("de", "Deutsch"),
+    ("la", "Latin"),
+];
 
 const TIME_FORMATS: [(TimeFormat, &str, &str); 3] = [
     (TimeFormat::Auto, "Automatic", "Follow your system settings"),
@@ -137,19 +142,32 @@ type ChoiceSelect = Entity<SelectState<Vec<Choice>>>;
 
 /// The default entry first, then each device (unnamed ones get a numbered label).
 fn device_choices(default: &str, fallback: &str, devices: &[String]) -> Vec<Choice> {
-    std::iter::once(Choice { value: "default".into(), label: default.to_string().into() })
-        .chain(devices.iter().enumerate().map(|(index, name)| Choice {
-            value: name.clone().into(),
-            label: if name.is_empty() { format!("{fallback} {}", index + 1).into() } else { name.clone().into() },
-        }))
-        .collect()
+    std::iter::once(Choice {
+        value: "default".into(),
+        label: default.to_string().into(),
+    })
+    .chain(devices.iter().enumerate().map(|(index, name)| Choice {
+        value: name.clone().into(),
+        label: if name.is_empty() {
+            format!("{fallback} {}", index + 1).into()
+        } else {
+            name.clone().into()
+        },
+    }))
+    .collect()
 }
 
 /// `color-mix(in srgb, color 35%, background)`
 pub fn mix(color: Hsla, background: Hsla, amount: f32) -> Hsla {
     let (a, b) = (color.to_rgb(), background.to_rgb());
     let channel = |x: f32, y: f32| x * amount + y * (1.0 - amount);
-    Rgba { r: channel(a.r, b.r), g: channel(a.g, b.g), b: channel(a.b, b.b), a: 1.0 }.into()
+    Rgba {
+        r: channel(a.r, b.r),
+        g: channel(a.g, b.g),
+        b: channel(a.b, b.b),
+        a: 1.0,
+    }
+    .into()
 }
 
 /// The `/^\d{6}$/` check before enabling TOTP.
@@ -161,13 +179,20 @@ pub fn valid_totp_code(code: &str) -> bool {
 pub fn totp_qr_png(uri: &str) -> Option<Vec<u8>> {
     let code = qrcode::QrCode::with_error_correction_level(uri, qrcode::EcLevel::M).ok()?;
     let modules = code.width();
-    let dark: Vec<bool> = code.to_colors().into_iter().map(|color| color == qrcode::Color::Dark).collect();
-    let scale = (224 / (modules + 2)).max(1) as u32;
-    let side = (modules as u32 + 2) * scale;
+    let dark: Vec<bool> = code
+        .to_colors()
+        .into_iter()
+        .map(|color| color == qrcode::Color::Dark)
+        .collect();
+    let (side, total) = (224u32, modules as u32 + 2);
     let image = image::RgbImage::from_fn(side, side, |x, y| {
-        let (column, row) = ((x / scale) as usize, (y / scale) as usize);
+        let (column, row) = ((x * total / side) as usize, (y * total / side) as usize);
         let inside = (1..=modules).contains(&column) && (1..=modules).contains(&row);
-        if inside && dark[(row - 1) * modules + column - 1] { image::Rgb([0x11, 0x18, 0x27]) } else { image::Rgb([255, 255, 255]) }
+        if inside && dark[(row - 1) * modules + column - 1] {
+            image::Rgb([0x11, 0x18, 0x27])
+        } else {
+            image::Rgb([255, 255, 255])
+        }
     });
     let mut bytes = Cursor::new(Vec::new());
     image.write_to(&mut bytes, image::ImageFormat::Png).ok()?;
@@ -175,7 +200,12 @@ pub fn totp_qr_png(uri: &str) -> Option<Vec<u8>> {
 }
 
 /// The update row's text for each updater status.
-pub fn update_message(status: Status, version: Option<&str>, percent: Option<f32>, auto_update: bool) -> String {
+pub fn update_message(
+    status: Status,
+    version: Option<&str>,
+    percent: Option<f32>,
+    auto_update: bool,
+) -> String {
     let version = version.unwrap_or_default();
     match status {
         Status::Idle if auto_update => "Novarum checks for updates every 30 minutes.".into(),
@@ -183,8 +213,13 @@ pub fn update_message(status: Status, version: Option<&str>, percent: Option<f32
         Status::Checking => "Checking for updates…".into(),
         Status::Current => "You're on the latest version.".into(),
         Status::Available => format!("Version {version} is available."),
-        Status::Downloading => format!("Downloading version {version}… {}%", percent.unwrap_or(0.0).round()),
-        Status::Downloaded => format!("Version {version} is ready. Restart Novarum to finish updating."),
+        Status::Downloading => format!(
+            "Downloading version {version}… {}%",
+            percent.unwrap_or(0.0).round()
+        ),
+        Status::Downloaded => {
+            format!("Version {version} is ready. Restart Novarum to finish updating.")
+        }
         Status::Unsupported => "Updates are only available in installed builds.".into(),
         Status::Error => "Could not update. Try again later.".into(),
     }
@@ -192,7 +227,9 @@ pub fn update_message(status: Status, version: Option<&str>, percent: Option<f32
 
 /// `/dev/video*` names, standing in for the browser's `videoinput` devices.
 fn cameras() -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir("/sys/class/video4linux") else { return vec![] };
+    let Ok(entries) = std::fs::read_dir("/sys/class/video4linux") else {
+        return vec![];
+    };
     let mut names: Vec<String> = entries
         .flatten()
         .filter_map(|entry| std::fs::read_to_string(entry.path().join("name")).ok())
@@ -299,39 +336,93 @@ impl SettingsDialog {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let user = Session::user(cx);
         let settings = SettingsStore::get(cx);
-        let avatar_color = user.as_ref().and_then(|user| user.avatar_color.clone()).unwrap_or("#6366F1".into());
-        let speaking_ring =
-            user.as_ref().and_then(|user| user.speaking_ring_color.clone()).unwrap_or(DEFAULT_SPEAKING_RING_COLOR.into());
+        let avatar_color = user
+            .as_ref()
+            .and_then(|user| user.avatar_color.clone())
+            .unwrap_or("#6366F1".into());
+        let speaking_ring = user
+            .as_ref()
+            .and_then(|user| user.speaking_ring_color.clone())
+            .unwrap_or(DEFAULT_SPEAKING_RING_COLOR.into());
 
         let about = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .rows(4)
                 .placeholder("What should people know about you?")
-                .default_value(user.as_ref().and_then(|user| user.about.clone()).unwrap_or_default())
+                .default_value(
+                    user.as_ref()
+                        .and_then(|user| user.about.clone())
+                        .unwrap_or_default(),
+                )
         });
         let mfa_password = cx.new(|cx| InputState::new(window, cx).masked(true));
         let totp_code = cx.new(|cx| InputState::new(window, cx).placeholder("000000"));
         let avatar_picker = cx.new(|cx| ColorPicker::new(&avatar_color, window, cx));
         let ring_picker = cx.new(|cx| ColorPicker::new(&speaking_ring, window, cx));
 
-        let choice_select = |items: Vec<Choice>, selected: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let index = items.iter().position(|item| item.value == selected).map(|row| IndexPath::default().row(row));
-            cx.new(|cx| SelectState::new(items, index, window, cx))
-        };
-        let input_select = choice_select(device_choices("Default microphone", "Microphone", &[]), &settings.voice_input_device_id, window, cx);
-        let output_select = choice_select(device_choices("Default output", "Output device", &[]), &settings.voice_output_device_id, window, cx);
-        let camera_select = choice_select(device_choices("Default camera", "Camera", &[]), &settings.video_input_device_id, window, cx);
-        let models = [NoiseSuppressionModel::Deepfilternet, NoiseSuppressionModel::Rnnoise]
-            .map(|model| Choice { value: model_value(model).into(), label: model.label().into() })
+        let choice_select =
+            |items: Vec<Choice>, selected: &str, window: &mut Window, cx: &mut Context<Self>| {
+                let index = items
+                    .iter()
+                    .position(|item| item.value == selected)
+                    .map(|row| IndexPath::default().row(row));
+                cx.new(|cx| SelectState::new(items, index, window, cx))
+            };
+        let input_select = choice_select(
+            device_choices("Default microphone", "Microphone", &[]),
+            &settings.voice_input_device_id,
+            window,
+            cx,
+        );
+        let output_select = choice_select(
+            device_choices("Default output", "Output device", &[]),
+            &settings.voice_output_device_id,
+            window,
+            cx,
+        );
+        let camera_select = choice_select(
+            device_choices("Default camera", "Camera", &[]),
+            &settings.video_input_device_id,
+            window,
+            cx,
+        );
+        let models = [
+            NoiseSuppressionModel::Deepfilternet,
+            NoiseSuppressionModel::Rnnoise,
+        ]
+        .map(|model| Choice {
+            value: model_value(model).into(),
+            label: model.label().into(),
+        })
+        .to_vec();
+        let model_select = choice_select(
+            models,
+            model_value(settings.noise_suppression_model),
+            window,
+            cx,
+        );
+        let languages = LANGUAGES
+            .map(|(value, label)| Choice {
+                value: value.into(),
+                label: label.into(),
+            })
             .to_vec();
-        let model_select = choice_select(models, model_value(settings.noise_suppression_model), window, cx);
-        let languages =
-            LANGUAGES.map(|(value, label)| Choice { value: value.into(), label: label.into() }).to_vec();
         let language_select = choice_select(languages, &settings.language, window, cx);
 
-        let volume = cx.new(|_| SliderState::new().min(0.0).max(1.0).step(0.01).default_value(settings.notification_volume));
-        let noise_level =
-            cx.new(|_| SliderState::new().min(0.0).max(60.0).step(1.0).default_value(settings.noise_suppression_level));
+        let volume = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(1.0)
+                .step(0.01)
+                .default_value(settings.notification_volume)
+        });
+        let noise_level = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(60.0)
+                .step(1.0)
+                .default_value(settings.noise_suppression_level)
+        });
         let mic_test = cx.new(|_| MicTest::new());
         let this = cx.entity().downgrade();
         let settings_devices = cx.new(|cx| {
@@ -355,36 +446,57 @@ impl SettingsDialog {
                     if value.chars().count() > ABOUT_MAX {
                         let truncated: String = value.chars().take(ABOUT_MAX).collect();
                         cx.defer(move |cx| {
-                            let Some(window) = cx.active_window() else { return };
+                            let Some(window) = cx.active_window() else {
+                                return;
+                            };
                             let _ = window.update(cx, |_, window, cx| {
-                                about.update(cx, |about, cx| about.set_value(truncated, window, cx));
+                                about
+                                    .update(cx, |about, cx| about.set_value(truncated, window, cx));
                             });
                         });
                     }
                     cx.notify();
                 }
             }),
-            cx.subscribe_in(&totp_code, window, |this, _, event: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    this.enable_totp(window, cx);
-                }
-            }),
+            cx.subscribe_in(
+                &totp_code,
+                window,
+                |this, _, event: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        this.enable_totp(window, cx);
+                    }
+                },
+            ),
             cx.subscribe(&volume, |_, _, event: &SliderEvent, cx| {
                 if let SliderEvent::Release(value) = event {
-                    SettingsStore::update(cx, |settings| settings.notification_volume = value.start());
+                    SettingsStore::update(cx, |settings| {
+                        settings.notification_volume = value.start()
+                    });
                     notifications::notification_sound(cx);
                 }
             }),
             cx.subscribe(&noise_level, |_, _, event: &SliderEvent, cx| {
                 let (SliderEvent::Change(value) | SliderEvent::Release(value)) = event;
-                SettingsStore::update(cx, |settings| settings.noise_suppression_level = value.start());
+                SettingsStore::update(cx, |settings| {
+                    settings.noise_suppression_level = value.start()
+                });
             }),
         ];
         for (select, edit) in [
-            (&input_select, (|settings, value| settings.voice_input_device_id = value) as fn(&mut Settings, String)),
-            (&output_select, |settings, value| settings.voice_output_device_id = value),
-            (&camera_select, |settings, value| settings.video_input_device_id = value),
-            (&language_select, |settings, value| settings.language = value),
+            (
+                &input_select,
+                (|settings, value| settings.voice_input_device_id = value)
+                    as fn(&mut Settings, String),
+            ),
+            (&output_select, |settings, value| {
+                settings.voice_output_device_id = value
+            }),
+            (&camera_select, |settings, value| {
+                settings.video_input_device_id = value
+            }),
+            (&language_select, |settings, value| {
+                settings.language = value
+            }),
             (&model_select, |settings, value| {
                 settings.noise_suppression_model = if value == "rnnoise" {
                     NoiseSuppressionModel::Rnnoise
@@ -393,18 +505,27 @@ impl SettingsDialog {
                 }
             }),
         ] {
-            subscriptions.push(cx.subscribe(select, move |this, _, event: &SelectEvent<Vec<Choice>>, cx| {
-                let SelectEvent::Confirm(Some(value)) = event else { return };
-                let value = value.to_string();
-                this.audio_device_error = None;
-                SettingsStore::update(cx, |settings| edit(settings, value));
-            }));
+            subscriptions.push(cx.subscribe(
+                select,
+                move |this, _, event: &SelectEvent<Vec<Choice>>, cx| {
+                    let SelectEvent::Confirm(Some(value)) = event else {
+                        return;
+                    };
+                    let value = value.to_string();
+                    this.audio_device_error = None;
+                    SettingsStore::update(cx, |settings| edit(settings, value));
+                },
+            ));
         }
 
         // `refreshAudioDevices`, off the main thread since probing devices can be slow
         cx.spawn_in(window, async move |this, cx| {
-            let (devices, cameras) = cx.background_spawn(async { (audio_devices(), cameras()) }).await;
-            let _ = this.update_in(cx, |this, window, cx| this.set_devices(devices, cameras, window, cx));
+            let (devices, cameras) = cx
+                .background_spawn(async { (audio_devices(), cameras()) })
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.set_devices(devices, cameras, window, cx)
+            });
         })
         .detach();
         // `getAnchorInfo(anchor.homeServer)` for the version line
@@ -471,12 +592,30 @@ impl SettingsDialog {
         }
     }
 
-    fn set_devices(&mut self, devices: AudioDevices, cameras: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+    fn set_devices(
+        &mut self,
+        devices: AudioDevices,
+        cameras: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let settings = SettingsStore::get(cx);
         let lists = [
-            (&self.input_select, device_choices("Default microphone", "Microphone", &devices.input), settings.voice_input_device_id),
-            (&self.output_select, device_choices("Default output", "Output device", &devices.output), settings.voice_output_device_id),
-            (&self.camera_select, device_choices("Default camera", "Camera", &cameras), settings.video_input_device_id),
+            (
+                &self.input_select,
+                device_choices("Default microphone", "Microphone", &devices.input),
+                settings.voice_input_device_id,
+            ),
+            (
+                &self.output_select,
+                device_choices("Default output", "Output device", &devices.output),
+                settings.voice_output_device_id,
+            ),
+            (
+                &self.camera_select,
+                device_choices("Default camera", "Camera", &cameras),
+                settings.video_input_device_id,
+            ),
         ];
         for (select, items, selected) in lists {
             select.update(cx, |select, cx| {
@@ -491,7 +630,11 @@ impl SettingsDialog {
 
     fn open_page(&mut self, page: Page, cx: &mut Context<Self>) {
         self.page = page;
-        if page == Page::Security && !self.mfa_loaded && !self.mfa_loading && self.mfa_error.is_none() {
+        if page == Page::Security
+            && !self.mfa_loaded
+            && !self.mfa_loading
+            && self.mfa_error.is_none()
+        {
             self.load_mfa_status(cx);
         }
         cx.notify();
@@ -528,7 +671,11 @@ impl SettingsDialog {
                     }
                     let weak = cx.entity().downgrade();
                     let on_crop = Rc::new(move |bytes: Vec<u8>, _: &mut Window, cx: &mut App| {
-                        let file = UploadFile { name: format!("{}.png", target.name()), content_type: "image/png".into(), bytes };
+                        let file = UploadFile {
+                            name: format!("{}.png", target.name()),
+                            content_type: "image/png".into(),
+                            bytes,
+                        };
                         let _ = weak.update(cx, |this, cx| this.upload_media(file, target, cx));
                     });
                     open_avatar_crop(file.bytes, target.crop_options(), on_crop, window, cx);
@@ -543,13 +690,25 @@ impl SettingsDialog {
         self.media_error = None;
         cx.notify();
         let name = target.name();
-        let file = UploadFile { name: format!("{name}.{}", if file.content_type == "image/gif" { "gif" } else { "png" }), ..file };
+        let file = UploadFile {
+            name: format!(
+                "{name}.{}",
+                if file.content_type == "image/gif" {
+                    "gif"
+                } else {
+                    "png"
+                }
+            ),
+            ..file
+        };
         cx.spawn(async move |this, cx| {
             let result = api::post_file::<UserPayload>(format!("/user/{name}"), name, file).await;
             let ok = result.is_ok();
             if let Ok(payload) = result {
                 let profile = payload.user.as_public();
-                let _ = cx.update(|cx| Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx)));
+                cx.update(|cx| {
+                    Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx))
+                });
                 let refresh = cx.update(Session::refresh);
                 refresh.await;
             }
@@ -576,7 +735,9 @@ impl SettingsDialog {
             let ok = result.is_ok();
             if let Ok(payload) = result {
                 let profile = payload.user.as_public();
-                let _ = cx.update(|cx| Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx)));
+                cx.update(|cx| {
+                    Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx))
+                });
                 cx.update(Session::refresh).await;
             }
             let _ = this.update(cx, |this, cx| {
@@ -589,12 +750,22 @@ impl SettingsDialog {
         .detach();
     }
 
-    fn set_color_open(&mut self, target: Option<ColorTarget>, window: &mut Window, cx: &mut Context<Self>) {
+    fn set_color_open(
+        &mut self,
+        target: Option<ColorTarget>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         // closing a picker without saving puts the saved color back
         if target.is_none() {
-            let (avatar, ring) = (self.saved_avatar_color.clone(), self.saved_speaking_ring.clone());
-            self.avatar_picker.update(cx, |picker, cx| picker.set_value(&avatar, window, cx));
-            self.ring_picker.update(cx, |picker, cx| picker.set_value(&ring, window, cx));
+            let (avatar, ring) = (
+                self.saved_avatar_color.clone(),
+                self.saved_speaking_ring.clone(),
+            );
+            self.avatar_picker
+                .update(cx, |picker, cx| picker.set_value(&avatar, window, cx));
+            self.ring_picker
+                .update(cx, |picker, cx| picker.set_value(&ring, window, cx));
         }
         self.color_open = target;
         cx.notify();
@@ -616,7 +787,9 @@ impl SettingsDialog {
                 let mut profile = user.as_public();
                 profile.avatar_color = Some(colors.avatar_color.clone());
                 profile.speaking_ring_color = Some(colors.speaking_ring_color.clone());
-                let _ = cx.update(|cx| Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx)));
+                cx.update(|cx| {
+                    Chat::global(cx).update(cx, |chat, cx| chat.update_user_profile(&profile, cx))
+                });
                 cx.update(Session::refresh).await;
             }
             let _ = this.update(cx, |this, cx| {
@@ -670,7 +843,12 @@ impl SettingsDialog {
             let _ = this.update(cx, |this, cx| {
                 this.mfa_loading = false;
                 match result {
-                    Err(error) => this.mfa_error = Some(api::error_message(&error.body, "Could not load MFA settings.")),
+                    Err(error) => {
+                        this.mfa_error = Some(api::error_message(
+                            &error.body,
+                            "Could not load MFA settings.",
+                        ))
+                    }
                     Ok(payload) => {
                         this.mfa_options = payload.mfa_options;
                         this.mfa_loaded = true;
@@ -704,7 +882,8 @@ impl SettingsDialog {
                 this.totp_loading = false;
                 match result {
                     Err(error) => {
-                        let message = api::error_message(&error.body, "Could not load MFA settings.");
+                        let message =
+                            api::error_message(&error.body, "Could not load MFA settings.");
                         if error.status == 400 && message.contains("already enabled") {
                             this.totp_state = TotpState::Enabled;
                         } else {
@@ -719,7 +898,8 @@ impl SettingsDialog {
                             this.totp_state = TotpState::Setup;
                         }
                         None => {
-                            this.totp_error = Some("The server returned an invalid MFA setup.".into());
+                            this.totp_error =
+                                Some("The server returned an invalid MFA setup.".into());
                             this.totp_state = TotpState::Error;
                         }
                     },
@@ -742,7 +922,10 @@ impl SettingsDialog {
         };
         let (path, fallback) = match method {
             MfaMethod::Email => ("/auth/mfa/email/toggle", "Could not update email MFA."),
-            MfaMethod::Totp => ("/auth/mfa/totp/toggle", "Could not update authenticator MFA."),
+            MfaMethod::Totp => (
+                "/auth/mfa/totp/toggle",
+                "Could not update authenticator MFA.",
+            ),
         };
         match method {
             MfaMethod::Email => self.email_mfa_loading = true,
@@ -751,7 +934,9 @@ impl SettingsDialog {
         self.mfa_error = None;
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = api::post::<api::Ignored>(path, json!({ "enable": enable, "password": password })).await;
+            let result =
+                api::post::<api::Ignored>(path, json!({ "enable": enable, "password": password }))
+                    .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
                     Err(error) => this.mfa_error = Some(api::error_message(&error.body, fallback)),
@@ -789,14 +974,18 @@ impl SettingsDialog {
             let _ = this.update_in(cx, |this, window, cx| {
                 this.totp_loading = false;
                 match result {
-                    Err(error) => this.totp_error = Some(api::error_message(&error.body, "Could not enable MFA.")),
+                    Err(error) => {
+                        this.totp_error =
+                            Some(api::error_message(&error.body, "Could not enable MFA."))
+                    }
                     Ok(_) => {
                         this.totp_state = TotpState::Enabled;
                         this.mfa_options.retain(|option| *option != MfaMethod::Totp);
                         this.mfa_options.push(MfaMethod::Totp);
                         this.totp_secret.clear();
                         this.totp_qr = None;
-                        this.totp_code.update(cx, |code, cx| code.set_value("", window, cx));
+                        this.totp_code
+                            .update(cx, |code, cx| code.set_value("", window, cx));
                     }
                 }
                 cx.notify();
@@ -809,7 +998,9 @@ impl SettingsDialog {
         cx.write_to_clipboard(ClipboardItem::new_string(self.totp_secret.clone()));
         self.secret_copied = true;
         self._timers[2] = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(1500)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(1500))
+                .await;
             let _ = this.update(cx, |this, cx| {
                 this.secret_copied = false;
                 cx.notify();
@@ -834,12 +1025,17 @@ impl SettingsDialog {
         self.mfa_error = None;
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = api::delete_with::<api::Ignored>("/auth/mfa/totp", json!({ "password": password })).await;
+            let result =
+                api::delete_with::<api::Ignored>("/auth/mfa/totp", json!({ "password": password }))
+                    .await;
             let _ = this.update(cx, |this, cx| {
                 this.totp_delete_loading = false;
                 match result {
                     Err(error) => {
-                        this.mfa_error = Some(api::error_message(&error.body, "Could not remove authenticator MFA."))
+                        this.mfa_error = Some(api::error_message(
+                            &error.body,
+                            "Could not remove authenticator MFA.",
+                        ))
                     }
                     Ok(_) => {
                         this.mfa_options.retain(|option| *option != MfaMethod::Totp);
@@ -881,8 +1077,19 @@ impl SettingsDialog {
         let t = theme::tokens(cx);
         div()
             .mb_2()
-            .child(div().text_2xl().font_weight(FontWeight::SEMIBOLD).child(title.to_string()))
-            .child(div().mt_1().text_sm().text_color(t.muted_foreground).child(description.to_string()))
+            .child(
+                div()
+                    .text_2xl()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(title.to_string()),
+            )
+            .child(
+                div()
+                    .mt_1()
+                    .text_sm()
+                    .text_color(t.muted_foreground)
+                    .child(description.to_string()),
+            )
     }
 
     fn switch(
@@ -891,56 +1098,94 @@ impl SettingsDialog {
         disabled: bool,
         on_change: impl Fn(bool, &mut Window, &mut App) + 'static,
     ) -> Switch {
-        Switch::new(id).checked(checked).disabled(disabled).on_click(move |checked, window, cx| on_change(*checked, window, cx))
+        Switch::new(id)
+            .checked(checked)
+            .disabled(disabled)
+            .on_click(move |checked, window, cx| on_change(*checked, window, cx))
     }
 
     fn setting_switch(id: &'static str, checked: bool, edit: fn(&mut Settings, bool)) -> Switch {
-        Self::switch(id, checked, false, move |checked, _, cx| SettingsStore::update(cx, |settings| edit(settings, checked)))
+        Self::switch(id, checked, false, move |checked, _, cx| {
+            SettingsStore::update(cx, |settings| edit(settings, checked))
+        })
     }
 
     fn render_nav(&self, user: Option<&SessionUser>, cx: &mut Context<Self>) -> Div {
         let t = theme::tokens(cx);
         let you = ui::hex(&self.saved_avatar_color).unwrap_or(t.primary);
-        let name = user.map(|user| user.name().to_string()).unwrap_or("You".into());
-        let handle = user.map(|user| user.handle.clone()).unwrap_or("@you".into());
+        let name = user
+            .map(|user| user.name().to_string())
+            .unwrap_or("You".into());
+        let handle = user
+            .map(|user| user.handle.clone())
+            .unwrap_or("@you".into());
         let anchor = self.anchor_version.clone().unwrap_or("unknown".into());
 
-        let mut groups = div().id("settings-nav").flex().flex_1().flex_col().gap_3().overflow_y_scroll();
+        let mut groups = div()
+            .id("settings-nav")
+            .flex()
+            .flex_1()
+            .flex_col()
+            .gap_3()
+            .overflow_y_scroll();
         let mut labels: Vec<&str> = PAGES.iter().map(|page| page.1).collect();
         labels.dedup();
         for label in labels {
-            let triggers = PAGES.iter().filter(|page| page.1 == label).map(|&(page, _, title, icon_name)| {
-                let active = page == self.page;
-                div()
-                    .id(title)
-                    .relative()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.0))
-                    .w_full()
-                    .min_h_9()
-                    .px(px(10.0))
-                    .py(px(6.0))
-                    .rounded(t.radius)
-                    .text_sm()
-                    .font_weight(FontWeight::MEDIUM)
-                    .cursor_pointer()
-                    .text_color(if active { t.foreground } else { t.muted_foreground })
-                    .hover(|trigger| trigger.text_color(t.foreground))
-                    .when(active, |trigger| {
-                        trigger.bg(t.sidebar_accent).child(div().absolute().left_0().top_0().bottom_0().w(px(2.0)).bg(you))
-                    })
-                    .child(icon(icon_name).size_4())
-                    .child(title)
-                    .on_click(cx.listener(move |this, _, _, cx| this.open_page(page, cx)))
-            });
+            let triggers =
+                PAGES
+                    .iter()
+                    .filter(|page| page.1 == label)
+                    .map(|&(page, _, title, icon_name)| {
+                        let active = page == self.page;
+                        div()
+                            .id(title)
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .gap(px(10.0))
+                            .w_full()
+                            .min_h_9()
+                            .px(px(10.0))
+                            .py(px(6.0))
+                            .rounded(t.radius)
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .cursor_pointer()
+                            .text_color(if active {
+                                t.foreground
+                            } else {
+                                t.muted_foreground
+                            })
+                            .hover(|trigger| trigger.text_color(t.foreground))
+                            .when(active, |trigger| {
+                                trigger.bg(t.sidebar_accent).child(
+                                    div()
+                                        .absolute()
+                                        .left_0()
+                                        .top_0()
+                                        .bottom_0()
+                                        .w(px(2.0))
+                                        .bg(you),
+                                )
+                            })
+                            .child(icon(icon_name).size_4())
+                            .child(title)
+                            .on_click(cx.listener(move |this, _, _, cx| this.open_page(page, cx)))
+                    });
             groups = groups.child(
                 div()
                     .flex()
                     .flex_shrink_0()
                     .flex_col()
                     .gap(px(2.0))
-                    .child(div().px_2().pb_1().text_xs().text_color(t.muted_foreground).child(label))
+                    .child(
+                        div()
+                            .px_2()
+                            .pb_1()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child(label),
+                    )
                     .children(triggers),
             );
         }
@@ -973,8 +1218,20 @@ impl SettingsDialog {
                     .child(
                         div()
                             .min_w_0()
-                            .child(div().truncate().text_sm().font_weight(FontWeight::MEDIUM).child(name))
-                            .child(div().truncate().text_xs().text_color(t.muted_foreground).child(handle)),
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(name),
+                            )
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_xs()
+                                    .text_color(t.muted_foreground)
+                                    .child(handle),
+                            ),
                     ),
             )
             .child(groups)
@@ -986,10 +1243,14 @@ impl SettingsDialog {
                     .px_2()
                     .text_size(px(11.0))
                     .text_color(t.muted_foreground)
-                    .child(format!("Desktop v{} · Anchor {anchor}", env!("CARGO_PKG_VERSION")))
+                    .child(format!(
+                        "Desktop v{} · Anchor {anchor}",
+                        env!("CARGO_PKG_VERSION")
+                    ))
                     .when_some(option_env!("NOVARUM_GIT_COMMIT"), |versions, commit| {
                         let commit = &commit[..commit.len().min(7)];
-                        let url = format!("https://github.com/novarumsocial/novarum/commit/{commit}");
+                        let url =
+                            format!("https://github.com/novarumsocial/novarum/commit/{commit}");
                         versions.child(
                             div()
                                 .id("commit")
@@ -1007,7 +1268,11 @@ impl SettingsDialog {
                     .danger()
                     .w_full()
                     .icon(icon("log-out"))
-                    .label(if self.confirm_logout { "You sure?" } else { "Log out" })
+                    .label(if self.confirm_logout {
+                        "You sure?"
+                    } else {
+                        "Log out"
+                    })
                     .disabled(self.logout_loading)
                     .on_click(cx.listener(|this, _, _, cx| this.request_logout(cx))),
             )
@@ -1016,12 +1281,18 @@ impl SettingsDialog {
     fn color_row(&self, target: ColorTarget, cx: &mut Context<Self>) -> AnyElement {
         let t = theme::tokens(cx);
         let (picker, id, title, description) = match target {
-            ColorTarget::Avatar => {
-                (&self.avatar_picker, "avatar-color", "Avatar color", "Shown behind your picture and on your banner.")
-            }
-            ColorTarget::SpeakingRing => {
-                (&self.ring_picker, "speaking-ring", "Speaking ring", "The outline around you while you talk.")
-            }
+            ColorTarget::Avatar => (
+                &self.avatar_picker,
+                "avatar-color",
+                "Avatar color",
+                "Shown behind your picture and on your banner.",
+            ),
+            ColorTarget::SpeakingRing => (
+                &self.ring_picker,
+                "speaking-ring",
+                "Speaking ring",
+                "The outline around you while you talk.",
+            ),
         };
         let color = picker.read(cx).value();
         let weak = cx.entity().downgrade();
@@ -1031,8 +1302,19 @@ impl SettingsDialog {
                 .flex()
                 .items_center()
                 .gap_2()
-                .child(div().size_4().border_1().border_color(black().opacity(0.15)).bg(ui::hex(&color).unwrap_or(t.primary)))
-                .child(div().font_family(cx.theme().mono_font_family.clone()).text_xs().child(color.to_uppercase())),
+                .child(
+                    div()
+                        .size_4()
+                        .border_1()
+                        .border_color(black().opacity(0.15))
+                        .bg(ui::hex(&color).unwrap_or(t.primary)),
+                )
+                .child(
+                    div()
+                        .font_family(cx.theme().mono_font_family.clone())
+                        .text_xs()
+                        .child(color.to_uppercase()),
+                ),
         );
         let popover = Popover::new(SharedString::from(format!("{id}-popover")))
             .anchor(Anchor::TopRight)
@@ -1041,13 +1323,17 @@ impl SettingsDialog {
             .on_open_change({
                 let weak = weak.clone();
                 move |open, window, cx| {
-                    let _ = weak.update(cx, |this, cx| this.set_color_open(open.then_some(target), window, cx));
+                    let _ = weak.update(cx, |this, cx| {
+                        this.set_color_open(open.then_some(target), window, cx)
+                    });
                 }
             })
             .p_0()
             .content(move |_, _, cx| {
                 let t = theme::tokens(cx);
-                let Some(this) = weak.upgrade() else { return div().into_any_element() };
+                let Some(this) = weak.upgrade() else {
+                    return div().into_any_element();
+                };
                 let (loading, error) = {
                     let dialog = this.read(cx);
                     (dialog.color_loading, dialog.color_error.clone())
@@ -1066,21 +1352,41 @@ impl SettingsDialog {
                             .border_color(t.border)
                             .px_3()
                             .py(px(10.0))
-                            .child(div().text_xs().text_color(t.destructive).child(error.unwrap_or_default()))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(t.destructive)
+                                    .child(error.unwrap_or_default()),
+                            )
                             .child(
                                 div()
                                     .flex()
                                     .gap_2()
-                                    .child(Button::new("color-cancel").ghost().small().label("Cancel").disabled(loading).on_click(
-                                        move |_, window, cx| cancel.update(cx, |this, cx| this.set_color_open(None, window, cx)),
-                                    ))
+                                    .child(
+                                        Button::new("color-cancel")
+                                            .ghost()
+                                            .small()
+                                            .label("Cancel")
+                                            .disabled(loading)
+                                            .on_click(move |_, window, cx| {
+                                                cancel.update(cx, |this, cx| {
+                                                    this.set_color_open(None, window, cx)
+                                                })
+                                            }),
+                                    )
                                     .child(
                                         Button::new("color-save")
                                             .primary()
                                             .small()
-                                            .label(if loading { "Saving…" } else { "Save colors" })
+                                            .label(if loading {
+                                                "Saving…"
+                                            } else {
+                                                "Save colors"
+                                            })
                                             .disabled(loading)
-                                            .on_click(move |_, _, cx| save.update(cx, |this, cx| this.save_colors(cx))),
+                                            .on_click(move |_, _, cx| {
+                                                save.update(cx, |this, cx| this.save_colors(cx))
+                                            }),
                                     ),
                             ),
                     )
@@ -1089,15 +1395,23 @@ impl SettingsDialog {
         settings_row(title, Some(description.into()), false, popover, cx)
     }
 
-    fn render_account(&self, user: Option<&SessionUser>, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn render_account(
+        &self,
+        user: Option<&SessionUser>,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
         let selected = self.avatar_picker.read(cx).value();
         let color = ui::hex(&selected).unwrap_or(t.primary);
         let name = user.map(|user| user.name().to_string());
-        let handle = user.map(|user| user.handle.clone()).unwrap_or("@you".into());
+        let handle = user
+            .map(|user| user.handle.clone())
+            .unwrap_or("@you".into());
         let busy = self.media_loading.is_some();
-        let banner_image = user.and_then(|user| user.banner_url.clone()).and_then(|url| ui::image::remote_img(&url, cx));
+        let banner_image = user
+            .and_then(|user| user.banner_url.clone())
+            .and_then(|url| ui::image::remote_img(&url, cx));
         let about_length = self.about.read(cx).value().chars().count();
 
         let banner = div()
@@ -1106,7 +1420,11 @@ impl SettingsDialog {
             .relative()
             .h_32()
             .overflow_hidden()
-            .bg(linear_gradient(125.0, linear_color_stop(color, 0.0), linear_color_stop(mix(color, t.background, 0.35), 1.0)))
+            .bg(linear_gradient(
+                125.0,
+                linear_color_stop(color, 0.0),
+                linear_color_stop(mix(color, t.background, 0.35), 1.0),
+            ))
             .children(banner_image.map(|image| image.object_fit(ObjectFit::Cover)))
             .child(
                 div()
@@ -1116,7 +1434,11 @@ impl SettingsDialog {
                     .items_center()
                     .justify_center()
                     .text_color(white())
-                    .when(!busy, |overlay| overlay.cursor_pointer().group_hover("banner", |overlay| overlay.bg(black().opacity(0.45))))
+                    .when(!busy, |overlay| {
+                        overlay
+                            .cursor_pointer()
+                            .group_hover("banner", |overlay| overlay.bg(black().opacity(0.45)))
+                    })
                     .child(
                         div()
                             .flex()
@@ -1125,14 +1447,22 @@ impl SettingsDialog {
                             .text_xs()
                             .font_weight(FontWeight::MEDIUM)
                             .when(self.media_loading != Some(MediaTarget::Banner), |label| {
-                                label.opacity(0.0).group_hover("banner", |label| label.opacity(1.0))
+                                label
+                                    .opacity(0.0)
+                                    .group_hover("banner", |label| label.opacity(1.0))
                             })
                             .child(icon("camera").size_4())
-                            .child(if self.media_loading == Some(MediaTarget::Banner) { "Uploading…" } else { "Change banner" }),
+                            .child(if self.media_loading == Some(MediaTarget::Banner) {
+                                "Uploading…"
+                            } else {
+                                "Change banner"
+                            }),
                     ),
             )
             .when(!busy, |banner| {
-                banner.on_click(cx.listener(|this, _, window, cx| this.select_media(MediaTarget::Banner, window, cx)))
+                banner.on_click(cx.listener(|this, _, window, cx| {
+                    this.select_media(MediaTarget::Banner, window, cx)
+                }))
             });
 
         let picture = div()
@@ -1162,11 +1492,22 @@ impl SettingsDialog {
                     .items_center()
                     .justify_center()
                     .text_color(white())
-                    .when(!busy, |overlay| overlay.cursor_pointer().group_hover("avatar", |overlay| overlay.bg(black().opacity(0.55))))
-                    .child(div().opacity(0.0).group_hover("avatar", |camera| camera.opacity(1.0)).child(icon("camera").size_5())),
+                    .when(!busy, |overlay| {
+                        overlay
+                            .cursor_pointer()
+                            .group_hover("avatar", |overlay| overlay.bg(black().opacity(0.55)))
+                    })
+                    .child(
+                        div()
+                            .opacity(0.0)
+                            .group_hover("avatar", |camera| camera.opacity(1.0))
+                            .child(icon("camera").size_5()),
+                    ),
             )
             .when(!busy, |picture| {
-                picture.on_click(cx.listener(|this, _, window, cx| this.select_media(MediaTarget::Avatar, window, cx)))
+                picture.on_click(cx.listener(|this, _, window, cx| {
+                    this.select_media(MediaTarget::Avatar, window, cx)
+                }))
             });
 
         let profile = div()
@@ -1188,16 +1529,42 @@ impl SettingsDialog {
                             .min_w_0()
                             .flex_1()
                             .pt_3()
-                            .child(div().truncate().text_base().font_weight(FontWeight::SEMIBOLD).child(name.clone().unwrap_or("Your profile".into())))
-                            .child(div().truncate().text_xs().text_color(t.muted_foreground).child(handle)),
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(name.clone().unwrap_or("Your profile".into())),
+                            )
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_xs()
+                                    .text_color(t.muted_foreground)
+                                    .child(handle),
+                            ),
                     ),
             )
             .when_some(self.media_error.clone(), |profile, error| {
-                profile.child(div().px_4().pb_3().text_xs().text_color(t.destructive).child(error))
+                profile.child(
+                    div()
+                        .px_4()
+                        .pb_3()
+                        .text_xs()
+                        .text_color(t.destructive)
+                        .child(error),
+                )
             });
 
         let about = div()
-            .child(div().text_sm().child(Textarea::new(&self.about).appearance(false).px_4().py(px(14.0))))
+            .child(
+                div().text_sm().child(
+                    Textarea::new(&self.about)
+                        .appearance(false)
+                        .px_4()
+                        .py(px(14.0)),
+                ),
+            )
             .child(
                 div()
                     .flex()
@@ -1207,8 +1574,14 @@ impl SettingsDialog {
                     .px_4()
                     .pb_3()
                     .child(match &self.about_error {
-                        Some(error) => div().text_xs().text_color(t.destructive).child(error.clone()),
-                        None => div().text_xs().text_color(t.muted_foreground).child(format!("{about_length}/{ABOUT_MAX}")),
+                        Some(error) => div()
+                            .text_xs()
+                            .text_color(t.destructive)
+                            .child(error.clone()),
+                        None => div()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child(format!("{about_length}/{ABOUT_MAX}")),
                     })
                     .child(
                         Button::new("save-about")
@@ -1227,16 +1600,25 @@ impl SettingsDialog {
             );
 
         let detail = |value: Option<String>| {
-            div().max_w_48().truncate().text_sm().text_color(t.muted_foreground).child(value.unwrap_or_default())
+            div()
+                .max_w_48()
+                .truncate()
+                .text_sm()
+                .text_color(t.muted_foreground)
+                .child(value.unwrap_or_default())
         };
         vec![
             Self::head("Account", "How you appear to everyone on Novarum.", cx).into_any_element(),
             profile.into_any_element(),
-            settings_group(Some("About me"), None, [about.into_any_element()], cx).into_any_element(),
+            settings_group(Some("About me"), None, [about.into_any_element()], cx)
+                .into_any_element(),
             settings_group(
                 Some("Colors"),
                 Some("Used for your avatar and when you speak in voice."),
-                [self.color_row(ColorTarget::Avatar, cx), self.color_row(ColorTarget::SpeakingRing, cx)],
+                [
+                    self.color_row(ColorTarget::Avatar, cx),
+                    self.color_row(ColorTarget::SpeakingRing, cx),
+                ],
                 cx,
             )
             .into_any_element(),
@@ -1244,7 +1626,13 @@ impl SettingsDialog {
                 Some("Sign-in details"),
                 None,
                 [
-                    settings_row("Display name", None, false, detail(user.and_then(|user| user.display_name.clone())), cx),
+                    settings_row(
+                        "Display name",
+                        None,
+                        false,
+                        detail(user.and_then(|user| user.display_name.clone())),
+                        cx,
+                    ),
                     settings_row(
                         "Email address",
                         Some("Only visible to you.".into()),
@@ -1261,23 +1649,44 @@ impl SettingsDialog {
 
     fn mfa_badge(enabled: bool, icon_name: &str, cx: &App) -> Div {
         let t = theme::tokens(cx);
-        let emerald = if SettingsStore::get(cx).dark_mode { rgb(0x34d399) } else { rgb(0x059669) };
+        let emerald = if SettingsStore::get(cx).dark_mode {
+            rgb(0x34d399)
+        } else {
+            rgb(0x059669)
+        };
         div()
             .flex()
             .size_8()
             .flex_shrink_0()
             .items_center()
             .justify_center()
-            .when(enabled, |badge| badge.bg(Hsla::from(rgb(0x10b981)).opacity(0.15)).text_color(emerald))
-            .when(!enabled, |badge| badge.bg(t.muted).text_color(t.muted_foreground))
+            .when(enabled, |badge| {
+                badge
+                    .bg(Hsla::from(rgb(0x10b981)).opacity(0.15))
+                    .text_color(emerald)
+            })
+            .when(!enabled, |badge| {
+                badge.bg(t.muted).text_color(t.muted_foreground)
+            })
             .child(icon(icon_name).size_4())
     }
 
     fn mfa_text(title: &str, description: &str, cx: &App) -> Div {
         div()
             .min_w_0()
-            .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(title.to_string()))
-            .child(div().mt(px(2.0)).text_xs().text_color(theme::tokens(cx).muted_foreground).child(description.to_string()))
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(title.to_string()),
+            )
+            .child(
+                div()
+                    .mt(px(2.0))
+                    .text_xs()
+                    .text_color(theme::tokens(cx).muted_foreground)
+                    .child(description.to_string()),
+            )
     }
 
     fn render_totp(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1293,7 +1702,12 @@ impl SettingsDialog {
                 .px_4()
                 .py_4()
                 .child(ui::spinner("totp-preparing"))
-                .child(div().text_xs().text_color(t.muted_foreground).child("Preparing authenticator setup..."))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(t.muted_foreground)
+                        .child("Preparing authenticator setup..."),
+                )
                 .into_any_element(),
             TotpState::Enabled => {
                 let busy = self.totp_mfa_loading || self.totp_delete_loading;
@@ -1302,9 +1716,15 @@ impl SettingsDialog {
                     .xsmall()
                     .disabled(busy)
                     .when(self.confirm_totp_delete, |button| {
-                        button.border_color(t.destructive).text_color(t.destructive).label("?").icon(icon("trash-2"))
+                        button
+                            .border_color(t.destructive)
+                            .text_color(t.destructive)
+                            .label("?")
+                            .icon(icon("trash-2"))
                     })
-                    .when(!self.confirm_totp_delete, |button| button.icon(icon("trash-2")))
+                    .when(!self.confirm_totp_delete, |button| {
+                        button.icon(icon("trash-2"))
+                    })
                     .loading(self.totp_delete_loading)
                     .on_click(cx.listener(|this, _, _, cx| this.request_delete_totp(cx)));
                 div()
@@ -1321,14 +1741,27 @@ impl SettingsDialog {
                             .items_start()
                             .gap_3()
                             .child(Self::mfa_badge(totp_enabled, "shield-check", cx))
-                            .child(Self::mfa_text("Authenticator app", "One-time codes from your authenticator app.", cx)),
+                            .child(Self::mfa_text(
+                                "Authenticator app",
+                                "One-time codes from your authenticator app.",
+                                cx,
+                            )),
                     )
                     .child(
-                        div().flex().flex_shrink_0().items_center().gap_4().child(delete).child(
-                            Switch::new("totp-mfa").checked(totp_enabled).disabled(busy).on_click(cx.listener(
-                                |this, checked: &bool, _, cx| this.toggle_mfa(MfaMethod::Totp, *checked, cx),
-                            )),
-                        ),
+                        div()
+                            .flex()
+                            .flex_shrink_0()
+                            .items_center()
+                            .gap_4()
+                            .child(delete)
+                            .child(
+                                Switch::new("totp-mfa")
+                                    .checked(totp_enabled)
+                                    .disabled(busy)
+                                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                        this.toggle_mfa(MfaMethod::Totp, *checked, cx)
+                                    })),
+                            ),
                     )
                     .into_any_element()
             }
@@ -1452,10 +1885,19 @@ impl SettingsDialog {
                 .child(
                     div()
                         .min_w_0()
-                        .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("Authenticator app"))
-                        .child(div().mt(px(2.0)).text_xs().text_color(t.destructive).child(
-                            self.totp_error.clone().unwrap_or("Could not prepare authenticator setup.".into()),
-                        )),
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child("Authenticator app"),
+                        )
+                        .child(
+                            div().mt(px(2.0)).text_xs().text_color(t.destructive).child(
+                                self.totp_error
+                                    .clone()
+                                    .unwrap_or("Could not prepare authenticator setup.".into()),
+                            ),
+                        ),
                 )
                 .child(
                     Button::new("retry-totp")
@@ -1471,7 +1913,12 @@ impl SettingsDialog {
     fn render_security(&self, settings: &Settings, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let t = theme::tokens(cx);
         let mut sections = vec![
-            Self::head("Privacy & security", "Protect your account and choose what others can see.", cx).into_any_element(),
+            Self::head(
+                "Privacy & security",
+                "Protect your account and choose what others can see.",
+                cx,
+            )
+            .into_any_element(),
             settings_group(
                 Some("Privacy"),
                 None,
@@ -1479,7 +1926,9 @@ impl SettingsDialog {
                     "Show online status",
                     Some("Let people see when you're online.".into()),
                     false,
-                    Self::setting_switch("online-status", settings.show_online_status, |s, v| s.show_online_status = v),
+                    Self::setting_switch("online-status", settings.show_online_status, |s, v| {
+                        s.show_online_status = v
+                    }),
                     cx,
                 )],
                 cx,
@@ -1493,7 +1942,12 @@ impl SettingsDialog {
                     .items_center()
                     .gap_2()
                     .child(ui::spinner("mfa-loading"))
-                    .child(div().text_xs().text_color(t.muted_foreground).child("Checking MFA status..."))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child("Checking MFA status..."),
+                    )
                     .into_any_element(),
             );
         } else if !self.mfa_loaded {
@@ -1506,10 +1960,19 @@ impl SettingsDialog {
                     .child(
                         div()
                             .min_w_0()
-                            .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("MFA settings are unavailable"))
-                            .child(div().mt_1().text_xs().text_color(t.destructive).child(
-                                self.mfa_error.clone().unwrap_or("Could not load MFA settings.".into()),
-                            )),
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child("MFA settings are unavailable"),
+                            )
+                            .child(
+                                div().mt_1().text_xs().text_color(t.destructive).child(
+                                    self.mfa_error
+                                        .clone()
+                                        .unwrap_or("Could not load MFA settings.".into()),
+                                ),
+                            ),
                     )
                     .child(
                         Button::new("retry-mfa")
@@ -1531,7 +1994,12 @@ impl SettingsDialog {
                     .py_3()
                     .child(ui::label("Current password"))
                     .child(Input::new(&self.mfa_password).h_9())
-                    .child(div().text_xs().text_color(t.muted_foreground).child("Needed to change two-step verification."))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(t.muted_foreground)
+                            .child("Needed to change two-step verification."),
+                    )
                     .into_any_element(),
                 div()
                     .flex()
@@ -1547,20 +2015,42 @@ impl SettingsDialog {
                             .items_start()
                             .gap_3()
                             .child(Self::mfa_badge(email_enabled, "mail", cx))
-                            .child(Self::mfa_text("Email codes", "A one-time code sent to your account email.", cx)),
+                            .child(Self::mfa_text(
+                                "Email codes",
+                                "A one-time code sent to your account email.",
+                                cx,
+                            )),
                     )
-                    .child(Switch::new("email-mfa").checked(email_enabled).disabled(self.email_mfa_loading).on_click(
-                        cx.listener(|this, checked: &bool, _, cx| this.toggle_mfa(MfaMethod::Email, *checked, cx)),
-                    ))
+                    .child(
+                        Switch::new("email-mfa")
+                            .checked(email_enabled)
+                            .disabled(self.email_mfa_loading)
+                            .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                this.toggle_mfa(MfaMethod::Email, *checked, cx)
+                            })),
+                    )
                     .into_any_element(),
                 self.render_totp(cx),
             ];
             if let Some(error) = &self.mfa_error {
-                rows.push(div().px_4().py_2().text_xs().text_color(t.destructive).child(error.clone()).into_any_element());
+                rows.push(
+                    div()
+                        .px_4()
+                        .py_2()
+                        .text_xs()
+                        .text_color(t.destructive)
+                        .child(error.clone())
+                        .into_any_element(),
+                );
             }
             sections.push(
-                settings_group(Some("Two-step verification"), Some("Ask for a second code when you sign in."), rows, cx)
-                    .into_any_element(),
+                settings_group(
+                    Some("Two-step verification"),
+                    Some("Ask for a second code when you sign in."),
+                    rows,
+                    cx,
+                )
+                .into_any_element(),
             );
         }
         sections
@@ -1577,14 +2067,18 @@ impl SettingsDialog {
                         "Dark mode",
                         Some("Use the dark color scheme.".into()),
                         false,
-                        Self::setting_switch("dark-mode", settings.dark_mode, |s, v| s.dark_mode = v),
+                        Self::setting_switch("dark-mode", settings.dark_mode, |s, v| {
+                            s.dark_mode = v
+                        }),
                         cx,
                     ),
                     settings_row(
                         "Round icons",
                         Some("Show avatars and server icons as circles instead of squares.".into()),
                         false,
-                        Self::setting_switch("circle-icons", settings.circle_icons, |s, v| s.circle_icons = v),
+                        Self::setting_switch("circle-icons", settings.circle_icons, |s, v| {
+                            s.circle_icons = v
+                        }),
                         cx,
                     ),
                 ],
@@ -1599,14 +2093,19 @@ impl SettingsDialog {
                         "Show member list",
                         Some("Display the member sidebar in channels.".into()),
                         false,
-                        Self::setting_switch("member-list", settings.show_member_list, |s, v| s.show_member_list = v),
+                        Self::setting_switch("member-list", settings.show_member_list, |s, v| {
+                            s.show_member_list = v
+                        }),
                         cx,
                     ),
                     settings_row(
                         "Compact mode",
                         Some("Reduce spacing between messages. Coming soon.".into()),
                         false,
-                        Self::setting_switch("compact-mode", settings.compact_mode, |s, v| s.compact_mode = v).disabled(true),
+                        Self::setting_switch("compact-mode", settings.compact_mode, |s, v| {
+                            s.compact_mode = v
+                        })
+                        .disabled(true),
                         cx,
                     ),
                 ],
@@ -1625,29 +2124,57 @@ impl SettingsDialog {
                 false,
                 Switch::new("push")
                     .checked(settings.push_notifications)
-                    .on_click(cx.listener(|this, checked: &bool, _, cx| this.set_push_notifications(*checked, cx))),
+                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                        this.set_push_notifications(*checked, cx)
+                    })),
                 cx,
             ),
             settings_row(
                 "Message preview",
                 Some("Show the message text in notifications.".into()),
                 false,
-                Self::switch("preview", settings.message_preview, false, |enabled, _, cx| {
-                    // the server decides what a push contains, so it needs to know about this one too
-                    SettingsStore::update(cx, |settings| settings.message_preview = enabled);
-                    NotificationSettings::save_preferences(None, Some(enabled), cx).detach();
-                }),
+                Self::switch(
+                    "preview",
+                    settings.message_preview,
+                    false,
+                    |enabled, _, cx| {
+                        // the server decides what a push contains, so it needs to know about this one too
+                        SettingsStore::update(cx, |settings| settings.message_preview = enabled);
+                        NotificationSettings::save_preferences(None, Some(enabled), cx).detach();
+                    },
+                ),
                 cx,
             ),
         ];
         if let Some(warning) = &self.push_warning {
-            alerts.push(div().px_4().py_2().text_xs().text_color(rgb(0xf59e0b)).child(warning.clone()).into_any_element());
+            alerts.push(
+                div()
+                    .px_4()
+                    .py_2()
+                    .text_xs()
+                    .text_color(rgb(0xf59e0b))
+                    .child(warning.clone())
+                    .into_any_element(),
+            );
         }
         if let Some(error) = &self.push_error {
-            alerts.push(div().px_4().py_2().text_xs().text_color(t.destructive).child(error.clone()).into_any_element());
+            alerts.push(
+                div()
+                    .px_4()
+                    .py_2()
+                    .text_xs()
+                    .text_color(t.destructive)
+                    .child(error.clone())
+                    .into_any_element(),
+            );
         }
         vec![
-            Self::head("Notifications", "Choose how Novarum gets your attention.", cx).into_any_element(),
+            Self::head(
+                "Notifications",
+                "Choose how Novarum gets your attention.",
+                cx,
+            )
+            .into_any_element(),
             settings_group(Some("Alerts"), None, alerts, cx).into_any_element(),
             settings_group(
                 Some("Sound"),
@@ -1657,7 +2184,9 @@ impl SettingsDialog {
                         "Mention sound",
                         Some("Play a sound when someone mentions you.".into()),
                         false,
-                        Self::setting_switch("mention-sound", settings.mention_sound, |s, v| s.mention_sound = v),
+                        Self::setting_switch("mention-sound", settings.mention_sound, |s, v| {
+                            s.mention_sound = v
+                        }),
                         cx,
                     ),
                     settings_row("Volume", None, true, Slider::new(&self.volume), cx),
@@ -1672,12 +2201,44 @@ impl SettingsDialog {
         let t = theme::tokens(cx);
         let testing = self.mic_test.read(cx).testing();
         let mut devices = vec![
-            settings_row("Microphone", None, true, Select::new(&self.input_select).w_full().placeholder("Unknown microphone"), cx),
-            settings_row("Speakers", None, true, Select::new(&self.output_select).w_full().placeholder("Unknown output"), cx),
-            settings_row("Camera", None, true, Select::new(&self.camera_select).w_full().placeholder("Unknown camera"), cx),
+            settings_row(
+                "Microphone",
+                None,
+                true,
+                Select::new(&self.input_select)
+                    .w_full()
+                    .placeholder("Unknown microphone"),
+                cx,
+            ),
+            settings_row(
+                "Speakers",
+                None,
+                true,
+                Select::new(&self.output_select)
+                    .w_full()
+                    .placeholder("Unknown output"),
+                cx,
+            ),
+            settings_row(
+                "Camera",
+                None,
+                true,
+                Select::new(&self.camera_select)
+                    .w_full()
+                    .placeholder("Unknown camera"),
+                cx,
+            ),
         ];
         if let Some(error) = &self.audio_device_error {
-            devices.push(div().px_4().py_2().text_xs().text_color(t.destructive).child(error.clone()).into_any_element());
+            devices.push(
+                div()
+                    .px_4()
+                    .py_2()
+                    .text_xs()
+                    .text_color(t.destructive)
+                    .child(error.clone())
+                    .into_any_element(),
+            );
         }
 
         let mut processing = vec![
@@ -1685,21 +2246,28 @@ impl SettingsDialog {
                 "Echo cancellation",
                 Some("Turn off if it interferes with noise suppression.".into()),
                 false,
-                Self::setting_switch("echo", settings.voice_echo_cancellation, |s, v| s.voice_echo_cancellation = v),
+                Self::setting_switch("echo", settings.voice_echo_cancellation, |s, v| {
+                    s.voice_echo_cancellation = v
+                }),
                 cx,
             ),
             settings_row(
                 "Automatic gain control",
                 Some("Keep your microphone volume steady.".into()),
                 false,
-                Self::setting_switch("agc", settings.voice_auto_gain_control, |s, v| s.voice_auto_gain_control = v),
+                Self::setting_switch("agc", settings.voice_auto_gain_control, |s, v| {
+                    s.voice_auto_gain_control = v
+                }),
                 cx,
             ),
             settings_row(
                 "Noise suppression",
                 Some("Reduce background noise.".into()),
                 false,
-                Self::setting_switch("noise", settings.noise_cancellation, |s, v| s.noise_cancellation = v).disabled(testing),
+                Self::setting_switch("noise", settings.noise_cancellation, |s, v| {
+                    s.noise_cancellation = v
+                })
+                .disabled(testing),
                 cx,
             ),
             settings_row(
@@ -1715,7 +2283,9 @@ impl SettingsDialog {
                 "Automatic strength",
                 Some("Adjusts to how noisy your room is.".into()),
                 false,
-                Self::setting_switch("noise-auto", settings.noise_suppression_auto, |s, v| s.noise_suppression_auto = v),
+                Self::setting_switch("noise-auto", settings.noise_suppression_auto, |s, v| {
+                    s.noise_suppression_auto = v
+                }),
                 cx,
             ));
             if !settings.noise_suppression_auto {
@@ -1786,18 +2356,33 @@ impl SettingsDialog {
                 .child(
                     div()
                         .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(label))
-                        .child(div().mt(px(2.0)).text_xs().text_color(t.muted_foreground).child(example)),
+                        .child(
+                            div()
+                                .mt(px(2.0))
+                                .text_xs()
+                                .text_color(t.muted_foreground)
+                                .child(example),
+                        ),
                 )
                 .child(
                     Radio::new(SharedString::from(format!("time-{label}")))
                         .checked(settings.time_format == format)
-                        .on_click(move |_, _, cx| SettingsStore::update(cx, |settings| settings.time_format = format)),
+                        .on_click(move |_, _, cx| {
+                            SettingsStore::update(cx, |settings| settings.time_format = format)
+                        }),
                 )
-                .on_click(move |_, _, cx| SettingsStore::update(cx, |settings| settings.time_format = format))
+                .on_click(move |_, _, cx| {
+                    SettingsStore::update(cx, |settings| settings.time_format = format)
+                })
                 .into_any_element()
         });
         vec![
-            Self::head("Language & time", "Set your language and how times are shown.", cx).into_any_element(),
+            Self::head(
+                "Language & time",
+                "Set your language and how times are shown.",
+                cx,
+            )
+            .into_any_element(),
             settings_group(
                 Some("Language"),
                 None,
@@ -1805,7 +2390,9 @@ impl SettingsDialog {
                     "Display language",
                     None,
                     true,
-                    Select::new(&self.language_select).w_full().placeholder("Select language"),
+                    Select::new(&self.language_select)
+                        .w_full()
+                        .placeholder("Select language"),
                     cx,
                 )],
                 cx,
@@ -1824,7 +2411,12 @@ impl SettingsDialog {
     fn render_desktop(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let prefs = self.launch_prefs;
         let update = Updater::status(cx);
-        let message = update_message(update.status, update.version.as_deref(), update.percent, prefs.auto_update);
+        let message = update_message(
+            update.status,
+            update.version.as_deref(),
+            update.percent,
+            prefs.auto_update,
+        );
         let busy = matches!(update.status, Status::Checking | Status::Downloading);
         let action = match update.status {
             Status::Downloaded => Button::new("install-update")
@@ -1843,7 +2435,14 @@ impl SettingsDialog {
                 .outline()
                 .small()
                 .disabled(busy)
-                .child(div().flex().items_center().gap_2().child(spin_icon("refresh-cw", busy)).child("Check for updates"))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(spin_icon("refresh-cw", busy))
+                        .child("Check for updates"),
+                )
                 .on_click(|_, _, cx| {
                     Updater::check(cx).detach();
                 }),
@@ -1940,7 +2539,15 @@ impl Render for SettingsDialog {
                     .min_h_0()
                     .overflow_y_scroll()
                     .p_8()
-                    .child(div().mx_auto().max_w(px(576.0)).flex().flex_col().gap_6().children(sections)),
+                    .child(
+                        div()
+                            .mx_auto()
+                            .max_w(px(576.0))
+                            .flex()
+                            .flex_col()
+                            .gap_6()
+                            .children(sections),
+                    ),
             )
     }
 }
@@ -1951,23 +2558,31 @@ impl Global for Shown {}
 /// Opens the dialog whenever `settingsDialog.open` turns true, and closes it when it turns false.
 /// The shell calls this once and keeps the subscription.
 pub fn watch<V: 'static>(window: &mut Window, cx: &mut Context<V>) -> Subscription {
-    cx.observe_in(&SettingsStore::global(cx), window, |_, store, window, cx| {
-        let open = store.read(cx).dialog_open;
-        let shown = cx.try_global::<Shown>().is_some_and(|shown| shown.0);
-        if open && !shown {
-            cx.set_global(Shown(true));
-            let view = cx.new(|cx| SettingsDialog::new(window, cx));
-            window.open_dialog(cx, move |dialog, _, _| {
-                dialog.w(px(896.0)).p_0().child(view.clone()).on_close(|_, _, cx| {
-                    cx.set_global(Shown(false));
-                    SettingsStore::set_dialog_open(false, cx);
-                })
-            });
-        } else if !open && shown {
-            cx.set_global(Shown(false));
-            window.close_dialog(cx);
-        }
-    })
+    cx.observe_in(
+        &SettingsStore::global(cx),
+        window,
+        |_, store, window, cx| {
+            let open = store.read(cx).dialog_open;
+            let shown = cx.try_global::<Shown>().is_some_and(|shown| shown.0);
+            if open && !shown {
+                cx.set_global(Shown(true));
+                let view = cx.new(|cx| SettingsDialog::new(window, cx));
+                window.open_dialog(cx, move |dialog, _, _| {
+                    dialog
+                        .w(px(896.0))
+                        .p_0()
+                        .child(view.clone())
+                        .on_close(|_, _, cx| {
+                            cx.set_global(Shown(false));
+                            SettingsStore::set_dialog_open(false, cx);
+                        })
+                });
+            } else if !open && shown {
+                cx.set_global(Shown(false));
+                window.close_dialog(cx);
+            }
+        },
+    )
 }
 
 #[cfg(test)]
@@ -1987,9 +2602,10 @@ mod tests {
 
     #[test]
     fn renders_a_scannable_size_qr_code() {
-        let png = totp_qr_png("otpauth://totp/Novarum:ana?secret=JBSWY3DPEHPK3PXP&issuer=Novarum").unwrap();
+        let png = totp_qr_png("otpauth://totp/Novarum:ana?secret=JBSWY3DPEHPK3PXP&issuer=Novarum")
+            .unwrap();
         let image = image::load_from_memory(&png).unwrap();
-        assert!(image.width() >= 200 && image.width() <= 224);
+        assert_eq!(image.width(), 224);
         assert_eq!(image.width(), image.height());
     }
 
@@ -2003,7 +2619,11 @@ mod tests {
 
     #[test]
     fn lists_devices_after_the_default() {
-        let choices = device_choices("Default microphone", "Microphone", &["USB".into(), String::new()]);
+        let choices = device_choices(
+            "Default microphone",
+            "Microphone",
+            &["USB".into(), String::new()],
+        );
         assert_eq!(choices[0].value, "default");
         assert_eq!(choices[1].label, "USB");
         assert_eq!(choices[2].label, "Microphone 2");
@@ -2011,8 +2631,17 @@ mod tests {
 
     #[test]
     fn describes_each_update_status() {
-        assert_eq!(update_message(Status::Idle, None, None, false), "Automatic checks are off.");
-        assert_eq!(update_message(Status::Downloading, Some("1.2.0"), Some(41.6), true), "Downloading version 1.2.0… 42%");
-        assert_eq!(update_message(Status::Available, Some("1.2.0"), None, true), "Version 1.2.0 is available.");
+        assert_eq!(
+            update_message(Status::Idle, None, None, false),
+            "Automatic checks are off."
+        );
+        assert_eq!(
+            update_message(Status::Downloading, Some("1.2.0"), Some(41.6), true),
+            "Downloading version 1.2.0… 42%"
+        );
+        assert_eq!(
+            update_message(Status::Available, Some("1.2.0"), None, true),
+            "Version 1.2.0 is available."
+        );
     }
 }

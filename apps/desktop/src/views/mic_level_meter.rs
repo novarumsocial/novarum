@@ -31,13 +31,18 @@ fn bar_color(index: usize) -> Hsla {
 pub fn mic_level_meter(level: f32, cx: &App) -> Div {
     let t = theme::tokens(cx);
     let lit = lit_count(level);
-    div().flex().h_5().items_end().gap(px(3.0)).children((0..N).map(|index| {
-        div()
-            .h_5()
-            .w(px(3.0))
-            .rounded(px(1.0))
-            .bg(if index < lit { bar_color(index) } else { t.muted_foreground.opacity(0.25) })
-    }))
+    div()
+        .flex()
+        .h_5()
+        .items_end()
+        .gap(px(3.0))
+        .children((0..N).map(|index| {
+            div().h_5().w(px(3.0)).rounded(px(1.0)).bg(if index < lit {
+                bar_color(index)
+            } else {
+                t.muted_foreground.opacity(0.25)
+            })
+        }))
 }
 
 #[cfg(test)]

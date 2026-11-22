@@ -12,13 +12,29 @@ pub fn settings_row(
     let t = theme::tokens(cx);
     let text = div()
         .min_w_0()
-        .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(title.into()))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(FontWeight::MEDIUM)
+                .child(title.into()),
+        )
         .when_some(description, |text, description| {
-            text.child(div().mt(px(2.0)).text_xs().line_height(px(19.5)).text_color(t.muted_foreground).child(description))
+            text.child(
+                div()
+                    .mt(px(2.0))
+                    .text_xs()
+                    .line_height(px(19.5))
+                    .text_color(t.muted_foreground)
+                    .child(description),
+            )
         });
     let row = div().flex().px_4().py(px(14.0));
     if stacked {
-        row.flex_col().gap_3().child(text).child(div().w_full().child(control)).into_any_element()
+        row.flex_col()
+            .gap_3()
+            .child(text)
+            .child(div().w_full().child(control))
+            .into_any_element()
     } else {
         row.items_center()
             .justify_between()

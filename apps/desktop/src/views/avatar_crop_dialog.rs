@@ -47,7 +47,12 @@ pub fn pick_image(cx: &mut App) -> Task<Result<Option<UploadFile>, String>> {
         prompt: None,
     });
     cx.background_spawn(async move {
-        let path: Option<PathBuf> = paths.await.ok().and_then(Result::ok).flatten().and_then(|paths| paths.into_iter().next());
+        let path: Option<PathBuf> = paths
+            .await
+            .ok()
+            .and_then(Result::ok)
+            .flatten()
+            .and_then(|paths| paths.into_iter().next());
         let Some(path) = path else { return Ok(None) };
         let file = UploadFile::from_path(&path).map_err(|error| error.to_string())?;
         if !IMAGE_TYPES.contains(&file.content_type.as_str()) {
@@ -73,9 +78,17 @@ pub fn displayed_size(image: (f32, f32), frame: (f32, f32), zoom: f32) -> (f32, 
 }
 
 /// Keeps the image's center offset from the frame's center so that no empty space shows.
-pub fn clamp_offset(offset: (f32, f32), image: (f32, f32), frame: (f32, f32), zoom: f32) -> (f32, f32) {
+pub fn clamp_offset(
+    offset: (f32, f32),
+    image: (f32, f32),
+    frame: (f32, f32),
+    zoom: f32,
+) -> (f32, f32) {
     let (width, height) = displayed_size(image, frame, zoom);
-    let (max_x, max_y) = (((width - frame.0) / 2.0).max(0.0), ((height - frame.1) / 2.0).max(0.0));
+    let (max_x, max_y) = (
+        ((width - frame.0) / 2.0).max(0.0),
+        ((height - frame.1) / 2.0).max(0.0),
+    );
     (offset.0.clamp(-max_x, max_x), offset.1.clamp(-max_y, max_y))
 }
 
@@ -92,14 +105,25 @@ pub fn crop_rect(offset: (f32, f32), image: (f32, f32), frame: (f32, f32), zoom:
 }
 
 /// The canvas `drawImage` + `toBlob('image/png')` step.
-pub fn render_crop(image: &DynamicImage, crop: CropRect, width: u32, height: u32) -> Result<Vec<u8>, String> {
+pub fn render_crop(
+    image: &DynamicImage,
+    crop: CropRect,
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, String> {
     let x = (crop.x.round().max(0.0) as u32).min(image.width().saturating_sub(1));
     let y = (crop.y.round().max(0.0) as u32).min(image.height().saturating_sub(1));
     let crop_width = (crop.width.round() as u32).clamp(1, image.width() - x);
     let crop_height = (crop.height.round() as u32).clamp(1, image.height() - y);
-    let cropped = image.crop_imm(x, y, crop_width, crop_height).resize_exact(width, height, FilterType::Lanczos3);
+    let cropped = image.crop_imm(x, y, crop_width, crop_height).resize_exact(
+        width,
+        height,
+        FilterType::Lanczos3,
+    );
     let mut bytes = Cursor::new(Vec::new());
-    cropped.write_to(&mut bytes, image::ImageFormat::Png).map_err(|error| error.to_string())?;
+    cropped
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
     Ok(bytes.into_inner())
 }
 
@@ -113,14 +137,20 @@ fn decode(bytes: Vec<u8>) -> Result<Loaded, String> {
     fn failed(_: impl std::fmt::Debug) -> String {
         "Could not read that image.".into()
     }
-    let mut decoder = ImageReader::new(Cursor::new(bytes)).with_guessed_format().map_err(failed)?.into_decoder().map_err(failed)?;
+    let mut decoder = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(failed)?
+        .into_decoder()
+        .map_err(failed)?;
     let orientation = decoder.orientation().ok();
     let mut image = DynamicImage::from_decoder(decoder).map_err(failed)?;
     if let Some(orientation) = orientation {
         image.apply_orientation(orientation);
     }
     let mut preview = Cursor::new(Vec::new());
-    image.write_to(&mut preview, image::ImageFormat::Png).map_err(failed)?;
+    image
+        .write_to(&mut preview, image::ImageFormat::Png)
+        .map_err(failed)?;
     Ok(Loaded {
         size: (image.width() as f32, image.height() as f32),
         preview: Arc::new(Image::from_bytes(ImageFormat::Png, preview.into_inner())),
@@ -146,7 +176,13 @@ struct CropView {
 
 impl CropView {
     fn new(bytes: Vec<u8>, options: CropOptions, cx: &mut Context<Self>) -> Self {
-        let slider = cx.new(|_| SliderState::new().min(1.0).max(3.0).step(0.01).default_value(1.0));
+        let slider = cx.new(|_| {
+            SliderState::new()
+                .min(1.0)
+                .max(3.0)
+                .step(0.01)
+                .default_value(1.0)
+        });
         let subscription = cx.subscribe(&slider, |this, _, event: &SliderEvent, cx| {
             let (SliderEvent::Change(value) | SliderEvent::Release(value)) = event;
             this.set_zoom(value.start(), cx);
@@ -176,7 +212,10 @@ impl CropView {
     }
 
     fn frame(&self) -> (f32, f32) {
-        (FRAME_WIDTH, FRAME_WIDTH * self.options.output_height as f32 / self.options.output_width as f32)
+        (
+            FRAME_WIDTH,
+            FRAME_WIDTH * self.options.output_height as f32 / self.options.output_width as f32,
+        )
     }
 
     fn set_zoom(&mut self, zoom: f32, cx: &mut Context<Self>) {
@@ -192,7 +231,10 @@ impl CropView {
         match (phase, self.drag_start) {
             (DragPhase::Start, _) => self.drag_start = Some((position, self.offset)),
             (DragPhase::Move, Some((start, offset))) => {
-                let moved = (offset.0 + f32::from(position.x - start.x), offset.1 + f32::from(position.y - start.y));
+                let moved = (
+                    offset.0 + f32::from(position.x - start.x),
+                    offset.1 + f32::from(position.y - start.y),
+                );
                 self.offset = clamp_offset(moved, loaded.size, self.frame(), self.zoom);
             }
             _ => self.drag_start = None,
@@ -203,7 +245,12 @@ impl CropView {
     fn crop(&self) -> Option<Result<Vec<u8>, String>> {
         let loaded = self.loaded.as_ref()?;
         let rect = crop_rect(self.offset, loaded.size, self.frame(), self.zoom);
-        Some(render_crop(&loaded.source, rect, self.options.output_width, self.options.output_height))
+        Some(render_crop(
+            &loaded.source,
+            rect,
+            self.options.output_width,
+            self.options.output_height,
+        ))
     }
 }
 
@@ -212,7 +259,8 @@ impl Render for CropView {
         let t = theme::tokens(cx);
         let frame = self.frame();
         // round icons crop avatars as circles; banners always stay rectangles
-        let round = SettingsStore::get(cx).circle_icons && self.options.output_width == self.options.output_height;
+        let round = SettingsStore::get(cx).circle_icons
+            && self.options.output_width == self.options.output_height;
         let this = cx.entity().downgrade();
 
         let mut area = div()
@@ -226,7 +274,8 @@ impl Render for CropView {
             .on_scroll(cx.listener(|this, event: &ScrollEvent, window, cx| {
                 let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
                 let zoom = (this.zoom + delta / 200.0).clamp(1.0, 3.0);
-                this.slider.update(cx, |slider, cx| slider.set_value(zoom, window, cx));
+                this.slider
+                    .update(cx, |slider, cx| slider.set_value(zoom, window, cx));
                 this.set_zoom(zoom, cx);
             }));
         if let Some(loaded) = &self.loaded {
@@ -263,37 +312,42 @@ impl Render for CropView {
                         .border_color(white().opacity(0.5))
                         .when(round, |outline| outline.rounded_full()),
                 )
-                .child(drag_surface(self.dragging.clone(), CursorStyle::OpenHand, move |phase, position, _, _, cx| {
-                    if let Some(this) = this.upgrade() {
-                        this.update(cx, |this, cx| this.drag(phase, position, cx));
-                    }
-                }));
+                .child(drag_surface(
+                    self.dragging.clone(),
+                    CursorStyle::OpenHand,
+                    move |phase, position, _, _, cx| {
+                        if let Some(this) = this.upgrade() {
+                            this.update(cx, |this, cx| this.drag(phase, position, cx));
+                        }
+                    },
+                ));
         } else if let Some(error) = &self.error {
-            area = area.flex().items_center().justify_center().child(ui::error_text(error.clone(), cx));
+            area = area
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(ui::error_text(error.clone(), cx));
         }
 
-        div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .child(area)
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .text_xs()
-                    .child(div().text_color(t.muted_foreground).child("Zoom"))
-                    .child(Slider::new(&self.slider)),
-            )
+        div().flex().flex_col().gap_4().child(area).child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .text_xs()
+                .child(div().text_color(t.muted_foreground).child("Zoom"))
+                .child(Slider::new(&self.slider)),
+        )
     }
 }
+
+pub type OnCrop = Rc<dyn Fn(Vec<u8>, &mut Window, &mut App)>;
 
 /// Opens the crop dialog for `image` (the picked file's bytes); `on_crop` gets the PNG result.
 pub fn open_avatar_crop(
     image: Vec<u8>,
     options: CropOptions,
-    on_crop: Rc<dyn Fn(Vec<u8>, &mut Window, &mut App)>,
+    on_crop: OnCrop,
     window: &mut Window,
     cx: &mut App,
 ) {
@@ -302,8 +356,11 @@ pub fn open_avatar_crop(
         let t = theme::tokens(cx);
         let state = view.read(cx);
         let ready = state.loaded.is_some();
-        let (title, description, action) =
-            (state.options.title.clone(), state.options.description.clone(), state.options.action_label.clone());
+        let (title, description, action) = (
+            state.options.title.clone(),
+            state.options.description.clone(),
+            state.options.action_label.clone(),
+        );
         let (apply_view, on_crop) = (view.clone(), on_crop.clone());
         dialog
             .w(px(DIALOG_WIDTH))
@@ -312,8 +369,19 @@ pub fn open_avatar_crop(
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(title))
-                    .child(div().text_sm().font_weight(FontWeight::NORMAL).text_color(t.muted_foreground).child(description)),
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(title),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::NORMAL)
+                            .text_color(t.muted_foreground)
+                            .child(description),
+                    ),
             )
             .child(view.clone())
             .footer(
@@ -321,10 +389,18 @@ pub fn open_avatar_crop(
                     .flex()
                     .justify_end()
                     .gap_2()
-                    .child(Button::new("crop-cancel").outline().label("Cancel").on_click(|_, window, cx| window.close_dialog(cx)))
-                    .child(Button::new("crop-apply").primary().label(action).disabled(!ready).on_click(
-                        move |_, window, cx| {
-                            match apply_view.read(cx).crop() {
+                    .child(
+                        Button::new("crop-cancel")
+                            .outline()
+                            .label("Cancel")
+                            .on_click(|_, window, cx| window.close_dialog(cx)),
+                    )
+                    .child(
+                        Button::new("crop-apply")
+                            .primary()
+                            .label(action)
+                            .disabled(!ready)
+                            .on_click(move |_, window, cx| match apply_view.read(cx).crop() {
                                 Some(Ok(bytes)) => {
                                     window.close_dialog(cx);
                                     on_crop(bytes, window, cx);
@@ -334,9 +410,8 @@ pub fn open_avatar_crop(
                                     cx.notify();
                                 }),
                                 None => {}
-                            }
-                        },
-                    )),
+                            }),
+                    ),
             )
     });
 }
@@ -349,25 +424,53 @@ mod tests {
 
     #[test]
     fn the_image_covers_the_frame_at_zoom_one() {
-        assert_eq!(displayed_size((1000.0, 500.0), (100.0, 100.0), 1.0), (200.0, 100.0));
-        assert_eq!(displayed_size((1000.0, 500.0), (100.0, 100.0), 2.0), (400.0, 200.0));
+        assert_eq!(
+            displayed_size((1000.0, 500.0), (100.0, 100.0), 1.0),
+            (200.0, 100.0)
+        );
+        assert_eq!(
+            displayed_size((1000.0, 500.0), (100.0, 100.0), 2.0),
+            (400.0, 200.0)
+        );
     }
 
     #[test]
     fn panning_stops_at_the_image_edges() {
-        assert_eq!(clamp_offset((500.0, 30.0), (1000.0, 500.0), (100.0, 100.0), 1.0), (50.0, 0.0));
-        assert_eq!(clamp_offset((-500.0, 0.0), (1000.0, 500.0), (100.0, 100.0), 1.0), (-50.0, 0.0));
+        assert_eq!(
+            clamp_offset((500.0, 30.0), (1000.0, 500.0), (100.0, 100.0), 1.0),
+            (50.0, 0.0)
+        );
+        assert_eq!(
+            clamp_offset((-500.0, 0.0), (1000.0, 500.0), (100.0, 100.0), 1.0),
+            (-50.0, 0.0)
+        );
     }
 
     #[test]
     fn a_centered_crop_takes_the_middle_square() {
         let crop = crop_rect((0.0, 0.0), (1000.0, 500.0), (100.0, 100.0), 1.0);
-        assert_eq!(crop, CropRect { x: 250.0, y: 0.0, width: 500.0, height: 500.0 });
+        assert_eq!(
+            crop,
+            CropRect {
+                x: 250.0,
+                y: 0.0,
+                width: 500.0,
+                height: 500.0
+            }
+        );
         // dragging the image right shows more of its left side
         let left = crop_rect((50.0, 0.0), (1000.0, 500.0), (100.0, 100.0), 1.0);
         assert_eq!(left.x, 0.0);
         let zoomed = crop_rect((0.0, 0.0), (1000.0, 500.0), (100.0, 100.0), 2.0);
-        assert_eq!(zoomed, CropRect { x: 375.0, y: 125.0, width: 250.0, height: 250.0 });
+        assert_eq!(
+            zoomed,
+            CropRect {
+                x: 375.0,
+                y: 125.0,
+                width: 250.0,
+                height: 250.0
+            }
+        );
     }
 
     #[test]
@@ -378,7 +481,12 @@ mod tests {
                 source.put_pixel(x, y, Rgba([255, 0, 0, 255]));
             }
         }
-        let crop = CropRect { x: 0.0, y: 0.0, width: 20.0, height: 20.0 };
+        let crop = CropRect {
+            x: 0.0,
+            y: 0.0,
+            width: 20.0,
+            height: 20.0,
+        };
         let png = render_crop(&DynamicImage::ImageRgba8(source), crop, 8, 8).unwrap();
         let output = image::load_from_memory(&png).unwrap();
         assert_eq!(output.dimensions(), (8, 8));

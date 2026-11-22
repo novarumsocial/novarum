@@ -9,9 +9,17 @@ pub fn settings_group(
     cx: &App,
 ) -> Div {
     let t = theme::tokens(cx);
-    let body = div().flex().flex_col().bg(t.card).children(rows.into_iter().enumerate().map(|(index, row)| {
-        div().when(index > 0, |row| row.border_t_1().border_color(t.border.opacity(0.6))).child(row)
-    }));
+    let body = div()
+        .flex()
+        .flex_col()
+        .bg(t.card)
+        .children(rows.into_iter().enumerate().map(|(index, row)| {
+            div()
+                .when(index > 0, |row| {
+                    row.border_t_1().border_color(t.border.opacity(0.6))
+                })
+                .child(row)
+        }));
     div()
         .flex()
         .flex_col()
@@ -19,9 +27,19 @@ pub fn settings_group(
         .when_some(title, |group, title| {
             group.child(
                 div()
-                    .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(title.to_string()))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(title.to_string()),
+                    )
                     .when_some(description, |header, description| {
-                        header.child(div().text_xs().text_color(t.muted_foreground).child(description.to_string()))
+                        header.child(
+                            div()
+                                .text_xs()
+                                .text_color(t.muted_foreground)
+                                .child(description.to_string()),
+                        )
                     }),
             )
         })

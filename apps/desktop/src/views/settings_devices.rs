@@ -7,9 +7,7 @@ use serde::Deserialize;
 
 use crate::prelude::*;
 use crate::{
-    api,
-    state::settings::SettingsStore,
-    util::format_date::format_date,
+    api, state::settings::SettingsStore, util::format_date::format_date,
     views::settings_group::settings_group,
 };
 
@@ -45,6 +43,8 @@ pub fn added_label(created_at: &str, now: &DateTime<Local>) -> String {
     }
 }
 
+type OpenNotifications = Rc<dyn Fn(&mut Window, &mut App)>;
+
 pub struct SettingsDevices {
     devices: Vec<Device>,
     loading: bool,
@@ -52,12 +52,12 @@ pub struct SettingsDevices {
     confirming_id: Option<String>,
     removing_id: Option<String>,
     remove_error: Option<String>,
-    on_open_notifications: Rc<dyn Fn(&mut Window, &mut App)>,
+    on_open_notifications: OpenNotifications,
     _confirm_timer: Option<Task<()>>,
 }
 
 impl SettingsDevices {
-    pub fn new(on_open_notifications: Rc<dyn Fn(&mut Window, &mut App)>, cx: &mut Context<Self>) -> Self {
+    pub fn new(on_open_notifications: OpenNotifications, cx: &mut Context<Self>) -> Self {
         let mut this = Self {
             devices: vec![],
             loading: true,
@@ -113,12 +113,16 @@ impl SettingsDevices {
         }
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = api::delete::<api::Ignored>(format!("/notifications/subscriptions/{}", device.id)).await;
+            let result =
+                api::delete::<api::Ignored>(format!("/notifications/subscriptions/{}", device.id))
+                    .await;
             let _ = this.update(cx, |this, cx| {
                 match result {
                     Err(error) if error.status != 404 && !device.current => {
-                        this.remove_error =
-                            Some(format!("Couldn't remove {}. Check your connection and try again.", device.host))
+                        this.remove_error = Some(format!(
+                            "Couldn't remove {}. Check your connection and try again.",
+                            device.host
+                        ))
                     }
                     _ => this.devices.retain(|item| item.id != device.id),
                 }
@@ -191,7 +195,11 @@ impl SettingsDevices {
                         div()
                             .mt(px(2.0))
                             .text_xs()
-                            .text_color(if confirming { t.destructive } else { t.muted_foreground })
+                            .text_color(if confirming {
+                                t.destructive
+                            } else {
+                                t.muted_foreground
+                            })
                             .child(detail),
                     ),
             )
@@ -202,7 +210,13 @@ impl SettingsDevices {
                     .when(!confirming, |button| button.ghost())
                     .disabled(removing)
                     .when(removing, |button| button.loading(true).label("Removing"))
-                    .when(!removing, |button| button.label(if confirming { "Confirm remove" } else { "Remove" }))
+                    .when(!removing, |button| {
+                        button.label(if confirming {
+                            "Confirm remove"
+                        } else {
+                            "Remove"
+                        })
+                    })
                     .on_click(cx.listener(move |this, _, _, cx| this.remove(target.clone(), cx))),
             )
             .into_any_element()
@@ -213,8 +227,12 @@ impl Render for SettingsDevices {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
-        let phones: Vec<Device> =
-            self.devices.iter().filter(|device| device.kind == DeviceKind::Unifiedpush).cloned().collect();
+        let phones: Vec<Device> = self
+            .devices
+            .iter()
+            .filter(|device| device.kind == DeviceKind::Unifiedpush)
+            .cloned()
+            .collect();
         let rows: Vec<AnyElement> = if self.loading {
             vec![
                 div()
@@ -238,7 +256,10 @@ impl Render for SettingsDevices {
                     .gap_4()
                     .px_4()
                     .py_4()
-                    .child(ui::muted("Couldn't load your devices. Check your connection and try again.", cx))
+                    .child(ui::muted(
+                        "Couldn't load your devices. Check your connection and try again.",
+                        cx,
+                    ))
                     .child(
                         Button::new("devices-retry")
                             .outline()
@@ -293,7 +314,10 @@ impl Render for SettingsDevices {
                     .into_any_element(),
             ]
         } else {
-            phones.iter().map(|device| self.render_device(device, cx)).collect()
+            phones
+                .iter()
+                .map(|device| self.render_device(device, cx))
+                .collect()
         };
 
         div()
@@ -323,7 +347,10 @@ mod tests {
         let now = Local.with_ymd_and_hms(2026, 11, 22, 15, 0, 0).unwrap();
         let today = now.to_rfc3339();
         assert_eq!(added_label(&today, &now), "Added today");
-        let old = Local.with_ymd_and_hms(2026, 3, 4, 9, 0, 0).unwrap().to_rfc3339();
+        let old = Local
+            .with_ymd_and_hms(2026, 3, 4, 9, 0, 0)
+            .unwrap()
+            .to_rfc3339();
         assert_eq!(added_label(&old, &now), "Added Mar 4, 2026");
     }
 

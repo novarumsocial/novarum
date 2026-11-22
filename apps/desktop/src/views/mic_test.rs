@@ -49,12 +49,24 @@ pub fn audio_devices() -> AudioDevices {
 
 fn find_device(name: &str, input: bool) -> Option<cpal::Device> {
     let host = cpal::default_host();
-    let default = || if input { host.default_input_device() } else { host.default_output_device() };
+    let default = || {
+        if input {
+            host.default_input_device()
+        } else {
+            host.default_output_device()
+        }
+    };
     if name == "default" {
         return default();
     }
-    let mut devices = if input { host.input_devices().ok()? } else { host.output_devices().ok()? };
-    devices.find(|device| device.name().is_ok_and(|device_name| device_name == name)).or_else(default)
+    let mut devices = if input {
+        host.input_devices().ok()?
+    } else {
+        host.output_devices().ok()?
+    };
+    devices
+        .find(|device| device.name().is_ok_and(|device_name| device_name == name))
+        .or_else(default)
 }
 
 /// Plays a buffer recorded at one rate at another, holding the last sample when it runs dry.
@@ -66,7 +78,11 @@ pub struct Resampler {
 
 impl Resampler {
     pub fn new(input_rate: u32, output_rate: u32) -> Self {
-        Self { ratio: input_rate as f32 / output_rate as f32, phase: 0.0, last: 0.0 }
+        Self {
+            ratio: input_rate as f32 / output_rate as f32,
+            phase: 0.0,
+            last: 0.0,
+        }
     }
 
     pub fn next(&mut self, buffer: &mut VecDeque<f32>) -> f32 {
@@ -102,7 +118,13 @@ where
             move |data, _| {
                 let mono: Vec<f32> = data
                     .chunks(channels)
-                    .map(|frame| frame.iter().map(|sample| sample.to_sample::<f32>()).sum::<f32>() / channels as f32)
+                    .map(|frame| {
+                        frame
+                            .iter()
+                            .map(|sample| sample.to_sample::<f32>())
+                            .sum::<f32>()
+                            / channels as f32
+                    })
                     .collect();
                 level.store(level_from_samples(&mono).to_bits(), Ordering::Relaxed);
                 if let Ok(mut buffer) = buffer.lock() {
@@ -132,7 +154,9 @@ where
         .build_output_stream::<T, _, _>(
             &config.config(),
             move |data: &mut [T], _| {
-                let Ok(mut buffer) = buffer.lock() else { return };
+                let Ok(mut buffer) = buffer.lock() else {
+                    return;
+                };
                 for frame in data.chunks_mut(channels) {
                     let sample = T::from_sample(resampler.next(&mut buffer));
                     frame.fill(sample);
@@ -153,29 +177,52 @@ impl Loopback {
     fn start(input: &str, output: &str, level: Arc<AtomicU32>) -> Result<Self, String> {
         let microphone = find_device(input, true).ok_or("No microphone was found.")?;
         let speakers = find_device(output, false).ok_or("No output device was found.")?;
-        let input_config = microphone.default_input_config().map_err(|error| error.to_string())?;
-        let output_config = speakers.default_output_config().map_err(|error| error.to_string())?;
+        let input_config = microphone
+            .default_input_config()
+            .map_err(|error| error.to_string())?;
+        let output_config = speakers
+            .default_output_config()
+            .map_err(|error| error.to_string())?;
         let buffer: Shared = Arc::default();
         let unsupported = |format| format!("Unsupported sample format {format:?}");
 
         let input = match input_config.sample_format() {
-            cpal::SampleFormat::F32 => input_stream::<f32>(&microphone, &input_config, buffer.clone(), level),
-            cpal::SampleFormat::I16 => input_stream::<i16>(&microphone, &input_config, buffer.clone(), level),
-            cpal::SampleFormat::U16 => input_stream::<u16>(&microphone, &input_config, buffer.clone(), level),
-            cpal::SampleFormat::I32 => input_stream::<i32>(&microphone, &input_config, buffer.clone(), level),
+            cpal::SampleFormat::F32 => {
+                input_stream::<f32>(&microphone, &input_config, buffer.clone(), level)
+            }
+            cpal::SampleFormat::I16 => {
+                input_stream::<i16>(&microphone, &input_config, buffer.clone(), level)
+            }
+            cpal::SampleFormat::U16 => {
+                input_stream::<u16>(&microphone, &input_config, buffer.clone(), level)
+            }
+            cpal::SampleFormat::I32 => {
+                input_stream::<i32>(&microphone, &input_config, buffer.clone(), level)
+            }
             format => Err(unsupported(format)),
         }?;
         let rate = input_config.sample_rate().0;
         let output = match output_config.sample_format() {
-            cpal::SampleFormat::F32 => output_stream::<f32>(&speakers, &output_config, buffer, rate),
-            cpal::SampleFormat::I16 => output_stream::<i16>(&speakers, &output_config, buffer, rate),
-            cpal::SampleFormat::U16 => output_stream::<u16>(&speakers, &output_config, buffer, rate),
-            cpal::SampleFormat::I32 => output_stream::<i32>(&speakers, &output_config, buffer, rate),
+            cpal::SampleFormat::F32 => {
+                output_stream::<f32>(&speakers, &output_config, buffer, rate)
+            }
+            cpal::SampleFormat::I16 => {
+                output_stream::<i16>(&speakers, &output_config, buffer, rate)
+            }
+            cpal::SampleFormat::U16 => {
+                output_stream::<u16>(&speakers, &output_config, buffer, rate)
+            }
+            cpal::SampleFormat::I32 => {
+                output_stream::<i32>(&speakers, &output_config, buffer, rate)
+            }
             format => Err(unsupported(format)),
         }?;
         input.play().map_err(|error| error.to_string())?;
         output.play().map_err(|error| error.to_string())?;
-        Ok(Self { _input: input, _output: output })
+        Ok(Self {
+            _input: input,
+            _output: output,
+        })
     }
 }
 
@@ -189,7 +236,13 @@ pub struct MicTest {
 
 impl MicTest {
     pub fn new() -> Self {
-        Self { loopback: None, pending: false, error: None, level: Arc::default(), _poll: None }
+        Self {
+            loopback: None,
+            pending: false,
+            error: None,
+            level: Arc::default(),
+            _poll: None,
+        }
     }
 
     /// `voice.audioLoopbackTesting`
@@ -208,13 +261,19 @@ impl MicTest {
         self.pending = true;
         cx.notify();
         let settings = SettingsStore::get(cx);
-        match Loopback::start(&settings.voice_input_device_id, &settings.voice_output_device_id, self.level.clone()) {
+        match Loopback::start(
+            &settings.voice_input_device_id,
+            &settings.voice_output_device_id,
+            self.level.clone(),
+        ) {
             Ok(loopback) => {
                 self.loopback = Some(loopback);
                 // the meter redraws like the web's requestAnimationFrame loop
                 self._poll = Some(cx.spawn(async move |this, cx| {
                     loop {
-                        cx.background_executor().timer(Duration::from_millis(33)).await;
+                        cx.background_executor()
+                            .timer(Duration::from_millis(33))
+                            .await;
                         if this.update(cx, |_, cx| cx.notify()).is_err() {
                             break;
                         }
@@ -232,7 +291,11 @@ impl Render for MicTest {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
         let testing = self.testing();
-        let level = if testing { f32::from_bits(self.level.load(Ordering::Relaxed)) } else { 0.0 };
+        let level = if testing {
+            f32::from_bits(self.level.load(Ordering::Relaxed))
+        } else {
+            0.0
+        };
         let label = match (self.pending, testing) {
             (true, true) => "Starting...",
             (true, false) => "Stopping...",
