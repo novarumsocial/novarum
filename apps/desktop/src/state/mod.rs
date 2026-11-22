@@ -13,10 +13,10 @@ pub mod notification_settings;
 #[allow(dead_code)]
 pub mod realtime;
 pub mod router;
-pub mod session;
-pub mod settings;
 #[cfg(target_os = "linux")]
 pub mod screen_audio;
+pub mod session;
+pub mod settings;
 pub mod video;
 pub mod voice;
 pub mod voice_capture;

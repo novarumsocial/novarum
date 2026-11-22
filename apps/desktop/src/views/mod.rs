@@ -47,7 +47,6 @@ pub mod settings_row;
 pub mod shell;
 pub mod system_message;
 pub mod titlebar;
-pub mod updater;
 pub mod user_area;
 pub mod video_player;
 pub mod voice_area;

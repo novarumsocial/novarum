@@ -1,7 +1,8 @@
 // Port of apps/frontend/src/lib/components/app-shell.svelte.
-use std::time::Duration;
 
 use crate::prelude::*;
+
+use futures::FutureExt;
 
 use crate::{
     models::{ChannelType, DmType},
@@ -28,11 +29,6 @@ use crate::{
 /// Tailwind's `md` and `lg` breakpoints: below them the sidebars become drawers.
 pub const MD: f32 = 768.0;
 pub const LG: f32 = 1024.0;
-
-/// Set when the launch splash already booted the app, so the shell skips its own loader
-/// (`window.electron.behindSplash`).
-pub struct BehindSplash;
-impl Global for BehindSplash {}
 
 /// The shell's own state that the panels act on (`mobileNavigationOpen`, `callExpanded`...).
 pub struct ShellState {
@@ -198,7 +194,6 @@ impl AppShell {
             });
             cx.set_global(GlobalShell(shell));
         }
-        let behind_splash = cx.has_global::<BehindSplash>();
         let subscriptions = vec![
             cx.observe(&Router::global(cx), |_, _, cx| cx.notify()),
             cx.observe(&Session::global(cx), |_, _, cx| cx.notify()),
@@ -222,49 +217,48 @@ impl AppShell {
             }),
         ];
 
-        let loader = cx.new(|_| InitialLoader::new());
-        let boot = state::boot(cx);
-        cx.spawn_in(window, async move |this, cx| {
-            let signed_in = boot.await;
-            if !signed_in {
-                let _ = cx.update(|_, cx| router::goto("/login", cx));
-                return;
-            }
-            if !behind_splash {
-                let _ = this.update(cx, |this, cx| {
-                    this.loader.update(cx, |loader, cx| loader.finish(cx))
-                });
-                cx.background_executor()
-                    .timer(Duration::from_millis(100))
-                    .await;
-            }
-            let _ = this.update_in(cx, |this, window, cx| {
-                this.booting = false;
-                this.panels = Some(Panels {
-                    guild_sidebar: cx.new(|cx| GuildSidebar::new(window, cx)),
-                    channel_sidebar: cx.new(|cx| ChannelSidebar::new(window, cx)),
-                    dm_sidebar: cx.new(|cx| DmSidebar::new(window, cx)),
-                    user_area: cx.new(|cx| UserArea::new(window, cx)),
-                    friends_home: cx.new(|cx| FriendsHome::new(window, cx)),
-                    developers_home: cx.new(|cx| DevelopersHome::new(window, cx)),
-                    chat_area: cx.new(|cx| ChatArea::new(window, cx)),
-                    voice_area: cx.new(|cx| VoiceArea::new(window, cx)),
-                    member_sidebar: cx.new(|cx| MemberSidebar::new(window, cx)),
-                    group_members: cx.new(|cx| GroupMembers::new(window, cx)),
-                    call_ringing: cx.new(|cx| CallRinging::new(window, cx)),
-                });
-                cx.notify();
-            });
-        })
-        .detach();
-
-        Self {
-            booting: !behind_splash,
-            loader,
+        let mut shell = Self {
+            booting: true,
+            loader: cx.new(|_| InitialLoader::new()),
             panels: None,
             unread_total: 0,
             _subscriptions: subscriptions,
+        };
+        let boot = state::boot(cx);
+        // the boot starts before the window opens, so it's often done by now: skip the loader
+        match boot.clone().now_or_never() {
+            Some(signed_in) => shell.on_booted(signed_in, window, cx),
+            None => cx
+                .spawn_in(window, async move |this, cx| {
+                    let signed_in = boot.await;
+                    let _ = this
+                        .update_in(cx, |this, window, cx| this.on_booted(signed_in, window, cx));
+                })
+                .detach(),
         }
+        shell
+    }
+
+    fn on_booted(&mut self, signed_in: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !signed_in {
+            router::goto("/login", cx);
+            return;
+        }
+        self.booting = false;
+        self.panels = Some(Panels {
+            guild_sidebar: cx.new(|cx| GuildSidebar::new(window, cx)),
+            channel_sidebar: cx.new(|cx| ChannelSidebar::new(window, cx)),
+            dm_sidebar: cx.new(|cx| DmSidebar::new(window, cx)),
+            user_area: cx.new(|cx| UserArea::new(window, cx)),
+            friends_home: cx.new(|cx| FriendsHome::new(window, cx)),
+            developers_home: cx.new(|cx| DevelopersHome::new(window, cx)),
+            chat_area: cx.new(|cx| ChatArea::new(window, cx)),
+            voice_area: cx.new(|cx| VoiceArea::new(window, cx)),
+            member_sidebar: cx.new(|cx| MemberSidebar::new(window, cx)),
+            group_members: cx.new(|cx| GroupMembers::new(window, cx)),
+            call_ringing: cx.new(|cx| CallRinging::new(window, cx)),
+        });
+        cx.notify();
     }
 
     /// Mentions across guilds plus unread DMs: the title and the launcher badge.

@@ -1,5 +1,5 @@
 // Port of apps/frontend/src/lib/components/initial-loader.svelte: the sun rises behind the horizon
-// while the guilds load, then settles when `finished`.
+// while the guilds load.
 use std::{sync::Arc, time::Instant};
 
 use crate::prelude::*;
@@ -19,31 +19,46 @@ fn hex(color: Hsla) -> String {
     )
 }
 
-/// The logo with the sun `offset` viewBox units below its resting place, clipped at the horizon.
-fn logo(offset: f32, color: Hsla) -> Arc<Image> {
+fn svg(body: &str, color: Hsla) -> Arc<Image> {
     let svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="{c}"><defs><clipPath id="c"><rect width="24" height="15"/></clipPath></defs><g clip-path="url(#c)"><g transform="translate(0 {offset:.2})">{SUN}</g></g>{HORIZON}</svg>"#,
-        c = hex(color)
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="{}">{body}</svg>"#,
+        hex(color)
     );
     Arc::new(Image::from_bytes(ImageFormat::Svg, svg.into_bytes()))
 }
 
+/// Rasterized once per color; the sun moves by layout rather than by redrawing the SVG.
+struct Logo {
+    color: Hsla,
+    sun: Arc<Image>,
+    horizon: Arc<Image>,
+}
+
+impl Logo {
+    fn new(color: Hsla) -> Self {
+        Self {
+            color,
+            sun: svg(SUN, color),
+            horizon: svg(HORIZON, color),
+        }
+    }
+}
+
+const LOGO_SIZE: f32 = 144.0;
+/// one viewBox unit of the 24-unit logo, in pixels
+const UNIT: f32 = LOGO_SIZE / 24.0;
+
 pub struct InitialLoader {
     started: Instant,
-    finished_at: Option<Instant>,
+    logo: Option<Logo>,
 }
 
 impl InitialLoader {
     pub fn new() -> Self {
         Self {
             started: Instant::now(),
-            finished_at: None,
+            logo: None,
         }
-    }
-
-    pub fn finish(&mut self, cx: &mut Context<Self>) {
-        self.finished_at.get_or_insert_with(Instant::now);
-        cx.notify();
     }
 }
 
@@ -51,31 +66,23 @@ fn ease_out(t: f32) -> f32 {
     1.0 - (1.0 - t).powi(2)
 }
 
-/// cubic-bezier(0.22, 1, 0.36, 1), close enough.
-fn ease_out_quint(t: f32) -> f32 {
-    1.0 - (1.0 - t).powi(5)
-}
-
 impl Render for InitialLoader {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let t = theme::tokens(cx);
-        // loading: 9 → 4 over 0.8s; finished: 4 → 0 over 0.55s
-        let offset = match self.finished_at {
-            None => {
-                let p = (self.started.elapsed().as_secs_f32() / 0.8).min(1.0);
-                9.0 - 5.0 * ease_out(p)
-            }
-            Some(at) => {
-                let p = (at.elapsed().as_secs_f32() / 0.55).min(1.0);
-                4.0 - 4.0 * ease_out_quint(p)
-            }
-        };
-        let settled = self
-            .finished_at
-            .is_some_and(|at| at.elapsed().as_secs_f32() >= 0.55);
-        if !settled {
+        // the sun rises 9 → 4 viewBox units over 0.8s while the boot runs
+        let progress = (self.started.elapsed().as_secs_f32() / 0.8).min(1.0);
+        let offset = 9.0 - 5.0 * ease_out(progress);
+        if progress < 1.0 {
             window.request_animation_frame();
         }
+        if self
+            .logo
+            .as_ref()
+            .is_none_or(|logo| logo.color != t.primary)
+        {
+            self.logo = Some(Logo::new(t.primary));
+        }
+        let logo = self.logo.as_ref().unwrap();
 
         div()
             .relative()
@@ -110,7 +117,35 @@ impl Render for InitialLoader {
                     .items_center()
                     .w_full()
                     .max_w(px(224.0))
-                    .child(img(logo(offset, t.primary)).size(px(144.0)))
+                    .child(
+                        div()
+                            .relative()
+                            .size(px(LOGO_SIZE))
+                            .child(
+                                // clipped at the horizon (y = 15), so the sun rises from behind it
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .w(px(LOGO_SIZE))
+                                    .h(px(15.0 * UNIT))
+                                    .overflow_hidden()
+                                    .child(
+                                        img(logo.sun.clone())
+                                            .absolute()
+                                            .left_0()
+                                            .top(px(offset * UNIT))
+                                            .size(px(LOGO_SIZE)),
+                                    ),
+                            )
+                            .child(
+                                img(logo.horizon.clone())
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .size(px(LOGO_SIZE)),
+                            ),
+                    )
                     .child(
                         div()
                             .mt_8()
