@@ -3,6 +3,7 @@
 // dropdown menu, switch, slider, tabs, tooltip...) and only add here what it lacks.
 pub mod avatar;
 pub mod image;
+pub mod trigger;
 
 use crate::prelude::*;
 use gpui_kit::{component::Icon, *};
