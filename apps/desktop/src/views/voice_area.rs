@@ -21,7 +21,10 @@ use crate::{
     },
     theme,
     ui::avatar::avatar_with_fallback,
-    util::voice_layout::{fit_tiles_with, initials_for},
+    util::{
+        voice_layout::{fit_tiles_with, initials_for},
+        zoom_pan::ZoomPan,
+    },
     views::{
         channel_sidebar::avatar_bg, participant_context_menu::participant_context_menu,
         shell::ShellState,
@@ -71,6 +74,13 @@ pub struct VoiceArea {
     idle: Option<Task<()>>,
     /// the spotlit stream's volume slider, for whoever is sharing
     stream_volume: Option<(String, Entity<SliderState>)>,
+    /// zoom and pan over a spotlit screen share, to read small text (the web's `ZoomPan`)
+    zoom: ZoomPan,
+    zoom_key: Option<String>,
+    zoomable: bool,
+    has_rest: bool,
+    drag: Option<Point<Pixels>>,
+    spotlight_origin: Rc<Cell<Point<Pixels>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -108,6 +118,12 @@ impl VoiceArea {
             hovering_controls: false,
             idle: None,
             stream_volume: None,
+            zoom: ZoomPan::new(5.0),
+            zoom_key: None,
+            zoomable: false,
+            has_rest: false,
+            drag: None,
+            spotlight_origin: Rc::default(),
             _subscriptions,
         }
     }
@@ -307,6 +323,9 @@ impl VoiceArea {
     }
 
     fn render_stage(&mut self, tiles: Vec<Tile>, cx: &mut Context<Self>) -> AnyElement {
+        // the zoom and filmstrip keys only apply while something is spotlit
+        self.zoomable = false;
+        self.has_rest = false;
         let size = self.stage_size.get();
         let (width, height) = (f32::from(size.width), f32::from(size.height));
         let spotlight_key = self.spotlight_key(&tiles, cx);
@@ -367,7 +386,12 @@ impl VoiceArea {
                         .children(tiles.iter().map(|tile| {
                             let target = tile.clone();
                             let element = self
-                                .render_tile(tile, TileSize::Grid(grid.width, grid.height), cx)
+                                .render_tile(
+                                    tile,
+                                    TileSize::Grid(grid.width, grid.height),
+                                    None,
+                                    cx,
+                                )
                                 .on_click(
                                     cx.listener(move |this, _, _, cx| this.focus_tile(&target, cx)),
                                 );
@@ -393,6 +417,90 @@ impl VoiceArea {
         let rest_count = rest.len();
         let circle = SettingsStore::get(cx).circle_icons;
 
+        // a new spotlight starts unzoomed; a resized one keeps its zoom, re-clamped to the new size
+        let zoomable = spotlight.screen && Self::has_video(&spotlight, cx);
+        if self.zoom_key.as_ref() != Some(&spotlight.key) || !zoomable {
+            self.zoom.reset();
+            self.zoom_key = Some(spotlight.key.clone());
+        }
+        let (fit_width, fit_height) =
+            fit(Self::frame_aspect(&spotlight, cx), box_width, box_height);
+        if (self.zoom.width, self.zoom.height) != (fit_width, fit_height) {
+            self.zoom.width = fit_width;
+            self.zoom.height = fit_height;
+            self.zoom.pan(0.0, 0.0);
+        }
+        self.zoomable = zoomable;
+        self.has_rest = rest_count > 0;
+        let zoomed = zoomable && self.zoom.zoomed();
+        let zoom_percent = (self.zoom.scale * 100.0).round();
+        let origin = self.spotlight_origin.clone();
+        let spotlight_tile = self
+            .render_tile(
+                &spotlight,
+                TileSize::Fit(box_width, box_height),
+                zoomable.then_some(self.zoom),
+                cx,
+            )
+            .child(
+                canvas(
+                    move |bounds, _, _| origin.set(bounds.origin),
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
+            .when(zoomable, |tile| {
+                tile.when(zoomed, |tile| tile.cursor_grab())
+                    .on_scroll(cx.listener(|this, event: &ScrollEvent, _, cx| {
+                        let at = event.position - this.spotlight_origin.get();
+                        let delta = event.delta.pixel_delta(px(20.0));
+                        this.zoom.wheel(
+                            f32::from(at.x),
+                            f32::from(at.y),
+                            -f32::from(delta.y),
+                            event.modifiers.control,
+                        );
+                        cx.notify();
+                    }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &MouseDownEvent, _, _| {
+                            this.drag = Some(event.position);
+                            this.zoom.moved = false;
+                        }),
+                    )
+                    .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
+                        let Some(last) = this.drag else {
+                            return;
+                        };
+                        if event.pressed_button != Some(MouseButton::Left) || !this.zoom.zoomed() {
+                            return;
+                        }
+                        let delta = event.position - last;
+                        this.zoom.pan(f32::from(delta.x), f32::from(delta.y));
+                        this.zoom.moved = true;
+                        this.drag = Some(event.position);
+                        cx.notify();
+                    }))
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, _| this.drag = None),
+                    )
+            })
+            // while zoomed, or right after a drag, a click pans instead of leaving the spotlight
+            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                if this.zoomable && (this.zoom.zoomed() || this.zoom.moved) {
+                    if event.click_count() == 2 {
+                        this.zoom.reset();
+                    }
+                    this.zoom.moved = false;
+                    cx.notify();
+                    return;
+                }
+                this.show_grid(cx);
+            }));
+
         let spotlight_box = div()
             .group("voice-spotlight")
             .relative()
@@ -403,12 +511,42 @@ impl VoiceArea {
             .items_center()
             .justify_center()
             .child(participant_context_menu(
-                self.render_tile(&spotlight, TileSize::Fit(box_width, box_height), cx)
-                    .on_click(cx.listener(|this, _, _, cx| this.show_grid(cx))),
+                spotlight_tile,
                 &spotlight.identity,
                 &spotlight.name,
                 cx,
             ))
+            .when(zoomed, |spot| {
+                spot.child(
+                    div()
+                        .id("voice-zoom-reset")
+                        .absolute()
+                        .top_2()
+                        .left_2()
+                        .flex()
+                        .h_7()
+                        .items_center()
+                        .gap(px(6.0))
+                        .px_2()
+                        .bg(black().opacity(0.6))
+                        .hover(|badge| badge.bg(black().opacity(0.75)))
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(white())
+                        .cursor_pointer()
+                        .when(circle, |badge| badge.rounded_full())
+                        .child(icon("zoom-out").size(px(14.0)))
+                        .child(format!("{zoom_percent}%"))
+                        .tooltip(|window, cx| {
+                            gpui_kit::component::tooltip::Tooltip::new("Reset zoom (0)")
+                                .build(window, cx)
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.zoom.reset();
+                            cx.notify();
+                        })),
+                )
+            })
             .when(rest_count > 0, |spot| {
                 spot.child(
                     div()
@@ -487,7 +625,7 @@ impl VoiceArea {
                             }
                         })
                         .child(participant_context_menu(
-                            self.render_tile(tile, TileSize::Strip, cx).on_click(
+                            self.render_tile(tile, TileSize::Strip, None, cx).on_click(
                                 cx.listener(move |this, _, _, cx| this.focus_tile(&target, cx)),
                             ),
                             &tile.identity,
@@ -510,7 +648,24 @@ impl VoiceArea {
             .into_any_element()
     }
 
-    fn render_tile(&self, tile: &Tile, size: TileSize, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn frame_aspect(tile: &Tile, cx: &App) -> f32 {
+        VideoFeeds::global(cx)
+            .read(cx)
+            .frame(&tile.identity, tile.screen)
+            .map(|frame| {
+                let size = frame.size(0);
+                size.width.0 as f32 / size.height.0.max(1) as f32
+            })
+            .unwrap_or(16.0 / 9.0)
+    }
+
+    fn render_tile(
+        &self,
+        tile: &Tile,
+        size: TileSize,
+        zoom: Option<ZoomPan>,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let t = theme::tokens(cx);
         let circle = SettingsStore::get(cx).circle_icons;
         let is_self = self.is_self(&tile.identity, cx);
@@ -532,25 +687,29 @@ impl VoiceArea {
         el = match size {
             TileSize::Grid(width, height) => el.w(px(width)).h(px(height)),
             TileSize::Fit(width, height) => {
-                let aspect = frame
-                    .as_ref()
-                    .map(|frame| {
-                        let size = frame.size(0);
-                        size.width.0 as f32 / size.height.0.max(1) as f32
-                    })
-                    .unwrap_or(16.0 / 9.0);
-                let fitted = width.min(height * aspect).max(0.0);
-                el.w(px(fitted.floor())).h(px((fitted / aspect).floor()))
+                let (width, height) = fit(Self::frame_aspect(tile, cx), width, height);
+                el.w(px(width)).h(px(height))
             }
             TileSize::Strip => el.size_full(),
         };
 
         let body: AnyElement = if let Some(frame) = frame {
             // contain, not cover: never crop someone's camera to fit the tile shape
-            img(frame)
-                .size_full()
-                .object_fit(ObjectFit::Contain)
-                .into_any_element()
+            match zoom {
+                // scaled from the top-left and clipped by the tile, like the web's transform
+                Some(zoom) => img(frame)
+                    .absolute()
+                    .left(px(zoom.x))
+                    .top(px(zoom.y))
+                    .w(px(zoom.width * zoom.scale))
+                    .h(px(zoom.height * zoom.scale))
+                    .object_fit(ObjectFit::Contain)
+                    .into_any_element(),
+                None => img(frame)
+                    .size_full()
+                    .object_fit(ObjectFit::Contain)
+                    .into_any_element(),
+            }
         } else if tile.screen && !is_self {
             div()
                 .flex()
@@ -1090,11 +1249,26 @@ impl Render for VoiceArea {
         let show_controls = self.controls_visible || self.hovering_controls;
         div()
             .track_focus(&self.focus)
-            .on_key_down(cx.listener(move |_, event: &KeyDownEvent, window, cx| {
-                if fullscreen && event.keystroke.key == "escape" {
-                    ShellState::set_call_fullscreen(false, window, cx);
-                    cx.stop_propagation();
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, window, cx| window.focus(&this.focus, cx)),
+            )
+            .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                let modified = event.keystroke.modifiers.control
+                    || event.keystroke.modifiers.platform
+                    || event.keystroke.modifiers.alt;
+                match event.keystroke.key.as_str() {
+                    "escape" if fullscreen => ShellState::set_call_fullscreen(false, window, cx),
+                    "+" | "=" if this.zoomable && !modified => this.zoom.zoom_by(1.25),
+                    "-" if this.zoomable && !modified => this.zoom.zoom_by(1.0 / 1.25),
+                    "0" if this.zoomable && !modified => this.zoom.reset(),
+                    "h" if this.has_rest && !modified => {
+                        this.strip_collapsed = !this.strip_collapsed
+                    }
+                    _ => return,
                 }
+                cx.stop_propagation();
+                cx.notify();
             }))
             .flex()
             .size_full()
@@ -1201,4 +1375,10 @@ impl Render for VoiceArea {
             )
             .into_any_element()
     }
+}
+
+/// The largest box of `aspect` that fits in `width` x `height`, in whole pixels.
+fn fit(aspect: f32, width: f32, height: f32) -> (f32, f32) {
+    let fitted = width.min(height * aspect).max(0.0);
+    (fitted.floor(), (fitted / aspect).floor())
 }
