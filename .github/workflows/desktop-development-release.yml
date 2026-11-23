@@ -146,7 +146,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: linux, arch: x86_64, deb: amd64, runner: blacksmith-4vcpu-ubuntu-2404 }
+          - { os: linux, arch: x86_64, deb: amd64, runner: ubuntu-24.04 }
           - { os: linux, arch: aarch64, deb: arm64, runner: ubuntu-24.04-arm }
           - { os: macos, arch: aarch64, runner: macos-latest }
           - { os: macos, arch: x86_64, runner: macos-15-intel }
@@ -308,7 +308,7 @@ jobs:
       - build-desktop-rs
       - release
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-desktop-rs.result == 'success' }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

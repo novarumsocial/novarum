@@ -22,7 +22,7 @@ permissions:
 jobs:
   check:
     name: Format, lint and test (Linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/desktop
