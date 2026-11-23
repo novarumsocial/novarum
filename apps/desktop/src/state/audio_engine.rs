@@ -71,7 +71,9 @@ struct Shared {
 pub struct AudioEngine {
     shared: Arc<Shared>,
     source: NativeAudioSource,
-    streams: Option<Streams>,
+    /// cpal's streams can't leave the thread that made them on every platform, so a thread of
+    /// their own opens and holds them; `None` closes them
+    devices: mpsc::Sender<Option<(String, String)>>,
     wake: mpsc::Sender<()>,
     stop: Arc<AtomicBool>,
     remote_tasks: HashMap<String, tokio::task::JoinHandle<()>>,
@@ -93,6 +95,28 @@ impl AudioEngine {
             100,
         );
         let (wake, woken) = mpsc::channel();
+        let (devices, device_requests) = mpsc::channel::<Option<(String, String)>>();
+        {
+            let (shared, wake) = (shared.clone(), wake.clone());
+            std::thread::Builder::new()
+                .name("novarum-audio-devices".into())
+                .spawn(move || {
+                    let mut _streams = None;
+                    for request in device_requests {
+                        _streams = None;
+                        let Some((input, output)) = request else {
+                            continue;
+                        };
+                        match Streams::open(&input, &output, &shared, wake.clone()) {
+                            Ok(streams) => _streams = Some(streams),
+                            Err(error) => {
+                                eprintln!("Could not open the call's audio devices: {error}")
+                            }
+                        }
+                    }
+                })
+                .expect("audio device thread");
+        }
         let stop = Arc::new(AtomicBool::new(false));
         {
             let (shared, source, stop) = (shared.clone(), source.clone(), stop.clone());
@@ -104,7 +128,7 @@ impl AudioEngine {
         let mut engine = Self {
             shared,
             source,
-            streams: None,
+            devices,
             wake,
             stop,
             remote_tasks: HashMap::new(),
@@ -119,11 +143,9 @@ impl AudioEngine {
 
     /// Reopens the mic and speakers, e.g. when the chosen devices change.
     pub fn set_devices(&mut self, input: &str, output: &str) {
-        self.streams = None;
-        match Streams::open(input, output, &self.shared, self.wake.clone()) {
-            Ok(streams) => self.streams = Some(streams),
-            Err(error) => eprintln!("Could not open the call's audio devices: {error}"),
-        }
+        let _ = self
+            .devices
+            .send(Some((input.to_string(), output.to_string())));
     }
 
     pub fn set_processing(&self, processing: Processing) {
@@ -182,6 +204,8 @@ impl Drop for AudioEngine {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         let _ = self.wake.send(());
+        // closes the streams; dropping the sender then ends the device thread
+        let _ = self.devices.send(None);
         for task in self.remote_tasks.values() {
             task.abort();
         }
