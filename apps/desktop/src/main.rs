@@ -3,8 +3,8 @@
 mod api;
 mod app;
 mod assets;
-mod media;
 mod desktop;
+mod media;
 mod models;
 #[allow(dead_code)]
 mod notifications;
