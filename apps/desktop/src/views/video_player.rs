@@ -2,6 +2,8 @@
 // (`media::Media`); until it's started, or without libmpv (which opens it externally instead), it
 // shows the homeserver's preview frame with a play button. The controls stand in for video.js's
 // skin: play/pause, seek, time, mute and the download button the web adds to the bar.
+use gpui_kit::component::slider::Slider;
+
 use crate::prelude::*;
 
 use crate::{
@@ -27,11 +29,26 @@ pub fn video_player(
     attachment: &Attachment,
     cx: &mut App,
 ) -> Stateful<Div> {
-    let id: ElementId = id.into();
+    player(id.into(), attachment, false, cx)
+}
+
+/// The fullscreen video, drawn over the whole window by `AppRoot`.
+pub fn fullscreen_video(cx: &mut App) -> Option<AnyElement> {
+    let attachment = Media::global(cx).read(cx).fullscreen()?.clone();
+    Some(
+        player("video-fullscreen".into(), &attachment, true, cx)
+            .absolute()
+            .inset_0()
+            .into_any_element(),
+    )
+}
+
+fn player(id: ElementId, attachment: &Attachment, fullscreen: bool, cx: &mut App) -> Stateful<Div> {
     let t = theme::tokens(cx);
     let radius = if t.radius > px(0.0) { px(8.0) } else { px(0.0) };
     let playing = Media::global(cx).read(cx).playing(&attachment.id);
-    let (key, url) = (attachment.id.clone(), attachment.url.clone());
+    let playable = attachment.clone();
+    let url = attachment.url.clone();
 
     let button = |id: ElementId, name: &'static str| {
         div()
@@ -62,13 +79,20 @@ pub fn video_player(
         .id(id.clone())
         .group("video")
         .relative()
-        .w_full()
-        .h(px(252.0))
         .overflow_hidden()
-        .rounded(radius)
-        .border_1()
-        .border_color(t.border)
-        .bg(black());
+        .bg(black())
+        .map(|player| {
+            if fullscreen {
+                player.size_full()
+            } else {
+                player
+                    .w_full()
+                    .h(px(252.0))
+                    .rounded(radius)
+                    .border_1()
+                    .border_color(t.border)
+            }
+        });
 
     let Some((frame, state)) = playing else {
         let poster = crate::ui::image::remote_img(&attachment.preview_url, cx);
@@ -111,7 +135,7 @@ pub fn video_player(
             .on_click(move |_, _, cx| {
                 let started = media::available()
                     && Media::global(cx)
-                        .update(cx, |media, cx| media.play(&key, &url, cx))
+                        .update(cx, |media, cx| media.play(&playable, cx))
                         .inspect_err(|error| eprintln!("Could not play the video: {error}"))
                         .is_ok();
                 if !started {
@@ -126,7 +150,10 @@ pub fn video_player(
         0.0
     };
     let show_controls = state.paused || state.ended;
-    let seeking = Media::global(cx).read(cx).seeking.clone();
+    let (seeking, volume_slider) = {
+        let media = Media::global(cx).read(cx);
+        (media.seeking.clone(), media.volume_slider.clone())
+    };
 
     player
         .children(frame.map(|frame| img(frame).size_full().object_fit(ObjectFit::Contain)))
@@ -200,7 +227,29 @@ pub fn video_player(
                         Media::global(cx).update(cx, |media, _| media.toggle_mute())
                     }),
                 )
-                .child(download_button),
+                .child(
+                    div()
+                        .w(px(72.0))
+                        .flex_shrink_0()
+                        .child(Slider::new(&volume_slider).w_full()),
+                )
+                .child(download_button)
+                .child(
+                    button(
+                        (id.clone(), SharedString::from("fullscreen")).into(),
+                        if fullscreen {
+                            "minimize-2"
+                        } else {
+                            "maximize-2"
+                        },
+                    )
+                    .on_click(move |_, window, cx| {
+                        cx.stop_propagation();
+                        Media::global(cx).update(cx, |media, cx| {
+                            media.set_fullscreen(!fullscreen, window, cx)
+                        })
+                    }),
+                ),
         )
 }
 

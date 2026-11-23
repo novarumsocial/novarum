@@ -12,9 +12,14 @@ use std::{
     time::Duration,
 };
 
-use gpui_kit::*;
+use gpui_kit::{
+    component::slider::{SliderEvent, SliderState},
+    *,
+};
 use libloading::Library;
 use tokio::sync::Notify;
+
+use crate::models::Attachment;
 
 const FORMAT_FLAG: c_int = 3;
 const FORMAT_INT64: c_int = 4;
@@ -257,6 +262,18 @@ impl Player {
         let _ = self.wake.send(());
     }
 
+    fn set_double(&self, name: &CStr, mut value: f64) {
+        unsafe {
+            (self.mpv.set_property)(
+                self.handle.0,
+                name.as_ptr(),
+                FORMAT_DOUBLE,
+                &mut value as *mut f64 as *mut c_void,
+            )
+        };
+        let _ = self.wake.send(());
+    }
+
     fn set_flag(&self, name: &CStr, value: bool) {
         let mut value = value as c_int;
         unsafe {
@@ -440,10 +457,16 @@ pub struct Media {
     active: Option<Active>,
     /// the seek bar's drag, which spans frames
     pub seeking: std::rc::Rc<std::cell::Cell<bool>>,
+    /// 0-100, kept across videos like a browser tab's
+    pub volume_slider: Entity<SliderState>,
+    volume: f64,
+    /// the playing video fills the window
+    fullscreen: bool,
+    _volume: Subscription,
 }
 
 struct Active {
-    key: String,
+    attachment: Attachment,
     player: Player,
     frame: Option<Arc<RenderImage>>,
     state: PlaybackState,
@@ -454,9 +477,26 @@ struct GlobalMedia(Entity<Media>);
 impl Global for GlobalMedia {}
 
 pub fn init(cx: &mut App) {
-    let media = cx.new(|_| Media {
-        active: None,
-        seeking: Default::default(),
+    let media = cx.new(|cx| {
+        let volume_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(100.0)
+                .step(1.0)
+                .default_value(100.0)
+        });
+        let _volume = cx.subscribe(&volume_slider, |media: &mut Media, _, event, cx| {
+            let (SliderEvent::Change(value) | SliderEvent::Release(value)) = event;
+            media.set_volume(value.start() as f64, cx);
+        });
+        Media {
+            active: None,
+            seeking: Default::default(),
+            volume_slider,
+            volume: 100.0,
+            fullscreen: false,
+            _volume,
+        }
     });
     cx.set_global(GlobalMedia(media));
 }
@@ -470,11 +510,11 @@ impl Media {
     pub fn playing(&self, key: &str) -> Option<(Option<Arc<RenderImage>>, PlaybackState)> {
         self.active
             .as_ref()
-            .filter(|active| active.key == key)
+            .filter(|active| active.attachment.id == key)
             .map(|active| (active.frame.clone(), active.state.clone()))
     }
 
-    pub fn play(&mut self, key: &str, url: &str, cx: &mut Context<Self>) -> Result<(), String> {
+    pub fn play(&mut self, attachment: &Attachment, cx: &mut Context<Self>) -> Result<(), String> {
         self.stop(cx);
         let shared = Arc::new(Mutex::new(Shared {
             state: PlaybackState {
@@ -484,7 +524,8 @@ impl Media {
             frame: None,
         }));
         let notify = Arc::new(Notify::new());
-        let player = Player::open(url, shared.clone(), notify.clone())?;
+        let player = Player::open(&attachment.url, shared.clone(), notify.clone())?;
+        player.set_double(c"volume", self.volume);
         let task = cx.spawn({
             async move |this, cx| {
                 loop {
@@ -513,7 +554,7 @@ impl Media {
             }
         });
         self.active = Some(Active {
-            key: key.to_string(),
+            attachment: attachment.clone(),
             player,
             frame: None,
             state: PlaybackState {
@@ -526,7 +567,35 @@ impl Media {
         Ok(())
     }
 
+    pub fn set_volume(&mut self, volume: f64, cx: &mut Context<Self>) {
+        self.volume = volume.clamp(0.0, 100.0);
+        if let Some(active) = &self.active {
+            active.player.set_double(c"volume", self.volume);
+            if active.state.muted && self.volume > 0.0 {
+                active.player.set_flag(c"mute", false);
+            }
+        }
+        cx.notify();
+    }
+
+    /// The video filling the window, if any (it's drawn over the app by `AppRoot`).
+    pub fn fullscreen(&self) -> Option<&Attachment> {
+        self.active
+            .as_ref()
+            .filter(|_| self.fullscreen)
+            .map(|active| &active.attachment)
+    }
+
+    pub fn set_fullscreen(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.fullscreen = on && self.active.is_some();
+        if window.is_fullscreen() != self.fullscreen {
+            window.toggle_fullscreen();
+        }
+        cx.notify();
+    }
+
     pub fn stop(&mut self, cx: &mut Context<Self>) {
+        self.fullscreen = false;
         if let Some(active) = self.active.take() {
             drop(active.player);
             if let Some(frame) = active.frame {

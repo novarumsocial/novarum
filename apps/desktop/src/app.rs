@@ -14,6 +14,7 @@ pub struct AppRoot {
     view: Option<AnyView>,
     generation: usize,
     _router: Subscription,
+    _fullscreen: Subscription,
 }
 
 /// Bumped by `restart_session`, the desktop's `window.location.href = '/'`.
@@ -25,11 +26,19 @@ impl AppRoot {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let router = Router::global(cx);
         let _router = cx.observe_in(&router, window, |this, _, window, cx| this.sync(window, cx));
+        // leaving fullscreen through the window manager also ends a fullscreen video
+        let _fullscreen = cx.observe_window_bounds(window, |_, window, cx| {
+            let media = crate::media::Media::global(cx);
+            if media.read(cx).fullscreen().is_some() && !window.is_fullscreen() {
+                media.update(cx, |media, cx| media.set_fullscreen(false, window, cx));
+            }
+        });
         let mut this = Self {
             page: None,
             view: None,
             generation: 0,
             _router,
+            _fullscreen,
         };
         this.sync(window, cx);
         this
@@ -68,6 +77,7 @@ impl Render for AppRoot {
         FIRST.call_once(|| crate::startup::mark("first frame"));
         let t = theme::tokens(cx);
         div()
+            .relative()
             .size_full()
             .flex()
             .flex_col()
@@ -78,5 +88,6 @@ impl Render for AppRoot {
                 root.child(views::titlebar::titlebar(cx))
             })
             .child(div().flex_1().min_h_0().children(self.view.clone()))
+            .children(views::video_player::fullscreen_video(cx))
     }
 }
