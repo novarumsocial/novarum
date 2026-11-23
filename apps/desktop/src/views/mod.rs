@@ -37,6 +37,7 @@ pub mod mic_level_meter;
 pub mod mic_test;
 pub mod new_dm_dialog;
 pub mod notification_menu;
+pub mod participant_context_menu;
 pub mod profile_card;
 pub mod register;
 pub mod reset_password;

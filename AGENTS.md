@@ -33,7 +33,7 @@
 - Native GPUI (Rust) port of `apps/frontend`, replacing `apps/electron`. Every view or store starts with a comment naming its web counterpart; keep names and behavior aligned with the web.
 - Build from `apps/desktop` with Cargo, not Bun: `cargo check -j 4`, `cargo build -j 4`, `cargo test -j 4 --bin novarum`. Format with `cargo fmt`. Keep `-j 4` and never run two builds at once: the LiveKit/webrtc links are memory-heavy enough to take the machine down.
 - Debug runs: `NOVARUM_START_PATH=/guilds/...` opens a route, `NOVARUM_TRACE_STARTUP=1` prints startup timings, `NOVARUM_NO_UPDATE=1` turns off the updater.
-- Voice/video run on LiveKit's Rust SDK (`src/state/voice_room.rs` on the tokio runtime, mirrored into gpui by `src/state/voice.rs`); in-app video playback loads libmpv at runtime (`src/media.rs`).
+- Voice/video run on LiveKit's Rust SDK (`src/state/voice_room.rs` on the tokio runtime, mirrored into gpui by `src/state/voice.rs`). Call audio doesn't use LiveKit's platform audio: `src/state/audio_engine.rs` captures and plays through cpal, with WebRTC's echo canceller, RNNoise/DeepFilterNet3 and per-track gain. In-app video playback loads libmpv at runtime (`src/media.rs`).
 - Packaging is cargo-packager (`[package.metadata.packager]` in `Cargo.toml`), built and signed in `.github/workflows/desktop-development-release.yml`; the updater (`src/updater.rs`) verifies releases against the public key there.
 
 ## Other apps

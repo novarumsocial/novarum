@@ -3,6 +3,11 @@
 // the floating controls.
 use std::{cell::Cell, collections::HashSet, rc::Rc, sync::Arc};
 
+use gpui_kit::component::{
+    popover::Popover,
+    slider::{Slider, SliderEvent, SliderState},
+};
+
 use crate::{
     models::{Author, ChannelType},
     prelude::*,
@@ -17,7 +22,10 @@ use crate::{
     theme,
     ui::avatar::avatar_with_fallback,
     util::voice_layout::{fit_tiles_with, initials_for},
-    views::{channel_sidebar::avatar_bg, shell::ShellState},
+    views::{
+        channel_sidebar::avatar_bg, participant_context_menu::participant_context_menu,
+        shell::ShellState,
+    },
 };
 
 const GAP: f32 = 8.0;
@@ -61,6 +69,8 @@ pub struct VoiceArea {
     controls_visible: bool,
     hovering_controls: bool,
     idle: Option<Task<()>>,
+    /// the spotlit stream's volume slider, for whoever is sharing
+    stream_volume: Option<(String, Entity<SliderState>)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -97,6 +107,7 @@ impl VoiceArea {
             controls_visible: true,
             hovering_controls: false,
             idle: None,
+            stream_volume: None,
             _subscriptions,
         }
     }
@@ -209,6 +220,36 @@ impl VoiceArea {
         self.idle = None;
         self.controls_visible = false;
         cx.notify();
+    }
+
+    /// The web's "Stream volume" popover: only the shared screen's audio, not their mic.
+    fn stream_slider(&mut self, identity: &str, cx: &mut Context<Self>) -> Entity<SliderState> {
+        if let Some((current, slider)) = &self.stream_volume
+            && current == identity
+        {
+            return slider.clone();
+        }
+        let volume = Voice::global(cx)
+            .read(cx)
+            .participant_screen_volume(identity);
+        let slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(300.0)
+                .step(1.0)
+                .default_value(volume * 100.0)
+        });
+        let owner = identity.to_string();
+        cx.subscribe(&slider, move |_, _, event: &SliderEvent, cx| {
+            let (SliderEvent::Change(value) | SliderEvent::Release(value)) = event;
+            let volume = value.start() / 100.0;
+            Voice::global(cx).update(cx, |voice, cx| {
+                voice.set_participant_screen_volume(&owner, volume, cx)
+            });
+        })
+        .detach();
+        self.stream_volume = Some((identity.to_string(), slider.clone()));
+        slider
     }
 
     fn focus_tile(&mut self, tile: &Tile, cx: &mut Context<Self>) {
@@ -325,10 +366,12 @@ impl VoiceArea {
                         })
                         .children(tiles.iter().map(|tile| {
                             let target = tile.clone();
-                            self.render_tile(tile, TileSize::Grid(grid.width, grid.height), cx)
+                            let element = self
+                                .render_tile(tile, TileSize::Grid(grid.width, grid.height), cx)
                                 .on_click(
                                     cx.listener(move |this, _, _, cx| this.focus_tile(&target, cx)),
-                                )
+                                );
+                            participant_context_menu(element, &tile.identity, &tile.name, cx)
                         })),
                 )
                 .into_any_element();
@@ -359,10 +402,13 @@ impl VoiceArea {
             .flex_1()
             .items_center()
             .justify_center()
-            .child(
+            .child(participant_context_menu(
                 self.render_tile(&spotlight, TileSize::Fit(box_width, box_height), cx)
                     .on_click(cx.listener(|this, _, _, cx| this.show_grid(cx))),
-            )
+                &spotlight.identity,
+                &spotlight.name,
+                cx,
+            ))
             .when(rest_count > 0, |spot| {
                 spot.child(
                     div()
@@ -440,8 +486,13 @@ impl VoiceArea {
                                 cell.h_full().w(px(BOTTOM_STRIP_HEIGHT * 16.0 / 9.0))
                             }
                         })
-                        .child(self.render_tile(tile, TileSize::Strip, cx).on_click(
-                            cx.listener(move |this, _, _, cx| this.focus_tile(&target, cx)),
+                        .child(participant_context_menu(
+                            self.render_tile(tile, TileSize::Strip, cx).on_click(
+                                cx.listener(move |this, _, _, cx| this.focus_tile(&target, cx)),
+                            ),
+                            &tile.identity,
+                            &tile.name,
+                            cx,
                         ))
                 }))
         });
@@ -637,6 +688,7 @@ impl VoiceArea {
     fn render_controls(
         &self,
         stop_watching: Option<(String, String)>,
+        stream_slider: Option<Entity<SliderState>>,
         cx: &mut Context<Self>,
     ) -> Div {
         let t = theme::tokens(cx);
@@ -772,6 +824,44 @@ impl VoiceArea {
                     Voice::global(cx).update(cx, |voice, cx| voice.set_screen_share(!screen, cx))
                 }),
             )
+            .when_some(stream_slider, |bar, slider| {
+                bar.child(
+                    Popover::new("call-stream-volume")
+                        .anchor(Anchor::BottomCenter)
+                        .w(px(192.0))
+                        .trigger(
+                            crate::ui::trigger::trigger("call-stream-volume-trigger")
+                                .flex()
+                                .size_8()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .bg(t.secondary)
+                                .text_color(t.foreground)
+                                .hover(|button| button.opacity(0.85))
+                                .when(circle, |button| button.rounded_full())
+                                .child(icon("volume-2").size(px(14.0))),
+                        )
+                        .content(move |_, _, cx| {
+                            let percent = slider.read(cx).value().start().round();
+                            div()
+                                .flex()
+                                .w_full()
+                                .flex_col()
+                                .gap_2()
+                                .text_sm()
+                                .child(
+                                    div()
+                                        .flex()
+                                        .w_full()
+                                        .justify_between()
+                                        .child("Stream volume")
+                                        .child(format!("{percent}%")),
+                                )
+                                .child(Slider::new(&slider).w_full())
+                        }),
+                )
+            })
             .when_some(stop_watching, |bar, (identity, name)| {
                 bar.child(
                     control(
@@ -993,6 +1083,9 @@ impl Render for VoiceArea {
                 .into_any_element()
         };
 
+        let stream_slider = stop_watching
+            .as_ref()
+            .map(|(identity, _)| self.stream_slider(identity, cx));
         let expanded = ShellState::global(cx).read(cx).call_expanded;
         let show_controls = self.controls_visible || self.hovering_controls;
         div()
@@ -1065,7 +1158,7 @@ impl Render for VoiceArea {
                     .when(active, |stage| {
                         stage
                             .child(
-                                self.render_controls(stop_watching, cx)
+                                self.render_controls(stop_watching, stream_slider, cx)
                                     .when(!show_controls, |controls| controls.invisible()),
                             )
                             .when(self.embedded, |stage| {

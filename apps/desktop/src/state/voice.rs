@@ -11,7 +11,7 @@ use crate::{
     sounds,
     state::{
         realtime::Realtime,
-        settings::{NoiseSuppressionModel, SettingsStore},
+        settings::{NoiseSuppressionModel, Settings, SettingsStore},
         video::{self, VideoFeeds},
         voice_room::{self, ParticipantAudio, ParticipantHandle, VoiceCommand, VoiceRoomEvent},
     },
@@ -93,6 +93,22 @@ pub struct Voice {
 
 struct GlobalVoice(Entity<Voice>);
 impl Global for GlobalVoice {}
+
+/// The mic chain the settings ask for: like the web, the browser-style noise suppression stays
+/// off and the chosen model does it, at a fixed strength or one picked from the room's noise.
+fn processing(settings: &Settings) -> voice_room::AudioProcessing {
+    voice_room::AudioProcessing {
+        echo_cancellation: settings.voice_echo_cancellation,
+        auto_gain_control: settings.voice_auto_gain_control,
+        noise: settings
+            .noise_cancellation
+            .then_some(match settings.noise_suppression_model {
+                NoiseSuppressionModel::Rnnoise => voice_room::NoiseModel::Rnnoise,
+                NoiseSuppressionModel::Deepfilternet => voice_room::NoiseModel::DeepFilter,
+            }),
+        noise_level: (!settings.noise_suppression_auto).then_some(settings.noise_suppression_level),
+    }
+}
 
 pub fn init(cx: &mut App) {
     let stored: SelfAudio = storage::get(SELF_AUDIO_KEY).unwrap_or_default();
@@ -179,9 +195,6 @@ impl Voice {
         self.local_identity.as_deref()
     }
 
-    // the participant context menu (volume, mute, stream volume) is the only caller of these,
-    // like the web's participant-context-menu.svelte; its view isn't ported yet
-    #[allow(dead_code)]
     pub fn participant_volume(&self, identity: &str) -> f32 {
         self.participant_audio
             .get(identity)
@@ -189,7 +202,6 @@ impl Voice {
             .unwrap_or(1.0)
     }
 
-    #[allow(dead_code)]
     pub fn participant_muted(&self, identity: &str) -> bool {
         self.participant_audio
             .get(identity)
@@ -246,7 +258,6 @@ impl Voice {
         cx.notify();
     }
 
-    #[allow(dead_code)]
     pub fn set_participant_volume(&mut self, identity: &str, volume: f32, cx: &mut Context<Self>) {
         self.set_participant_audio(
             identity,
@@ -257,7 +268,6 @@ impl Voice {
         );
     }
 
-    #[allow(dead_code)]
     pub fn set_participant_muted(&mut self, identity: &str, muted: bool, cx: &mut Context<Self>) {
         self.set_participant_audio(
             identity,
@@ -268,7 +278,6 @@ impl Voice {
         );
     }
 
-    #[allow(dead_code)]
     pub fn set_participant_screen_volume(
         &mut self,
         identity: &str,
@@ -319,11 +328,7 @@ impl Voice {
         let _ = self.commands.unbounded_send(VoiceCommand::Join {
             channel_id: channel_id.to_string(),
             options: voice_room::JoinOptions {
-                processing: voice_room::AudioProcessing {
-                    echo_cancellation: settings.voice_echo_cancellation,
-                    auto_gain_control: settings.voice_auto_gain_control,
-                    noise_suppression: settings.noise_cancellation,
-                },
+                processing: processing(&settings),
                 devices: voice_room::AudioDevices {
                     input: settings.voice_input_device_id.clone(),
                     output: settings.voice_output_device_id.clone(),
@@ -454,11 +459,7 @@ impl Voice {
         let settings = SettingsStore::get(cx);
         self.noise_cancellation_enabled = settings.noise_cancellation;
         let _ = self.commands.unbounded_send(VoiceCommand::SetProcessing {
-            processing: voice_room::AudioProcessing {
-                echo_cancellation: settings.voice_echo_cancellation,
-                auto_gain_control: settings.voice_auto_gain_control,
-                noise_suppression: settings.noise_cancellation,
-            },
+            processing: processing(&settings),
         });
         let _ = self.commands.unbounded_send(VoiceCommand::SetDevices {
             devices: voice_room::AudioDevices {

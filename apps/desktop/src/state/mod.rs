@@ -1,5 +1,6 @@
 // The web app's `$lib/*.svelte.ts` stores, as gpui entities reachable through globals.
 // the views use most of these as they're ported
+pub mod audio_engine;
 #[allow(dead_code)]
 pub mod bots;
 #[allow(dead_code)]

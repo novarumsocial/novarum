@@ -11,6 +11,7 @@ use serde::Deserialize;
 use crate::{
     api, runtime,
     state::{
+        audio_engine::AudioEngine,
         video::{FeedKey, FrameSink},
         voice::ConnectionState as UiState,
         voice_capture::{self, Capture},
@@ -19,12 +20,7 @@ use crate::{
 
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-#[derive(Debug, Clone, Copy)]
-pub struct AudioProcessing {
-    pub echo_cancellation: bool,
-    pub auto_gain_control: bool,
-    pub noise_suppression: bool,
-}
+pub use crate::state::audio_engine::{NoiseModel, Processing as AudioProcessing};
 
 #[derive(Debug, Clone)]
 pub struct AudioDevices {
@@ -183,7 +179,7 @@ struct RemoteVideo {
 struct Actor {
     events: mpsc::UnboundedSender<VoiceRoomEvent>,
     channel_id: String,
-    audio: Option<livekit::PlatformAudio>,
+    audio: Option<AudioEngine>,
     mic: Option<LocalAudioTrack>,
     muted: bool,
     deafened: bool,
@@ -229,10 +225,11 @@ impl Actor {
     }
 
     async fn publish_mic(&mut self, room: &Room) -> Option<LocalAudioTrack> {
-        let Some(audio) = self.audio.clone() else {
-            return None;
-        };
-        let track = LocalAudioTrack::create_audio_track("microphone", audio.rtc_source());
+        let source = self.audio.as_ref()?.source();
+        let track = LocalAudioTrack::create_audio_track(
+            "microphone",
+            livekit::webrtc::audio_source::RtcAudioSource::Native(source),
+        );
         let publication = room
             .local_participant()
             .publish_track(
@@ -258,34 +255,17 @@ impl Actor {
         }
     }
 
-    /// Device ids differ per direction; `wanted` is the human name saved in settings, matching
-    /// the names the device pickers show. Falls back to the first device, like the web's
-    /// `deviceId: undefined` meaning "let the browser pick".
-    fn match_recording_device(&self, audio: &livekit::PlatformAudio) -> Option<RecordingDeviceId> {
-        let devices: Vec<_> = audio.recording_devices().collect();
-        devices
-            .iter()
-            .find(|device| device.name == self.devices.input)
-            .or_else(|| devices.first())
-            .map(|device| device.id.clone())
-    }
-
-    fn match_playout_device(&self, audio: &livekit::PlatformAudio) -> Option<PlayoutDeviceId> {
-        let devices: Vec<_> = audio.playout_devices().collect();
-        devices
-            .iter()
-            .find(|device| device.name == self.devices.output)
-            .or_else(|| devices.first())
-            .map(|device| device.id.clone())
-    }
-
-    fn select_devices(&self, audio: &livekit::PlatformAudio) {
-        if let Some(id) = self.match_recording_device(audio) {
-            let _ = audio.set_recording_device(&id);
+    /// The volume `identity`'s track from `source` plays at: their mic or their stream's.
+    fn gain(&self, identity: &str, source: TrackSource) -> f32 {
+        let settings = self.participant_audio.get(identity);
+        if settings.is_some_and(|audio| audio.muted) {
+            return 0.0;
         }
-        if let Some(id) = self.match_playout_device(audio) {
-            let _ = audio.set_playout_device(&id);
+        match source {
+            TrackSource::ScreenshareAudio => settings.map(|audio| audio.screen_volume),
+            _ => settings.map(|audio| audio.volume),
         }
+        .unwrap_or(1.0)
     }
 
     async fn dial(&mut self) -> Result<Session, ()> {
@@ -329,23 +309,14 @@ impl Actor {
             return Err(());
         }
 
-        self.audio = match livekit::PlatformAudio::new() {
-            Ok(audio) => {
-                let _ = audio.configure_audio_processing(livekit::AudioProcessingOptions {
-                    echo_cancellation: self.processing.echo_cancellation,
-                    auto_gain_control: self.processing.auto_gain_control,
-                    noise_suppression: self.processing.noise_suppression,
-                    prefer_hardware_processing: false,
-                });
-                self.select_devices(&audio);
-                Some(audio)
-            }
-            Err(error) => {
-                eprintln!("No audio devices: {error}");
-                self.muted = true;
-                None
-            }
-        };
+        let audio = AudioEngine::new(
+            &self.devices.input,
+            &self.devices.output,
+            self.processing.clone(),
+        );
+        audio.set_muted(self.muted || self.deafened);
+        audio.set_deafened(self.deafened);
+        self.audio = Some(audio);
 
         self.mic = self.publish_mic(&room).await;
         // with auto-subscribe off, whoever was already here needs subscribing by hand
@@ -365,34 +336,30 @@ impl Actor {
                 if let Some(mic) = &self.mic {
                     if muted { mic.mute() } else { mic.unmute() }
                 }
+                if let Some(audio) = &self.audio {
+                    audio.set_muted(muted || self.deafened);
+                }
                 self.send_sync(session, UiState::Connected);
             }
             VoiceCommand::SetDeafened { deafened } => {
                 self.deafened = deafened;
-                self.apply_remote_audio(session);
+                if let Some(audio) = &self.audio {
+                    audio.set_deafened(deafened);
+                    audio.set_muted(self.muted || deafened);
+                }
                 self.send_sync(session, UiState::Connected);
             }
             VoiceCommand::SetProcessing { processing } => {
-                self.processing = processing;
                 if let Some(audio) = &self.audio {
-                    let _ = audio.configure_audio_processing(livekit::AudioProcessingOptions {
-                        echo_cancellation: processing.echo_cancellation,
-                        auto_gain_control: processing.auto_gain_control,
-                        noise_suppression: processing.noise_suppression,
-                        prefer_hardware_processing: false,
-                    });
+                    audio.set_processing(processing.clone());
                 }
+                self.processing = processing;
             }
             VoiceCommand::SetDevices { devices } => {
-                self.devices = devices;
-                if let Some(audio) = &self.audio {
-                    if let Some(id) = self.match_recording_device(audio) {
-                        let _ = audio.switch_recording_device(&id);
-                    }
-                    if let Some(id) = self.match_playout_device(audio) {
-                        let _ = audio.switch_playout_device(&id);
-                    }
+                if let Some(audio) = &mut self.audio {
+                    audio.set_devices(&devices.input, &devices.output);
                 }
+                self.devices = devices;
             }
             VoiceCommand::SetParticipantAudio { identity, audio } => {
                 self.participant_audio.insert(identity, audio);
@@ -590,24 +557,16 @@ impl Actor {
     /// The web's `attachRemoteAudio`/`detachRemoteAudio`: deafening silences everyone, and a
     /// per-participant mute or zero volume silences just them. (Volume scaling itself has no
     /// API on the native SDK's ADM playout, so only mute and 0 actually change anything.)
+    /// The web's per-participant volume and mute (`attachRemoteAudio`), as gains in the mixer.
     fn apply_remote_audio(&self, session: &Session) {
+        let Some(audio) = &self.audio else {
+            return;
+        };
         for participant in session.room.remote_participants().values() {
-            let identity = participant.identity().as_str().to_string();
-            let settings = self.participant_audio.get(identity.as_str());
-            let muted = settings.is_some_and(|audio| audio.muted);
             for publication in participant.track_publications().values() {
-                if let Some(RemoteTrack::Audio(track)) = publication.track() {
-                    let volume = match publication.source() {
-                        TrackSource::ScreenshareAudio => {
-                            settings.map(|audio| audio.screen_volume).unwrap_or(1.0)
-                        }
-                        _ => settings.map(|audio| audio.volume).unwrap_or(1.0),
-                    };
-                    if !self.deafened && !muted && volume > 0.0 {
-                        track.enable();
-                    } else {
-                        track.disable();
-                    }
+                if matches!(publication.track(), Some(RemoteTrack::Audio(_))) {
+                    let gain = self.gain(participant.identity().as_str(), publication.source());
+                    audio.set_gain(publication.sid().as_str(), gain);
                 }
             }
         }
@@ -706,15 +665,26 @@ impl Actor {
                 publication,
                 participant,
             } => {
-                if let RemoteTrack::Video(track) = track {
-                    let screen = publication.source() == TrackSource::Screenshare;
-                    self.watch_video(track, FeedKey::new(participant.identity().as_str(), screen));
+                match track {
+                    RemoteTrack::Video(track) => {
+                        let screen = publication.source() == TrackSource::Screenshare;
+                        let key = FeedKey::new(participant.identity().as_str(), screen);
+                        self.watch_video(track, key);
+                    }
+                    RemoteTrack::Audio(track) => {
+                        let gain = self.gain(participant.identity().as_str(), publication.source());
+                        if let Some(audio) = &mut self.audio {
+                            audio.add_remote(publication.sid().as_str(), track.rtc_track(), gain);
+                        }
+                    }
                 }
-                self.apply_remote_audio(session);
                 self.send_sync(session, UiState::Connected);
             }
             RoomEvent::TrackUnsubscribed { publication, .. } => {
                 self.unwatch_video(&publication.sid());
+                if let Some(audio) = &mut self.audio {
+                    audio.remove_remote(publication.sid().as_str());
+                }
                 self.send_sync(session, UiState::Connected);
             }
             RoomEvent::ActiveSpeakersChanged { .. }
@@ -866,7 +836,8 @@ pub fn spawn(
             processing: AudioProcessing {
                 echo_cancellation: true,
                 auto_gain_control: true,
-                noise_suppression: true,
+                noise: None,
+                noise_level: None,
             },
             devices: AudioDevices {
                 input: "default".into(),

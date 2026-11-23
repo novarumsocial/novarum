@@ -30,6 +30,7 @@ use crate::{
         guild_sidebar::{move_to, sync_order},
         invite_dialog::open_invite,
         notification_menu::{Noun, notification_menu},
+        participant_context_menu::participant_context_menu,
         profile_card::profile_card,
         shell::ShellState,
     },
@@ -582,6 +583,9 @@ impl ChannelSidebar {
             };
 
             let row = div()
+                .id(SharedString::from(format!(
+                    "voice-user-row-{channel_id}-{user_id}"
+                )))
                 .flex()
                 .w_full()
                 .items_center()
@@ -676,7 +680,7 @@ impl ChannelSidebar {
                     SharedString::from(format!("voice-user-{channel_id}-{user_id}")),
                     author,
                     None,
-                    row,
+                    participant_context_menu(row, &user_id, &name, cx),
                 ))
         });
         div()
