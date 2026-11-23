@@ -1,9 +1,10 @@
 // The auto-updater of apps/electron/src/main.ts (electron-updater on the `dev` prerelease channel).
-// Releases tagged `v<version>` carry a `novarum-desktop-<os>-<arch>.tar.gz` with the binary; it
-// replaces the running executable and the app relaunches into it.
-use std::{io::Read, time::Duration};
+// Releases tagged `v<version>` carry a signed `novarum-desktop-update.json` (cargo-packager's
+// updater manifest) pointing at the AppImage, the macOS .app or the NSIS installer; the updater
+// verifies the download against `PUBKEY` and swaps in whichever of those Novarum runs from.
+use std::time::Duration;
 
-use futures::StreamExt;
+use cargo_packager_updater::{Update, UpdaterBuilder, WindowsConfig, WindowsUpdateInstallMode};
 use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +12,9 @@ use crate::{api, runtime, storage};
 
 const RELEASES_URL: &str =
     "https://api.github.com/repos/novarumsocial/novarum/releases?per_page=30";
-
+const MANIFEST: &str = "novarum-desktop-update.json";
+/// minisign public key; the private half signs releases in CI
+const PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENBREM3NTIyOEM0Mzg1NTcKUldSWGhVT01JblhjeXEzK2E2RnNnaGZFYjhtUk5lVzNMOGtXcGxERTdyQVpoVzh0ek5SSDlJbEkK";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
@@ -62,25 +65,33 @@ pub fn set_launch_prefs(prefs: LaunchPrefs) {
     crate::desktop::apply_auto_launch(prefs.auto_launch);
 }
 
-#[derive(Debug, Clone)]
-struct Release {
-    version: semver::Version,
-    asset_url: String,
-}
-
 pub struct Updater {
     pub status: UpdateStatus,
-    release: Option<Release>,
-    downloaded: Option<std::path::PathBuf>,
+    update: Option<Update>,
+    downloaded: Option<Vec<u8>>,
     busy: bool,
 }
 
 struct GlobalUpdater(Entity<Updater>);
 impl Global for GlobalUpdater {}
 
-/// Only release builds update themselves, like `app.isPackaged`.
+/// Release builds installed in a form that can replace itself, like `app.isPackaged`: the
+/// AppImage, the macOS bundle or the Windows install. A .deb updates through the package manager.
 pub fn supported() -> bool {
-    !cfg!(debug_assertions) && std::env::var_os("NOVARUM_NO_UPDATE").is_none()
+    !cfg!(debug_assertions)
+        && std::env::var_os("NOVARUM_NO_UPDATE").is_none()
+        && (cfg!(windows) || std::env::var_os("APPIMAGE").is_some() || app_bundle().is_some())
+}
+
+/// The `Novarum.app` this binary runs from, on macOS.
+fn app_bundle() -> Option<std::path::PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    let exe = std::env::current_exe().ok()?;
+    exe.ancestors()
+        .find(|path| path.extension().is_some_and(|ext| ext == "app"))
+        .map(|path| path.to_path_buf())
 }
 
 pub fn init(cx: &mut App) {
@@ -95,7 +106,7 @@ pub fn init(cx: &mut App) {
             version: None,
             percent: None,
         },
-        release: None,
+        update: None,
         downloaded: None,
         busy: false,
     });
@@ -115,15 +126,6 @@ pub fn init(cx: &mut App) {
     .detach();
 }
 
-fn asset_name() -> String {
-    let os = match std::env::consts::OS {
-        "macos" => "macos",
-        "windows" => "windows",
-        _ => "linux",
-    };
-    format!("novarum-desktop-{os}-{}.tar.gz", std::env::consts::ARCH)
-}
-
 #[derive(Deserialize)]
 struct GithubAsset {
     name: String,
@@ -138,7 +140,26 @@ struct GithubRelease {
     assets: Vec<GithubAsset>,
 }
 
-async fn latest_release() -> Result<Option<Release>, String> {
+/// Silent: no installer window, no recreated shortcuts (`/NS`), and Novarum restarts (`/R`).
+fn windows_install(relaunch: bool) -> WindowsConfig {
+    let mut config = WindowsConfig::default();
+    config.install_mode = Some(if relaunch {
+        WindowsUpdateInstallMode::Quiet
+    } else {
+        WindowsUpdateInstallMode::BasicUi
+    });
+    config.installer_args = Some(if relaunch {
+        vec!["/NS".into()]
+    } else {
+        vec!["/S".into(), "/NS".into()]
+    });
+    config
+}
+
+/// The newest prerelease's manifest, handed to cargo-packager's updater, which picks this
+/// platform's entry and checks it's newer. GitHub's "latest release" skips prereleases, so the
+/// manifest is found through the releases list instead of a fixed URL.
+async fn find_update() -> Result<Option<Update>, String> {
     runtime::io(async {
         let releases: Vec<GithubRelease> = api::http()
             .get(RELEASES_URL)
@@ -152,26 +173,38 @@ async fn latest_release() -> Result<Option<Release>, String> {
             .json()
             .await
             .map_err(|error| error.to_string())?;
-        let current =
-            semver::Version::parse(env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
-        let name = asset_name();
-        Ok(releases
+        // desktop releases are plain `v1.2.3-dev.4`; mobile-/native- have their own prefixes
+        let Some(manifest) = releases
             .into_iter()
             .filter(|release| !release.draft)
-            // desktop releases are plain `v1.2.3-dev.4`; mobile-/native- have their own prefixes
             .filter_map(|release| {
                 let version = semver::Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
                 let asset = release
                     .assets
                     .into_iter()
-                    .find(|asset| asset.name == name)?;
-                Some(Release {
-                    version,
-                    asset_url: asset.browser_download_url,
-                })
+                    .find(|asset| asset.name == MANIFEST)?;
+                Some((version, asset.browser_download_url))
             })
-            .filter(|release| release.version > current)
-            .max_by(|a, b| a.version.cmp(&b.version)))
+            .max_by(|a, b| a.0.cmp(&b.0))
+        else {
+            return Ok(None);
+        };
+        let current =
+            semver::Version::parse(env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
+        let mut config = cargo_packager_updater::Config::default();
+        config.endpoints = vec![manifest.1.parse().map_err(|_| "Bad manifest url")?];
+        config.pubkey = PUBKEY.into();
+        config.windows = Some(windows_install(true));
+        // the updater is blocking
+        tokio::task::spawn_blocking(move || {
+            UpdaterBuilder::new(current, config)
+                .timeout(Duration::from_secs(30))
+                .build()
+                .and_then(|updater| updater.check())
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
     })
     .await
 }
@@ -189,10 +222,7 @@ impl Updater {
         this.update(cx, |updater, cx| {
             updater.status.status = status;
             updater.status.percent = percent;
-            updater.status.version = updater
-                .release
-                .as_ref()
-                .map(|release| release.version.to_string());
+            updater.status.version = updater.update.as_ref().map(|update| update.version.clone());
             cx.notify();
         });
         crate::desktop::update_tray(cx);
@@ -210,17 +240,17 @@ impl Updater {
                 Status::Downloading | Status::Downloaded
             )
         {
-            return Task::ready(state.release.is_some());
+            return Task::ready(state.update.is_some());
         }
         this.update(cx, |updater, _| updater.busy = true);
         Self::set(&this, Status::Checking, None, cx);
         cx.spawn(async move |cx| {
-            let result = latest_release().await;
+            let result = find_update().await;
             cx.update(|cx| {
                 this.update(cx, |updater, _| {
                     updater.busy = false;
-                    if let Ok(release) = &result {
-                        updater.release = release.clone();
+                    if let Ok(update) = &result {
+                        updater.update = update.clone();
                     }
                 });
                 match result {
@@ -245,14 +275,14 @@ impl Updater {
         })
     }
 
-    /// `downloadUpdate`. Resolves once the new binary is unpacked next to the old one.
+    /// `downloadUpdate`. Resolves once the update is downloaded and its signature checks out.
     pub fn download(cx: &mut App) -> Task<Result<(), String>> {
         let this = Self::global(cx);
         let state = this.read(cx);
         if state.status.status == Status::Downloaded {
             return Task::ready(Ok(()));
         }
-        let Some(release) = state.release.clone() else {
+        let Some(update) = state.update.clone() else {
             return Task::ready(Err("No update".into()));
         };
         if state.status.status == Status::Downloading {
@@ -274,23 +304,23 @@ impl Updater {
 
         let (progress_tx, mut progress_rx) = futures::channel::mpsc::unbounded::<f32>();
         let download = runtime::io(async move {
-            let response = api::http()
-                .get(&release.asset_url)
-                .send()
-                .await
-                .and_then(|response| response.error_for_status())
-                .map_err(|error| error.to_string())?;
-            let total = response.content_length().unwrap_or(0) as f32;
-            let mut bytes = Vec::new();
-            let mut stream = response.bytes_stream();
-            while let Some(chunk) = stream.next().await {
-                bytes.extend_from_slice(&chunk.map_err(|error| error.to_string())?);
-                if total > 0.0 {
-                    let _ = progress_tx.unbounded_send(bytes.len() as f32 / total * 100.0);
-                }
-            }
-            drop(progress_tx);
-            unpack(&bytes)
+            tokio::task::spawn_blocking(move || {
+                let received = std::cell::Cell::new(0usize);
+                update
+                    .download_extended(
+                        |chunk, total| {
+                            received.set(received.get() + chunk);
+                            if let Some(total) = total.filter(|total| *total > 0) {
+                                let percent = received.get() as f32 / total as f32 * 100.0;
+                                let _ = progress_tx.unbounded_send(percent);
+                            }
+                        },
+                        || {},
+                    )
+                    .map_err(|error| error.to_string())
+            })
+            .await
+            .map_err(|error| error.to_string())?
         });
 
         cx.spawn(async move |cx| {
@@ -298,6 +328,7 @@ impl Updater {
                 let this = this.clone();
                 let cx = cx.clone();
                 async move {
+                    use futures::StreamExt;
                     while let Some(percent) = progress_rx.next().await {
                         let _ = cx
                             .update(|cx| Self::set(&this, Status::Downloading, Some(percent), cx));
@@ -306,8 +337,8 @@ impl Updater {
             };
             let (result, _) = futures::join!(download, watcher);
             cx.update(|cx| match result {
-                Ok(path) => {
-                    this.update(cx, |updater, _| updater.downloaded = Some(path));
+                Ok(bytes) => {
+                    this.update(cx, |updater, _| updater.downloaded = Some(bytes));
                     Self::set(&this, Status::Downloaded, None, cx);
                     Ok(())
                 }
@@ -320,61 +351,47 @@ impl Updater {
         })
     }
 
-    /// `quitAndInstall`: swaps the executable and relaunches.
+    fn take_download(cx: &mut App) -> Option<(Update, Vec<u8>)> {
+        Self::global(cx).update(cx, |updater, _| {
+            Some((updater.update.clone()?, updater.downloaded.take()?))
+        })
+    }
+
+    /// `quitAndInstall`. On Windows the silent installer closes Novarum and restarts it itself.
     pub fn install(cx: &mut App) {
-        let Some(path) = Self::global(cx).read(cx).downloaded.clone() else {
+        let Some((update, bytes)) = Self::take_download(cx) else {
             return;
         };
-        if let Err(error) = self_replace::self_replace(&path) {
+        if let Err(error) = update.install(bytes) {
             eprintln!("Could not install the update: {error}");
             return;
         }
-        let _ = std::fs::remove_file(&path);
-        if let Ok(exe) = std::env::current_exe() {
-            let _ = std::process::Command::new(exe).spawn();
-        }
+        relaunch_after_quit();
         cx.quit();
     }
 
-    /// `autoInstallOnAppQuit`.
+    /// `autoInstallOnAppQuit`: installs without starting Novarum again.
     pub fn install_on_quit(cx: &mut App) {
-        if let Some(path) = Self::global(cx).read(cx).downloaded.clone() {
-            let _ = self_replace::self_replace(&path);
-            let _ = std::fs::remove_file(path);
+        if let Some((mut update, bytes)) = Self::take_download(cx) {
+            update.config.windows = Some(windows_install(false));
+            let _ = update.install(bytes);
         }
     }
 }
 
-/// Pulls the `novarum` executable out of the release tarball, next to the running one.
-fn unpack(bytes: &[u8]) -> Result<std::path::PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
-    let target = exe.with_extension("update");
-    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(bytes));
-    for entry in archive.entries().map_err(|error| error.to_string())? {
-        let mut entry = entry.map_err(|error| error.to_string())?;
-        let path = entry
-            .path()
-            .map_err(|error| error.to_string())?
-            .into_owned();
-        let name = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default();
-        if name == "novarum" || name == "novarum.exe" {
-            let mut data = Vec::new();
-            entry
-                .read_to_end(&mut data)
-                .map_err(|error| error.to_string())?;
-            std::fs::write(&target, data).map_err(|error| error.to_string())?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755));
-            }
-            return Ok(target);
-        }
+/// Starts the updated Novarum once this one is gone, so its single-instance check doesn't just
+/// hand off to the instance that's quitting.
+fn relaunch_after_quit() {
+    let target = app_bundle()
+        .map(|bundle| ("open -n \"$0\"", bundle.into_os_string()))
+        .or_else(|| std::env::var_os("APPIMAGE").map(|appimage| ("exec \"$0\"", appimage)));
+    if let Some((command, path)) = target {
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("sleep 1; {command}"))
+            .arg(path)
+            .spawn();
     }
-    Err("The update has no novarum executable".into())
 }
 
 #[cfg(test)]

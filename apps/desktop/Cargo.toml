@@ -33,9 +33,6 @@ dirs = "5"
 uuid = { version = "1", features = ["v4"] }
 rust-embed = "8"
 semver = "1"
-self-replace = "1"
-tar = "0.4"
-flate2 = "1"
 rand = "0.9"
 png = "0.18"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -47,6 +44,7 @@ qrcode = { version = "0.15.0", default-features = false }
 cpal = "0.16"
 livekit = { version = "0.12.0", features = ["native", "rustls-tls-webpki-roots", "glib-main-loop"] }
 nokhwa = { version = "0.10", features = ["input-native"] }
+cargo-packager-updater = "0.2.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni = "0.3"
@@ -75,3 +73,31 @@ strip = true
 # optimized dependencies: unoptimized wgpu/naga made opening a debug window take ~500ms
 [profile.dev.package."*"]
 opt-level = 2
+
+[build-dependencies]
+winresource = "0.1.34"
+
+# cargo-packager: AppImage + .deb, macOS .app (+ a .dmg made in CI), and a per-user NSIS installer
+[package.metadata.packager]
+product-name = "Novarum"
+identifier = "me.novarum.desktop"
+publisher = "Novarum"
+description = "Novarum desktop client"
+category = "SocialNetworking"
+out-dir = "dist"
+binaries = [{ path = "novarum", main = true }]
+icons = ["packaging/icons/*.png", "packaging/icons/icon.icns", "packaging/icons/icon.ico"]
+
+[package.metadata.packager.deb]
+depends = ["libpipewire-0.3-0t64 | libpipewire-0.3-0", "libxkbcommon-x11-0", "libvulkan1"]
+
+# PipeWire has to be the host's: its plugins and daemon protocol come with the system
+[package.metadata.packager.appimage]
+excluded-libraries = ["libpipewire-0.3.so*"]
+
+[package.metadata.packager.macos]
+minimum-system-version = "12.0"
+info-plist-path = "packaging/macos/Info.plist"
+
+[package.metadata.packager.nsis]
+installer-mode = "currentUser"

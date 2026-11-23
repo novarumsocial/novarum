@@ -121,6 +121,17 @@ pub async fn camera(device: String, preview: FrameSink, key: FeedKey) -> Result<
     let (ready, opened) = oneshot::channel();
     std::thread::spawn(move || {
         let open = || -> Result<Camera, String> {
+            // macOS asks the user first, and the cameras stay hidden until they agree
+            #[cfg(target_os = "macos")]
+            {
+                let (granted, answer) = std::sync::mpsc::channel();
+                nokhwa::nokhwa_initialize(move |ok| {
+                    let _ = granted.send(ok);
+                });
+                if !answer.recv().unwrap_or(false) {
+                    return Err("Camera access was denied".into());
+                }
+            }
             // one webcam can show up as several devices (metadata and IR nodes that can't
             // stream), in no particular order, so try the chosen one first and then by index
             let mut cameras = nokhwa::query(ApiBackend::Auto).map_err(|error| error.to_string())?;

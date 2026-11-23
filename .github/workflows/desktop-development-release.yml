@@ -123,8 +123,10 @@ jobs:
             apps/electron/dist/latest*.yml
           if-no-files-found: error
 
-  # the native GPUI app (apps/desktop): a tarball per platform with the `novarum` binary, which
-  # its updater looks for as novarum-desktop-<os>-<arch>.tar.gz
+  # the native GPUI app (apps/desktop), packaged by cargo-packager: an AppImage and .deb on Linux,
+  # an ad-hoc signed .app (plus its updater tarball) and .dmg on macOS, and a per-user NSIS
+  # installer on Windows. The updater artifacts are signed with the CARGO_PACKAGER_SIGN_* secrets,
+  # whose public key is `PUBKEY` in apps/desktop/src/updater.rs.
   build-desktop-rs:
     name: Build desktop-rs (${{ matrix.os }})
     needs: version
@@ -143,6 +145,9 @@ jobs:
       run:
         shell: bash
         working-directory: apps/desktop
+    env:
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -155,12 +160,18 @@ jobs:
         with:
           workspaces: apps/desktop
 
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-packager@0.11.8
+
       - name: Install Linux dependencies
         if: matrix.os == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config cmake libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
-            libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev
+          sudo apt-get install -y pkg-config cmake clang libclang-dev libxcb1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev \
+            libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev
 
       - name: Set version
         env:
@@ -171,25 +182,44 @@ jobs:
         run: cargo build --release
 
       - name: Package
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+          # linuxdeploy's own strip chokes on newer libraries, and FUSE isn't there in CI
+          NO_STRIP: 'true'
+          APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
-          arch=$(rustc -vV | sed -n 's/^host: \([^-]*\)-.*/\1/p')
-          mkdir -p package dist
-          if [ "${{ matrix.os }}" = windows ]; then
-            cp target/release/novarum.exe package/
-          else
-            cp target/release/novarum package/
-          fi
-          if [ "${{ matrix.os }}" = linux ]; then
-            cp packaging/novarum.desktop package/
-            cp packaging/icons/512x512.png package/novarum.png
-          fi
-          tar -czf "dist/novarum-desktop-${{ matrix.os }}-${arch}.tar.gz" -C package .
+          name="novarum-desktop-${DESKTOP_RS_VERSION}"
+          mkdir -p dist/release
+          case "${{ matrix.os }}" in
+            linux)
+              cargo packager --release -f appimage,deb
+              mv dist/*.AppImage "dist/release/${name}-linux-x86_64.AppImage"
+              mv dist/*.AppImage.sig "dist/release/${name}-linux-x86_64.AppImage.sig"
+              mv dist/*.deb "dist/release/${name}-linux-amd64.deb"
+              ;;
+            macos)
+              # packaged unsigned, then ad-hoc signed as a whole (no Developer ID), then tarred
+              # and signed for the updater so the tarball holds the signed bundle
+              env -u CARGO_PACKAGER_SIGN_PRIVATE_KEY cargo packager --release -f app
+              codesign --force --deep --sign - dist/Novarum.app
+              tar -czf "dist/release/${name}-macos-aarch64.app.tar.gz" -C dist Novarum.app
+              cargo packager signer sign "dist/release/${name}-macos-aarch64.app.tar.gz"
+              hdiutil create -volname Novarum -srcfolder dist/Novarum.app -ov -format UDZO \
+                "dist/release/${name}-macos-aarch64.dmg"
+              ;;
+            windows)
+              cargo packager --release -f nsis
+              mv dist/*-setup.exe "dist/release/${name}-windows-x86_64-setup.exe"
+              mv dist/*-setup.exe.sig "dist/release/${name}-windows-x86_64-setup.exe.sig"
+              ;;
+          esac
+          ls -la dist/release
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-rs-${{ matrix.os }}
-          path: apps/desktop/dist/*.tar.gz
+          path: apps/desktop/dist/release/*
           if-no-files-found: error
 
   release:
@@ -251,6 +281,35 @@ jobs:
           path: release-assets
           pattern: desktop-rs-*
           merge-multiple: true
+
+      # the manifest cargo-packager's updater reads: one entry per platform, with the signature
+      - name: Write update manifest
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: |
+          python3 - <<'PY'
+          import datetime, glob, json, os
+          version = os.environ["DESKTOP_RS_VERSION"]
+          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{version}"
+          platforms = {}
+          for key, pattern, kind in [
+              ("linux-x86_64", "*-linux-x86_64.AppImage", "appimage"),
+              ("macos-aarch64", "*-macos-aarch64.app.tar.gz", "app"),
+              ("windows-x86_64", "*-windows-x86_64-setup.exe", "nsis"),
+          ]:
+              for path in glob.glob(f"release-assets/{pattern}"):
+                  name = os.path.basename(path)
+                  with open(f"{path}.sig") as sig:
+                      platforms[key] = {"url": f"{base}/{name}", "signature": sig.read().strip(), "format": kind}
+          manifest = {
+              "version": version,
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          with open("release-assets/novarum-desktop-update.json", "w") as out:
+              json.dump(manifest, out, indent=2)
+          print(json.dumps(manifest, indent=2))
+          PY
 
       - name: Publish
         env:
