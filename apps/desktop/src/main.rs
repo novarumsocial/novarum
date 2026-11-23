@@ -72,14 +72,13 @@ fn main() {
             open_main_window(cx);
         }
         if auto_update {
-            // after startup's own requests; a found update installs when Novarum quits
+            // after startup's own requests; `check` downloads a found update, which installs
+            // when Novarum quits
             cx.spawn(async move |cx| {
                 cx.background_executor()
                     .timer(Duration::from_secs(10))
                     .await;
-                if cx.update(updater::Updater::check).await {
-                    let _ = cx.update(updater::Updater::download).await;
-                }
+                cx.update(updater::Updater::check).await;
             })
             .detach();
         }
