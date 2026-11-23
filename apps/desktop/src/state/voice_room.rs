@@ -92,7 +92,7 @@ pub enum VoiceCommand {
         on: bool,
         device: String,
     },
-    /// `system_audio` also shares what the computer plays (Linux only for now).
+    /// `system_audio` also shares what the computer plays.
     SetScreenShare {
         on: bool,
         system_audio: bool,
@@ -197,7 +197,6 @@ struct Actor {
     want_camera: bool,
     want_screen: bool,
     system_audio: bool,
-    #[cfg(target_os = "linux")]
     screen_audio: Option<(crate::state::screen_audio::ScreenAudio, TrackSid)>,
     remote_video: HashMap<TrackSid, RemoteVideo>,
 }
@@ -484,7 +483,6 @@ impl Actor {
         } else {
             self.camera = published
         }
-        #[cfg(target_os = "linux")]
         if screen && self.system_audio {
             self.publish_screen_audio(session).await;
         }
@@ -492,7 +490,6 @@ impl Actor {
     }
 
     /// Sharing goes on without sound if this fails, like the web.
-    #[cfg(target_os = "linux")]
     async fn publish_screen_audio(&mut self, session: &Session) {
         let audio = match crate::state::screen_audio::start().await {
             Ok(audio) => audio,
@@ -526,7 +523,6 @@ impl Actor {
                 .unpublish_track(&published.sid)
                 .await;
         }
-        #[cfg(target_os = "linux")]
         if let Some((_, sid)) = self.screen_audio.take().filter(|_| screen) {
             let _ = session.room.local_participant().unpublish_track(&sid).await;
         }
@@ -804,10 +800,7 @@ impl Actor {
         self.audio = None;
         self.camera = None;
         self.screen = None;
-        #[cfg(target_os = "linux")]
-        {
-            self.screen_audio = None;
-        }
+        self.screen_audio = None;
         for sid in self.remote_video.keys().cloned().collect::<Vec<_>>() {
             self.unwatch_video(&sid);
         }
@@ -853,7 +846,6 @@ pub fn spawn(
             want_camera: false,
             want_screen: false,
             system_audio: false,
-            #[cfg(target_os = "linux")]
             screen_audio: None,
             remote_video: HashMap::new(),
         };

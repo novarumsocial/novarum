@@ -226,6 +226,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 
 [[package]]
+name = "apple-cf"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "799ab3415228df60c174342065a1c8270ddeaaa35770b2e4ec7a3f63def6199c"
+dependencies = [
+ "doom-fish-utils 0.5.0",
+]
+
+[[package]]
+name = "apple-metal"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5ecd43c9a8443c6ea515108326330313d6390a0383152e6c2db7b776123974"
+dependencies = [
+ "doom-fish-utils 0.4.3",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2188,6 +2206,18 @@ checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
 dependencies = [
  "litrs",
 ]
+
+[[package]]
+name = "doom-fish-utils"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b17b6b508be066ed1f17547113c170b9105d9b7d9ba0a9c86b6dc767167ec0f3"
+
+[[package]]
+name = "doom-fish-utils"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ae0c359a5058039843557499a8a8704d8fd8c71f9d02c49aec64a3cf06a4baf"
 
 [[package]]
 name = "downcast-rs"
@@ -5889,6 +5919,7 @@ dependencies = [
  "reqwest_cookie_store",
  "rodio",
  "rust-embed",
+ "screencapturekit 12.0.0",
  "semver",
  "serde",
  "serde_json",
@@ -5897,6 +5928,7 @@ dependencies = [
  "tray-icon",
  "url",
  "uuid",
+ "wasapi",
  "winresource",
  "zbus 5.19.0",
 ]
@@ -7151,7 +7183,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6e4d69d0fa3e7f6f9cf6b53a0e83e4fc99ba3586f65ce166cff30bd13bb4ad2"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "multimap",
  "petgraph",
@@ -7170,7 +7202,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad9c5423459fa2f729b8d9235fab810aa29628b171467744fc86d21460ad70d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -8115,6 +8147,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a5eeeb57ac94960cfe5ff4c402be6585ae4c8d29a2cf41b276048c2e849d64e"
 dependencies = [
  "screencapturekit-sys",
+]
+
+[[package]]
+name = "screencapturekit"
+version = "12.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5f891b0db00740f80bf876cfb83ae67c1484924be9cbf9d1b4aee87b1511108"
+dependencies = [
+ "apple-cf",
+ "apple-metal",
 ]
 
 [[package]]
@@ -10045,6 +10087,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasapi"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58b35dbcb6fae6fbaba9f6f52a22686bb405978ee112ed6eb33d98bd63c97583"
+dependencies = [
+ "log",
+ "num-integer",
+ "thiserror 2.0.21",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
+]
+
+[[package]]
 name = "wasi"
 version = "0.11.1+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11651,7 +11706,7 @@ dependencies = [
  "log",
  "objc",
  "rand 0.8.8",
- "screencapturekit",
+ "screencapturekit 0.2.8",
  "screencapturekit-sys",
  "sysinfo",
  "tao-core-video-sys",

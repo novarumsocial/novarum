@@ -14,7 +14,6 @@ pub mod notification_settings;
 #[allow(dead_code)]
 pub mod realtime;
 pub mod router;
-#[cfg(target_os = "linux")]
 pub mod screen_audio;
 pub mod session;
 pub mod settings;
