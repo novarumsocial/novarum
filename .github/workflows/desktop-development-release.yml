@@ -203,6 +203,14 @@ jobs:
           mkdir -p packaging/bundle
           cp mpv/libmpv-2.dll packaging/bundle/
 
+      # screencapturekit's Metal bindings need the macOS 26 SDK, newer than the Intel image's default
+      - name: Use Xcode 26
+        if: matrix.os == 'macos'
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          xcodebuild -version
+
       - name: Install libmpv for macOS
         if: matrix.os == 'macos'
         run: brew install mpv dylibbundler
