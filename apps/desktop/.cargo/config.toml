@@ -1,0 +1,3 @@
+# libwebrtc is built against the static MSVC runtime (/MT), so Rust has to link it too
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

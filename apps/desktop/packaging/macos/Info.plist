@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Novarum needs your microphone for voice calls.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Novarum needs your camera for video calls.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Novarum needs permission to capture system audio so it can be included when you share your screen.</string>
+</dict>
+</plist>

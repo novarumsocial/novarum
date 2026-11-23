@@ -28,8 +28,16 @@
 - Tests: start infra with `bun run --filter anchor test:infra`, then `test`, `test:unit`, `test:integration`, `test:migrations`, or `test:fed`.
 - DB (Drizzle): `db:generate`, `db:migrate`, `db:push`; migrations in `apps/anchor/drizzle` run on startup.
 
+## Desktop (`apps/desktop`)
+
+- Native GPUI (Rust) port of `apps/frontend`, replacing `apps/electron`. Every view or store starts with a comment naming its web counterpart; keep names and behavior aligned with the web.
+- Build from `apps/desktop` with Cargo, not Bun: `cargo check -j 4`, `cargo build -j 4`, `cargo test -j 4 --bin novarum`. Format with `cargo fmt`. Keep `-j 4` and never run two builds at once: the LiveKit/webrtc links are memory-heavy enough to take the machine down.
+- Debug runs: `NOVARUM_START_PATH=/guilds/...` opens a route, `NOVARUM_TRACE_STARTUP=1` prints startup timings, `NOVARUM_NO_UPDATE=1` turns off the updater.
+- Voice/video run on LiveKit's Rust SDK (`src/state/voice_room.rs` on the tokio runtime, mirrored into gpui by `src/state/voice.rs`). Call audio doesn't use LiveKit's platform audio: `src/state/audio_engine.rs` captures and plays through cpal, with WebRTC's echo canceller, RNNoise/DeepFilterNet3 and per-track gain. In-app video playback loads libmpv at runtime (`src/media.rs`).
+- Packaging is cargo-packager (`[package.metadata.packager]` in `Cargo.toml`), built and signed in `.github/workflows/desktop-development-release.yml`; the updater (`src/updater.rs`) verifies releases against the public key there.
+
 ## Other apps
-- `apps/electron` (desktop shell around the frontend), `apps/mobile` (Capacitor wrapper), `apps/native` (Expo/React Native rewrite, see `NATIVE_APP_PLAN.md`), `apps/landing` (Astro), and `worker` (Cloudflare Worker).
+- `apps/electron` (the previous desktop shell around the frontend), `apps/mobile` (Capacitor wrapper), `apps/native` (Expo/React Native rewrite, see `NATIVE_APP_PLAN.md`), `apps/landing` (Astro), and `worker` (Cloudflare Worker).
 
 ## Formatting
 
@@ -46,6 +54,7 @@ Whenever possible, use the following conventions:
 
 ## Implementing features (checklist)
 
+- **Frontend feature → desktop parity.** User-facing changes in `apps/frontend` also land in `apps/desktop` (see the Desktop section), unless they're web- or mobile-only; run its `cargo check`/`test` too.
 - **Frontend feature → native parity.** When adding or changing user-facing behavior in `apps/frontend`, implement the same in `apps/native` where applicable (same store/method names, file starts with a comment naming its web counterpart; see `NATIVE_APP_PLAN.md`). If a web control is a stub with no backend, hide it on native. If it genuinely doesn't apply to native (e.g. Electron/desktop-only, or feature not necessary on mobile), say so in the summary. Run `bun run --filter native check` as well as the frontend checks.
 - **Anchor changes need tests.** Add or update tests in `apps/anchor/test` (`unit` for pure helpers, `integration` for routes/realtime, `federation` for cross-server flows) using the helpers in `test/harness`. Cover the happy path and failure cases.
 - **Anchor security tests.** For any new or changed route, realtime event, upload or federation endpoint, also test authentication, authorization (extend `integration/authz-matrix.test.ts`, which checks every route against access rules; also `openapi-auth.test.ts`), input validation/abuse (see `fuzz.test.ts`, `upload-abuse.test.ts`), rate limits where relevant, and for outbound requests SSRF (`harness/ssrf.ts`). Never leak private data to users who lack access.

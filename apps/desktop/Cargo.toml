@@ -1,0 +1,124 @@
+[package]
+name = "novarum-desktop"
+version = "0.2.1"
+edition = "2024"
+description = "Novarum desktop client"
+publish = false
+
+[[bin]]
+name = "novarum"
+path = "src/main.rs"
+
+[dependencies]
+gpui-kit = "0.10.0"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+  "cookies",
+  "multipart",
+  "stream",
+  "http2",
+] }
+reqwest_cookie_store = "0.8"
+cookie_store = "0.21"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures = "0.3"
+url = "2"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+uuid = { version = "1", features = ["v4"] }
+rust-embed = "8"
+semver = "1"
+rand = "0.9"
+png = "0.18"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+notify-rust = "4"
+rodio = { version = "0.21", default-features = false, features = ["playback", "vorbis", "mp3", "wav", "flac"] }
+base64 = "0.22"
+regex = "1"
+qrcode = { version = "0.15.0", default-features = false }
+cpal = "0.16"
+livekit = { version = "0.12.0", features = ["native", "rustls-tls-webpki-roots", "glib-main-loop"] }
+nokhwa = { version = "0.10", features = ["input-native"] }
+cargo-packager-updater = "0.2.3"
+libloading = "0.9.1"
+nnnoiseless = "0.5.2"
+deep-filter-rt = "0.2.0"
+ndarray = "0.17"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = "0.3"
+pipewire = "0.10.1"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+tray-icon = "0.26"
+auto-launch = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSApplication",
+  "NSDockTile",
+  "NSResponder",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString"] }
+screencapturekit = "12"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+wasapi = "0.27"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# optimized dependencies: unoptimized wgpu/naga made opening a debug window take ~500ms
+[profile.dev.package."*"]
+opt-level = 2
+
+[build-dependencies]
+winresource = "0.1.34"
+
+# cargo-packager: AppImage + .deb, macOS .app (+ a .dmg made in CI), and a per-user NSIS installer
+[package.metadata.packager]
+product-name = "Novarum"
+identifier = "me.novarum.desktop"
+publisher = "Novarum"
+description = "Novarum desktop client"
+category = "SocialNetworking"
+out-dir = "dist"
+binaries = [{ path = "novarum", main = true }]
+icons = ["packaging/icons/*.png", "packaging/icons/icon.icns", "packaging/icons/icon.ico"]
+# libraries CI drops next to the binary (libmpv on Windows)
+resources = ["packaging/bundle/*"]
+
+[package.metadata.packager.deb]
+depends = ["libpipewire-0.3-0t64 | libpipewire-0.3-0", "libxkbcommon-x11-0", "libvulkan1", "libmpv2"]
+
+[package.metadata.packager.appimage]
+# libmpv is loaded at runtime, so it's listed for linuxdeploy to bundle along with its libraries
+libs = ["libmpv.so.2"]
+# these front the host's daemons and GPU drivers, so they have to be the host's own
+excluded-libraries = ["libpipewire-0.3.so*", "libvulkan.so*", "libva*.so*", "libvdpau.so*", "libOpenCL.so*"]
+
+[package.metadata.packager.macos]
+minimum-system-version = "12.0"
+info-plist-path = "packaging/macos/Info.plist"
+
+[package.metadata.packager.nsis]
+installer-mode = "currentUser"
+
+# novarumsocial/gpui-kit: upstream 0.10.0 with shadcn-sized menus, inputs, buttons and tooltips.
+# Every crate of that repo is patched together so they share one copy of gpui-base.
+[patch.crates-io]
+gpui-kit = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-kit-assets = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-base = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-component = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-component-macros = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }

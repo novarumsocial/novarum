@@ -1,0 +1,12 @@
+{
+  "name": "desktop-rs",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Novarum desktop client (Rust + GPUI)",
+  "scripts": {
+    "dev": "cargo run",
+    "check": "cargo check && cargo clippy --quiet",
+    "test": "cargo test",
+    "build": "cargo build --release"
+  }
+}

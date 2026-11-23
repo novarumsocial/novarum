@@ -1,0 +1,62 @@
+name: Desktop checks
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint and test (Linux)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake clang libclang-dev libxcb1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev \
+            libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev libasound2-dev
+          # libwebrtc's bundled libc++ needs clang 21+, newer than Ubuntu's
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          sudo bash /tmp/llvm.sh 21
+          echo "CC=clang-21" >> "$GITHUB_ENV"
+          echo "CXX=clang++-21" >> "$GITHUB_ENV"
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Check
+        run: cargo check --locked
+
+      - name: Test
+        run: cargo test --locked --bin novarum

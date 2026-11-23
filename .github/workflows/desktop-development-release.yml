@@ -8,16 +8,27 @@ on:
       version:
         type: string
         required: true
+  # pull requests only build and package the native app (apps/desktop), so its packages can be
+  # tried before merging; nothing is published from them
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-development-release.yml'
   push:
     branches:
       - main
     paths:
       - 'apps/electron/**'
       - 'apps/frontend/**'
+      - 'apps/desktop/**'
       - '.github/workflows/desktop-development-release.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # releases use their version and upload to the existing v<version> release; other builds are
@@ -27,6 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      desktop_rs_version: ${{ steps.version.outputs.desktop_rs_version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,17 +47,25 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
+          next_dev() {
+            IFS=. read -r major minor patch <<< "$1"
+            echo "${major}.${minor}.$((patch + 1))-dev.${GITHUB_RUN_NUMBER}"
+          }
           if [ -n "$RELEASE_VERSION" ]; then
             version="$RELEASE_VERSION"
+            desktop_rs_version="$RELEASE_VERSION"
           else
-            IFS=. read -r major minor patch < <(jq -r .version apps/electron/package.json)
-            version="${major}.${minor}.$((patch + 1))-dev.${GITHUB_RUN_NUMBER}"
+            version=$(next_dev "$(jq -r .version apps/electron/package.json)")
+            # the GPUI app (apps/desktop) goes by the first `version =` in its Cargo.toml
+            desktop_rs_version=$(next_dev "$(sed -n 's/^version = "\(.*\)"/\1/p' apps/desktop/Cargo.toml | head -n 1)")
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "desktop_rs_version=$desktop_rs_version" >> "$GITHUB_OUTPUT"
 
   build-linux-windows:
     name: Build desktop (Linux and Windows)
     needs: version
+    if: github.event_name != 'pull_request'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     container: electronuserland/builder:wine
     steps:
@@ -85,6 +105,7 @@ jobs:
   build-macos:
     name: Build desktop (macOS)
     needs: version
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     steps:
       - name: Check out repository
@@ -114,12 +135,147 @@ jobs:
             apps/electron/dist/latest*.yml
           if-no-files-found: error
 
+  # the native GPUI app (apps/desktop), packaged by cargo-packager: an AppImage and .deb on Linux,
+  # an ad-hoc signed .app (plus its updater tarball) and .dmg on macOS, and a per-user NSIS
+  # installer on Windows. The updater artifacts are signed with the CARGO_PACKAGER_SIGN_* secrets,
+  # whose public key is `PUBKEY` in apps/desktop/src/updater.rs.
+  build-desktop-rs:
+    name: Build desktop-rs (${{ matrix.os }} ${{ matrix.arch }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: x86_64, deb: amd64, runner: ubuntu-24.04 }
+          - { os: linux, arch: aarch64, deb: arm64, runner: ubuntu-24.04-arm }
+          - { os: macos, arch: aarch64, runner: macos-latest }
+          - { os: macos, arch: x86_64, runner: macos-15-intel }
+          - { os: windows, arch: x86_64, runner: windows-latest }
+          - { os: windows, arch: aarch64, runner: windows-11-arm }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    env:
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop
+
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-packager@0.11.8
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake clang libclang-dev libxcb1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev \
+            libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev libmpv2 libasound2-dev
+          # libwebrtc's bundled libc++ needs clang 21+, newer than Ubuntu's
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          sudo bash /tmp/llvm.sh 21
+          echo "CC=clang-21" >> "$GITHUB_ENV"
+          echo "CXX=clang++-21" >> "$GITHUB_ENV"
+
+      # libmpv plays videos in-app (loaded at runtime): the AppImage bundles the system's, Windows
+      # ships a pinned build next to the exe, and macOS gets Homebrew's copied into the bundle
+      - name: Fetch libmpv for Windows
+        if: matrix.os == 'windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download 20261111 -R shinchiro/mpv-winbuild-cmake \
+            -p 'mpv-dev-${{ matrix.arch }}-20261111-git-*.7z' -D mpv
+          7z e mpv/*.7z -ompv libmpv-2.dll
+          mkdir -p packaging/bundle
+          cp mpv/libmpv-2.dll packaging/bundle/
+
+      # screencapturekit's Metal bindings need the macOS 26 SDK, newer than the Intel image's default
+      - name: Use Xcode 26
+        if: matrix.os == 'macos'
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Install libmpv for macOS
+        if: matrix.os == 'macos'
+        run: brew install mpv dylibbundler
+
+      - name: Set version
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: perl -pi -e '$done ||= s/^version = "[^"]*"/version = "$ENV{DESKTOP_RS_VERSION}"/' Cargo.toml
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+          # linuxdeploy's own strip chokes on newer libraries, and FUSE isn't there in CI
+          NO_STRIP: 'true'
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          name="novarum-desktop-${DESKTOP_RS_VERSION}"
+          mkdir -p dist/release
+          case "${{ matrix.os }}" in
+            linux)
+              cargo packager --release -f appimage,deb
+              mv dist/*.AppImage "dist/release/${name}-linux-${{ matrix.arch }}.AppImage"
+              mv dist/*.AppImage.sig "dist/release/${name}-linux-${{ matrix.arch }}.AppImage.sig"
+              mv dist/*.deb "dist/release/${name}-linux-${{ matrix.deb }}.deb"
+              ;;
+            macos)
+              # packaged unsigned, then ad-hoc signed as a whole (no Developer ID), then tarred
+              # and signed for the updater so the tarball holds the signed bundle
+              env -u CARGO_PACKAGER_SIGN_PRIVATE_KEY cargo packager --release -f app
+              frameworks=dist/Novarum.app/Contents/Frameworks
+              mkdir -p "$frameworks"
+              cp "$(brew --prefix mpv)/lib/libmpv.2.dylib" "$frameworks/"
+              chmod u+w "$frameworks/libmpv.2.dylib"
+              dylibbundler -of -b -x "$frameworks/libmpv.2.dylib" -d "$frameworks" -p @loader_path/
+              codesign --force --deep --sign - dist/Novarum.app
+              tar -czf "dist/release/${name}-macos-${{ matrix.arch }}.app.tar.gz" -C dist Novarum.app
+              cargo packager signer sign "dist/release/${name}-macos-${{ matrix.arch }}.app.tar.gz"
+              hdiutil create -volname Novarum -srcfolder dist/Novarum.app -ov -format UDZO \
+                "dist/release/${name}-macos-${{ matrix.arch }}.dmg"
+              ;;
+            windows)
+              cargo packager --release -f nsis
+              mv dist/*-setup.exe "dist/release/${name}-windows-${{ matrix.arch }}-setup.exe"
+              mv dist/*-setup.exe.sig "dist/release/${name}-windows-${{ matrix.arch }}-setup.exe.sig"
+              ;;
+          esac
+          ls -la dist/release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-rs-${{ matrix.os }}-${{ matrix.arch }}
+          path: apps/desktop/dist/release/*
+          if-no-files-found: error
+
   release:
     name: Publish development release
     needs:
       - version
       - build-linux-windows
       - build-macos
+    if: github.event_name != 'pull_request'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
@@ -131,6 +287,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release-assets
+          pattern: desktop-{linux-windows,macos}
           merge-multiple: true
 
       - name: Publish prerelease
@@ -148,5 +305,73 @@ jobs:
               --target "$GITHUB_SHA" \
               --title "$release_tag" \
               --notes "$notes" \
+              --prerelease
+          fi
+
+  # after the Electron release, so the two don't race to create the same v<version> release
+  release-desktop-rs:
+    name: Publish desktop-rs builds
+    needs:
+      - version
+      - build-desktop-rs
+      - release
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-desktop-rs.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: desktop-rs-*
+          merge-multiple: true
+
+      # the manifest cargo-packager's updater reads: one entry per platform, with the signature
+      - name: Write update manifest
+        env:
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: |
+          python3 - <<'PY'
+          import datetime, glob, json, os
+          version = os.environ["DESKTOP_RS_VERSION"]
+          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{version}"
+          platforms = {}
+          kinds = [("linux", "{}.AppImage", "appimage"), ("macos", "{}.app.tar.gz", "app"),
+                   ("windows", "{}-setup.exe", "nsis")]
+          for os_name, suffix, kind in kinds:
+            for arch in ("x86_64", "aarch64"):
+              key = f"{os_name}-{arch}"
+              for path in glob.glob(f"release-assets/*-{suffix.format(key)}"):
+                  name = os.path.basename(path)
+                  with open(f"{path}.sig") as sig:
+                      platforms[key] = {"url": f"{base}/{name}", "signature": sig.read().strip(), "format": kind}
+          manifest = {
+              "version": version,
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          with open("release-assets/novarum-desktop-update.json", "w") as out:
+              json.dump(manifest, out, indent=2)
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DESKTOP_RS_VERSION: ${{ needs.version.outputs.desktop_rs_version }}
+        run: |
+          release_tag="v${DESKTOP_RS_VERSION}"
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" release-assets/* --clobber
+          else
+            gh release create "$release_tag" release-assets/* \
+              --target "$GITHUB_SHA" \
+              --title "$release_tag" \
+              --notes "Development build for commit ${GITHUB_SHA}." \
               --prerelease
           fi
