@@ -4518,6 +4518,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libloading"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1832accd5a4ca2795ace4d05d15c4039be15b62d3b950eff99746a990e3cc10"
+dependencies = [
+ "cfg-if 1.0.5",
+ "windows-link 0.2.1",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5462,6 +5472,7 @@ dependencies = [
  "gpui-kit",
  "image",
  "ksni",
+ "libloading 0.9.1",
  "livekit",
  "nokhwa",
  "notify-rust",

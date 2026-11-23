@@ -3,6 +3,7 @@
 mod api;
 mod app;
 mod assets;
+mod media;
 mod desktop;
 mod models;
 #[allow(dead_code)]
@@ -61,6 +62,7 @@ fn main() {
         gpui_kit::init(cx);
         assets::load_fonts(cx);
         state::init(cx);
+        media::init(cx);
         updater::init(cx);
         desktop::init(cx);
         startup::mark("state ready");

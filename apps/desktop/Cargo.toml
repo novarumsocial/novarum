@@ -45,6 +45,7 @@ cpal = "0.16"
 livekit = { version = "0.12.0", features = ["native", "rustls-tls-webpki-roots", "glib-main-loop"] }
 nokhwa = { version = "0.10", features = ["input-native"] }
 cargo-packager-updater = "0.2.3"
+libloading = "0.9.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni = "0.3"
@@ -87,13 +88,17 @@ category = "SocialNetworking"
 out-dir = "dist"
 binaries = [{ path = "novarum", main = true }]
 icons = ["packaging/icons/*.png", "packaging/icons/icon.icns", "packaging/icons/icon.ico"]
+# libraries CI drops next to the binary (libmpv on Windows)
+resources = ["packaging/bundle/*"]
 
 [package.metadata.packager.deb]
-depends = ["libpipewire-0.3-0t64 | libpipewire-0.3-0", "libxkbcommon-x11-0", "libvulkan1"]
+depends = ["libpipewire-0.3-0t64 | libpipewire-0.3-0", "libxkbcommon-x11-0", "libvulkan1", "libmpv2"]
 
-# PipeWire has to be the host's: its plugins and daemon protocol come with the system
 [package.metadata.packager.appimage]
-excluded-libraries = ["libpipewire-0.3.so*"]
+# libmpv is loaded at runtime, so it's listed for linuxdeploy to bundle along with its libraries
+libs = ["libmpv.so.2"]
+# these front the host's daemons and GPU drivers, so they have to be the host's own
+excluded-libraries = ["libpipewire-0.3.so*", "libvulkan.so*", "libva*.so*", "libvdpau.so*", "libOpenCL.so*"]
 
 [package.metadata.packager.macos]
 minimum-system-version = "12.0"

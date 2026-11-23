@@ -171,7 +171,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config cmake clang libclang-dev libxcb1-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev \
-            libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev
+            libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev libmpv2
+
+      # libmpv plays videos in-app (loaded at runtime): the AppImage bundles the system's, Windows
+      # ships a pinned build next to the exe, and macOS gets Homebrew's copied into the bundle
+      - name: Fetch libmpv for Windows
+        if: matrix.os == 'windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download 20261111 -R shinchiro/mpv-winbuild-cmake \
+            -p 'mpv-dev-x86_64-20261111-git-*.7z' -D mpv
+          7z e mpv/*.7z -ompv libmpv-2.dll
+          mkdir -p packaging/bundle
+          cp mpv/libmpv-2.dll packaging/bundle/
+
+      - name: Install libmpv for macOS
+        if: matrix.os == 'macos'
+        run: brew install mpv dylibbundler
 
       - name: Set version
         env:
@@ -201,6 +218,11 @@ jobs:
               # packaged unsigned, then ad-hoc signed as a whole (no Developer ID), then tarred
               # and signed for the updater so the tarball holds the signed bundle
               env -u CARGO_PACKAGER_SIGN_PRIVATE_KEY cargo packager --release -f app
+              frameworks=dist/Novarum.app/Contents/Frameworks
+              mkdir -p "$frameworks"
+              cp "$(brew --prefix mpv)/lib/libmpv.2.dylib" "$frameworks/"
+              chmod u+w "$frameworks/libmpv.2.dylib"
+              dylibbundler -of -b -x "$frameworks/libmpv.2.dylib" -d "$frameworks" -p @loader_path/
               codesign --force --deep --sign - dist/Novarum.app
               tar -czf "dist/release/${name}-macos-aarch64.app.tar.gz" -C dist Novarum.app
               cargo packager signer sign "dist/release/${name}-macos-aarch64.app.tar.gz"
