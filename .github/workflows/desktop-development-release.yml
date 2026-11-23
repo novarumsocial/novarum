@@ -8,6 +8,12 @@ on:
       version:
         type: string
         required: true
+  # pull requests only build and package the native app (apps/desktop), so its packages can be
+  # tried before merging; nothing is published from them
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-development-release.yml'
   push:
     branches:
       - main
@@ -19,6 +25,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # releases use their version and upload to the existing v<version> release; other builds are
@@ -55,6 +65,7 @@ jobs:
   build-linux-windows:
     name: Build desktop (Linux and Windows)
     needs: version
+    if: github.event_name != 'pull_request'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     container: electronuserland/builder:wine
     steps:
@@ -94,6 +105,7 @@ jobs:
   build-macos:
     name: Build desktop (macOS)
     needs: version
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     steps:
       - name: Check out repository
@@ -128,18 +140,18 @@ jobs:
   # installer on Windows. The updater artifacts are signed with the CARGO_PACKAGER_SIGN_* secrets,
   # whose public key is `PUBKEY` in apps/desktop/src/updater.rs.
   build-desktop-rs:
-    name: Build desktop-rs (${{ matrix.os }})
+    name: Build desktop-rs (${{ matrix.os }} ${{ matrix.arch }})
     needs: version
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: linux
-            runner: blacksmith-4vcpu-ubuntu-2404
-          - os: macos
-            runner: macos-latest
-          - os: windows
-            runner: windows-latest
+          - { os: linux, arch: x86_64, deb: amd64, runner: blacksmith-4vcpu-ubuntu-2404 }
+          - { os: linux, arch: aarch64, deb: arm64, runner: ubuntu-24.04-arm }
+          - { os: macos, arch: aarch64, runner: macos-latest }
+          - { os: macos, arch: x86_64, runner: macos-15-intel }
+          - { os: windows, arch: x86_64, runner: windows-latest }
+          - { os: windows, arch: aarch64, runner: windows-11-arm }
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -181,7 +193,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download 20261111 -R shinchiro/mpv-winbuild-cmake \
-            -p 'mpv-dev-x86_64-20261111-git-*.7z' -D mpv
+            -p 'mpv-dev-${{ matrix.arch }}-20261111-git-*.7z' -D mpv
           7z e mpv/*.7z -ompv libmpv-2.dll
           mkdir -p packaging/bundle
           cp mpv/libmpv-2.dll packaging/bundle/
@@ -210,9 +222,9 @@ jobs:
           case "${{ matrix.os }}" in
             linux)
               cargo packager --release -f appimage,deb
-              mv dist/*.AppImage "dist/release/${name}-linux-x86_64.AppImage"
-              mv dist/*.AppImage.sig "dist/release/${name}-linux-x86_64.AppImage.sig"
-              mv dist/*.deb "dist/release/${name}-linux-amd64.deb"
+              mv dist/*.AppImage "dist/release/${name}-linux-${{ matrix.arch }}.AppImage"
+              mv dist/*.AppImage.sig "dist/release/${name}-linux-${{ matrix.arch }}.AppImage.sig"
+              mv dist/*.deb "dist/release/${name}-linux-${{ matrix.deb }}.deb"
               ;;
             macos)
               # packaged unsigned, then ad-hoc signed as a whole (no Developer ID), then tarred
@@ -224,15 +236,15 @@ jobs:
               chmod u+w "$frameworks/libmpv.2.dylib"
               dylibbundler -of -b -x "$frameworks/libmpv.2.dylib" -d "$frameworks" -p @loader_path/
               codesign --force --deep --sign - dist/Novarum.app
-              tar -czf "dist/release/${name}-macos-aarch64.app.tar.gz" -C dist Novarum.app
-              cargo packager signer sign "dist/release/${name}-macos-aarch64.app.tar.gz"
+              tar -czf "dist/release/${name}-macos-${{ matrix.arch }}.app.tar.gz" -C dist Novarum.app
+              cargo packager signer sign "dist/release/${name}-macos-${{ matrix.arch }}.app.tar.gz"
               hdiutil create -volname Novarum -srcfolder dist/Novarum.app -ov -format UDZO \
-                "dist/release/${name}-macos-aarch64.dmg"
+                "dist/release/${name}-macos-${{ matrix.arch }}.dmg"
               ;;
             windows)
               cargo packager --release -f nsis
-              mv dist/*-setup.exe "dist/release/${name}-windows-x86_64-setup.exe"
-              mv dist/*-setup.exe.sig "dist/release/${name}-windows-x86_64-setup.exe.sig"
+              mv dist/*-setup.exe "dist/release/${name}-windows-${{ matrix.arch }}-setup.exe"
+              mv dist/*-setup.exe.sig "dist/release/${name}-windows-${{ matrix.arch }}-setup.exe.sig"
               ;;
           esac
           ls -la dist/release
@@ -240,7 +252,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-rs-${{ matrix.os }}
+          name: desktop-rs-${{ matrix.os }}-${{ matrix.arch }}
           path: apps/desktop/dist/release/*
           if-no-files-found: error
 
@@ -250,6 +262,7 @@ jobs:
       - version
       - build-linux-windows
       - build-macos
+    if: github.event_name != 'pull_request'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
@@ -289,7 +302,7 @@ jobs:
       - version
       - build-desktop-rs
       - release
-    if: ${{ !cancelled() && needs.build-desktop-rs.result == 'success' }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-desktop-rs.result == 'success' }}
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: write
@@ -314,12 +327,12 @@ jobs:
           version = os.environ["DESKTOP_RS_VERSION"]
           base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{version}"
           platforms = {}
-          for key, pattern, kind in [
-              ("linux-x86_64", "*-linux-x86_64.AppImage", "appimage"),
-              ("macos-aarch64", "*-macos-aarch64.app.tar.gz", "app"),
-              ("windows-x86_64", "*-windows-x86_64-setup.exe", "nsis"),
-          ]:
-              for path in glob.glob(f"release-assets/{pattern}"):
+          kinds = [("linux", "{}.AppImage", "appimage"), ("macos", "{}.app.tar.gz", "app"),
+                   ("windows", "{}-setup.exe", "nsis")]
+          for os_name, suffix, kind in kinds:
+            for arch in ("x86_64", "aarch64"):
+              key = f"{os_name}-{arch}"
+              for path in glob.glob(f"release-assets/*-{suffix.format(key)}"):
                   name = os.path.basename(path)
                   with open(f"{path}.sig") as sig:
                       platforms[key] = {"url": f"{base}/{name}", "signature": sig.read().strip(), "format": kind}
