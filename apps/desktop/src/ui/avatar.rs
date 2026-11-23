@@ -47,7 +47,14 @@ pub fn avatar_with_fallback(
         .when(!circle, |div| div.rounded(t.radius));
 
     match image {
-        Some(Some(image)) => base.child(img(image).size_full().object_fit(ObjectFit::Contain)),
+        // gpui clips children to rectangles, so the image has to be rounded itself
+        Some(Some(image)) => base.child(
+            img(image)
+                .size_full()
+                .object_fit(ObjectFit::Contain)
+                .when(circle, |img| img.rounded_full())
+                .when(!circle, |img| img.rounded(t.radius)),
+        ),
         // still loading: keep the colored box, like the browser before the image arrives
         Some(None) => base,
         None => {
