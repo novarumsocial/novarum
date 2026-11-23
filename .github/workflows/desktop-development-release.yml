@@ -184,6 +184,11 @@ jobs:
           sudo apt-get install -y pkg-config cmake clang libclang-dev libxcb1-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev \
             libglib2.0-dev libpipewire-0.3-dev libspa-0.2-dev libmpv2 libasound2-dev
+          # libwebrtc's bundled libc++ needs clang 21+, newer than Ubuntu's
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          sudo bash /tmp/llvm.sh 21
+          echo "CC=clang-21" >> "$GITHUB_ENV"
+          echo "CXX=clang++-21" >> "$GITHUB_ENV"
 
       # libmpv plays videos in-app (loaded at runtime): the AppImage bundles the system's, Windows
       # ships a pinned build next to the exe, and macOS gets Homebrew's copied into the bundle
