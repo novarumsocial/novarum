@@ -106,3 +106,12 @@ info-plist-path = "packaging/macos/Info.plist"
 
 [package.metadata.packager.nsis]
 installer-mode = "currentUser"
+
+# novarumsocial/gpui-kit: upstream 0.10.0 with shadcn-sized menus, inputs, buttons and tooltips.
+# Every crate of that repo is patched together so they share one copy of gpui-base.
+[patch.crates-io]
+gpui-kit = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-kit-assets = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-base = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-component = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
+gpui-component-macros = { git = "https://github.com/novarumsocial/gpui-kit", rev = "ef8553d4bc6392008a798e2653d163b537efeafe" }
