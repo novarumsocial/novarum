@@ -592,7 +592,7 @@ impl GuildSettingsDialog {
                         div()
                             .flex()
                             .gap_2()
-                            .child(div().flex_1().min_w_0().child(Input::new(&self.bot_handle)))
+                            .child(div().flex_1().min_w_0().child(Input::new(&self.bot_handle).text_xs()))
                             .child(role)
                             .child(
                                 Button::new("add-bot")

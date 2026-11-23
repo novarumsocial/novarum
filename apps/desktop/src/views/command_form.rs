@@ -375,7 +375,7 @@ impl CommandForm {
                 .flex()
                 .flex_col()
                 .gap_1()
-                .child(Input::new(input).small())
+                .child(Input::new(input).text_xs())
                 .children(suggestions)
                 .into_any_element()
         } else {

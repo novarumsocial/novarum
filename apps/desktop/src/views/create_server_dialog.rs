@@ -138,6 +138,7 @@ impl Render for CreateServerDialog {
                             )
                             .child(
                                 Input::new(&self.name)
+                                    .text_xs()
                                     .prefix(icon("users").size_4().text_color(t.muted_foreground)),
                             ),
                     ),

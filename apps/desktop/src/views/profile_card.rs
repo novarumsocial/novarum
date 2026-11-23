@@ -336,7 +336,7 @@ fn card(
                 )
             },
         );
-        div().mt(px(10.0)).child(Input::new(&input))
+        div().mt(px(10.0)).child(Input::new(&input).text_xs())
     });
 
     let about = user

@@ -563,7 +563,7 @@ impl DevelopersHome {
                                 .flex_col()
                                 .gap(px(6.0))
                                 .child(ui::label("Username"))
-                                .child(Input::new(&this.new_username))
+                                .child(Input::new(&this.new_username).text_xs())
                                 .child(
                                     ui::muted("Letters, numbers, dots and underscores.", cx)
                                         .text_xs(),
@@ -575,7 +575,7 @@ impl DevelopersHome {
                                 .flex_col()
                                 .gap(px(6.0))
                                 .child(ui::label("Display name"))
-                                .child(Input::new(&this.new_display_name)),
+                                .child(Input::new(&this.new_display_name).text_xs()),
                         )
                         .when_some(this.create_error.clone(), |form, error| {
                             form.child(ui::error_text(error, cx).text_xs())
@@ -680,7 +680,7 @@ impl DevelopersHome {
                                 .child("\u{a0}to confirm."),
                         ),
                 )
-                .child(Input::new(&this.delete_confirm))
+                .child(Input::new(&this.delete_confirm).text_xs())
                 .footer(
                     div()
                         .flex()
@@ -1268,7 +1268,7 @@ impl DevelopersHome {
                     .flex()
                     .flex_col()
                     .gap_5()
-                    .child(div().flex().flex_col().gap(px(6.0)).child(ui::label("Display name")).child(Input::new(&self.display_name)))
+                    .child(div().flex().flex_col().gap(px(6.0)).child(ui::label("Display name")).child(Input::new(&self.display_name).text_xs()))
                     .child(div().flex().flex_col().gap(px(6.0)).child(ui::label("About")).child(Textarea::new(&self.about)))
                     .child(
                         div()

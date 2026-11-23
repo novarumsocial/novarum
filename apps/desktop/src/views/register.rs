@@ -222,7 +222,7 @@ impl Render for RegisterPage {
                                 field(
                                     Self::required("Username", cx),
                                     "at-sign",
-                                    Input::new(&self.inputs[USERNAME]),
+                                    Input::new(&self.inputs[USERNAME]).text_xs(),
                                     &self.errors[USERNAME],
                                     cx,
                                 )
@@ -233,7 +233,7 @@ impl Render for RegisterPage {
                                 field(
                                     Self::required("Home server", cx),
                                     "server",
-                                    Input::new(&self.inputs[HOME_SERVER]),
+                                    Input::new(&self.inputs[HOME_SERVER]).text_xs(),
                                     &self.errors[HOME_SERVER],
                                     cx,
                                 )
@@ -264,14 +264,14 @@ impl Render for RegisterPage {
                     .gap_2()
                     .child(div().text_color(t.muted_foreground).child("(optional)")),
                 "user",
-                Input::new(&self.inputs[DISPLAY_NAME]),
+                Input::new(&self.inputs[DISPLAY_NAME]).text_xs(),
                 &self.errors[DISPLAY_NAME],
                 cx,
             ))
             .child(field(
                 Self::required("Email", cx),
                 "mail",
-                Input::new(&self.inputs[EMAIL]),
+                Input::new(&self.inputs[EMAIL]).text_xs(),
                 &self.errors[EMAIL],
                 cx,
             ))
@@ -279,7 +279,7 @@ impl Render for RegisterPage {
                 field(
                     Self::required("Password", cx),
                     "lock",
-                    Input::new(&self.inputs[PASSWORD]).suffix(eye),
+                    Input::new(&self.inputs[PASSWORD]).text_xs().suffix(eye),
                     &self.errors[PASSWORD],
                     cx,
                 )
@@ -291,7 +291,7 @@ impl Render for RegisterPage {
                 field(
                     Self::required("Confirm password", cx),
                     "lock",
-                    Input::new(&self.inputs[CONFIRM]),
+                    Input::new(&self.inputs[CONFIRM]).text_xs(),
                     &self.errors[CONFIRM],
                     cx,
                 )

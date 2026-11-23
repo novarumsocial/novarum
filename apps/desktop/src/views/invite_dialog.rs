@@ -306,7 +306,7 @@ impl Render for InviteDialog {
                     .flex_col()
                     .gap(px(6.0))
                     .child(label("Invite Friends"))
-                    .child(Input::new(&self.query).prefix(icon("search").size_4().text_color(t.muted_foreground)))
+                    .child(Input::new(&self.query).text_xs().prefix(icon("search").size_4().text_color(t.muted_foreground)))
                     .child(self.render_friends(cx)),
             )
             .child(label("Invite Link"))

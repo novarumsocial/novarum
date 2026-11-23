@@ -260,6 +260,7 @@ impl Render for NewDmDialog {
             .child(ui::muted(description, cx))
             .child(
                 Input::new(&self.query)
+                    .text_xs()
                     .prefix(icon("search").size_4().text_color(t.muted_foreground)),
             )
             .child(

@@ -471,14 +471,14 @@ impl LoginPage {
             .child(field(
                 ui::label("Home server"),
                 "server",
-                Input::new(&self.home_server),
+                Input::new(&self.home_server).text_xs(),
                 &self.errors[0],
                 cx,
             ))
             .child(field(
                 ui::label("Username"),
                 "at-sign",
-                Input::new(&self.username),
+                Input::new(&self.username).text_xs(),
                 &self.errors[1],
                 cx,
             ))
@@ -510,7 +510,7 @@ impl LoginPage {
                             }),
                     ),
                 "lock",
-                Input::new(&self.password),
+                Input::new(&self.password).text_xs(),
                 &self.errors[2],
                 cx,
             ))

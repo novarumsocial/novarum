@@ -1856,7 +1856,7 @@ impl SettingsDialog {
                                                 div()
                                                     .flex_1()
                                                     .font_family(cx.theme().mono_font_family.clone())
-                                                    .child(Input::new(&self.totp_code).h_9()),
+                                                    .child(Input::new(&self.totp_code).text_xs().h_9()),
                                             )
                                             .child(
                                                 Button::new("enable-totp")
@@ -1993,7 +1993,7 @@ impl SettingsDialog {
                     .px_4()
                     .py_3()
                     .child(ui::label("Current password"))
-                    .child(Input::new(&self.mfa_password).h_9())
+                    .child(Input::new(&self.mfa_password).text_xs().h_9())
                     .child(
                         div()
                             .text_xs()
@@ -2206,6 +2206,7 @@ impl SettingsDialog {
                 None,
                 true,
                 Select::new(&self.input_select)
+                    .text_xs()
                     .w_full()
                     .placeholder("Unknown microphone"),
                 cx,
@@ -2215,6 +2216,7 @@ impl SettingsDialog {
                 None,
                 true,
                 Select::new(&self.output_select)
+                    .text_xs()
                     .w_full()
                     .placeholder("Unknown output"),
                 cx,
@@ -2224,6 +2226,7 @@ impl SettingsDialog {
                 None,
                 true,
                 Select::new(&self.camera_select)
+                    .text_xs()
                     .w_full()
                     .placeholder("Unknown camera"),
                 cx,
@@ -2274,7 +2277,10 @@ impl SettingsDialog {
                 "Noise suppression model",
                 Some("DeepFilterNet removes more noise; RNNoise is lighter on your CPU.".into()),
                 false,
-                Select::new(&self.model_select).w_40().disabled(testing),
+                Select::new(&self.model_select)
+                    .text_xs()
+                    .w_40()
+                    .disabled(testing),
                 cx,
             ),
         ];
@@ -2391,6 +2397,7 @@ impl SettingsDialog {
                     None,
                     true,
                     Select::new(&self.language_select)
+                        .text_xs()
                         .w_full()
                         .placeholder("Select language"),
                     cx,

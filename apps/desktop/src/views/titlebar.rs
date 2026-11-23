@@ -12,19 +12,19 @@ pub fn titlebar(cx: &App) -> impl IntoElement {
         .border_color(t.border)
         .child(
             div()
+                .flex_1()
                 .flex()
                 .items_center()
-                .gap_2()
-                .pl_2()
-                .text_xs()
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(t.muted_foreground)
+                .justify_center()
+                .gap(px(7.0))
+                .text_size(px(11.0))
+                .font_weight(FontWeight::SEMIBOLD)
                 .child(
                     svg()
                         .path("logo.svg")
-                        .size_4()
-                        .text_color(t.muted_foreground),
+                        .size(px(15.0))
+                        .text_color(t.foreground.opacity(0.85)),
                 )
-                .child("novarum"),
+                .child("NOVARUM"),
         )
 }

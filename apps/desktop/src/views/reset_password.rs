@@ -258,14 +258,14 @@ impl ResetPasswordPage {
             .child(field(
                 ui::label("Home server"),
                 "server",
-                Input::new(&self.home_server),
+                Input::new(&self.home_server).text_xs(),
                 &self.request_errors[0],
                 cx,
             ))
             .child(field(
                 ui::label("Email"),
                 "mail",
-                Input::new(&self.email_input),
+                Input::new(&self.email_input).text_xs(),
                 &self.request_errors[1],
                 cx,
             ))
@@ -300,21 +300,23 @@ impl ResetPasswordPage {
             .child(field(
                 ui::label("Verification code"),
                 "key-round",
-                Input::new(&self.code).font_family(cx.theme().mono_font_family.clone()),
+                Input::new(&self.code)
+                    .text_xs()
+                    .font_family(cx.theme().mono_font_family.clone()),
                 &self.reset_errors[0],
                 cx,
             ))
             .child(field(
                 ui::label("New password"),
                 "lock",
-                Input::new(&self.password).suffix(eye),
+                Input::new(&self.password).text_xs().suffix(eye),
                 &self.reset_errors[1],
                 cx,
             ))
             .child(field(
                 ui::label("Confirm new password"),
                 "lock",
-                Input::new(&self.confirm),
+                Input::new(&self.confirm).text_xs(),
                 &self.reset_errors[2],
                 cx,
             ))

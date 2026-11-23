@@ -399,7 +399,7 @@ impl FriendsHome {
             .child(
                 div()
                     .flex_1()
-                    .child(Input::new(&self.query).appearance(false)),
+                    .child(Input::new(&self.query).text_xs().appearance(false)),
             )
             .child(icon("search").size_4().text_color(t.muted_foreground));
 

@@ -39,12 +39,18 @@ fn main_window_options(cx: &App) -> WindowOptions {
 
 pub fn open_main_window(cx: &mut App) {
     let options = main_window_options(cx);
-    gpui_kit::open_window(options, cx, |window, cx| {
+    let (window, _) = gpui_kit::open_window(options, cx, |window, cx| {
         startup::mark("window created");
         window.set_window_title("Novarum");
         cx.new(|cx| app::AppRoot::new(window, cx))
     })
     .expect("failed to open the main window");
+    // Tailwind's preflight `html { line-height: 1.5 }`; gpui defaults to the golden ratio
+    let _ = window.update(cx, |_, window, cx| {
+        base::Root::update(window, cx, |root, _, _| {
+            root.style().text.line_height = Some(relative(1.5))
+        })
+    });
 }
 
 fn main() {

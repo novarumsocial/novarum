@@ -101,6 +101,7 @@ impl Render for EditChannelDialog {
                     )
                     .child(
                         Input::new(&self.name)
+                            .text_xs()
                             .prefix(icon(prefix).size_4().text_color(t.muted_foreground)),
                     ),
             )

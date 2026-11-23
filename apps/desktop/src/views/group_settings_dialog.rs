@@ -312,7 +312,7 @@ impl Render for GroupSettingsDialog {
                             div()
                                 .flex()
                                 .gap_2()
-                                .child(div().flex_1().child(Input::new(&self.name)))
+                                .child(div().flex_1().child(Input::new(&self.name).text_xs()))
                                 .child(
                                     Button::new("save")
                                         .primary()
@@ -335,7 +335,7 @@ impl Render for GroupSettingsDialog {
                         div()
                             .flex()
                             .gap_2()
-                            .child(div().flex_1().child(Input::new(&self.bot_handle)))
+                            .child(div().flex_1().child(Input::new(&self.bot_handle).text_xs()))
                             .child(
                                 Button::new("add-bot")
                                     .primary()

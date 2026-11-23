@@ -265,7 +265,7 @@ impl Render for ColorPicker {
                             .flex_1()
                             .font_family(cx.theme().mono_font_family.clone())
                             .text_size(px(10.0))
-                            .child(Input::new(&self.hex)),
+                            .child(Input::new(&self.hex).text_xs()),
                     ),
             )
     }
