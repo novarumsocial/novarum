@@ -259,14 +259,20 @@ name = "GitHub"
 authorization_endpoint = "https://github.com/login/oauth/authorize"
 token_endpoint = "https://github.com/login/oauth/access_token"
 userinfo_endpoint = "https://api.github.com/user"
+# GitHub only shows a public email at /user; the real (verified) ones are here
+emails_endpoint = "https://api.github.com/user/emails"
 client_id = "..."
 client_secret = "..."
-scopes = ["read:user"]
+scopes = ["read:user", "user:email"]
 # subject_field = "id"
 # username_field = "login"
 ```
 
-A first sign-on asks the person to pick a username and creates a new account. Signed-in users can link and unlink providers under Settings → Privacy & security. Accounts are never merged by email. Invite-only mode applies only to password sign-ups, so anyone who can sign in with a configured provider can make an account. Providers must use `https`, except on `localhost`.
+A first sign-on asks the person to pick a username and creates a new account. Every account keeps an email on file, so a new account needs a **verified** email from the provider (`email_verified` in OpenID Connect, the primary verified address from `emails_endpoint`, or `email_verified`/`verified` in a plain OAuth 2 userinfo response). Without one, the sign-up is refused. For a provider that never marks emails verified but that you trust, set `trust_email = true` on it.
+
+Accounts are never merged by email: when the provider's email already belongs to an account, the sign-up is refused and the person is told to sign in and link the provider instead. Signed-in users link and unlink providers under Settings → Privacy & security. Once one is linked, they can also remove their password there. Their email stays on file, so a password reset brings a password back. Removing the password also turns off two-step verification, which only protects password sign-ins.
+
+Invite-only mode applies only to password sign-ups, so anyone who can sign in with a configured provider can make an account. Providers must use `https`, except on `localhost`.
 
 ## Ports and locations
 
