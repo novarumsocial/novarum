@@ -15,7 +15,21 @@ type SignupInput = {
   displayName?: string;
   email: string;
   password: string;
+  inviteCode?: string;
 };
+
+type SignOnSignupInput = {
+  code: string;
+  verifier: string;
+  username: string;
+  displayName?: string;
+};
+
+type SignOnResult = NonNullable<
+  Awaited<
+    ReturnType<ReturnType<typeof anchor>['client']['auth']['sso']['exchange']['post']>
+  >['data']
+>;
 
 type SessionResult =
   | { ok: true; user: SessionUser }
@@ -69,6 +83,11 @@ type SessionState = {
   completeMfa: (challenge: string, method: MfaMethod, code: string) => Promise<SessionResult>;
   sendMfaEmail: (challenge: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   signup: (input: SignupInput) => Promise<SessionResult>;
+  finishSignOn: (
+    code: string,
+    verifier: string
+  ) => Promise<{ ok: true; result: SignOnResult } | { ok: false; error: string }>;
+  signOnSignup: (input: SignOnSignupInput) => Promise<SessionResult>;
   switchAccount: (homeServer: string) => Promise<void>;
   forget: (homeServer: string) => void;
   logout: () => Promise<void>;
@@ -227,6 +246,7 @@ export const useSession = create<SessionState>((set, get) => {
           displayName: input.displayName,
           email: input.email,
           password: input.password,
+          inviteCode: input.inviteCode || undefined,
         });
 
         if (error) return fail(error.value, 'Could not create your account.');
@@ -236,6 +256,29 @@ export const useSession = create<SessionState>((set, get) => {
         return fail(error, 'Could not create your account. Try again.');
       } finally {
         set({ loading: false });
+      }
+    },
+
+    async finishSignOn(code, verifier) {
+      try {
+        const { data, error } = await anchor().client.auth.sso.exchange.post({ code, verifier });
+        if (error) return fail(error.value, 'Could not finish signing in.');
+        if (data.status !== 'login') return { ok: true, result: data };
+
+        const session = await verifyNewSession('Sign-in');
+        return session.ok ? { ok: true, result: data } : session;
+      } catch (error) {
+        return fail(error, 'Could not finish signing in.');
+      }
+    },
+
+    async signOnSignup(input) {
+      try {
+        const { error } = await anchor().client.auth.sso.signup.post(input);
+        if (error) return fail(error.value, 'Could not create your account.');
+        return await verifyNewSession('Account creation');
+      } catch (error) {
+        return fail(error, 'Could not create your account.');
       }
     },
 

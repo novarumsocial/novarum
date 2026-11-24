@@ -19,7 +19,17 @@ const anchorInfoSchema = z.object({
   homeserver: z.string(),
   baseUrl: z.url(),
   version: z.string().optional(),
+  // older homeservers have no single sign-on and no invite-only mode
+  auth: z
+    .object({
+      passwordSignup: z.boolean(),
+      inviteOnly: z.boolean(),
+      providers: z.array(z.object({ id: z.string(), name: z.string() })),
+    })
+    .default({ passwordSignup: true, inviteOnly: false, providers: [] }),
 });
+
+export type AnchorAuthInfo = z.infer<typeof anchorInfoSchema>['auth'];
 
 export function normalizeHomeServer(homeServerUrl: string) {
   const url = homeServerUrl.trim().replace(/\/+$/, '');

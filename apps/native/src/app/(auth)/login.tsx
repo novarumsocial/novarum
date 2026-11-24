@@ -25,6 +25,8 @@ import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { useAuthParams } from '@/lib/safe-redirect';
+import { SsoButtons } from '@/components/sso-buttons';
+import { useServerAuth } from '@/lib/sso';
 import { useSession, type MfaMethod } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -106,7 +108,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [pickServer, setPickServer] = useState(false);
   const session = useSession();
-  const { add, query, done } = useAuthParams();
+  const { add, query, done, redirect } = useAuthParams();
 
   useEffect(() => {
     if (add) return;
@@ -124,6 +126,9 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
     defaultValues: { homeServer: anchor().homeServer, username: '', password: '' },
   });
+
+  const homeServer = watch('homeServer');
+  const serverAuth = useServerAuth(homeServer);
 
   const submit = handleSubmit(async (data) => {
     setLoading(true);
@@ -415,6 +420,12 @@ export default function Login() {
           <Button size="lg" className="w-full" disabled={loading} onPress={submit}>
             <ButtonLabel loading={loading} loadingText="Signing in…" text="Sign in" icon={LogIn} />
           </Button>
+
+          <SsoButtons
+            homeServer={homeServer}
+            providers={serverAuth?.providers ?? []}
+            redirect={redirect}
+          />
         </View>
       )}
     </AuthCard>

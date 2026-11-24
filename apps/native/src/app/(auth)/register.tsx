@@ -2,7 +2,17 @@
 import { anchor } from '@/lib/anchor';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, type Href } from 'expo-router';
-import { AtSign, CircleCheck, Eye, EyeOff, Lock, Mail, Server, User } from 'lucide-react-native';
+import {
+  AtSign,
+  CircleCheck,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Server,
+  Ticket,
+  User,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Pressable, View } from 'react-native';
@@ -13,6 +23,8 @@ import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { useAuthParams } from '@/lib/safe-redirect';
 import { useSession } from '@/lib/session';
+import { SsoButtons } from '@/components/sso-buttons';
+import { useServerAuth } from '@/lib/sso';
 
 const registerSchema = z
   .object({
@@ -34,6 +46,7 @@ const registerSchema = z
     email: z.email('Enter a valid email.'),
     password: z.string().min(8, 'At least 8 characters.'),
     confirmPassword: z.string().min(1, 'Confirm your password.'),
+    inviteCode: z.string().trim().max(64),
   })
   .refine((data) => data.password === data.confirmPassword, {
     path: ['confirmPassword'],
@@ -54,7 +67,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const session = useSession();
-  const { query, done } = useAuthParams();
+  const { query, done, redirect } = useAuthParams();
 
   const { control, handleSubmit, setFocus } = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -66,6 +79,7 @@ export default function Register() {
       email: '',
       password: '',
       confirmPassword: '',
+      inviteCode: '',
     },
   });
   const [username, homeserver, password, confirmPassword] = useWatch({
@@ -73,6 +87,8 @@ export default function Register() {
     name: ['username', 'homeserver', 'password', 'confirmPassword'],
   });
   const handle = `@${username || 'username'}:${homeserver || 'server'}`;
+  const serverAuth = useServerAuth(homeserver);
+  const passwordSignup = serverAuth?.passwordSignup ?? true;
 
   const submit = handleSubmit(async (data) => {
     setLoading(true);
@@ -84,6 +100,7 @@ export default function Register() {
       displayName: data.displayName,
       email: data.email,
       password: data.password,
+      inviteCode: data.inviteCode,
     });
 
     if (!result.ok) {
@@ -118,23 +135,25 @@ export default function Register() {
     >
       <View className="gap-4">
         <View className="gap-2">
-          <AuthField
-            control={control}
-            name="username"
-            label={
-              <>
-                Username <Required />
-              </>
-            }
-            icon={AtSign}
-            placeholder="alice"
-            autoComplete="username-new"
-            textContentType="username"
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="next"
-            onSubmitEditing={() => setFocus('homeserver')}
-          />
+          {passwordSignup && (
+            <AuthField
+              control={control}
+              name="username"
+              label={
+                <>
+                  Username <Required />
+                </>
+              }
+              icon={AtSign}
+              placeholder="alice"
+              autoComplete="username-new"
+              textContentType="username"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => setFocus('homeserver')}
+            />
+          )}
           <AuthField
             control={control}
             name="homeserver"
@@ -152,95 +171,134 @@ export default function Register() {
             returnKeyType="next"
             onSubmitEditing={() => setFocus('displayName')}
           />
-          <Text className="text-xs text-muted-foreground">
-            Handle preview: <Text className="font-mono text-xs">{handle}</Text>
+          {passwordSignup && (
+            <Text className="text-xs text-muted-foreground">
+              Handle preview: <Text className="font-mono text-xs">{handle}</Text>
+            </Text>
+          )}
+        </View>
+
+        {passwordSignup ? (
+          <>
+            <AuthField
+              control={control}
+              name="displayName"
+              label={
+                <>
+                  Display name <Text className="text-sm text-muted-foreground">(optional)</Text>
+                </>
+              }
+              icon={User}
+              placeholder="Alice"
+              autoComplete="name"
+              textContentType="nickname"
+              maxLength={64}
+              returnKeyType="next"
+              onSubmitEditing={() => setFocus('email')}
+            />
+
+            <AuthField
+              control={control}
+              name="email"
+              label={
+                <>
+                  Email <Required />
+                </>
+              }
+              icon={Mail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => setFocus('password')}
+            />
+
+            <View className="gap-1.5">
+              <AuthField
+                control={control}
+                name="password"
+                label={
+                  <>
+                    Password <Required />
+                  </>
+                }
+                icon={Lock}
+                right={toggle}
+                secureTextEntry={!showPassword}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                autoCapitalize="none"
+                returnKeyType="next"
+                onSubmitEditing={() => setFocus('confirmPassword')}
+              />
+              {password.length >= 8 && <Ok>Looks good</Ok>}
+            </View>
+
+            <View className="gap-1.5">
+              <AuthField
+                control={control}
+                name="confirmPassword"
+                label={
+                  <>
+                    Confirm password <Required />
+                  </>
+                }
+                icon={Lock}
+                secureTextEntry={!showPassword}
+                placeholder="Re-enter your password"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                autoCapitalize="none"
+                returnKeyType="go"
+                onSubmitEditing={submit}
+              />
+              {confirmPassword && confirmPassword === password && <Ok>Matches</Ok>}
+            </View>
+
+            {serverAuth?.inviteOnly && (
+              <View className="gap-1.5">
+                <AuthField
+                  control={control}
+                  name="inviteCode"
+                  label={
+                    <>
+                      Invite code <Required />
+                    </>
+                  }
+                  icon={Ticket}
+                  placeholder="From the server's admins"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text className="text-xs text-muted-foreground">{homeserver} is invite-only.</Text>
+              </View>
+            )}
+
+            <Button size="lg" className="w-full" disabled={loading} onPress={submit}>
+              <ButtonLabel
+                loading={loading}
+                loadingText="Creating account…"
+                text="Create account"
+              />
+            </Button>
+
+            {submitError ? <Text className="text-sm text-destructive">{submitError}</Text> : null}
+          </>
+        ) : (
+          <Text className="text-sm text-muted-foreground">
+            {homeserver} only creates accounts through single sign-on.
           </Text>
-        </View>
+        )}
 
-        <AuthField
-          control={control}
-          name="displayName"
-          label={
-            <>
-              Display name <Text className="text-sm text-muted-foreground">(optional)</Text>
-            </>
-          }
-          icon={User}
-          placeholder="Alice"
-          autoComplete="name"
-          textContentType="nickname"
-          maxLength={64}
-          returnKeyType="next"
-          onSubmitEditing={() => setFocus('email')}
+        <SsoButtons
+          homeServer={homeserver}
+          providers={serverAuth?.providers ?? []}
+          redirect={redirect}
         />
-
-        <AuthField
-          control={control}
-          name="email"
-          label={
-            <>
-              Email <Required />
-            </>
-          }
-          icon={Mail}
-          placeholder="you@example.com"
-          keyboardType="email-address"
-          autoComplete="email"
-          textContentType="emailAddress"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="next"
-          onSubmitEditing={() => setFocus('password')}
-        />
-
-        <View className="gap-1.5">
-          <AuthField
-            control={control}
-            name="password"
-            label={
-              <>
-                Password <Required />
-              </>
-            }
-            icon={Lock}
-            right={toggle}
-            secureTextEntry={!showPassword}
-            placeholder="At least 8 characters"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            autoCapitalize="none"
-            returnKeyType="next"
-            onSubmitEditing={() => setFocus('confirmPassword')}
-          />
-          {password.length >= 8 && <Ok>Looks good</Ok>}
-        </View>
-
-        <View className="gap-1.5">
-          <AuthField
-            control={control}
-            name="confirmPassword"
-            label={
-              <>
-                Confirm password <Required />
-              </>
-            }
-            icon={Lock}
-            secureTextEntry={!showPassword}
-            placeholder="Re-enter your password"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            autoCapitalize="none"
-            returnKeyType="go"
-            onSubmitEditing={submit}
-          />
-          {confirmPassword && confirmPassword === password && <Ok>Matches</Ok>}
-        </View>
-
-        <Button size="lg" className="w-full" disabled={loading} onPress={submit}>
-          <ButtonLabel loading={loading} loadingText="Creating account…" text="Create account" />
-        </Button>
-
-        {submitError ? <Text className="text-sm text-destructive">{submitError}</Text> : null}
       </View>
     </AuthCard>
   );
