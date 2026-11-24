@@ -3,6 +3,8 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { View } from 'react-native';
 import { useAnchor } from '@/lib/anchor';
 import { getErrorMessage } from '@/lib/session';
 import { startSignOn } from '@/lib/sso';
@@ -20,6 +22,7 @@ export function SettingsSso({ onPasswordless }: { onPasswordless?: (value: boole
   const [linked, setLinked] = useState<Identities | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [password, setPassword] = useState('');
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await client.auth.sso.identities.get();
@@ -59,6 +62,18 @@ export function SettingsSso({ onPasswordless }: { onPasswordless?: (value: boole
     await load();
   };
 
+  // the email stays on file, so a password reset can always bring a password back
+  const removePassword = async () => {
+    setBusy('password');
+    setError('');
+    const { error: removeError } = await client.auth.password.delete({ password });
+    if (removeError)
+      setError(getErrorMessage(removeError.value, 'Could not remove your password.'));
+    else setPassword('');
+    setBusy(null);
+    await load();
+  };
+
   return (
     <SettingsGroup
       title="Single sign-on"
@@ -91,6 +106,32 @@ export function SettingsSso({ onPasswordless }: { onPasswordless?: (value: boole
           </SettingsRow>
         );
       })}
+      {linked.hasPassword && linked.identities.length ? (
+        <SettingsRow
+          title="Remove password"
+          description="Sign in only with a linked provider. Two-step verification is turned off, and a password reset can bring a password back."
+          stacked
+        >
+          <View className="flex-row gap-2">
+            <Input
+              className="flex-1"
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              placeholder="Current password"
+              value={password}
+              onChangeText={setPassword}
+            />
+            <Button
+              variant="destructive"
+              disabled={busy !== null || !password}
+              onPress={removePassword}
+            >
+              <Text>Remove</Text>
+            </Button>
+          </View>
+        </SettingsRow>
+      ) : null}
       {error ? <Text className="px-4 py-3 text-xs text-destructive">{error}</Text> : null}
     </SettingsGroup>
   );

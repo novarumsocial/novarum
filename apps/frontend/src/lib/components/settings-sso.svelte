@@ -4,6 +4,7 @@
   import { getErrorMessage } from '$lib/session.svelte';
   import { signOnSupported, startSignOn } from '$lib/sso.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
   import SettingsGroup from './settings-group.svelte';
   import SettingsRow from './settings-row.svelte';
 
@@ -16,6 +17,7 @@
   let linked = $state<Identities | null>(null);
   let busy = $state<string | null>(null);
   let error = $state('');
+  let password = $state('');
 
   // configured providers first, then ones linked before the server dropped them
   const rows = $derived([
@@ -43,6 +45,17 @@
     error = '';
     const { error: unlinkError } = await anchor.client.auth.sso.identities({ provider }).delete();
     if (unlinkError) error = getErrorMessage(unlinkError.value, 'Could not unlink.');
+    busy = null;
+    await load();
+  }
+
+  // the email stays on file, so a password reset can always bring a password back
+  async function removePassword() {
+    busy = 'password';
+    error = '';
+    const { error: removeError } = await anchor.client.auth.password.delete({ password });
+    if (removeError) error = getErrorMessage(removeError.value, 'Could not remove your password.');
+    else password = '';
     busy = null;
     await load();
   }
@@ -75,6 +88,29 @@
         {/if}
       </SettingsRow>
     {/each}
+    {#if linked.hasPassword && linked.identities.length}
+      <SettingsRow
+        title="Remove password"
+        description="Sign in only with a linked provider. Two-step verification is turned off, and a password reset can bring a password back."
+        stacked
+      >
+        <div class="flex gap-2">
+          <Input
+            type="password"
+            autocomplete="current-password"
+            placeholder="Current password"
+            bind:value={password}
+            class="h-9"
+          />
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={busy !== null || !password}
+            onclick={removePassword}>Remove</Button
+          >
+        </div>
+      </SettingsRow>
+    {/if}
     {#if error}
       <p class="px-4 py-3 text-xs text-destructive">{error}</p>
     {/if}
