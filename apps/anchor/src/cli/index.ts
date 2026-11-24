@@ -1,15 +1,17 @@
 import { parseArgs } from 'node:util';
-import { db, guilds, users } from '../db';
+import { db, guilds, signupInvites, users } from '../db';
 import { and, eq } from 'drizzle-orm';
 import { getConfig } from '../../utils/config';
 import { getAverageColor } from 'fast-average-color-node';
 import { processImage } from '../../utils/optimizeWebp';
 import { storage } from '../../utils/services/storage';
 import { generateKeys } from '../../utils/keys';
+import { randomString } from '../../utils/randomString';
 
-const { positionals } = parseArgs({
+const { positionals, values } = parseArgs({
   args: Bun.argv.slice(3),
   allowPositionals: true,
+  options: { uses: { type: 'string' }, days: { type: 'string' } },
 });
 const homeserver = getConfig().server.homeserver;
 
@@ -219,6 +221,40 @@ if (command === 'rotate-keys') {
     `generated federation key ${id}; remotes pick it up on their next unknown-key refresh.`
   );
   process.exit(0);
+}
+
+if (command === 'create-signup-invite') {
+  const maxUses = values.uses ? Number(values.uses) : null;
+  const days = values.days ? Number(values.days) : null;
+  if ([maxUses, days].some((n) => n !== null && !(Number.isInteger(n) && n > 0))) {
+    console.error('--uses and --days must be positive whole numbers.');
+    process.exit(1);
+  }
+  const [invite] = await db
+    .insert(signupInvites)
+    .values({
+      code: randomString(),
+      maxUses,
+      expiresAt: days ? new Date(Date.now() + days * 24 * 60 * 60_000) : null,
+    })
+    .returning();
+  console.log(invite!.code);
+  process.exit(0);
+}
+
+if (command === 'list-signup-invites') {
+  for (const invite of await db.select().from(signupInvites)) {
+    const uses = `${invite.uses}/${invite.maxUses ?? '∞'} uses`;
+    const expiry = invite.expiresAt ? `expires ${invite.expiresAt.toISOString()}` : 'no expiry';
+    console.log(`${invite.code}  ${uses}  ${expiry}`);
+  }
+  process.exit(0);
+}
+
+if (command === 'revoke-signup-invite' && arg1) {
+  const deleted = await db.delete(signupInvites).where(eq(signupInvites.code, arg1)).returning();
+  console.log(deleted.length ? `revoked ${arg1}.` : `no invite ${arg1}.`);
+  process.exit(deleted.length ? 0 : 1);
 }
 
 console.log('no valid command, check docs');

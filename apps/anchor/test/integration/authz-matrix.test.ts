@@ -10,7 +10,21 @@ import { addBot, createBot } from '../harness/bots';
 
 let anchor: RunningAnchor;
 beforeAll(async () => {
-  anchor = await spawnAnchor({ name: 'authz' });
+  anchor = await spawnAnchor({
+    name: 'authz',
+    config: {
+      auth: {
+        providers: {
+          idp: {
+            name: 'IdP',
+            issuer: 'http://127.0.0.1:1',
+            client_id: 'anchor',
+            client_secret: 'secret',
+          },
+        },
+      },
+    },
+  });
 });
 afterAll(() => anchor.destroy());
 
@@ -560,5 +574,38 @@ describe('group DM routes', () => {
     expect((await create(anonymous(anchor.url), [friend.user.id])).status).toBe(401);
     expect((await create(a, [stranger.user.id])).status).toBe(403);
     expect((await create(a, [friend.user.id])).status).toBe(200);
+  });
+});
+
+// linked sign-on providers belong to the session's own user; bots and other users never reach them
+describe('single sign-on identity routes', () => {
+  const cells = [
+    { method: 'GET', path: '/auth/sso/identities' },
+    { method: 'DELETE', path: '/auth/sso/identities/idp' },
+    {
+      method: 'POST',
+      path: '/auth/sso/authorize',
+      body: { provider: 'idp', redirectUri: 'https://app.novarum.me/sso', link: true },
+    },
+  ];
+
+  for (const cell of cells) {
+    test(`${cell.method} ${cell.path}: anonymous and bots are 401`, async () => {
+      const owner = await signup(anchor.url);
+      const bot = await createBot(owner);
+      for (const actor of [anonymous(anchor.url), bot]) {
+        const res = await call(actor, cell.method, cell.path, cell.body);
+        expect(res.status, JSON.stringify(res.body)).toBe(401);
+      }
+    });
+  }
+
+  test('a user only ever sees their own linked providers', async () => {
+    const [a, b] = await Promise.all([signup(anchor.url), signup(anchor.url)]);
+    expect((await call(a, 'GET', '/auth/sso/identities')).body).toEqual({
+      hasPassword: true,
+      identities: [],
+    });
+    expect((await call(b, 'DELETE', '/auth/sso/identities/idp')).status).toBe(404);
   });
 });

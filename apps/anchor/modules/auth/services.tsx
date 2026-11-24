@@ -11,7 +11,7 @@ import {
   validateSessionToken,
 } from './provider';
 import { getConfig } from '../../utils/config';
-import { db, emailOtps, localCredentials, sessions, users } from '../../src/db';
+import { db, emailOtps, localCredentials, sessions, signupInvites, users } from '../../src/db';
 import { publicUser, publicUserSchema } from '../../utils/publicUser';
 import { z } from 'zod';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -41,7 +41,7 @@ const sessionId = (request: Request) =>
     new Bun.CookieMap(request.headers.get('cookie') ?? '').get(sessionCookieName) ?? ''
   )?.sessionId ?? '';
 
-const authRateLimit = (
+export const authRateLimit = (
   path: string,
   max: number,
   duration: number,
@@ -69,7 +69,7 @@ export const userResponseSchema = publicUserSchema.omit({ userId: true }).extend
   handle: z.string(),
   email: z.string().nullable(),
 });
-const userPayloadResponseSchema = z.object({ user: userResponseSchema });
+export const userPayloadResponseSchema = z.object({ user: userResponseSchema });
 const mfaChallengeResponseSchema = z.object({
   mfaRequired: z.literal(true),
   challenge: z.string(),
@@ -90,9 +90,17 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
   .post(
     '/signup',
     async ({ body, cookie, status }) => {
-      const { username, displayName, email, password } = body;
-      const homeserver = getConfig().server.homeserver;
+      const { username, displayName, email, password, inviteCode } = body;
+      const { server, auth } = getConfig();
+      const homeserver = server.homeserver;
       const now = new Date();
+
+      if (!auth.password_signup) {
+        return status(403, { error: 'Sign-up with a password is disabled on this server' });
+      }
+      if (auth.invite_only && !inviteCode) {
+        return status(403, { error: 'This server is invite-only. Enter an invite code.' });
+      }
 
       const existingCredential = await db.query.localCredentials.findFirst({
         where: {
@@ -113,28 +121,29 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         return status(409, { error: 'Username is already taken' });
       }
 
-      const [user] = await db
-        .insert(users)
-        .values({
-          id: randomString(),
-          username,
-          homeserver,
-          displayName: displayName || null,
-          avatarUrl: null,
-          isBot: false,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!user) {
-        return status(500, { error: 'Failed to create user' });
-      }
+      const passwordHash = await Bun.password.hash(password);
+      const user = await db.transaction(async (tx) => {
+        if (auth.invite_only && !(await useSignupInvite(tx, inviteCode!))) return null;
 
-      await db.insert(localCredentials).values({
-        userId: user.id,
-        email,
-        passwordHash: await Bun.password.hash(password),
+        const [user] = await tx
+          .insert(users)
+          .values({
+            id: randomString(),
+            username,
+            homeserver,
+            displayName: displayName || null,
+            avatarUrl: null,
+            isBot: false,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        await tx.insert(localCredentials).values({ userId: user!.id, email, passwordHash });
+        return user!;
       });
+      if (!user) {
+        return status(403, { error: 'That invite code is invalid, used up or expired' });
+      }
 
       const session = await createSession(user.id);
       const sessionCookie = createSessionCookie(session.token);
@@ -154,11 +163,12 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         displayName: t.Optional(t.String({ maxLength: 64 })),
         email: t.String({ type: 'email' }),
         password: t.String({ minLength: 8 }),
+        inviteCode: t.Optional(t.String({ maxLength: 64 })),
       }),
       response: {
         200: userPayloadResponseSchema,
+        403: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
-        500: genericResponseErrorSchema,
       },
     }
   )
@@ -866,6 +876,22 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       },
     }
   );
+
+/** counts one use of a signup invite, if it still has one left */
+async function useSignupInvite(tx: Pick<typeof db, 'update'>, code: string) {
+  const [invite] = await tx
+    .update(signupInvites)
+    .set({ uses: sql`${signupInvites.uses} + 1` })
+    .where(
+      and(
+        eq(signupInvites.code, code),
+        or(isNull(signupInvites.maxUses), lt(signupInvites.uses, signupInvites.maxUses)),
+        or(isNull(signupInvites.expiresAt), gt(signupInvites.expiresAt, new Date()))
+      )
+    )
+    .returning({ code: signupInvites.code });
+  return Boolean(invite);
+}
 
 async function claimTotpCounter(userId: string, counter: number) {
   const [claimed] = await db

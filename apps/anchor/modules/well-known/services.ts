@@ -9,6 +9,7 @@ export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Wel
   '/info',
   async () => {
     const { homeserver, base_url: baseUrl } = getConfig().server;
+    const { auth } = getConfig();
     const { publicKey, id } = await getKeys();
 
     return {
@@ -27,6 +28,11 @@ export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Wel
       baseUrl,
       version,
       features: [...federationFeatures],
+      auth: {
+        passwordSignup: auth.password_signup,
+        inviteOnly: auth.invite_only,
+        providers: Object.entries(auth.providers).map(([id, { name }]) => ({ id, name })),
+      },
     };
   },
   {
@@ -47,6 +53,11 @@ export const wellKnown = new Elysia({ prefix: '/.well-known/anchor', tags: ['Wel
         baseUrl: z.url(),
         version: z.string(),
         features: z.array(z.string()),
+        auth: z.object({
+          passwordSignup: z.boolean(),
+          inviteOnly: z.boolean(),
+          providers: z.array(z.object({ id: z.string(), name: z.string() })),
+        }),
       }),
     },
   }

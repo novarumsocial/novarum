@@ -6,9 +6,15 @@ import { anchorRoot, s3Endpoint, smtpPort, livekitUrl } from './env';
 type Json = string | number | boolean | Json[] | { [key: string]: Json };
 
 const value = (v: Json): string =>
-  Array.isArray(v) ? `[${v.map(value).join(', ')}]` : JSON.stringify(v);
+  Array.isArray(v)
+    ? `[${v.map(value).join(', ')}]`
+    : typeof v === 'object'
+      ? `{ ${Object.entries(v)
+          .map(([k, inner]) => `${JSON.stringify(k)} = ${value(inner)}`)
+          .join(', ')} }`
+      : JSON.stringify(v);
 
-/** tiny TOML writer: tables of scalars/arrays, which is all anchor's config uses */
+/** tiny TOML writer: tables of scalars, arrays and inline tables, which is all anchor's config uses */
 export function stringifyToml(data: Record<string, Record<string, Json>>) {
   return Object.entries(data)
     .map(
@@ -30,6 +36,7 @@ export type ConfigOverrides = {
   email?: Record<string, Json>;
   bots?: Record<string, Json>;
   dms?: Record<string, Json>;
+  auth?: Record<string, Json>;
 };
 
 /** reads test/config.toml, applies overrides, writes it to dir/config.toml and returns the path */
