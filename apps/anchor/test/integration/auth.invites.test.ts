@@ -110,7 +110,12 @@ describe('invite-only homeserver', () => {
   // invite-only gates password signups; accounts from the configured providers are trusted
   test('single sign-on signups do not need an invite', async () => {
     const username = uniqueName('sso');
-    idp.as({ sub: 'invite-free', preferred_username: username });
+    idp.as({
+      sub: 'invite-free',
+      preferred_username: username,
+      email: `${username}@idp.test`,
+      email_verified: true,
+    });
     const { code, verifier } = await ssoRedirect(inviteOnly, 'idp');
     expect((await ssoSignup(inviteOnly, { code: code!, verifier, username })).status).toBe(200);
   });
@@ -125,7 +130,12 @@ describe('password signup disabled', () => {
 
   test('single sign-on still creates accounts', async () => {
     const username = uniqueName('sso');
-    idp.as({ sub: 'sso-only', preferred_username: username });
+    idp.as({
+      sub: 'sso-only',
+      preferred_username: username,
+      email: `${username}@idp.test`,
+      email_verified: true,
+    });
     const { code, verifier } = await ssoRedirect(ssoOnly, 'idp');
     expect((await exchange(ssoOnly, code!, verifier)).status).toBe(200);
     expect((await ssoSignup(ssoOnly, { code: code!, verifier, username })).status).toBe(200);

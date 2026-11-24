@@ -122,7 +122,9 @@ describe('getConfig', () => {
       (c) => (c.auth = { providers: { pocketid: oidc, github: oauth2 } })
     ).auth;
     expect(providers.pocketid).toMatchObject({ scopes: ['openid', 'profile', 'email'] });
+    expect(providers.pocketid).toMatchObject({ trust_email: false });
     expect(providers.github).toMatchObject({
+      trust_email: false,
       subject_field: 'id',
       username_field: 'login',
       scopes: [],

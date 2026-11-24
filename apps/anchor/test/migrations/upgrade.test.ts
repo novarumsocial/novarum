@@ -373,6 +373,22 @@ const specs: Record<string, Spec> = {
       expect(await rows(url, `SELECT 1 FROM sso_flow`)).toHaveLength(0);
     },
   },
+  '20261124204644_optional_password': {
+    check: async (url) => {
+      // existing passwords are kept, and a credential can now hold just the email
+      expect(
+        await rows(url, `SELECT 1 FROM local_credential WHERE "passwordHash" IS NULL`)
+      ).toHaveLength(0);
+      await query(url, `UPDATE local_credential SET "passwordHash" = NULL WHERE "userId" = 'u3'`);
+      expect(
+        await rows(
+          url,
+          `SELECT 1 FROM local_credential WHERE "userId" = 'u3' AND email = 'u3@example.test'`
+        )
+      ).toHaveLength(1);
+      expect(await rows(url, `SELECT 1 FROM sso_identity WHERE "userId" = 'u3'`)).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

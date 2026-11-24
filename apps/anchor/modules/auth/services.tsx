@@ -87,6 +87,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
   .use(authRateLimit('/mfa/totp/toggle', 10, 15 * 60_000, sessionId))
   .use(authRateLimit('/mfa/email/toggle', 10, 15 * 60_000, sessionId))
   .use(authRateLimit('/mfa/totp', 10, 15 * 60_000, sessionId))
+  .use(authRateLimit('/password', 10, 15 * 60_000, sessionId))
   .post(
     '/signup',
     async ({ body, cookie, status }) => {
@@ -197,7 +198,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         return status(401, { error: 'Invalid username or password' });
       }
 
-      const validPassword = await Bun.password.verify(password, credential.passwordHash);
+      const validPassword = await verifyPassword(password, credential.passwordHash);
       if (!validPassword) {
         return status(401, { error: 'Invalid username or password' });
       }
@@ -632,7 +633,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
-      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+      if (!(await verifyPassword(body.password, localCreds.passwordHash))) {
         return status(403, { error: 'Incorrect password' });
       }
 
@@ -708,7 +709,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
-      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+      if (!(await verifyPassword(body.password, localCreds.passwordHash))) {
         return status(403, { error: 'Incorrect password' });
       }
 
@@ -761,7 +762,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
-      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+      if (!(await verifyPassword(body.password, localCreds.passwordHash))) {
         return status(403, { error: 'Incorrect password' });
       }
 
@@ -814,7 +815,7 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       if (!localCreds) {
         return status(404, { error: 'User not found' });
       }
-      if (!(await Bun.password.verify(body.password, localCreds.passwordHash))) {
+      if (!(await verifyPassword(body.password, localCreds.passwordHash))) {
         return status(403, { error: 'Incorrect password' });
       }
       if (!localCreds.totpSecret) {
@@ -843,6 +844,45 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
         401: genericResponseErrorSchema,
         403: genericResponseErrorSchema,
         404: genericResponseErrorSchema,
+      },
+    }
+  )
+  .delete(
+    '/password',
+    async ({ body, cookie, status }) => {
+      const session = await validateSessionToken(cookie[sessionCookieName]?.value as string);
+      if (!session) return status(401, { error: 'Unauthorized' });
+
+      // the user row lock keeps a concurrent unlink from removing the last sign-on provider meanwhile
+      const error = await db.transaction(async (tx) => {
+        await tx.select().from(users).where(eq(users.id, session.userId)).for('update');
+        const [credential, identity] = await Promise.all([
+          tx.query.localCredentials.findFirst({ where: { userId: session.userId } }),
+          tx.query.ssoIdentities.findFirst({ where: { userId: session.userId } }),
+        ]);
+        if (!credential || !(await verifyPassword(body.password, credential.passwordHash))) {
+          return status(401, { error: 'Invalid password' });
+        }
+        if (!identity) {
+          return status(409, {
+            error: 'Link a single sign-on provider before removing your password',
+          });
+        }
+
+        // two-step verification protects password sign-ins, so it goes with the password
+        await tx
+          .update(localCredentials)
+          .set({ passwordHash: null, mfaOptions: [], totpSecret: null, totpLastCounter: null })
+          .where(eq(localCredentials.userId, session.userId));
+      });
+      return error ?? { success: true };
+    },
+    {
+      body: t.Object({ password: t.String({ maxLength: 1024 }) }),
+      response: {
+        200: z.object({ success: z.boolean() }),
+        401: genericResponseErrorSchema,
+        409: genericResponseErrorSchema,
       },
     }
   )
@@ -876,6 +916,10 @@ export const auth = new Elysia({ prefix: '/auth', tags: ['Auth'] })
       },
     }
   );
+
+/** an account that moved to single sign-on has no password, which nothing matches */
+const verifyPassword = (password: string, hash: string | null) =>
+  hash ? Bun.password.verify(password, hash) : Promise.resolve(false);
 
 /** counts one use of a signup invite, if it still has one left */
 async function useSignupInvite(tx: Pick<typeof db, 'update'>, code: string) {

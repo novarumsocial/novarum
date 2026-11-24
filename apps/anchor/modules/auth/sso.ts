@@ -2,7 +2,7 @@ import Elysia, { t } from 'elysia';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 import { and, eq, gt, isNull, lt } from 'drizzle-orm';
-import { db, ssoFlows, ssoIdentities, users } from '../../src/db';
+import { db, localCredentials, ssoFlows, ssoIdentities, users } from '../../src/db';
 import { getConfig } from '../../utils/config';
 import { randomString } from '../../utils/randomString';
 import { genericResponseErrorSchema } from '../../utils/genericResponseError';
@@ -61,43 +61,62 @@ function configuration(id: string, provider: Provider) {
 const profileSchema = z.looseObject({
   sub: z.union([z.string(), z.number()]).optional(),
   email: z.string().nullish(),
+  // OIDC says email_verified, some plain OAuth 2 providers (Discord) say verified
   email_verified: z.boolean().optional(),
+  verified: z.boolean().optional(),
   name: z.string().nullish(),
   preferred_username: z.string().nullish(),
 });
 
-/** who the provider says signed in */
+const emailListSchema = z.array(
+  z.looseObject({ email: z.string(), primary: z.boolean().optional(), verified: z.boolean() })
+);
+
+/** who the provider says signed in; the email is only kept when the provider vouches for it */
 async function identify(provider: Provider, config: oidc.Configuration, url: URL, flow: Flow) {
   const tokens = await oidc.authorizationCodeGrant(config, url, {
     pkceCodeVerifier: flow.pkceVerifier,
     expectedState: flow.id,
     ...(isOidc(provider) && { expectedNonce: flow.nonce, idTokenExpected: true }),
   });
+  const fetchJson = async (endpoint: string) =>
+    (
+      await oidc.fetchProtectedResource(config, tokens.access_token, new URL(endpoint), 'GET')
+    ).json();
+  const verifiedEmail = (email: string | null | undefined, verified: boolean | undefined) =>
+    email && (verified || provider.trust_email) ? email : null;
 
   if ('issuer' in provider) {
-    const claims = profileSchema.parse(tokens.claims());
+    const idToken = profileSchema.parse(tokens.claims());
+    // some providers (Authelia) only put the email in the userinfo response
+    const claims =
+      idToken.email || !config.serverMetadata().userinfo_endpoint
+        ? idToken
+        : profileSchema.parse(
+            await oidc.fetchUserInfo(config, tokens.access_token, String(idToken.sub))
+          );
     return {
-      subject: String(claims.sub),
-      email: claims.email_verified === false ? null : (claims.email ?? null),
+      subject: String(idToken.sub),
+      email: verifiedEmail(claims.email, claims.email_verified),
       username: claims.preferred_username ?? claims.email?.split('@')[0] ?? null,
       displayName: claims.name ?? null,
     };
   }
 
-  const response = await oidc.fetchProtectedResource(
-    config,
-    tokens.access_token,
-    new URL(provider.userinfo_endpoint),
-    'GET'
-  );
-  const profile = z.record(z.string(), z.unknown()).parse(await response.json());
+  const profile = z
+    .record(z.string(), z.unknown())
+    .parse(await fetchJson(provider.userinfo_endpoint));
   const field = (name: string) => z.union([z.string(), z.number()]).nullish().parse(profile[name]);
   const subject = field(provider.subject_field);
   if (subject == null || subject === '') throw new Error('the provider returned no user id');
-  const { email, name } = profileSchema.parse(profile);
+  const { email, email_verified, verified, name } = profileSchema.parse(profile);
+  const emails = provider.emails_endpoint
+    ? emailListSchema.parse(await fetchJson(provider.emails_endpoint))
+    : [];
+  const listed = emails.find((e) => e.primary && e.verified) ?? emails.find((e) => e.verified);
   return {
     subject: String(subject),
-    email: email ?? null,
+    email: listed?.email ?? verifiedEmail(email, email_verified ?? verified),
     username: field(provider.username_field)?.toString() ?? null,
     displayName: name ?? null,
   };
@@ -129,6 +148,25 @@ const pendingFlow = (code: string, verifier: string) =>
   db.query.ssoFlows.findFirst({
     where: { code, verifier, expiresAt: { gt: new Date() } },
   });
+
+/** why a provider account can't become a new user here, if it can't */
+async function signupProblem(flow: Flow) {
+  const name = getConfig().auth.providers[flow.provider]?.name ?? flow.provider;
+  if (!flow.email) {
+    return {
+      code: 403 as const,
+      error: `Your ${name} account has no verified email address. Add one there and try again.`,
+    };
+  }
+  const taken = await db.query.localCredentials.findFirst({ where: { email: flow.email } });
+  if (taken) {
+    return {
+      code: 409 as const,
+      error: `An account with ${flow.email} already exists. Sign in to it, then link ${name} in Settings → Privacy & security.`,
+    };
+  }
+  return null;
+}
 
 const sessionUser = (cookie: Record<string, { value?: unknown }>) =>
   validateSessionToken(cookie[sessionCookieName]?.value as string | undefined);
@@ -294,12 +332,18 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
         };
       }
 
+      const problem = await signupProblem(flow);
+      if (problem) {
+        await db.delete(ssoFlows).where(eq(ssoFlows.id, flow.id));
+        return status(problem.code, { error: problem.error });
+      }
+
       return {
         status: 'signup' as const,
         provider: name,
         username: flow.username,
         displayName: flow.displayName,
-        email: flow.email,
+        email: flow.email!,
       };
     },
     {
@@ -313,10 +357,11 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
             provider: z.string(),
             username: z.string().nullable(),
             displayName: z.string().nullable(),
-            email: z.string().nullable(),
+            email: z.string(),
           }),
         ]),
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
       },
     }
@@ -328,6 +373,9 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
       if (!flow?.subject || flow.linkUserId) {
         return status(401, { error: 'This sign-in attempt has expired' });
       }
+
+      const problem = await signupProblem(flow);
+      if (problem) return status(problem.code, { error: problem.error });
 
       const homeserver = getConfig().server.homeserver;
       const taken = await db.query.users.findFirst({
@@ -367,6 +415,8 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
             .onConflictDoNothing()
             .returning();
           if (!identity) tx.rollback();
+          // the email on file, for password resets; there is no password until one is set that way
+          await tx.insert(localCredentials).values({ userId: user!.id, email: flow.email! });
           return user!;
         })
         .catch(() => null);
@@ -374,7 +424,7 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
         return status(409, { error: 'This account was already created. Sign in instead.' });
 
       await signIn(cookie, user.id);
-      return { user: userResponse(user) };
+      return { user: userResponse(user, flow.email) };
     },
     {
       body: t.Object({
@@ -385,6 +435,7 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
       response: {
         200: userPayloadResponseSchema,
         401: genericResponseErrorSchema,
+        403: genericResponseErrorSchema,
         409: genericResponseErrorSchema,
       },
     }
@@ -401,7 +452,7 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
       ]);
       const providers = getConfig().auth.providers;
       return {
-        hasPassword: Boolean(credential),
+        hasPassword: Boolean(credential?.passwordHash),
         identities: identities.map((identity) => ({
           provider: identity.provider,
           name: providers[identity.provider]?.name ?? identity.provider,
@@ -441,7 +492,7 @@ export const sso = new Elysia({ prefix: '/auth/sso', tags: ['Auth'] })
           tx.query.localCredentials.findFirst({ where: { userId: session.userId } }),
         ]);
         if (!identities.some((identity) => identity.provider === params.provider)) return 404;
-        if (!credential && identities.length === 1) return 409;
+        if (!credential?.passwordHash && identities.length === 1) return 409;
 
         await tx
           .delete(ssoIdentities)

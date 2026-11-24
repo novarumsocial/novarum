@@ -8,6 +8,8 @@ export type IdpUser = {
   email_verified?: boolean;
   name?: string;
   preferred_username?: string;
+  /** leave the email out of the id token, so it has to come from the userinfo endpoint */
+  emailInUserinfoOnly?: boolean;
 };
 
 /**
@@ -34,7 +36,7 @@ export async function startIdp() {
             issuer,
             authorization_endpoint: `${issuer}/authorize`,
             token_endpoint: `${issuer}/token`,
-            userinfo_endpoint: `${issuer}/user`,
+            userinfo_endpoint: `${issuer}/userinfo`,
             jwks_uri: `${issuer}/jwks`,
             response_types_supported: ['code'],
             subject_types_supported: ['public'],
@@ -75,7 +77,11 @@ export async function startIdp() {
           }
           const accessToken = crypto.randomUUID();
           tokens.set(accessToken, grant.user);
-          const idToken = await new SignJWT({ ...grant.user, nonce: grant.nonce })
+          const { emailInUserinfoOnly, ...claims } = grant.user;
+          const tokenClaims = emailInUserinfoOnly
+            ? { ...claims, email: undefined, email_verified: undefined }
+            : claims;
+          const idToken = await new SignJWT({ ...tokenClaims, nonce: grant.nonce })
             .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
             .setIssuer(issuer)
             .setAudience(String(form.get('client_id')))
@@ -88,16 +94,35 @@ export async function startIdp() {
             ...(grant.nonce && { id_token: idToken }),
           });
         }
+        case '/userinfo': {
+          const user = tokens.get(request.headers.get('authorization')?.split(' ')[1] ?? '');
+          if (!user) return new Response(null, { status: 401 });
+          const { emailInUserinfoOnly: _, ...claims } = user;
+          return Response.json(claims);
+        }
         case '/user': {
           const user = tokens.get(request.headers.get('authorization')?.split(' ')[1] ?? '');
           if (!user) return new Response(null, { status: 401 });
-          // shaped like GitHub's GET /user: a numeric id and a login instead of sub/preferred_username
+          // shaped like GitHub's GET /user: a numeric id and a login instead of sub/preferred_username,
+          // and no email (GitHub only shows a public one; the real ones are at /user/emails)
           return Response.json({
             id: Number(user.sub),
             login: user.preferred_username,
             name: user.name ?? null,
-            email: user.email ?? null,
+            email: null,
           });
+        }
+        case '/emails': {
+          const user = tokens.get(request.headers.get('authorization')?.split(' ')[1] ?? '');
+          if (!user) return new Response(null, { status: 401 });
+          return Response.json(
+            user.email
+              ? [
+                  { email: `old-${user.email}`, primary: false, verified: true },
+                  { email: user.email, primary: true, verified: user.email_verified !== false },
+                ]
+              : []
+          );
         }
       }
       return new Response(null, { status: 404 });
@@ -110,8 +135,26 @@ export async function startIdp() {
     /** anchor config.toml providers: an OpenID Connect one and a plain OAuth 2 one */
     providers: {
       idp: { name: 'Fake IdP', issuer, client_id: 'anchor', client_secret: 'secret' },
+      // the same provider, configured to take emails it doesn't mark verified
+      trusting: {
+        name: 'Trusting IdP',
+        issuer,
+        client_id: 'anchor',
+        client_secret: 'secret',
+        trust_email: true,
+      },
       hub: {
         name: 'FakeHub',
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        userinfo_endpoint: `${issuer}/user`,
+        emails_endpoint: `${issuer}/emails`,
+        client_id: 'anchor',
+        client_secret: 'secret',
+      },
+      // GitHub-like without the emails endpoint: it never learns an email
+      bare: {
+        name: 'BareHub',
         authorization_endpoint: `${issuer}/authorize`,
         token_endpoint: `${issuer}/token`,
         userinfo_endpoint: `${issuer}/user`,

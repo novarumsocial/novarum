@@ -582,6 +582,7 @@ describe('single sign-on identity routes', () => {
   const cells = [
     { method: 'GET', path: '/auth/sso/identities' },
     { method: 'DELETE', path: '/auth/sso/identities/idp' },
+    { method: 'DELETE', path: '/auth/password', body: { password: 'correct-horse-battery' } },
     {
       method: 'POST',
       path: '/auth/sso/authorize',

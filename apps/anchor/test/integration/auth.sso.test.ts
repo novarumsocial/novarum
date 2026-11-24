@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { spawnAnchor, type RunningAnchor } from '../harness/anchor';
 import { meStatus, post, withCookie } from '../harness/http';
-import { parseSetCookie, signup, uniqueName } from '../harness/users';
+import { freshIp, parseSetCookie, signup, uniqueName } from '../harness/users';
+import { latestOtpFor } from '../harness/mail';
 import { appRedirect, exchange, ssoRedirect, ssoSignup, startIdp } from '../harness/sso';
 
 let anchor: RunningAnchor;
@@ -22,6 +23,7 @@ const person = (extra: Partial<Parameters<typeof idp.as>[0]> = {}) => {
   const user = {
     sub: String(1000 + subjects++),
     email: `${username}@idp.test`,
+    email_verified: true,
     name: 'Single Sign',
     preferred_username: username,
     ...extra,
@@ -52,7 +54,9 @@ describe('discovery', () => {
       inviteOnly: false,
       providers: [
         { id: 'idp', name: 'Fake IdP' },
+        { id: 'trusting', name: 'Trusting IdP' },
         { id: 'hub', name: 'FakeHub' },
+        { id: 'bare', name: 'BareHub' },
       ],
     });
   });
@@ -127,6 +131,11 @@ describe('sign up and sign in', () => {
     expect(created.status).toBe(200);
     const { user } = (await created.json()) as any;
     expect(user.displayName).toBe('Picked');
+    expect(user.email).toBe(who.email);
+    const me = await fetch(`${anchor.url}/auth/me`, {
+      headers: withCookie(parseSetCookie(created)!),
+    });
+    expect(((await me.json()) as any).user.email).toBe(who.email);
     expect(await meStatus(anchor.url, parseSetCookie(created)!)).toBe(200);
 
     const again = await ssoRedirect(anchor, 'idp');
@@ -157,18 +166,18 @@ describe('sign up and sign in', () => {
     expect(body).toMatchObject({ status: 'login', user: { id: user.id } });
 
     // the same subject at another provider is a different person
-    idp.as(who);
+    idp.as({ ...who, email: `other-${who.email}` });
     const other = await ssoRedirect(anchor, 'idp');
     expect(
       ((await (await exchange(anchor, other.code!, other.verifier)).json()) as any).status
     ).toBe('signup');
   });
 
-  test('unverified emails and odd usernames are not passed on as-is', async () => {
-    person({ email_verified: false, preferred_username: 'a b!' });
+  test('odd usernames are cleaned up into a suggestion', async () => {
+    person({ preferred_username: 'a b!' });
     const { code, verifier } = await ssoRedirect(anchor, 'idp');
     const body = (await (await exchange(anchor, code!, verifier)).json()) as any;
-    expect(body).toMatchObject({ status: 'signup', email: null, username: 'ab' });
+    expect(body).toMatchObject({ status: 'signup', username: 'ab' });
   });
 
   test('a taken username is refused and the attempt can be retried with another', async () => {
@@ -179,6 +188,75 @@ describe('sign up and sign in', () => {
     expect(clash.status).toBe(409);
     const ok = await ssoSignup(anchor, { code: code!, verifier, username: who.preferred_username });
     expect(ok.status).toBe(200);
+  });
+});
+
+describe('an email on file', () => {
+  const tryProvider = async (provider: string) => {
+    const { code, verifier } = await ssoRedirect(anchor, provider);
+    return { code: code!, verifier, res: await exchange(anchor, code!, verifier) };
+  };
+
+  test('an unverified email is not enough to sign up, and the attempt is dropped', async () => {
+    const who = person({ email_verified: false });
+    const { code, verifier, res } = await tryProvider('idp');
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error).toMatch(/no verified email/);
+    const retry = await ssoSignup(anchor, { code, verifier, username: who.preferred_username });
+    expect(retry.status).toBe(401);
+  });
+
+  test('no email at all is refused too', async () => {
+    person({ email: undefined });
+    expect((await tryProvider('idp')).res.status).toBe(403);
+  });
+
+  test('trust_email takes the email even when the provider does not verify it', async () => {
+    const who = person({ email_verified: false });
+    const { res } = await tryProvider('trusting');
+    expect((await res.json()) as any).toMatchObject({ status: 'signup', email: who.email });
+  });
+
+  test('an OIDC email that is only in the userinfo response is found there', async () => {
+    const who = person({ emailInUserinfoOnly: true });
+    const { res } = await tryProvider('idp');
+    expect((await res.json()) as any).toMatchObject({ status: 'signup', email: who.email });
+  });
+
+  test('plain OAuth 2 takes the primary verified address from the emails endpoint', async () => {
+    const who = person();
+    const { res } = await tryProvider('hub');
+    expect((await res.json()) as any).toMatchObject({ status: 'signup', email: who.email });
+
+    // an unverified primary falls back to another verified address
+    const other = person({ email_verified: false });
+    expect((await (await tryProvider('hub')).res.json()) as any).toMatchObject({
+      email: `old-${other.email}`,
+    });
+  });
+
+  test('without an emails endpoint, a GitHub-like provider gives no email', async () => {
+    person();
+    expect((await tryProvider('bare')).res.status).toBe(403);
+  });
+
+  test('an email that already has an account points to linking instead', async () => {
+    const existing = await signup(anchor.url);
+    person({ email: existing.email });
+    const { code, verifier, res } = await tryProvider('idp');
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as any).error).toMatch(/link Fake IdP in Settings/);
+    const retry = await ssoSignup(anchor, { code, verifier, username: uniqueName() });
+    expect(retry.status).toBe(401);
+  });
+
+  test('the email check also holds at signup, for an account made in between', async () => {
+    const who = person();
+    const { code, verifier, res } = await tryProvider('idp');
+    expect(res.status).toBe(200);
+    await signup(anchor.url, { email: who.email });
+    const late = await ssoSignup(anchor, { code, verifier, username: who.preferred_username });
+    expect(late.status).toBe(409);
   });
 });
 
@@ -304,11 +382,10 @@ describe('unlinking', () => {
     expect((await unlink(cookie, 'idp')).status).toBe(200);
     expect((await identities(cookie)).identities.map((i: any) => i.provider)).toEqual(['hub']);
 
+    // no longer a way in; its email is this account's, so it is pointed back to linking
     idp.as(who);
     const login = await ssoRedirect(anchor, 'idp');
-    expect(
-      ((await (await exchange(anchor, login.code!, login.verifier)).json()) as any).status
-    ).toBe('signup');
+    expect((await exchange(anchor, login.code!, login.verifier)).status).toBe(409);
   });
 
   test('unlinking both providers at once leaves one of them', async () => {
@@ -328,5 +405,105 @@ describe('unlinking', () => {
     expect((await identities(attacker.cookie)).identities).toEqual([]);
     expect((await unlink(attacker.cookie, 'idp')).status).toBe(404);
     expect((await identities(victim)).identities).toHaveLength(1);
+  });
+});
+
+describe('moving a password account to single sign-on', () => {
+  const removePassword = (cookie: string, password: string) =>
+    fetch(`${anchor.url}/auth/password`, {
+      method: 'DELETE',
+      headers: withCookie(cookie, {
+        'content-type': 'application/json',
+        'x-forwarded-for': freshIp(),
+      }),
+      body: JSON.stringify({ password }),
+    });
+  const unlink = (cookie: string, provider: string) =>
+    fetch(`${anchor.url}/auth/sso/identities/${provider}`, {
+      method: 'DELETE',
+      headers: withCookie(cookie),
+    });
+  const login = (username: string, password: string) =>
+    post(anchor.url, '/auth/login', { username, password });
+  const linkIdp = async (cookie: string) => {
+    const who = person();
+    const { code, verifier } = await ssoRedirect(anchor, 'idp', { cookie, link: true });
+    expect((await exchange(anchor, code!, verifier)).status).toBe(200);
+    return who;
+  };
+
+  test('link, drop the password, sign in with the provider, get a password back by reset', async () => {
+    const account = await signup(anchor.url);
+    const who = await linkIdp(account.cookie);
+    const mfa = await post(
+      anchor.url,
+      '/auth/mfa/email/toggle',
+      { password: account.password, enable: true },
+      withCookie(account.cookie)
+    );
+    expect(mfa.status).toBe(200);
+
+    expect((await removePassword(account.cookie, 'not-the-password')).status).toBe(401);
+    expect((await removePassword(account.cookie, account.password)).status).toBe(200);
+
+    expect((await login(account.user.username, account.password)).status).toBe(401);
+    expect(await identities(account.cookie)).toMatchObject({ hasPassword: false });
+    const mfaNow = await fetch(`${anchor.url}/auth/mfa`, { headers: withCookie(account.cookie) });
+    expect(((await mfaNow.json()) as any).mfaOptions).toEqual([]);
+    // the provider is now the only way in, so it stays
+    expect((await unlink(account.cookie, 'idp')).status).toBe(409);
+
+    idp.as(who);
+    const sso = await ssoRedirect(anchor, 'idp');
+    const body = (await (await exchange(anchor, sso.code!, sso.verifier)).json()) as any;
+    expect(body).toMatchObject({
+      status: 'login',
+      user: { id: account.user.id, email: account.email },
+    });
+
+    // the email on file still resets the password
+    const since = Date.now() - 1000;
+    expect(
+      (await post(anchor.url, '/auth/password-reset/request', { email: account.email })).status
+    ).toBe(200);
+    const code = await latestOtpFor(account.email, { since });
+    const reset = await post(anchor.url, '/auth/reset-password', {
+      email: account.email,
+      newPassword: 'a-brand-new-password',
+      verificationCode: Number(code),
+    });
+    expect(reset.status).toBe(200);
+    expect((await login(account.user.username, 'a-brand-new-password')).status).toBe(200);
+  });
+
+  test('the password stays until a provider is linked', async () => {
+    const account = await signup(anchor.url);
+    expect((await removePassword(account.cookie, account.password)).status).toBe(409);
+    expect((await login(account.user.username, account.password)).status).toBe(200);
+  });
+
+  test('an account without a password has nothing to remove', async () => {
+    const { cookie } = await signUpVia('idp');
+    expect((await removePassword(cookie, 'anything-at-all')).status).toBe(401);
+  });
+
+  test('dropping the password and unlinking at once never locks the account', async () => {
+    const account = await signup(anchor.url);
+    await linkIdp(account.cookie);
+    await Promise.all([
+      removePassword(account.cookie, account.password),
+      unlink(account.cookie, 'idp'),
+    ]);
+    const after = (await identities(account.cookie)) as any;
+    expect(after.hasPassword || after.identities.length > 0).toBe(true);
+  });
+
+  test('needs a session', async () => {
+    const res = await fetch(`${anchor.url}/auth/password`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'x' }),
+    });
+    expect(res.status).toBe(401);
   });
 });

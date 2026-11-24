@@ -16,6 +16,8 @@ const ssoProviderSchema = z.union([
     client_id: z.string().min(1),
     client_secret: z.string().min(1),
     scopes: z.array(z.string()).optional().default(['openid', 'profile', 'email']),
+    // take the email even when the provider doesn't mark it verified (for providers that never do)
+    trust_email: z.boolean().optional().default(false),
   }),
   // plain OAuth 2 (GitHub and the like): the identity comes from the userinfo endpoint
   z.object({
@@ -28,6 +30,9 @@ const ssoProviderSchema = z.union([
     scopes: z.array(z.string()).optional().default([]),
     subject_field: z.string().optional().default('id'),
     username_field: z.string().optional().default('login'),
+    // a GitHub-style list of { email, primary, verified }, for providers that keep emails apart
+    emails_endpoint: endpoint.optional(),
+    trust_email: z.boolean().optional().default(false),
   }),
 ]);
 

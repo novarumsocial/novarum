@@ -75,7 +75,8 @@ export const localCredentials = pgTable('local_credential', {
     }),
 
   email: text('email').notNull().unique(),
-  passwordHash: text('passwordHash').notNull(),
+  // null once the user moved to single sign-on; a password reset sets one again
+  passwordHash: text('passwordHash'),
 
   totpSecret: bytea('totpSecret'),
   totpLastCounter: integer('totpLastCounter'),
