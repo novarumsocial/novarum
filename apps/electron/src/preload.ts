@@ -53,6 +53,7 @@ const api: ElectronAPI = {
   appReady: () => ipcRenderer.send('app:ready'),
   getVersion: () => ipcRenderer.invoke('version:get'),
   setBadgeCount: (count) => ipcRenderer.invoke('badge:set', count),
+  signOn: (url) => ipcRenderer.invoke('sso:open', url),
   platform: process.platform,
   behindSplash: process.argv.includes('--behind-splash'),
   venmic: {

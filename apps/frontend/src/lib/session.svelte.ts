@@ -16,6 +16,14 @@ type SignupInput = {
   displayName?: string;
   email: string;
   password: string;
+  inviteCode?: string;
+};
+
+type SignOnSignupInput = {
+  code: string;
+  verifier: string;
+  username: string;
+  displayName?: string;
 };
 
 type SessionResult =
@@ -175,6 +183,7 @@ class SessionState {
         displayName: input.displayName,
         email: input.email,
         password: input.password,
+        inviteCode: input.inviteCode || undefined,
       });
 
       if (error) {
@@ -191,6 +200,40 @@ class SessionState {
       return { ok: false, error: this.error };
     } finally {
       this.loading = false;
+    }
+  }
+
+  /** redeems what the sign-on provider sent back; a known account is signed in right away */
+  async finishSignOn(code: string, verifier: string) {
+    try {
+      const { data, error } = await anchor.client.auth.sso.exchange.post({ code, verifier });
+      if (error) {
+        return {
+          ok: false as const,
+          error: getErrorMessage(error.value, 'Could not finish signing in.'),
+        };
+      }
+      if (data.status !== 'login') return { ok: true as const, result: data };
+
+      const session = await this.verifyNewSession('Sign-in');
+      return session.ok ? { ok: true as const, result: data } : session;
+    } catch (error) {
+      return { ok: false as const, error: getErrorMessage(error, 'Could not finish signing in.') };
+    }
+  }
+
+  async signOnSignup(input: SignOnSignupInput): Promise<SessionResult> {
+    try {
+      const { error } = await anchor.client.auth.sso.signup.post(input);
+      if (error) {
+        return {
+          ok: false,
+          error: getErrorMessage(error.value, 'Could not create your account.'),
+        };
+      }
+      return await this.verifyNewSession('Account creation');
+    } catch (error) {
+      return { ok: false, error: getErrorMessage(error, 'Could not create your account.') };
     }
   }
 

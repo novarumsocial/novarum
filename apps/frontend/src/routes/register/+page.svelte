@@ -9,7 +9,6 @@
   import Logo from '$lib/assets/favicon.svg';
   import * as Form from '$lib/components/ui/form/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
-  import { Separator } from '$lib/components/ui/separator/index.js';
   import {
     Server,
     AtSign,
@@ -21,10 +20,13 @@
     ArrowRight,
     LoaderCircle,
     CircleCheck,
+    Ticket,
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { page } from '$app/state';
   import { safeRedirect } from '$lib/safeRedirect';
+  import SsoButtons from '$lib/components/sso-buttons.svelte';
+  import { serverAuth } from '$lib/sso.svelte';
 
   const redirectParam = page.url.searchParams.get('redirect');
 
@@ -50,6 +52,7 @@
       email: z.email('Enter a valid email.').default(''),
       password: z.string().min(8, 'At least 8 characters.').default(''),
       confirmPassword: z.string().min(1, 'Confirm your password.').default(''),
+      inviteCode: z.string().trim().max(64).default(''),
     })
     .refine((data) => data.password === data.confirmPassword, {
       path: ['confirmPassword'],
@@ -83,6 +86,7 @@
         displayName: updatedForm.data.displayName,
         email: updatedForm.data.email,
         password: updatedForm.data.password,
+        inviteCode: updatedForm.data.inviteCode,
       });
 
       if (!result.ok) {
@@ -96,6 +100,8 @@
   });
 
   const { form: formData, enhance } = form;
+  const server = serverAuth(() => $formData.homeserver);
+  const passwordSignup = $derived(server.info?.passwordSignup ?? true);
   let handle = $derived(`@${$formData.username || 'username'}:${$formData.homeserver || 'server'}`);
 </script>
 
@@ -137,29 +143,31 @@
       <Card.Content>
         <form method="POST" class="space-y-4" use:enhance>
           <div class="space-y-2">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Form.Field {form} name="username" class="space-y-1.5">
-                <Form.Control>
-                  {#snippet children({ props })}
-                    <Form.Label>Username <span class="text-destructive">*</span></Form.Label>
-                    <div class="relative">
-                      <AtSign
-                        class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                      />
-                      <Input
-                        {...props}
-                        bind:value={$formData.username}
-                        placeholder="alice"
-                        class="pl-8"
-                        autocomplete="username"
-                        spellcheck="false"
-                        autocapitalize="none"
-                      />
-                    </div>
-                  {/snippet}
-                </Form.Control>
-                <Form.FieldErrors class="text-xs" />
-              </Form.Field>
+            <div class={['grid grid-cols-1 gap-3', passwordSignup && 'sm:grid-cols-2']}>
+              {#if passwordSignup}
+                <Form.Field {form} name="username" class="space-y-1.5">
+                  <Form.Control>
+                    {#snippet children({ props })}
+                      <Form.Label>Username <span class="text-destructive">*</span></Form.Label>
+                      <div class="relative">
+                        <AtSign
+                          class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                          {...props}
+                          bind:value={$formData.username}
+                          placeholder="alice"
+                          class="pl-8"
+                          autocomplete="username"
+                          spellcheck="false"
+                          autocapitalize="none"
+                        />
+                      </div>
+                    {/snippet}
+                  </Form.Control>
+                  <Form.FieldErrors class="text-xs" />
+                </Form.Field>
+              {/if}
 
               <Form.Field {form} name="homeserver" class="space-y-1.5">
                 <Form.Control>
@@ -185,148 +193,180 @@
               </Form.Field>
             </div>
 
-            <p class="text-xs text-muted-foreground">
-              Handle preview: <span class="font-mono text-foreground">{handle}</span>
-            </p>
+            {#if passwordSignup}
+              <p class="text-xs text-muted-foreground">
+                Handle preview: <span class="font-mono text-foreground">{handle}</span>
+              </p>
+            {/if}
           </div>
 
-          <Form.Field {form} name="displayName" class="space-y-1.5">
-            <Form.Control>
-              {#snippet children({ props })}
-                <Form.Label>
-                  Display name <span class="text-muted-foreground">(optional)</span>
-                </Form.Label>
-                <div class="relative">
-                  <User
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    {...props}
-                    bind:value={$formData.displayName}
-                    placeholder="Alice"
-                    class="pl-8"
-                    autocomplete="nickname"
-                    maxlength={64}
-                  />
-                </div>
-              {/snippet}
-            </Form.Control>
-            <Form.FieldErrors class="text-xs" />
-          </Form.Field>
+          {#if passwordSignup}
+            <Form.Field {form} name="displayName" class="space-y-1.5">
+              <Form.Control>
+                {#snippet children({ props })}
+                  <Form.Label>
+                    Display name <span class="text-muted-foreground">(optional)</span>
+                  </Form.Label>
+                  <div class="relative">
+                    <User
+                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      {...props}
+                      bind:value={$formData.displayName}
+                      placeholder="Alice"
+                      class="pl-8"
+                      autocomplete="nickname"
+                      maxlength={64}
+                    />
+                  </div>
+                {/snippet}
+              </Form.Control>
+              <Form.FieldErrors class="text-xs" />
+            </Form.Field>
 
-          <Form.Field {form} name="email" class="space-y-1.5">
-            <Form.Control>
-              {#snippet children({ props })}
-                <Form.Label>Email <span class="text-destructive">*</span></Form.Label>
-                <div class="relative">
-                  <Mail
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    {...props}
-                    type="email"
-                    bind:value={$formData.email}
-                    placeholder="you@example.com"
-                    class="pl-8"
-                    autocomplete="email"
-                  />
-                </div>
-              {/snippet}
-            </Form.Control>
-            <Form.FieldErrors class="text-xs" />
-          </Form.Field>
+            <Form.Field {form} name="email" class="space-y-1.5">
+              <Form.Control>
+                {#snippet children({ props })}
+                  <Form.Label>Email <span class="text-destructive">*</span></Form.Label>
+                  <div class="relative">
+                    <Mail
+                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      {...props}
+                      type="email"
+                      bind:value={$formData.email}
+                      placeholder="you@example.com"
+                      class="pl-8"
+                      autocomplete="email"
+                    />
+                  </div>
+                {/snippet}
+              </Form.Control>
+              <Form.FieldErrors class="text-xs" />
+            </Form.Field>
 
-          <Form.Field {form} name="password" class="space-y-1.5">
-            <Form.Control>
-              {#snippet children({ props })}
-                <Form.Label>Password <span class="text-destructive">*</span></Form.Label>
-                <div class="relative">
-                  <Lock
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    {...props}
-                    type={showPassword ? 'text' : 'password'}
-                    bind:value={$formData.password}
-                    placeholder="At least 8 characters"
-                    class="pl-8 pr-8"
-                    autocomplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onclick={() => (showPassword = !showPassword)}
-                    class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    tabindex={-1}
-                  >
-                    {#if showPassword}
-                      <EyeOff class="size-4" />
-                    {:else}
-                      <Eye class="size-4" />
-                    {/if}
-                  </button>
-                </div>
-              {/snippet}
-            </Form.Control>
-            <Form.FieldErrors class="text-xs" />
-            {#if $formData.password.length >= 8}
-              <p class="flex items-center gap-1 text-xs text-emerald-400">
-                <CircleCheck class="size-3" />Looks good
-              </p>
+            <Form.Field {form} name="password" class="space-y-1.5">
+              <Form.Control>
+                {#snippet children({ props })}
+                  <Form.Label>Password <span class="text-destructive">*</span></Form.Label>
+                  <div class="relative">
+                    <Lock
+                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      {...props}
+                      type={showPassword ? 'text' : 'password'}
+                      bind:value={$formData.password}
+                      placeholder="At least 8 characters"
+                      class="pl-8 pr-8"
+                      autocomplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onclick={() => (showPassword = !showPassword)}
+                      class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      tabindex={-1}
+                    >
+                      {#if showPassword}
+                        <EyeOff class="size-4" />
+                      {:else}
+                        <Eye class="size-4" />
+                      {/if}
+                    </button>
+                  </div>
+                {/snippet}
+              </Form.Control>
+              <Form.FieldErrors class="text-xs" />
+              {#if $formData.password.length >= 8}
+                <p class="flex items-center gap-1 text-xs text-emerald-400">
+                  <CircleCheck class="size-3" />Looks good
+                </p>
+              {/if}
+            </Form.Field>
+
+            <Form.Field {form} name="confirmPassword" class="space-y-1.5">
+              <Form.Control>
+                {#snippet children({ props })}
+                  <Form.Label>Confirm password <span class="text-destructive">*</span></Form.Label>
+                  <div class="relative">
+                    <Lock
+                      class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      {...props}
+                      type={showPassword ? 'text' : 'password'}
+                      bind:value={$formData.confirmPassword}
+                      placeholder="Re-enter your password"
+                      class="pl-8"
+                      autocomplete="new-password"
+                    />
+                  </div>
+                {/snippet}
+              </Form.Control>
+              <Form.FieldErrors class="text-xs" />
+              {#if $formData.confirmPassword && $formData.confirmPassword === $formData.password}
+                <p class="flex items-center gap-1 text-xs text-emerald-400">
+                  <CircleCheck class="size-3" />Matches
+                </p>
+              {/if}
+            </Form.Field>
+
+            {#if server.info?.inviteOnly}
+              <Form.Field {form} name="inviteCode" class="space-y-1.5">
+                <Form.Control>
+                  {#snippet children({ props })}
+                    <Form.Label>Invite code <span class="text-destructive">*</span></Form.Label>
+                    <div class="relative">
+                      <Ticket
+                        class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <Input
+                        {...props}
+                        bind:value={$formData.inviteCode}
+                        placeholder="From the server's admins"
+                        class="pl-8"
+                        autocomplete="off"
+                        spellcheck="false"
+                        autocapitalize="none"
+                      />
+                    </div>
+                  {/snippet}
+                </Form.Control>
+                <p class="text-xs text-muted-foreground">
+                  {$formData.homeserver} is invite-only.
+                </p>
+                <Form.FieldErrors class="text-xs" />
+              </Form.Field>
             {/if}
-          </Form.Field>
 
-          <Form.Field {form} name="confirmPassword" class="space-y-1.5">
-            <Form.Control>
-              {#snippet children({ props })}
-                <Form.Label>Confirm password <span class="text-destructive">*</span></Form.Label>
-                <div class="relative">
-                  <Lock
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    {...props}
-                    type={showPassword ? 'text' : 'password'}
-                    bind:value={$formData.confirmPassword}
-                    placeholder="Re-enter your password"
-                    class="pl-8"
-                    autocomplete="new-password"
-                  />
-                </div>
-              {/snippet}
-            </Form.Control>
-            <Form.FieldErrors class="text-xs" />
-            {#if $formData.confirmPassword && $formData.confirmPassword === $formData.password}
-              <p class="flex items-center gap-1 text-xs text-emerald-400">
-                <CircleCheck class="size-3" />Matches
-              </p>
-            {/if}
-          </Form.Field>
-
-          <Form.Button class="w-full" size="lg" disabled={loading}>
-            {#if loading}
-              <LoaderCircle class="size-4 animate-spin" />
-              <span>Creating account…</span>
-            {:else}
-              <span>Create account</span>
-              <ArrowRight class="size-4" />
-            {/if}
-          </Form.Button>
+            <Form.Button class="w-full" size="lg" disabled={loading}>
+              {#if loading}
+                <LoaderCircle class="size-4 animate-spin" />
+                <span>Creating account…</span>
+              {:else}
+                <span>Create account</span>
+                <ArrowRight class="size-4" />
+              {/if}
+            </Form.Button>
+          {:else}
+            <p class="text-sm text-muted-foreground">
+              {$formData.homeserver} only creates accounts through single sign-on.
+            </p>
+          {/if}
 
           {#if submitError}
             <p class="text-sm text-destructive">{submitError}</p>
           {/if}
         </form>
 
-        <!--<div class="my-5 flex items-center gap-3">
-					<Separator class="flex-1" />
-					<span class="text-xs text-muted-foreground">or</span>
-					<Separator class="flex-1" />
-				</div>
-
-				<Button type="button" variant="outline" class="w-full" size="lg">
-					Continue with SSO
-				</Button>-->
+        <SsoButtons
+          homeServer={$formData.homeserver}
+          providers={server.info?.providers ?? []}
+          redirect={redirectParam ? safeRedirect(redirectParam) : '/guilds'}
+        />
       </Card.Content>
 
       <Card.Footer class="justify-center text-xs text-muted-foreground">

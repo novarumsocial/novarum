@@ -26,6 +26,8 @@
   } from '@lucide/svelte';
   import ConstellationBackground from '$lib/components/constellation-background.svelte';
   import { safeRedirect } from '$lib/safeRedirect';
+  import SsoButtons from '$lib/components/sso-buttons.svelte';
+  import { serverAuth } from '$lib/sso.svelte';
 
   const loginSchema = z.object({
     homeServer: z
@@ -111,6 +113,7 @@
   });
 
   const { form: formData, enhance } = form;
+  const server = serverAuth(() => $formData.homeServer);
 
   async function verifyMfa(event: SubmitEvent) {
     event.preventDefault();
@@ -443,15 +446,13 @@
           </form>
         {/if}
 
-        <!--<div class="my-5 flex items-center gap-3">
-					<Separator class="flex-1" />
-					<span class="text-xs text-muted-foreground">or</span>
-					<Separator class="flex-1" />
-				</div>
-
-				<Button type="button" variant="outline" class="w-full" size="lg">
-					Continue with SSO
-				</Button>-->
+        {#if !mfaChallenge}
+          <SsoButtons
+            homeServer={$formData.homeServer}
+            providers={server.info?.providers ?? []}
+            redirect={safeRedirect(redirectParam)}
+          />
+        {/if}
       </Card.Content>
 
       <Card.Footer class="justify-center text-xs text-muted-foreground">
