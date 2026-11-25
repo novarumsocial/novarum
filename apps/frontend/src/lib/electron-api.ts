@@ -36,6 +36,11 @@ export interface ElectronAPI {
   getVersion(): Promise<string>;
   /** Sets the dock / launcher unread badge; 0 clears it. */
   setBadgeCount(count: number): Promise<void>;
+  /**
+   * Opens a single sign-on page in its own window and resolves with the app URL the provider
+   * finally sends the user back to, or null if the window was closed first.
+   */
+  signOn(url: string): Promise<string | null>;
   /** `process.platform` from the main process, e.g. 'linux' | 'darwin' | 'win32'. */
   platform: string;
   /** The window boots hidden behind the launch updater, so it has no need for its own loader. */

@@ -55,6 +55,32 @@ function openExternalUrl(value: string) {
   if (url.protocol === 'http:' || url.protocol === 'https:') void shell.openExternal(url.href);
 }
 
+// the provider's pages run in their own window (no preload) until they redirect back into the app
+function signOn(sender: Electron.WebContents, url: string) {
+  return new Promise<string | null>((resolve) => {
+    if (!/^https?:$/.test(new URL(url).protocol)) return resolve(null);
+    const popup = new BrowserWindow({
+      parent: BrowserWindow.fromWebContents(sender) ?? undefined,
+      modal: true,
+      width: 520,
+      height: 720,
+      autoHideMenuBar: true,
+      webPreferences: { partition: 'persist:sso' },
+    });
+    const intercept = (event: Electron.Event, target: string) => {
+      if (!isInternalUrl(target)) return;
+      event.preventDefault();
+      resolve(target);
+      popup.destroy();
+    };
+    popup.webContents.on('will-redirect', intercept);
+    popup.webContents.on('will-navigate', intercept);
+    popup.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    popup.on('closed', () => resolve(null));
+    void popup.loadURL(url);
+  });
+}
+
 const prefsFile = path.join(app.getPath('userData'), 'launch-prefs.json');
 const defaultPrefs = { autoLaunch: false, startHidden: true, autoUpdate: true };
 const readPrefs = () => {
@@ -378,6 +404,7 @@ app.whenReady().then(async () => {
     });
   });
 
+  ipcMain.handle('sso:open', (event, url: string) => signOn(event.sender, url));
   ipcMain.handle('launch:get', readPrefs);
   ipcMain.handle('launch:set', (_event, prefs: { autoLaunch?: boolean; startHidden?: boolean }) => {
     const next = { ...readPrefs(), ...prefs };

@@ -1,6 +1,7 @@
 // Port of apps/frontend/src/lib/anchor.svelte.ts
 import { create } from 'zustand';
 import {
+  type AnchorAuthInfo,
   anchorUrlFromHomeServer,
   createAnchorClient,
   getAnchorInfo,
@@ -19,6 +20,7 @@ type AnchorState = {
   baseUrl: string;
   maxFileSize: number;
   maxGroupMembers: number;
+  auth: AnchorAuthInfo;
   client: ReturnType<typeof createAnchorClient>;
   setHomeServer: (homeServer: string) => Promise<void>;
   refreshInfo: () => Promise<void>;
@@ -29,6 +31,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
   baseUrl,
   maxFileSize: 10,
   maxGroupMembers: 30,
+  auth: { passwordSignup: true, inviteOnly: false, providers: [] },
   client: createAnchorClient(baseUrl),
 
   async setHomeServer(input) {
@@ -41,6 +44,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
       baseUrl,
       maxFileSize: info.maxFileSize,
       maxGroupMembers: info.maxGroupMembers,
+      auth: info.auth,
       client: createAnchorClient(baseUrl),
     });
     storage.set(homeServerStorageKey, homeServer);
@@ -58,6 +62,7 @@ export const useAnchor = create<AnchorState>((set, get) => ({
         baseUrl,
         maxFileSize: info.maxFileSize,
         maxGroupMembers: info.maxGroupMembers,
+        auth: info.auth,
         ...(baseUrl === get().baseUrl ? {} : { client: createAnchorClient(baseUrl) }),
       });
     } catch {

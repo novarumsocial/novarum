@@ -94,6 +94,53 @@ describe('getConfig', () => {
     ]);
   });
 
+  test('auth: password signups on, no invites, no providers by default', () => {
+    const c = load((c) => delete c.auth);
+    expect(c.auth.password_signup).toBe(true);
+    expect(c.auth.invite_only).toBe(false);
+    expect(c.auth.providers).toEqual({});
+    expect(c.auth.client_origins).toContain('https://app.novarum.me');
+  });
+
+  const oidc = {
+    name: 'Pocket ID',
+    issuer: 'https://id.example.test',
+    client_id: 'a',
+    client_secret: 'b',
+  };
+  const oauth2 = {
+    name: 'GitHub',
+    authorization_endpoint: 'https://github.com/login/oauth/authorize',
+    token_endpoint: 'https://github.com/login/oauth/access_token',
+    userinfo_endpoint: 'https://api.github.com/user',
+    client_id: 'a',
+    client_secret: 'b',
+  };
+
+  test('auth: OpenID Connect and plain OAuth 2 providers, with their defaults', () => {
+    const { providers } = load(
+      (c) => (c.auth = { providers: { pocketid: oidc, github: oauth2 } })
+    ).auth;
+    expect(providers.pocketid).toMatchObject({ scopes: ['openid', 'profile', 'email'] });
+    expect(providers.pocketid).toMatchObject({ trust_email: false });
+    expect(providers.github).toMatchObject({
+      trust_email: false,
+      subject_field: 'id',
+      username_field: 'login',
+      scopes: [],
+    });
+  });
+
+  test('auth: providers need https (except on localhost), credentials and a safe id', () => {
+    const withProvider = (id: string, provider: object) => () =>
+      load((c) => (c.auth = { providers: { [id]: provider } }));
+    expect(withProvider('local', { ...oidc, issuer: 'http://localhost:9000' })).not.toThrow();
+    expect(withProvider('plain', { ...oidc, issuer: 'http://id.example.test' })).toThrow();
+    expect(withProvider('half', { ...oauth2, token_endpoint: undefined })).toThrow();
+    expect(withProvider('nosecret', { ...oidc, client_secret: '' })).toThrow();
+    expect(withProvider('Bad Id', oidc)).toThrow();
+  });
+
   test('CORS: an explicit empty list or a non-url is rejected', () => {
     expect(() => load((c) => (c.files!.s3_cors_origins = []))).toThrow();
     expect(() => load((c) => (c.files!.s3_cors_origins = ['not a url']))).toThrow();

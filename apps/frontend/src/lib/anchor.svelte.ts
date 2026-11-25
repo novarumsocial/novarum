@@ -1,4 +1,5 @@
 import {
+  type AnchorAuthInfo,
   anchorUrlFromHomeServer,
   createAnchorClient,
   getAnchorInfo,
@@ -25,6 +26,7 @@ class AnchorState {
   baseUrl = $state(getInitialBaseUrl(this.homeServer));
   maxFileSize = $state(10);
   maxGroupMembers = $state(30);
+  auth = $state<AnchorAuthInfo>({ passwordSignup: true, inviteOnly: false, providers: [] });
   client = $derived(createAnchorClient(this.baseUrl));
 
   constructor() {
@@ -39,6 +41,7 @@ class AnchorState {
     this.baseUrl = info.baseUrl.replace(/\/+$/, '');
     this.maxFileSize = info.maxFileSize;
     this.maxGroupMembers = info.maxGroupMembers;
+    this.auth = info.auth;
     localStorage.setItem(homeServerStorageKey, normalizedHomeServer);
     localStorage.setItem(anchorBaseUrlStorageKey, this.baseUrl);
   }
@@ -49,6 +52,7 @@ class AnchorState {
       this.baseUrl = info.baseUrl.replace(/\/+$/, '');
       this.maxFileSize = info.maxFileSize;
       this.maxGroupMembers = info.maxGroupMembers;
+      this.auth = info.auth;
     } catch {
       // offline or unreachable — keep cached values
     }

@@ -75,7 +75,8 @@ export const localCredentials = pgTable('local_credential', {
     }),
 
   email: text('email').notNull().unique(),
-  passwordHash: text('passwordHash').notNull(),
+  // null once the user moved to single sign-on; a password reset sets one again
+  passwordHash: text('passwordHash'),
 
   totpSecret: bytea('totpSecret'),
   totpLastCounter: integer('totpLastCounter'),
@@ -83,6 +84,51 @@ export const localCredentials = pgTable('local_credential', {
     .array()
     .notNull()
     .default(sql`ARRAY[]::mfa_method[]`),
+});
+
+// an account at a single sign-on provider (config.toml `auth.providers`) that can log in as a user
+export const ssoIdentities = pgTable(
+  'sso_identity',
+  {
+    provider: text('provider').notNull(),
+    subject: text('subject').notNull(),
+    userId: text('userId')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    email: text('email'),
+    createdAt: date('createdAt').notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.subject] }),
+    unique('sso_identity_user_provider_unique').on(table.userId, table.provider),
+  ]
+);
+
+// one sign-on attempt: created by /auth/sso/authorize (id is the oauth state), filled in by the
+// callback with the provider's answer and a one-time `code` the client redeems with `verifier`
+export const ssoFlows = pgTable('sso_flow', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  pkceVerifier: text('pkceVerifier').notNull(),
+  nonce: text('nonce').notNull(),
+  redirectUri: text('redirectUri').notNull(),
+  verifier: text('verifier').notNull(),
+  // set when a logged in user is linking the provider instead of signing in
+  linkUserId: text('linkUserId').references(() => users.id, { onDelete: 'cascade' }),
+  code: text('code').unique(),
+  subject: text('subject'),
+  email: text('email'),
+  username: text('username'),
+  displayName: text('displayName'),
+  expiresAt: date('expiresAt').notNull(),
+});
+
+export const signupInvites = pgTable('signup_invite', {
+  code: text('code').primaryKey(),
+  maxUses: integer('maxUses'),
+  uses: integer('uses').notNull().default(0),
+  expiresAt: date('expiresAt'),
+  createdAt: date('createdAt').notNull().defaultNow(),
 });
 
 export const sessions = pgTable(

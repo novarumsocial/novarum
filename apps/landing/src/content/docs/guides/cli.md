@@ -18,6 +18,14 @@ docker exec -it anchor ./anchor cli <command> [options]
 
 This will allow access to the admin panel for the given user. Use carefully!
 
+## Signup invites
+
+With `invite_only = true` under `[auth]`, password sign-ups need one of these codes.
+
+- `create-signup-invite [--uses <n>] [--days <n>]`: prints a new code. Without options it never runs out or expires.
+- `list-signup-invites`: every code with its uses and expiry.
+- `revoke-signup-invite <code>`: deletes a code.
+
 ## Update migrations
 
 ### Computing avatar colors

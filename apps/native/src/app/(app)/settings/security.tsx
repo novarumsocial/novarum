@@ -15,6 +15,7 @@ import { Alert, Linking, View } from 'react-native';
 import { z } from 'zod';
 import { SettingsGroup, SettingsPage } from '@/components/settings-group';
 import { SettingsSwitchRow } from '@/components/settings-row';
+import { SettingsSso } from '@/components/settings-sso';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
@@ -85,6 +86,8 @@ export default function Security() {
   const [mfaLoaded, setMfaLoaded] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaError, setMfaError] = useState<string | null>(null);
+  // accounts made through single sign-on have no password, so no two-step verification of their own
+  const [passwordless, setPasswordless] = useState(false);
   const [mfaPassword, setMfaPassword] = useState('');
   const [emailMfaLoading, setEmailMfaLoading] = useState(false);
   const [totpState, setTotpState] = useState<'idle' | 'setup' | 'enabled' | 'error'>('idle');
@@ -300,7 +303,14 @@ export default function Security() {
         />
       </SettingsGroup>
 
-      {mfaLoading && !mfaLoaded ? (
+      <SettingsSso onPasswordless={setPasswordless} />
+
+      {passwordless ? (
+        <Text className="text-xs text-muted-foreground">
+          This account signs in through single sign-on, so two-step verification is up to your
+          sign-on provider.
+        </Text>
+      ) : mfaLoading && !mfaLoaded ? (
         <View className="flex-row items-center gap-2">
           <Spinner />
           <Text className="text-xs text-muted-foreground">Checking MFA status...</Text>

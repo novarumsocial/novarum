@@ -144,6 +144,11 @@ A few files must be created. Hopefully it's not much :')
     # optional, see below
     [network]
     proxy_url = "http://proxy:3128"
+
+    # optional, see "Sign-up and single sign-on" below
+    [auth]
+    password_signup = true
+    invite_only = false
     ```
 
     A few notes:
@@ -228,6 +233,46 @@ A few secrets must be generated:
     wire it up in the `config.toml` file for Anchor's database connection.
   </TabItem>
 </Tabs>
+
+## Sign-up and single sign-on
+
+Everything here lives under `[auth]` in `config.toml` and is optional.
+
+- `invite_only = true`: signing up with a password needs an invite code. Make codes with the [admin CLI](/guides/cli#signup-invites).
+- `password_signup = false`: nobody can sign up with a password. Existing password accounts still sign in.
+- `client_origins`: the apps a sign-on may return to. The default covers the official web, desktop and mobile apps (`https://app.novarum.me`, `app://novarum`, `https://localhost`, `http://localhost:5173`, `novarum://`). Add the origin of any self-hosted web client.
+
+Single sign-on providers go in `[auth.providers.<id>]`, where `<id>` is short and lowercase. People see `name` on the sign-in buttons. Register `https://<your anchor base_url>/auth/sso/callback` as the redirect/callback URL with each provider.
+
+```toml
+# OpenID Connect (Pocket ID, Authentik, Keycloak, Authelia, Google, ...): only the issuer is needed
+[auth.providers.pocketid]
+name = "Pocket ID"
+issuer = "https://id.piedpiper.com"
+client_id = "..."
+client_secret = "..."
+# scopes = ["openid", "profile", "email"]
+
+# plain OAuth 2 (GitHub and the like): the endpoints, plus which userinfo fields hold the id and username
+[auth.providers.github]
+name = "GitHub"
+authorization_endpoint = "https://github.com/login/oauth/authorize"
+token_endpoint = "https://github.com/login/oauth/access_token"
+userinfo_endpoint = "https://api.github.com/user"
+# GitHub only shows a public email at /user; the real (verified) ones are here
+emails_endpoint = "https://api.github.com/user/emails"
+client_id = "..."
+client_secret = "..."
+scopes = ["read:user", "user:email"]
+# subject_field = "id"
+# username_field = "login"
+```
+
+A first sign-on asks the person to pick a username and creates a new account. Every account keeps an email on file, so a new account needs a **verified** email from the provider (`email_verified` in OpenID Connect, the primary verified address from `emails_endpoint`, or `email_verified`/`verified` in a plain OAuth 2 userinfo response). Without one, the sign-up is refused. For a provider that never marks emails verified but that you trust, set `trust_email = true` on it.
+
+Accounts are never merged by email: when the provider's email already belongs to an account, the sign-up is refused and the person is told to sign in and link the provider instead. Signed-in users link and unlink providers under Settings → Privacy & security. Once one is linked, they can also remove their password there. Their email stays on file, so a password reset brings a password back. Removing the password also turns off two-step verification, which only protects password sign-ins.
+
+Invite-only mode applies only to password sign-ups, so anyone who can sign in with a configured provider can make an account. Providers must use `https`, except on `localhost`.
 
 ## Ports and locations
 

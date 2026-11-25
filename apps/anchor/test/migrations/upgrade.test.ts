@@ -350,6 +350,45 @@ const specs: Record<string, Spec> = {
       ).toHaveLength(1);
     },
   },
+  '20261124192916_sso_and_signup_invites': {
+    check: async (url) => {
+      // the new tables start empty, and an identity or pending flow goes away with its user
+      for (const table of ['sso_identity', 'sso_flow', 'signup_invite']) {
+        expect(await rows(url, `SELECT 1 FROM ${table}`)).toHaveLength(0);
+      }
+      await query(
+        url,
+        `INSERT INTO "user" (id, username, "homeserverName", "isBot", "createdAt", "updatedAt") VALUES ('u9', 'sso', 'localhost', false, now(), now())`
+      );
+      await query(
+        url,
+        `INSERT INTO sso_identity (provider, subject, "userId") VALUES ('pocketid', 'sub-1', 'u9')`
+      );
+      await query(
+        url,
+        `INSERT INTO sso_flow (id, provider, "pkceVerifier", nonce, "redirectUri", verifier, "linkUserId", "expiresAt") VALUES ('f1', 'pocketid', 'p', 'n', 'novarum://sso', 'v', 'u9', now())`
+      );
+      await query(url, `DELETE FROM "user" WHERE id = 'u9'`);
+      expect(await rows(url, `SELECT 1 FROM sso_identity`)).toHaveLength(0);
+      expect(await rows(url, `SELECT 1 FROM sso_flow`)).toHaveLength(0);
+    },
+  },
+  '20261124204644_optional_password': {
+    check: async (url) => {
+      // existing passwords are kept, and a credential can now hold just the email
+      expect(
+        await rows(url, `SELECT 1 FROM local_credential WHERE "passwordHash" IS NULL`)
+      ).toHaveLength(0);
+      await query(url, `UPDATE local_credential SET "passwordHash" = NULL WHERE "userId" = 'u3'`);
+      expect(
+        await rows(
+          url,
+          `SELECT 1 FROM local_credential WHERE "userId" = 'u3' AND email = 'u3@example.test'`
+        )
+      ).toHaveLength(1);
+      expect(await rows(url, `SELECT 1 FROM sso_identity WHERE "userId" = 'u3'`)).toHaveLength(1);
+    },
+  },
 };
 
 describe('step-wise upgrade with data', () => {

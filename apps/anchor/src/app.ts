@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import { getConfig } from '../utils/config';
 import { wellKnown } from '../modules/well-known/services';
 import { auth } from '../modules/auth/services';
+import { sso } from '../modules/auth/sso';
 import { guilds } from '../modules/guilds/services';
 import { realtime } from '../modules/realtime/services';
 import { channel } from '../modules/channel/services';
@@ -55,6 +56,7 @@ export const createApp = () =>
     )
     .use(wellKnown)
     .use(auth)
+    .use(sso)
     .use(guilds)
     .use(realtime)
     .use(channel)

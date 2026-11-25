@@ -58,6 +58,7 @@
   import QRCode from 'qrcode';
   import { cn } from '$lib/utils';
   import SettingsGroup from './settings-group.svelte';
+  import SettingsSso from './settings-sso.svelte';
   import SettingsRow from './settings-row.svelte';
   import SettingsDevices from './settings-devices.svelte';
   import MicTest from './mic-test.svelte';
@@ -102,6 +103,8 @@
   let activeTab = $state('account');
   let mfaOptions = $state<('EMAIL' | 'TOTP')[]>([]);
   let mfaLoaded = $state(false);
+  // accounts made through single sign-on have no password, so no two-step verification of their own
+  let passwordless = $state(false);
   let mfaLoading = $state(false);
   let mfaError = $state<string | null>(null);
   let mfaPassword = $state('');
@@ -974,7 +977,14 @@
               </SettingsRow>
             </SettingsGroup>
 
-            {#if mfaLoading && !mfaLoaded}
+            <SettingsSso onPasswordless={(value) => (passwordless = value)} />
+
+            {#if passwordless}
+              <p class="text-xs text-muted-foreground">
+                This account signs in through single sign-on, so two-step verification is up to your
+                sign-on provider.
+              </p>
+            {:else if mfaLoading && !mfaLoaded}
               <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
               <span class="text-xs text-muted-foreground">Checking MFA status...</span>
             {:else if !mfaLoaded}

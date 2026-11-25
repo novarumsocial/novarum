@@ -2,12 +2,16 @@ import { defineRelations } from 'drizzle-orm';
 import * as schema from './schema';
 
 export const relations = defineRelations(schema, (r) => ({
+  ssoIdentities: {
+    user: r.one.users({ from: r.ssoIdentities.userId, to: r.users.id, optional: false }),
+  },
   users: {
     localCredential: r.one.localCredentials({
       from: r.users.id,
       to: r.localCredentials.userId,
     }),
     sessions: r.many.sessions({ from: r.users.id, to: r.sessions.userId }),
+    ssoIdentities: r.many.ssoIdentities({ from: r.users.id, to: r.ssoIdentities.userId }),
     ownedGuilds: r.many.guilds({ from: r.users.id, to: r.guilds.ownerId }),
     guildMemberships: r.many.guildMembers({ from: r.users.id, to: r.guildMembers.userId }),
     messages: r.many.messages({ from: r.users.id, to: r.messages.authorId }),

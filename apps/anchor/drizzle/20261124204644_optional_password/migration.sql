@@ -1,0 +1,1 @@
+ALTER TABLE "local_credential" ALTER COLUMN "passwordHash" DROP NOT NULL;

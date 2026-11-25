@@ -2,6 +2,40 @@ import { TOML } from 'bun';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
+const endpoint = z
+  .url()
+  .refine((url) => /^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url), {
+    error: 'must be https (http is only allowed for localhost)',
+  });
+
+const ssoProviderSchema = z.union([
+  // OpenID Connect: everything is discovered from the issuer
+  z.object({
+    name: z.string().min(1),
+    issuer: endpoint,
+    client_id: z.string().min(1),
+    client_secret: z.string().min(1),
+    scopes: z.array(z.string()).optional().default(['openid', 'profile', 'email']),
+    // take the email even when the provider doesn't mark it verified (for providers that never do)
+    trust_email: z.boolean().optional().default(false),
+  }),
+  // plain OAuth 2 (GitHub and the like): the identity comes from the userinfo endpoint
+  z.object({
+    name: z.string().min(1),
+    authorization_endpoint: endpoint,
+    token_endpoint: endpoint,
+    userinfo_endpoint: endpoint,
+    client_id: z.string().min(1),
+    client_secret: z.string().min(1),
+    scopes: z.array(z.string()).optional().default([]),
+    subject_field: z.string().optional().default('id'),
+    username_field: z.string().optional().default('login'),
+    // a GitHub-style list of { email, primary, verified }, for providers that keep emails apart
+    emails_endpoint: endpoint.optional(),
+    trust_email: z.boolean().optional().default(false),
+  }),
+]);
+
 const schema = z.object({
   server: z.object({
     database_url: z.string().regex(/^postgresql:\/\/.*$/),
@@ -92,14 +126,12 @@ const schema = z.object({
       enabled: z.boolean().optional().default(true),
       max_per_user: z.number().int().nonnegative().optional().default(25),
     })
-    .optional()
     .prefault({}),
   dms: z
     .object({
       // bots count towards this too
       max_group_members: z.number().int().min(3).optional().default(30),
     })
-    .optional()
     .prefault({}),
   network: z
     .object({
@@ -107,6 +139,28 @@ const schema = z.object({
     })
     .optional()
     .default({}),
+  auth: z
+    .object({
+      password_signup: z.boolean().optional().default(true),
+      // password signups need a code made with the `create-signup-invite` cli command
+      invite_only: z.boolean().optional().default(false),
+      // where a single sign-on flow may send the user back to (prefix match, per path segment)
+      client_origins: z
+        .array(z.string().regex(/^[a-z][a-z0-9+.-]*:\/\/[^\s]*$/))
+        .optional()
+        .default([
+          'https://app.novarum.me',
+          'app://novarum',
+          'https://localhost',
+          'http://localhost:5173',
+          'novarum://',
+        ]),
+      providers: z
+        .record(z.string().regex(/^[a-z0-9_-]{1,32}$/), ssoProviderSchema)
+        .optional()
+        .default({}),
+    })
+    .prefault({}),
 });
 
 export type Config = z.infer<typeof schema>;
